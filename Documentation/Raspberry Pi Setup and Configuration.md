@@ -9,7 +9,7 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
 **Necessary & Recommended Components:**
 
 - A raspberry Pi 4 and a Pi 5 with at least 4 GB of memory (8 GB recommend for the Pi 5\)  
-- A Micro SD card with at least 64Gig  
+- A Micro SD card with at least 64GB of memory  
 - Especially if you are planning on using the larger Pi 5 as a development environment, an NVMe hat with an NVMe SSD drive is a great investment.  
 - Power supplies for the Pi’s  
 - Network cabling if using the Pi’s wired ethernet port (recommended \- some of the packages we’ll be downloading are large and slow over WiFi)  
