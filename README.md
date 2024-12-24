@@ -1,5 +1,8 @@
 **Introduction to PiTrac:**
 
+- [Introduction](#introducing-pitrac)
+
+## Introducing PiTrac
 Introducing [PiTrac](https://hackaday.io/project/195042-pitrac-the-diy-golf-launch-monitor) \- the world’s first (free\!) open-source golf launch monitor (as far as we know). 
 
 ![image](https://github.com/user-attachments/assets/fbdc9825-b340-47b5-83ad-6c58d4588f34)
