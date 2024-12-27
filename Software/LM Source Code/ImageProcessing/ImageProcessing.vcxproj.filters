@@ -1,0 +1,615 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="lm_main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="golf_ball.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="logging_tools.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cv_utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="colorsys.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ball_image_proc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="camera_hardware.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_camera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="EllipseDetectorYaed.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="EllipseDetectorCommon.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_fsm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="libcamera_interface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_events.h">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_events.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ball_watcher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="libcamera_jpeg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="worker_thread.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_options.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_globals.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_ipc_message.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_ipc_mat.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_message_consumer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_ipc_system.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_message_producer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ball_watcher_image_buffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="post_processing_stages\motion_detect_stage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pulse_strobe.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_ipc_result.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_results.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_config.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_ui_system.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_gspro_results.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_ipc_test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_sim_interface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_gspro_interface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_gspro_test_server.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_gspro_response.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ED.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="EDColor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="EDPF.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_clubs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_ipc_control_msg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_e6_interface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_e6_results.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_sim_socket_interface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="core\dma_heaps.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="core\options.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="core\post_processor.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="core\rpicam_app.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="encoder\encoder.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="encoder\h264_encoder.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="encoder\libav_encoder.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="encoder\mjpeg_encoder.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="encoder\null_encoder.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="image\bmp.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="image\dng.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="image\jpeg.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="image\png.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="image\yuv.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="output\circular_output.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="output\file_output.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="output\net_output.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="output\output.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="post_processing_stages\annotate_cv_stage.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="post_processing_stages\face_detect_cv_stage.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="post_processing_stages\hdr_stage.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="post_processing_stages\histogram.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="post_processing_stages\negate_stage.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="post_processing_stages\object_classify_tf_stage.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="post_processing_stages\object_detect_draw_cv_stage.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="post_processing_stages\object_detect_tf_stage.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="post_processing_stages\plot_pose_cv_stage.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="post_processing_stages\pose_estimation_tf_stage.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="post_processing_stages\post_processing_stage.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="post_processing_stages\pwl.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="post_processing_stages\segmentation_tf_stage.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="post_processing_stages\sobel_cv_stage.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="post_processing_stages\tf_stage.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="preview\drm_preview.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="preview\egl_preview.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="preview\null_preview.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="preview\preview.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="preview\qt_preview.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_e6_response.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="golf_ball.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="logging_tools.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cv_utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="colorsys.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ball_image_proc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_globals.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="camera_hardware.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_camera.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="EllipseDetectorCommon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="EllipseDetectorYaed.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_fsm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="libcamera_interface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ball_watcher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="still_image_libcamera_app.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="blocking_queue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="worker_thread.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_options.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_ipc_message.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_ipc_mat.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_message_consumer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_ipc_system.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_message_producer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ball_watcher_image_buffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pulse_strobe.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_ipc_result.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_results.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_ui_system.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_gspro_results.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_ipc_test.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_sim_interface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_gspro_interface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_gspro_test_server.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_gspro_response.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="post_processing_stages\post_processing_stage.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ED.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="EDPF.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="EDColor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_clubs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_ipc_control_msg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_e6_interface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_e6_results.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_sim_socket_interface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_e6_response.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\buffer_sync.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\completed_request.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\dma_heaps.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\frame_info.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\lc_logging.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\libcamera_encoder.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\logging.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\metadata.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\options.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\post_processor.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\rpicam_app.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\rpicam_encoder.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\still_options.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\stream_info.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\version.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\video_options.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="encoder\encoder.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="encoder\h264_encoder.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="encoder\libav_encoder.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="encoder\mjpeg_encoder.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="encoder\null_encoder.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="image\image.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="output\circular_output.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="output\file_output.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="output\net_output.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="output\output.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="post_processing_stages\histogram.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="post_processing_stages\object_detect.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="post_processing_stages\pwl.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="post_processing_stages\segmentation.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="post_processing_stages\tf_stage.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="preview\preview.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gs_format_lib.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="golfsim_tomee_webapp\src\main\java\com\verdanttechs\jakarta\ee9\HelloServlet.java">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="golfsim_tomee_webapp\src\main\java\com\verdanttechs\jakarta\ee9\MonitorServlet.java">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="golfsim_tomee_webapp\src\main\webapp\WEB-INF\gs_dashboard.jsp">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="golf_sim_config.json">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="golfsim_tomee_webapp\src\main\webapp\index.html">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="meson.build">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="core\meson.build">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="core\version.cmake">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="core\version.cpp.in">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="encoder\meson.build">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="image\meson.build">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="output\meson.build">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="post_processing_stages\meson.build">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="preview\meson.build">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="imx296_noir.json">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="motion_detect.json">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="CameraTools\imx296_noir.json" />
+    <None Include="CameraTools\lc.sh" />
+    <None Include="CameraTools\lcGS.sh" />
+    <None Include="CameraTools\lcHQ.sh" />
+    <None Include="CameraTools\lcV2.sh" />
+    <None Include="CameraTools\preview.sh" />
+    <None Include="CameraTools\previewGS.sh" />
+    <None Include="CameraTools\previewGS_noir.sh" />
+    <None Include="CameraTools\previewV2.sh" />
+    <None Include="CameraTools\previewV2_640.sh" />
+    <None Include="CameraTools\rcGS.sh" />
+    <None Include="CameraTools\rcPi4GS.sh" />
+    <None Include="CameraTools\rcPi5GS.sh" />
+    <None Include="CameraTools\setCameraCropModes.sh" />
+    <None Include="CameraTools\setCameraTriggerExternal.sh" />
+    <None Include="CameraTools\setCameraTriggerInternal.sh" />
+    <None Include="CameraTools\take_calibration_shots.sh" />
+    <None Include="RunScripts\runCam1.sh" />
+    <None Include="RunScripts\runCam1BallLocation.sh" />
+    <None Include="RunScripts\runCam1Calibration.sh" />
+    <None Include="RunScripts\runCam1ExternalStrobe.sh" />
+    <None Include="RunScripts\runCam1Still.sh" />
+    <None Include="RunScripts\runCam1Test.sh" />
+    <None Include="RunScripts\runCam2.sh" />
+    <None Include="RunScripts\runCam2BallLocation.sh" />
+    <None Include="RunScripts\runCam2Calibration.sh" />
+    <None Include="RunScripts\runCam2Still.sh" />
+    <None Include="RunScripts\runPiTracCommon.sh" />
+    <None Include="RunScripts\runPulseTest.sh" />
+    <None Include="RunScripts\runShutdown.sh" />
+    <None Include="RunScripts\runTestExternalSimMessage.sh" />
+    <None Include="RunScripts\runTestGsProServer.sh" />
+    <None Include="RunScripts\runTestResults.sh" />
+    <None Include="RunScripts\runTestSpin.sh" />
+    <None Include="RunScripts\shutdown_gs.sh" />
+    <None Include="create_closed_source_objects.sh" />
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="golfsim_tomee_webapp\pom.xml">
+      <Filter>Resource Files</Filter>
+    </Xml>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="core\CMakeLists.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="encoder\CMakeLists.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="image\CMakeLists.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="output\CMakeLists.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="post_processing_stages\CMakeLists.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="preview\CMakeLists.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+  </ItemGroup>
+</Project>

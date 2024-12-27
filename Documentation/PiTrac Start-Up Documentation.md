@@ -25,7 +25,9 @@ If you are at this point, you should have PiTrac compiled on both Pi’s, your e
    1. If you can’t see the red pulses, check first to see if the little red LED on the Connector Board is pulsing.  If it is, but there is no strobe-light pulses, it’s likely one or more of the following problems:  
       1. The power-supply to the Connector Board is not connected correctly  
       2. The wiring from the output of the Connector Board to the LED strobe assembly not connected correctly  
-5. Camera 2 Shutter Triggering  
+5. You’ll have to hit Ctrl-C to stop the pulse test.  
+6. **WARNING** \- Double-check after stopping the test that the LED is OFF (and not showing any red color\!)  
+7. Camera 2 Shutter Triggering  
    1. When the system is running normally, the shutter for Camera 2 is triggered by a pulse from the Pi 1\.  The correct functioning of this signal pathway should be confirmed before starting the system in full.  
    2. To check the triggering, we will set the Pi 2 camera in an “external” triggering mode, where its shutter is controlled by the XTR signal that is sent to the camera from Pi 1 through the connector board.  
    3. On the Pi 2, cd $PITRAC\_ROOT/ImageProcessing  
@@ -38,8 +40,9 @@ If you are at this point, you should have PiTrac compiled on both Pi’s, your e
    9. As soon as the Pi 1 script starts sending pulses to the Camera 2 (as well as pulses to the LED strobe array), the Camera 2 program that is running should take a picture.  Of course, the resulting picture is likely to be pretty dark if you have the IR filter on it.  
    10. Finally, return the triggering to internal on the Pi 2:  
        1. $PITRAC\_ROOT/CameraTools/setCameraTriggerInternal.sh  
-6. Full System Startup  
+8. Full System Startup  
    1. To run PiTrac, just start the runCam1.sh on Pi 1 and runCam2.sh on Pi 2\.  At least the Pi 2 executable should be run with \=info or hight (e.g., warning).  Setting the Pi 2 executable at DEBUG or TRACE may slow the system down so much that it will not reliably take the images quickly enough to catch the flight of the golf ball.  
-   2. Generally start the Pi 2 executable first to ensure it’s ready to take strobed images as soon as the Pi 1 system comes up.
+   2. Generally start the Pi 2 executable first to ensure it’s ready to take strobed images as soon as the Pi 1 system comes up.  
+   3. For problems, please see the still-under-construction troubleshooting guide here.
 
   

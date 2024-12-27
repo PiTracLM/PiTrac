@@ -1,0 +1,13 @@
+p.monitor_text {
+    /* sets the font size to 24 points */
+    font-size: 24pt;
+    font-family: Arial;
+}
+
+#rcorners1 {
+  border-radius: 25px;
+  border: 2px solid #73AD21;
+  padding: 20px;
+  width: 200px;
+  height: 150px;
+}

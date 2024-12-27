@@ -32,8 +32,6 @@
 
 ## Summary
 
-**THIS DOCUMENT IS STILL UNDER CONSTRUCTION \- CHECK BACK LATER**
-
 These instructions are targeted toward folks who do not have a lot of experience building software systems in the Pi Operating System and who could benefit from more step-by-step direction. Someone who’s familiar with using tools like meson and ninja to build software can likely skip over many of these steps. However, the instructions contain a number of idiosyncratic steps and configuration requirements that are particular to PiTrac.
 
 These instructions start with a Raspberry Pi with nothing on it, and are meant to describe all the steps to get from that point to a working, compiled version of PiTrac.  PiTrac currently requires two Raspberry Pi’s, so the majority of these instructions will have to be repeated twice.  Because the ‘smaller’ Pi system that connects to Camera 2 is the only Pi that handles the Tomcat/Tomee web-based GUI for the system, there are a few more steps for that system.
@@ -529,15 +527,15 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
 
 26. **Build the PiTrac Launch Monitor\!**  
     1. Download the PiTrac repository, including the source code under the “Software” subdirectory if you haven’t already  
-       1. We usually use a subdirectory called \~/Dev under the home directory of the PiTrac user.  
+       1. We usually use a subdirectory called \~/Dev under the home directory of the PiTrac user to house any cloned repositories.  You will probably use an equivalent directory in the current GitHub repo, e.g., PiTrac/Software  
        2. You can do the copy by going to github and downloading the .zip  file, or from the command-line on the Pi using something like:  
-          1. cd \~\!/Dev  
+          1. cd \~/Dev  
           2. git clone https://github.com/jamespilgrim/PiTrac.git  
        3. NOTE \- If you do you plan to do any code changes, you may want to create a fork from the main repository and then clone that into your Pi.  
     2. Install Remaining Prerequisites and Setup Environment:  
        1. Setup the PITRAC\_ROOT environment variable to point to the “Software” directory of the PiTrac build.  That is one directory “up” from the “ImageProcessing” directory that contains the main PiTrac meson.build file.  
           1. E.g., include in your .zshrc or .bashrc or whatever shell you use:  
-             1. export PITRAC\_ROOT=/Dev/PiTrac/Software  
+             1. export PITRAC\_ROOT=/Dev/PiTrac/Software/LM Source Code  
        2. sudo apt-get \-y install libraspberrypi-dev raspberrypi-kernel-headers  
        3. Add extended timeout to  rpi\_apps.yaml file so that even if an external trigger doesn’t fire for a really long time, the libcamera library won’t time-out:  
           1. (**NOTE** for Pi 5, use /usr/share/libcamera/pipeline/rpi/pisp instead of /usr/share/libcamera/pipeline/rpi/vc4, below)  
@@ -554,13 +552,14 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
              8. "camera\_timeout\_value\_ms": 1000000,  
           5. The first file deals with the local file from the libcamera build, and the second one is the for libcamera that is installed with the O/S.  We will set both, just in case.  
        2. Get the latest imx296\_noir.json into /usr/share/libcamera/ipa/rpi/pisp  
+          1. For the Pi 4:  
+             1. sudo cp imx296\_noir.json /usr/share/libcamera/ipa/rpi/vc4  
+          2. For the Pi 5:  
+             1. sudo cp imx296\_noir.json /usr/share/libcamera/ipa/rpi/pisp  
     2. Go to the directory called ImageProcessing in whatever directory path you will be using to compile.  E.g.,   
        1. cd $PITRAC\_ROOT/ImageProcessing  
     3. meson setup build  
-       1. **~~NOTE \- (Pi4-Specific)~~** ~~\- If compiling on a Pi 4, add the following build flag:~~  
-          1. ~~meson setup build \-Denable\_compile\_on\_pi4=true~~  
-       2. ~~TBD \- This requirement should go away once we have the latest rpicam-app code integrated into the system.~~  
-       3. If there are any missing libraries, ensure that the pre-requisites were all successfully built and installed and that any corresponding pkgconfig files were created correctly per the steps above.  
+       1. If there are any missing libraries, ensure that the pre-requisites were all successfully built and installed and that any corresponding pkgconfig files were created correctly per the steps above.  
     4. ninja \-C build       (add \-j 2 if compiling in 4GB or less)  
     5. If the build completes successfully, try a quick sanity check to ensure that any shared libraries are correctly linked at that the PiTrac application can at least run:  
        1. build/pitrac\_lm –help  
@@ -571,10 +570,13 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
 26. First, make sure you’ve setup the required IP and directory values in the golf\_sim\_config.json file.  Instructions are [here](https://github.com/jamespilgrim/PiTrac/blob/main/Documentation/PiTrac%20configuration%20and%20the%20golf_sim_config.json%20file.md).  
     1. The value tells the web-based PiTrac GUI where to look for the .json configuration file, which the GUI in turn uses to know where to look for certain shared image files.  
 27. Setup the PiTrac-specific code package for the PiTrac GUI on the Tomee server  
-    1. cd \~  
-    2. mkdir WebAppDev  
-    3. cd WebAppDev  
-    4. vi refresh\_from\_dev.sh     (a new file) and put this in it:  
+    1. Log into the Pi 2 computer where the Tomee instance is running  
+    2. Make sure Tomee is running:  
+       1. sudo systemctl status tomee   (hit ‘q’ to exit)  
+    3. cd \~/Dev   (or whatever the root of your development environment is)  
+    4. mkdir WebAppDev  
+    5. cd WebAppDev  
+    6. vi refresh\_from\_dev.sh     (a new file) and put this in it:  
        1. \# After running this script, then do a "mvn package" to compile and then  
        2. \# /opt/tomee/bin/restart.sh  
        3. mkdir \-p src/main/{webapp/WEB-INF,java/com/verdanttechs/jakarta/ee9}  
@@ -584,21 +586,31 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
        7. cp $PITRAC\_ROOT//ImageProcessing/golfsim\_tomee\_webapp/pom.xml .  
        8. \# Also pull over the current .json configuration file to make sure that the webapp is looking at the correct version.  
        9. cp $PITRAC\_ROOT//ImageProcessing/golf\_sim\_config.json  \~/LM\_Shares/GolfSim\_Share/  
-    2. Tell the MonitorServlet where to find its configuration file  
+    2. Run the new script to bring over the java and other web-based GUI files:   
+       1. . ./refresh\_from\_dev.sh  
+       2. NOTE that the above script will also move a copy of the golf\_sim\_config.json file into the shared directory that the GUI can access in order to get information about its run-time environment.  
+    3. Tell the MonitorServlet where to find its configuration file  
        1. vi ./src/main/webapp/index.html  
        2. Change the FPITRAC\_USERNAME to be whatever the PiTrac user’s name is on the system.  That line in the index.html file tells the java servlet where to find the json configuration file.  
           1. Alternatively, you can just create a browser bookmark to point to the servlet with the correct filename  
     2. Create the “.war” package for Tomee  
        1. mvn package  
        2. NOTE:  The first time this is performed, it will take a few minutes to gather up all the required packages from the internet  
-       3. This process will create a “golfsim.war” file in the “target” directory.  That file will then have to be “deployed” into tomee by using the manager console at http://\<Pi-with-Tomee\>:8080/manager/html  
-       4. Copy the .war file to a place that is visible from where the browser is logged into the tomee console.  
-       5. Select “Choose File” in the section in the console labeled “WAR file to deploy”.  Select the .war file and then wait a moment until it’s name is displayed.  Then push the “Deploy” button.  
-       6. In a moment, the “golfsim” app should show up on the list.  Click it.  
-       7. If you get a “HTTP Status 404 – Not Found” error, try:  
+       3. This process will create a “golfsim.war” file in the “target” directory.  That file will then have to be “deployed” into tomee by using the manager console at http://\<Name-or-IP-address-of-Pi-with-Tomee\>:8080/manager/html  
+       4. Your browser should have a window titled “Tomcat Web Application Manager”.  You may have to use the default login of tomcat/tomcat  
+       5. Copy the .war file to a place that is visible on the computer from where your browser is logged into the tomee console.  
+       6. Select “Choose File” in the section in the Tomee manager console labeled “WAR file to deploy”.  Select the .war file and then wait a moment until it’s name is displayed.  Then push the “Deploy” button.  
+       7. In a moment, the “golfsim” app should show up on the list.  Click it.  
+       8. If you get a “HTTP Status 404 – Not Found” error, try:  
           1. cd /opt/tomee/webapps  
           2. sudo chmod \-R 777 golfsim  
-          3. sudo systemctl restart tomee  (the first error will ‘stick’ otherwise)r
+          3. sudo systemctl restart tomee  (the first error will ‘stick’ otherwise)  
+       9. Alternatively, you can just manually move the .war file into place and Tomee should pick it up.  Wait 30 seconds or so after doing this to give Tomee a moment to see the new war file and deploy it.  
+          1. cd /opt/tomee/webapps  
+          2. sudo cp \~/Dev/WebAppDev/target/golfsim.war .  
+       10. Confirm you can see the PiTrac GUI by entering the following into your browser:  
+           1. http://\<The-Pi-2-name-or-IP\>:8080/golfsim/monitor?config\_filename=%2Fhome%2Fmleary%2FLM\_Shares/%2FGolfSim\_Share%2Fgolf\_sim\_config.json  
+       11. You should see the PiTrac GUI
 
 **CONGRATULATIONS\!** \- At this point, you’ve (hopefully) built the PiTrac software.  Please see the [Startup Documentation](https://github.com/jamespilgrim/PiTrac/blob/main/Documentation/PiTrac%20Start-Up%20Documentation.md) for how to get PiTrac working\!
 

@@ -1,0 +1,20 @@
+{
+	"Color": "EEEEEEB3",
+	"StatBackgroundColor": "000000CC",
+	"TextColor1": "ffffffff",
+	"TextColor2": "00000000",
+	"TextColor3": "8c8c8cff",
+	"Image1": "Hardware",
+	"Logo": "PiTracImagesPath",
+	"PiTracImagesPath": "c:/TruGolf/Tracking/TruSimAPI/Images/PiTrac_Logo_256x50.png",
+	"Hardware": "Tracking/TruSimAPI/Images/trugolf_postShot.jpg",
+	"Stat2": [ "Distance", "DISTANCE", "Unit_yards", "b42025ff" ],
+	"Stat3": [ "Carry", "CARRY", "Unit_yards" ],
+	"Stat4": [ "LaunchAngle", "LAUNCH ANGLE", "Unit_degrees" ],
+	"Stat5": [ "BallSpeed", "BALL SPEED", "Unit_mph" ],
+	"Stat20": [ "BackSpin", "BACK SPIN", "Unit_rpm" ],
+	"Stat21": [ "SideSpin", "SIDE SPIN", "Unit_rpm" ],
+	"Stat27": [ "LaunchDirection", "DIRECTION", "Left" ],
+	"Stat28": [ "SmashFactor", "SMASH FACTOR", " " ],
+	"LargeStat6": [ "ShotNumber", "SHOT #", " " ]
+} 

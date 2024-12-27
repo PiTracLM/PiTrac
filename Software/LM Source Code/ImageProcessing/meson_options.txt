@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Copyright (C) 2022-2025, Verdant Consultants, LLC.
+#
+
+option('enable_compile_on_pi4',
+        type : 'boolean',
+        value : false,
+        description : 'Prevents libcamera & rpicam-related compile problems when compiling on Pi 4')
+
+option('enable_recompile_closed_source',
+        type : 'boolean',
+        value : false,
+        description : 'Only for PiTrac Admin - Compiles new object file for closed-source code')
+
+option('enable_libav',
+        type : 'boolean',
+        value : true,
+        description : 'Enable the libav encoder for video/audio capture')
+
+option('enable_drm',
+        type : 'boolean',
+        value : true,
+        description : 'Enable DRM preview window support')
+
+option('enable_egl',
+        type : 'boolean',
+        value : true,
+        description : 'Enable EGL preview window support')
+
+option('enable_qt',
+        type : 'boolean',
+        value : true,
+        description : 'Enable QT preview window support')
+
+option('enable_opencv',
+        type : 'boolean',
+        value : true,
+        description : 'Enable OpenCV postprocessing support')
+
+option('enable_tflite',
+        type : 'boolean',
+        value : false,
+        description : 'Enable Tensorflow Lite postprocessing support')
+
+option('neon_flags',
+        type : 'combo',
+        choices: ['arm64', 'armv8-neon', 'auto'],
+        value : 'auto',
+        description : 'User selectable arm-neon optimisation flags')

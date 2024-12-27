@@ -1,0 +1,95 @@
+ninja: Entering directory `build'
+[1/82] Generating core/version.cpp with a custom command
+[2/82] Generating copy_closed_source_object with a custom command
+Inserting Closed Source Object Files...
+[3/82] Compiling C++ object pitrac_lm.p/meson-generated_.._core_version.cpp.o
+[4/82] Compiling C++ object pitrac_lm.p/gs_globals.cpp.o
+[5/82] Compiling C++ object pitrac_lm.p/ED.cpp.o
+[6/82] Compiling C++ object pitrac_lm.p/EDPF.cpp.o
+[7/82] Compiling C++ object pitrac_lm.p/EDColor.cpp.o
+[8/82] Compiling C++ object pitrac_lm.p/ball_watcher_image_buffer.cpp.o
+[9/82] Compiling C++ object pitrac_lm.p/ball_watcher.cpp.o
+[10/82] Compiling C++ object pitrac_lm.p/libcamera_jpeg.cpp.o
+[11/82] Compiling C++ object pitrac_lm.p/colorsys.cpp.o
+[12/82] Compiling C++ object pitrac_lm.p/gs_test.cpp.o
+[13/82] Compiling C++ object pitrac_lm.p/gs_fsm.cpp.o
+[14/82] Compiling C++ object pitrac_lm.p/libcamera_interface.cpp.o
+[15/82] Compiling C++ object pitrac_lm.p/pulse_strobe.cpp.o
+[16/82] Compiling C++ object pitrac_lm.p/ball_image_proc.cpp.o
+[17/82] Compiling C++ object pitrac_lm.p/cv_utils.cpp.o
+[18/82] Compiling C++ object pitrac_lm.p/EllipseDetectorCommon.cpp.o
+[19/82] Compiling C++ object pitrac_lm.p/golf_ball.cpp.o
+[20/82] Compiling C++ object pitrac_lm.p/EllipseDetectorYaed.cpp.o
+In file included from ../EllipseDetectorYaed.cpp:15:
+../EllipseDetectorYaed.h: In constructor ‘golf_sim::CEllipseDetectorYaed::CEllipseDetectorYaed()’:
+../EllipseDetectorYaed.h:105:24: warning: ‘golf_sim::CEllipseDetectorYaed::_times’ will be initialized after [-Wreorder]
+  105 |         vector<double> _times;  // _times is a vector containing the execution time of each step.
+      |                        ^~~~~~
+../EllipseDetectorYaed.h:104:24: warning:   ‘std::vector<double, std::allocator<double> > golf_sim::CEllipseDetectorYaed::_timesHelper’ [-Wreorder]
+  104 |         vector<double> _timesHelper;
+      |                        ^~~~~~~~~~~~
+../EllipseDetectorYaed.cpp:20:1: warning:   when initialized here [-Wreorder]
+   20 | CEllipseDetectorYaed::CEllipseDetectorYaed(void) : _times(6, 0.0), _timesHelper(6, 0.0)
+      | ^~~~~~~~~~~~~~~~~~~~
+[21/82] Compiling C++ object pitrac_lm.p/gs_options.cpp.o
+[22/82] Compiling C++ object pitrac_lm.p/gs_clubs.cpp.o
+[23/82] Compiling C++ object pitrac_lm.p/gs_camera.cpp.o
+[24/82] Compiling C++ object pitrac_lm.p/gs_gspro_response.cpp.o
+[25/82] Compiling C++ object pitrac_lm.p/gs_config.cpp.o
+[26/82] Compiling C++ object pitrac_lm.p/gs_sim_interface.cpp.o
+[27/82] Compiling C++ object pitrac_lm.p/gs_gspro_interface.cpp.o
+[28/82] Compiling C++ object pitrac_lm.p/gs_gspro_test_server.cpp.o
+[29/82] Compiling C++ object pitrac_lm.p/gs_e6_results.cpp.o
+[30/82] Compiling C++ object pitrac_lm.p/gs_e6_interface.cpp.o
+[31/82] Compiling C++ object pitrac_lm.p/logging_tools.cpp.o
+[32/82] Compiling C++ object pitrac_lm.p/gs_sim_socket_interface.cpp.o
+[33/82] Compiling C++ object pitrac_lm.p/worker_thread.cpp.o
+[34/82] Compiling C++ object pitrac_lm.p/gs_events.cpp.o
+[35/82] Compiling C++ object pitrac_lm.p/camera_hardware.cpp.o
+[36/82] Compiling C++ object pitrac_lm.p/gs_gspro_results.cpp.o
+[37/82] Compiling C++ object pitrac_lm.p/gs_ipc_message.cpp.o
+[38/82] Compiling C++ object pitrac_lm.p/gs_ipc_control_msg.cpp.o
+[39/82] Compiling C++ object pitrac_lm.p/gs_results.cpp.o
+[40/82] Compiling C++ object pitrac_lm.p/gs_ipc_mat.cpp.o
+[41/82] Compiling C++ object pitrac_lm.p/gs_ui_system.cpp.o
+[42/82] Compiling C++ object pitrac_lm.p/gs_ipc_result.cpp.o
+[43/82] Compiling C++ object pitrac_lm.p/core_buffer_sync.cpp.o
+[44/82] Compiling C++ object pitrac_lm.p/core_dma_heaps.cpp.o
+[45/82] Compiling C++ object pitrac_lm.p/gs_ipc_test.cpp.o
+[46/82] Compiling C++ object pitrac_lm.p/gs_ipc_system.cpp.o
+[47/82] Compiling C++ object pitrac_lm.p/gs_message_consumer.cpp.o
+[48/82] Compiling C++ object pitrac_lm.p/core_post_processor.cpp.o
+[49/82] Compiling C++ object pitrac_lm.p/gs_message_producer.cpp.o
+[50/82] Compiling C++ object pitrac_lm.p/core_options.cpp.o
+[51/82] Compiling C++ object pitrac_lm.p/encoder_encoder.cpp.o
+[52/82] Compiling C++ object pitrac_lm.p/encoder_h264_encoder.cpp.o
+[53/82] Compiling C++ object pitrac_lm.p/encoder_mjpeg_encoder.cpp.o
+[54/82] Compiling C++ object pitrac_lm.p/image_bmp.cpp.o
+[55/82] Compiling C++ object pitrac_lm.p/encoder_libav_encoder.cpp.o
+[56/82] Compiling C++ object pitrac_lm.p/core_rpicam_app.cpp.o
+[57/82] Compiling C++ object pitrac_lm.p/encoder_null_encoder.cpp.o
+[58/82] Compiling C++ object pitrac_lm.p/image_dng.cpp.o
+[59/82] Compiling C++ object pitrac_lm.p/image_png.cpp.o
+[60/82] Compiling C++ object pitrac_lm.p/image_jpeg.cpp.o
+[61/82] Compiling C++ object pitrac_lm.p/output_circular_output.cpp.o
+[62/82] Compiling C++ object pitrac_lm.p/output_file_output.cpp.o
+[63/82] Compiling C++ object pitrac_lm.p/image_yuv.cpp.o
+[64/82] Compiling C++ object pitrac_lm.p/output_net_output.cpp.o
+[65/82] Compiling C++ object pitrac_lm.p/output_output.cpp.o
+[66/82] Compiling C++ object pitrac_lm.p/preview_null_preview.cpp.o
+[67/82] Compiling C++ object pitrac_lm.p/preview_preview.cpp.o
+[68/82] Compiling C++ object pitrac_lm.p/post_processing_stages_histogram.cpp.o
+[69/82] Compiling C++ object pitrac_lm.p/preview_drm_preview.cpp.o
+[70/82] Compiling C++ object pitrac_lm.p/preview_egl_preview.cpp.o
+[71/82] Compiling C++ object pitrac_lm.p/post_processing_stages_pwl.cpp.o
+[72/82] Compiling C++ object pitrac_lm.p/post_processing_stages_negate_stage.cpp.o
+[73/82] Compiling C++ object pitrac_lm.p/preview_qt_preview.cpp.o
+[74/82] Compiling C++ object pitrac_lm.p/post_processing_stages_post_processing_stage.cpp.o
+[75/82] Compiling C++ object pitrac_lm.p/post_processing_stages_hdr_stage.cpp.o
+[76/82] Compiling C++ object pitrac_lm.p/post_processing_stages_sobel_cv_stage.cpp.o
+[77/82] Compiling C++ object pitrac_lm.p/post_processing_stages_annotate_cv_stage.cpp.o
+[78/82] Compiling C++ object pitrac_lm.p/post_processing_stages_plot_pose_cv_stage.cpp.o
+[79/82] Compiling C++ object pitrac_lm.p/post_processing_stages_face_detect_cv_stage.cpp.o
+[80/82] Compiling C++ object pitrac_lm.p/post_processing_stages_object_detect_draw_cv_stage.cpp.o
+[81/82] Compiling C++ object pitrac_lm.p/post_processing_stages_motion_detect_stage.cpp.o
+[82/82] Linking target pitrac_lm
