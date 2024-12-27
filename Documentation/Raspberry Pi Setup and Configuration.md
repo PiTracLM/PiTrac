@@ -527,15 +527,15 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
 
 26. **Build the PiTrac Launch Monitor\!**  
     1. Download the PiTrac repository, including the source code under the “Software” subdirectory if you haven’t already  
-       1. We usually use a subdirectory called \~/Dev under the home directory of the PiTrac user to house any cloned repositories.  You will probably use an equivalent directory in the current GitHub repo, e.g., PiTrac/Software  
+       1. We usually use a subdirectory called \~/Dev under the home directory of the PiTrac user to house any cloned repositories such as PiTrac.    
        2. You can do the copy by going to github and downloading the .zip  file, or from the command-line on the Pi using something like:  
           1. cd \~/Dev  
           2. git clone https://github.com/jamespilgrim/PiTrac.git  
        3. NOTE \- If you do you plan to do any code changes, you may want to create a fork from the main repository and then clone that into your Pi.  
     2. Install Remaining Prerequisites and Setup Environment:  
-       1. Setup the PITRAC\_ROOT environment variable to point to the “Software” directory of the PiTrac build.  That is one directory “up” from the “ImageProcessing” directory that contains the main PiTrac meson.build file.  
+       1. Setup the PITRAC\_ROOT environment variable to point to the “Software/LMSourceCode” directory of the PiTrac build.  That is one directory “up” from the “ImageProcessing” directory that contains the main PiTrac meson.build file.  
           1. E.g., include in your .zshrc or .bashrc or whatever shell you use:  
-             1. export PITRAC\_ROOT=/Dev/PiTrac/Software/LM Source Code  
+             1. export PITRAC\_ROOT=/Dev/PiTrac/Software/LMSourceCode  
        2. sudo apt-get \-y install libraspberrypi-dev raspberrypi-kernel-headers  
        3. Add extended timeout to  rpi\_apps.yaml file so that even if an external trigger doesn’t fire for a really long time, the libcamera library won’t time-out:  
           1. (**NOTE** for Pi 5, use /usr/share/libcamera/pipeline/rpi/pisp instead of /usr/share/libcamera/pipeline/rpi/vc4, below)  
@@ -556,14 +556,16 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
              1. sudo cp imx296\_noir.json /usr/share/libcamera/ipa/rpi/vc4  
           2. For the Pi 5:  
              1. sudo cp imx296\_noir.json /usr/share/libcamera/ipa/rpi/pisp  
-    2. Go to the directory called ImageProcessing in whatever directory path you will be using to compile.  E.g.,   
+    2. Go to the directory called ImageProcessing below whatever PITRAC\_ROOT directory path you will be using to compile.  E.g.,   
        1. cd $PITRAC\_ROOT/ImageProcessing  
-    3. meson setup build  
+    3. chmod \+x create\_closed\_source\_objects.sh  
+    4. meson setup build  
        1. If there are any missing libraries, ensure that the pre-requisites were all successfully built and installed and that any corresponding pkgconfig files were created correctly per the steps above.  
-    4. ninja \-C build       (add \-j 2 if compiling in 4GB or less)  
-    5. If the build completes successfully, try a quick sanity check to ensure that any shared libraries are correctly linked at that the PiTrac application can at least run:  
-       1. build/pitrac\_lm –help  
-       2. The app should return the available command-line options
+    5. ninja \-C build       (add \-j 2 if compiling in 4GB or less)  
+    6. If the build completes successfully, try a quick sanity check to ensure that any shared libraries are correctly linked at that the PiTrac application can at least run:  
+       1. build/pitrac\_lm –help    
+       2. (that’s two ‘-’ characters before help)  
+       3. The app should return the available command-line options
 
 #### Setup PiTrac GUI
 
