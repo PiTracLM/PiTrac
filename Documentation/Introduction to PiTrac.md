@@ -14,6 +14,6 @@ We are hoping that we can inspire a community of developers to help test and con
 
 Please visit our [project page](https://hackaday.io/project/195042-pitrac-the-diy-golf-launch-monitor) and also our YouTube channel [here](https://www.youtube.com/@PiTrac) for more details and videos.  The [GitHub repository](https://github.com/jamespilgrim/PiTrac) is in the works and already has the 3D printed part designs, the hardware design and initial software documentation.  If you’re interested in more of the details and some of PiTrac’s development history, please look through the [project logs](https://hackaday.io/project/195042-pitrac-the-diy-golf-launch-monitor#menu-logs).  
 
-Finally, any help at our [support page](https://ko-fi.com/Pitrac) would be appreciated to continue this work and complete the release process.
+Finally, any help at our [support page](https://ko-fi.com/Pitrac) or our project wish-list at [support page](https://github.com/jamespilgrim/PiTrac) would be appreciated to continue this work and complete the release process.
 
 (\*) Raspberry Pi is a trademark of Raspberry Pi Ltd.  The PiTrac project is not endorsed, sponsored by or associated with Raspberry Pi or Raspberry Pi products or services.
