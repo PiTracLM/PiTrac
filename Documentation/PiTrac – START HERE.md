@@ -6,17 +6,17 @@ First a bit of a caveat – this is not a beginner project.  You’ll need to be
 
 With that said, here is what you need to do to make your own PiTrac:
 
-[1\. Download the PiTrac Repository](#1.-download-the-pitrac-repository)
+[1\. Download the PiTrac Repository](#1-download-the-pitrac-repository)
 
-[2\. Gather the Parts You’ll Need](#2.-gather-the-parts-you’ll-need)
+[2\. Gather the Parts You’ll Need](#2-gather-the-parts-you’ll-need)
 
-[3\. Setup the Raspberry Pi Computers That You Will Use in the PiTrac](#3.-setup-the-raspberry-pi-computers-that-you-will-use-in-the-pitrac)
+[3\. Setup the Raspberry Pi Computers That You Will Use in the PiTrac](#3-setup-the-raspberry-pi-computers-that-you-will-use-in-the-pitrac)
 
-[4\. Print the Parts That Make Up the PiTrac Enclosure](#4.-print-the-parts-that-make-up-the-pitrac-enclosure)
+[4\. Print the Parts That Make Up the PiTrac Enclosure](#4-print-the-parts-that-make-up-the-pitrac-enclosure)
 
-[5\. Assemble Your PiTrac](#5.-assemble-your-pitrac)
+[5\. Assemble Your PiTrac](#5-assemble-your-pitrac)
 
-[6\. Perform Startup Testing and Final Configuration](#6.-perform-startup-testing-and-final-configuration)
+[6\. Perform Startup Testing and Final Configuration](#6-perform-startup-testing-and-final-configuration)
 
 # 1. Download the PiTrac Repository
 
