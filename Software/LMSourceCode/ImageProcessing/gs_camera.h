@@ -88,7 +88,6 @@ namespace golf_sim {
         // Determines whether and how intermediate processing images (of which there are over a dozen) are logged to the 
         // file system.  Doing so is expensive, time-wise.
         static bool kLogIntermediateExposureImagesToFile;
-        static bool kShowDebugImagesDuringExposureSelection;
         static bool kLogWebserverImagesToFile;
         static bool kLogDiagnosticImagesToUniqueFiles;
 

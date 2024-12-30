@@ -19,7 +19,6 @@ namespace golf_sim {
 
     // Constants used by this class
     bool GolfSimCamera::kLogIntermediateExposureImagesToFile = false;
-    bool GolfSimCamera::kShowDebugImagesDuringExposureSelection = true;
     bool GolfSimCamera::kLogWebserverImagesToFile = true;
     bool GolfSimCamera::kLogDiagnosticImagesToUniqueFiles = false;
     
@@ -121,7 +120,6 @@ namespace golf_sim {
         GS_LOG_TRACE_MSG(trace, "GolfSimCamera reading constants from JSON file.");
         // The following constants are only used internal to the GolfSimCamera class, and so can be initialized in the constructor
         GolfSimConfiguration::SetConstant("gs_config.logging.kLogIntermediateExposureImagesToFile", kLogIntermediateExposureImagesToFile);
-        GolfSimConfiguration::SetConstant("gs_config.logging.kShowDebugImagesDuringExposureSelection", kShowDebugImagesDuringExposureSelection);
         GolfSimConfiguration::SetConstant("gs_config.logging.kLogWebserverImagesToFile", kLogWebserverImagesToFile);
         GolfSimConfiguration::SetConstant("gs_config.logging.kLogDiagnosticImagesToUniqueFiles", kLogDiagnosticImagesToUniqueFiles);
 

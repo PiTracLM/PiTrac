@@ -6,9 +6,8 @@
 			"kLogIntermediateSpinImagesToFile": 0,
 			"kLogWebserverImagesToFile": 1,
 			"kLogDiagnosticImagesToUniqueFiles": 0,
-			"kShowDebugImagesDuringExposureSelection": 0,
 			"kLinuxBaseImageLoggingDir": "/home/PiTracUserName/LM_Shares/Images/",
-			"kPCBaseImageLoggingDir": "D:\\GolfSim\\LM\\Images\\",
+			"kPCBaseImageLoggingDir": "D:\\GolfSim\\LM\\Images\\"
 		},
 
 		"modes": {

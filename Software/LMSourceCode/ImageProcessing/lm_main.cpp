@@ -1257,9 +1257,12 @@ void test_gspro_communication() {
     GS_LOG_MSG(debug, json);
 }
 
-void test_function(int argc, char* argv[])
+// In Linux, this function will start running the actual LM code.
+// In Windoiws, this function will run whatever tests are currently
+// commented in to run.
+void run_main(int argc, char* argv[])
 {
-    GS_LOG_TRACE_MSG(trace, "Test called");
+    GS_LOG_TRACE_MSG(trace, "run_main called");
 
     // Start of testing
     GS_LOG_TRACE_MSG(trace, "Running on " + GolfSimPlatform);  //  platform.platform());
@@ -1268,10 +1271,6 @@ void test_function(int argc, char* argv[])
     bool kStartInPuttingMode = false;
     GolfSimConfiguration::SetConstant("gs_config.modes.kStartInPuttingMode", kStartInPuttingMode);
 
-
-    // test_strobed_balls_detection();
-    // testBallPosition();
-    // test_gspro_communication();
 
 #ifdef __unix__   
 
@@ -1336,8 +1335,6 @@ void test_function(int argc, char* argv[])
             if (!GsSimInterface::SendResultsToGolfSims(result)) {
                 GS_LOG_MSG(error, "Could not SendResultsToGolfSim. Continuing");
             }
-
-
         }
 
         /**** DEPRECATED 
@@ -1652,8 +1649,11 @@ void test_function(int argc, char* argv[])
     }
 
 
-
+    // Comment in whichever tests you want to run in Windows here
     testAnalyzeStrobedBalls();
+    // test_strobed_balls_detection();
+    // testBallPosition();
+    // test_gspro_communication();
     // testSpinDetection();
 #endif
 
@@ -1731,7 +1731,7 @@ int main(int argc, char *argv[])
         // TBD - consider if there is a better place for this?
         GolfSimGlobals::golf_sim_running_ = true;
 
-        test_function(argc, argv);
+        run_main(argc, argv);
     }
     catch (std::exception const& e)
     {
@@ -1739,7 +1739,7 @@ int main(int argc, char *argv[])
         return false;
     }
 
-    GS_LOG_TRACE_MSG(trace, "Finished test_function.");
+    GS_LOG_TRACE_MSG(trace, "Finished run_main.");
     
     // GS_LOG_TRACE_MSG(trace, "Waiting for any keypress to end program.");
     // cv::waitKey(0);
