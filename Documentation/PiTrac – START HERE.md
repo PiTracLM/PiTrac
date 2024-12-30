@@ -18,7 +18,7 @@ With that said, here is what you need to do to make your own PiTrac:
 
 [6\. Perform Startup Testing and Final Configuration](#6.-perform-startup-testing-and-final-configuration)
 
-# 1\. Download the PiTrac Repository {#1.-download-the-pitrac-repository}
+# 1. Download the PiTrac Repository
 
 If you haven’t already done so, download the entire current PiTrac repository.  This can be accomplished using any one of several github utilities.  Exactly how you do this will depend on your particular environment, but here’s a few ways:
 
@@ -27,7 +27,7 @@ If you haven’t already done so, download the entire current PiTrac repository.
 * 2\.       For Windows (and the Mac, for that matter), there’s lots of YouTube videos.  [Here’s a decent one](https://www.youtube.com/watch?v=7ouVv6PFZGc&t=281).  Once you’ve installed git, you can use one of the tools described in the video to clone the PiTrac project as described above for Macs.  
 * 3\.       You can also install Microsoft Visual Studio, which includes git management functionality.
 
-# 2\. Gather the Parts You’ll Need {#2.-gather-the-parts-you’ll-need}
+# 2. Gather the Parts You’ll Need
 
 We’ve listed the basic components that you’ll need to build a PiTrac in the [Parts List here](https://github.com/jamespilgrim/PiTrac/blob/main/Documentation/PiTrac%20-%20DIY%20LM%20%20Parts%20List.md).  We (at least currently) don’t sell any of these components. 
 
@@ -39,7 +39,7 @@ NOTE:  You may want to skim through the rest of the documents to see if you want
 
  
 
-# 3\. Setup the Raspberry Pi Computers That You Will Use in the PiTrac {#3.-setup-the-raspberry-pi-computers-that-you-will-use-in-the-pitrac}
+# 3. Setup the Raspberry Pi Computers That You Will Use in the PiTrac
 
 The next step is to get your Pi computers up and running and to install the software packages that will be needed to build the PiTrac software.  This process is done first, before putting together the 3D-printed enclosure that the Pi computers are eventually mounted to.
 
@@ -49,7 +49,7 @@ NOTE: If you are going to have someone else 3D print the enclosure, it’s proba
 
  
 
-# 4\. Print the Parts That Make Up the PiTrac Enclosure {#4.-print-the-parts-that-make-up-the-pitrac-enclosure}
+# 4. Print the Parts That Make Up the PiTrac Enclosure
 
 If you have your own 3D Printer (or access to one), you can print your own 3D parts using the [3D design models](https://github.com/jamespilgrim/PiTrac/tree/main/3D%20Printed%20Parts/Enclosure%20Models) and [assembly instructions](https://github.com/jamespilgrim/PiTrac/blob/main/Documentation/DIY%20LM%20Enclosure%20Assembly.zip).  We know that some folks have also had some luck having a third-party printing company take the models and documentation and print the parts for a fee.
 
@@ -57,12 +57,12 @@ The parts are large enough that you’ll need several spools of printer filament
 
  
 
-# 5\. Assemble Your PiTrac {#5.-assemble-your-pitrac}
+# 5. Assemble Your PiTrac
 
 Once you have PiTrac compiled on each of the two Pi’s, you’re ready to attach the Pi’s to the 3D-printed PiTrac enclosure and assemble the final(ish\!) launch monitor.  See the [assembly instructions](https://github.com/jamespilgrim/PiTrac/blob/main/Documentation/DIY%20LM%20Enclosure%20Assembly.md).  The assembly requires that the cameras be calibrated as the LM is being built.  For that reason, the PiTrac software (which performs some of that calibration) needs to be ready to go before you start putting things together.
 
  
 
-# 6\. Perform Startup Testing and Final Configuration {#6.-perform-startup-testing-and-final-configuration}
+# 6. Perform Startup Testing and Final Configuration
 
 Use [this document](https://github.com/jamespilgrim/PiTrac/blob/main/Documentation/PiTrac%20Start-Up%20Documentation.md) to perform some final sanity-checks and testing.  That document also details how to get PiTrac running.
