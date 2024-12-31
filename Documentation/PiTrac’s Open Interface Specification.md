@@ -27,7 +27,7 @@ Each ActiveMQ IPC message sent to/from PiTrac has a particular message type that
 
 | Value | Message Type | Notes |
 | :---- | :---- | :---- |
-| 0 | Unknown  | Essentially and error \- should not occur |
+| 0 | Unknown  | Essentially an error \- should not occur |
 | 1 | RequestForCamera2Image  | Sent by the Pi 1 system to signal the Pi 2 system to be ready to take a picture.  This also signals to the Pi 2 that the Pi 1 system is going to expect a picture in a Camera2Image \- type message, and that the Pi 1  will be sending an external trigger to the Pi 2 camera. |
 | 2 | Camera2Image  | Sent by the Pi 2 system when it takes a picture.  The message will include the picture itself.  The picture is an OpenCV Mat object packed as a MsgPack serialized data type.  See gpc\_ipc\_mat.\* in the PiTrac C++ source code.  |
 | 3 | RequestForCamera2TestStillImage | Reserved for testing modes.  |
