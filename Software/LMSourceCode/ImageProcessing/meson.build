@@ -97,7 +97,13 @@ pitrac_lm_sources = []
 
 if enable_recompile_closed_source 
     message('Recompiling closed source code')
-    run_command('cp', '../../ClosedSourceCode/gs_e6_response.cpp.FULL_CODE', 'gs_e6_response.cpp', check:true)
+    run_command('cp', '../../ClosedSourceCode/gs_e6_response.cpp.EMPTY', 'gs_e6_response.cpp', check:true)
+    pitrac_lm_sources += ([ 'gs_e6_response.cpp' ])
+endif
+
+if enable_recompile_closed_source 
+    message('Recompiling closed source code')
+    run_command('cp', '../../ClosedSourceCode/obfuscate.h', 'obfuscate.h', check:true)
     pitrac_lm_sources += ([ 'gs_e6_response.cpp' ])
 endif
 
