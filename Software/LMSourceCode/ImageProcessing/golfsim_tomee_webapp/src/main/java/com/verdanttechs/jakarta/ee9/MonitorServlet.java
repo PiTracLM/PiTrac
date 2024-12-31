@@ -381,23 +381,23 @@ public class MonitorServlet extends HttpServlet {
                 String images_string = "";
                 
                 if (club_type_ == GsClubType.kDriver) {
-                    images_string += "<img src=\"" + kWebServerShareDirectory + "/" + kWebServerResultSpinBall1Image + "\" alt=\"1st Ball Image\" />" + 
-                                     "<img src=\"" + kWebServerShareDirectory + "/" + kWebServerResultSpinBall2Image + "\" alt=\"2nd Ball Image\" />" + 
-                                     "<img src=\"" + kWebServerShareDirectory + "/" + kWebServerResultBallRotatedByBestAngles + "\" alt=\"Ball1 Rotated by determined angles image\" />";
+                    images_string += "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerResultSpinBall1Image + "\" alt=\"1st Ball Image\" />" + 
+                                     "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerResultSpinBall2Image + "\" alt=\"2nd Ball Image\" />" + 
+                                     "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerResultBallRotatedByBestAngles + "\" alt=\"Ball1 Rotated by determined angles image\" />";
                 }
 
-                images_string += "<img src=\"" + kWebServerShareDirectory + "/" + kWebServerResultBallExposureCandidates + "\" alt=\"Identified Exposures Image\" width = \"720\" heigth=\"544\" />"; 
+                images_string += "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerResultBallExposureCandidates + "\" alt=\"Identified Exposures Image\" width = \"720\" heigth=\"544\" />"; 
 
                 request.setAttribute("images", images_string);                                                
             }
             else if (result_type_ == GsIPCResultType.kError )
             {
-                request.setAttribute("images", "<img src=\"" + kWebServerShareDirectory + "/" + kWebServerResultBallExposureCandidates + "\" alt=\"Identified Exposures Image\" width = \"720\" heigth=\"544\" />" +
-                            "<img src=\"" + kWebServerShareDirectory + "/" + kWebServerErrorExposuresImage + "\" alt=\"Camera2 Image\" width = \"720\" heigth=\"544\" />");        
+                request.setAttribute("images", "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerResultBallExposureCandidates + "\" alt=\"Identified Exposures Image\" width = \"720\" heigth=\"544\" />" +
+                            "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerErrorExposuresImage + "\" alt=\"Camera2 Image\" width = \"720\" heigth=\"544\" />");        
             }
             else if (result_type_ == GsIPCResultType.kWaitingForBallToAppear )
             {
-                request.setAttribute("images", "<img src=\"" + kWebServerShareDirectory + "/" + kWebServerBallSearchAreaImage + "\" alt=\"Ball Search Area\" width = \"360\" heigth=\"272\" />");        
+                request.setAttribute("images", "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerBallSearchAreaImage + "\" alt=\"Ball Search Area\" width = \"360\" heigth=\"272\" />");        
             }
 
 
@@ -597,7 +597,7 @@ public class MonitorServlet extends HttpServlet {
     private static String kGolfSimTopic = "Golf.Sim";
     // Set from JSON file.  The default should probably be a symbolic address like rsp02
     private static String kWebActiveMQHostAddress = "tcp://10.0.0.41:61616";
-    private static String kWebServerShareDirectory;
+    private static String kWebServerTomcatShareDirectory;
     private static String kWebServerResultBallExposureCandidates;
     private static String kWebServerResultSpinBall1Image;
     private static String kWebServerResultSpinBall2Image;
@@ -627,7 +627,7 @@ public class MonitorServlet extends HttpServlet {
         }
 
         // The config filename comes from the request, e.g., 
-        // http://rsp02:8080/golfsim/monitor?config_filename="%2Fmnt%2FVerdantShare%2Fdev%2FGolfsim_Share%2Fgolf_sim_config.json"
+        // http://rsp02:8080/golfsim/monitor?config_filename="%2Fmnt%2FVerdantShare%2Fdev%2FWebShare%2Fgolf_sim_config.json"
         Gson gson = new Gson();
 
         // The monitor isn't up and running yet.  Initialize
@@ -645,7 +645,7 @@ public class MonitorServlet extends HttpServlet {
             
             String pngSuffix = new String(".png");
 
-            JsonElement kWebServerShareDirectoryElement = userInterfaceElement.getAsJsonObject().get("kWebServerTomcatShareDirectory");
+            JsonElement kWebServerTomcatShareDirectoryElement = userInterfaceElement.getAsJsonObject().get("kWebServerTomcatShareDirectory");
             JsonElement kWebServerResultBallExposureCandidatesElement = userInterfaceElement.getAsJsonObject().get("kWebServerResultBallExposureCandidates");
             JsonElement kWebServerResultSpinBall1ImageElement = userInterfaceElement.getAsJsonObject().get("kWebServerResultSpinBall1Image");
             JsonElement kWebServerResultSpinBall2ImageElement = userInterfaceElement.getAsJsonObject().get("kWebServerResultSpinBall2Image");
@@ -656,7 +656,7 @@ public class MonitorServlet extends HttpServlet {
             
             kWebActiveMQHostAddress = (String) ipcInterfaceElement.getAsJsonObject().get("kWebActiveMQHostAddress").getAsString();
             
-            kWebServerShareDirectory = (String) kWebServerShareDirectoryElement.getAsString();
+            kWebServerTomcatShareDirectory = (String) kWebServerTomcatShareDirectoryElement.getAsString();
             kWebServerResultBallExposureCandidates = (String) kWebServerResultBallExposureCandidatesElement.getAsString() + pngSuffix;
             kWebServerResultSpinBall1Image = (String) kWebServerResultSpinBall1ImageElement.getAsString() + pngSuffix;
             kWebServerResultSpinBall2Image = (String) kWebServerResultSpinBall2ImageElement.getAsString() + pngSuffix;
@@ -671,7 +671,7 @@ public class MonitorServlet extends HttpServlet {
         }
         System.out.println("Golf Sim Configuration Settings: ");
         System.out.println("  kWebActiveMQHostAddress: " + kWebActiveMQHostAddress);
-        System.out.println("  kWebServerShareDirectory (NOTE - Must be setup in Tomcat's conf/server.xml): " + kWebServerShareDirectory);
+        System.out.println("  kWebServerTomcatShareDirectory (NOTE - Must be setup in Tomcat's conf/server.xml): " + kWebServerTomcatShareDirectory);
         System.out.println("  kWebServerResultBallExposureCandidates " + kWebServerResultBallExposureCandidates);
         System.out.println("  kWebServerResultSpinBall1Image " + kWebServerResultSpinBall1Image);
         System.out.println("  kWebServerResultSpinBall2Image " + kWebServerResultSpinBall2Image);

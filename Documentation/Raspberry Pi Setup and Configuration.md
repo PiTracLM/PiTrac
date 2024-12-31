@@ -86,35 +86,35 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
    a. If running headless, remotely login using putty or a ssh tool of your choice  
    1. Logging in from whatever computer you are reading this setup document on will make it easy to copy-paste from this document into files on the Pi  
    2. For example,  
-      1. `putty rsp02 -l \<username\>`    (the boot image should already allow putty)  
+      1. putty rsp02 \-l \\\<username\\\>    (the boot image should already allow putty)  
          b. If running directly with a monitor and keyboard, click on updates icon near top-right to make sure everything is up to date  
    3. Install everything to get up to date  
       c. Or, equivalently, do the following from the command line:  
-   4. `sudo apt -y update`  
-   5. `sudo apt -y upgrade`  
-   6. `sudo reboot now`      (to make sure everything is updated)
+   4. sudo apt \-y update  
+   5. sudo apt \-y upgrade  
+   6. sudo reboot now      (to make sure everything is updated)
 
 #### Remote Log into Pi
 
 5. Remotely login (to be able to paste from this setup document)  
-   a. `putty rsp01 -l \<username\>`    (the boot image should already allow putty)  
+   a. putty rsp01 \-l \\\<username\\\>    (the boot image should already allow putty)  
    b. Then, follow the instructions below…
 
-#### Sudo Priviledges
+#### Sudo Privileges
 
 6. If necessary, make sure that \<PiTracUserName\> has sudo privileges  
    a. Some guidance [here](https://askubuntu.com/questions/168280/how-do-i-grant-sudo-privileges-to-an-existing-user).
 
 #### Install NVME Board
 
-7. To Install an NVME Board on the Pi  \[Optional, and probably only for the Pi 5 (confusingly referred to as the “Pi 1” computer in the PiTrac project)\]:  
-   a. If you have a SSD drive, best to get it up and booting now  
+7. To Install an NVME Board on the Pi  \[Optional, and probably only for the Pi 5 (confusingly referred to as the “Pi 1” computer in the PiTrac project):  
+   a. If you have a SSD drive, best to get it up and booting now before you install everything on the slower, smaller MicroSD card instead.  
    b. See also the instructions here, which will work in most cases: [https://wiki.geekworm.com/NVMe\_SSD\_boot\_with\_the\_Raspberry\_Pi\_5](https://wiki.geekworm.com/NVMe_SSD_boot_with_the_Raspberry_Pi_5)  
    Although the instructions below should work as well.  
    c. With the Pi off, Install the NVMe Board and NVMe SSD drive per instructions of whatever board you are using.  
    d. Power up and Enable the PCIe interface (your instructions may differ):  
-   1. `cd /boot/firmware/`  
-   2. `sudo cp config.txt config.txt.ORIGINAL`  
+   1. cd /boot/firmware/  
+   2. sudo cp config.txt config.txt.ORIGINAL  
    3. By default the PCIe connector is not enabled.  
    4. To enable it you should add the following option into /boot/firmware/config.txt before the last “\[all\]” at the end of the file and reboot (sudo reboot now):  
       1. \# Enable the PCIe External Connector.  
@@ -128,17 +128,18 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
       3. Select whatever order you want, usually NVMe card first  
    2. Shutdown, remove power to the Pi, and reboot.  Afterward, an lsblk command should show something like this (see last line):  
         
-      1\. pitrac@rsp05:\\\~ $ lsblk    
+      pitrac@rsp05:\\\~ $ lsblk    
         
-      2\. NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS    
         
-      3\. mmcblk0     179:0    0  29.7G  0 disk    
+      NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS    
         
-      4\. |-mmcblk0p1 179:1    0   512M  0 part /boot/firmware    
+      mmcblk0     179:0    0  29.7G  0 disk    
         
-      5\. \\\`-mmcblk0p2 179:2    0  29.2G  0 part /    
+      |-mmcblk0p1 179:1    0   512M  0 part /boot/firmware    
         
-      6\. nvme0n1     259:0    0 238.5G  0 disk    
+      \\\`-mmcblk0p2179:2    0  29.2G  0 part /    
+        
+      nvme0n1     259:0    0 238.5G  0 disk    
         
    3. At this point, the NVMe drive should be accessible, and we will make a copy (image) of the bootup Micro SD card onto the SSD drive  
    4. From the Pi Graphical Desktop, Applications \=\>Accessories \=\>SD Card Copier on the main screen, run the SD Card Copier program, and copy the OS to the NVME ssd.  There’s no need to select the separate UUID option.  
@@ -149,7 +150,7 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
 #### NAS Drive Setup and Mounting
 
 8. Setup mounting of a remote NAS drive (or similar)  
-   a. To use for development so that you can’t lose everything if the Pi has an issue.  Also allows for easier transfers of files to the Pi from another computer.  
+   a. Many folks use an external NAS drive for development so that you can’t lose everything if an individual Pi has an issue.  An external drive also allows for easier transfers of files to the Pi from another computer that can also see that drive.  
    b. The remote drive will store the development environment, though you can obviously set up the PiTrac not to need a separate drive once you have everything working.  However, it’s really a good idea to have the development and test environment on a different computer than on the individual Pi’s.  
    c. There are many ways to automatically mount a removable drive to a Pi.  The following is just one way that assumes you have a NAS with NFS services enabled and with a shareable drive that the Pi can read/write to.  
    1. NOTE:  If this Pi will be anywhere in a public network, obviously do not include your password in the fstab\!  
@@ -158,7 +159,7 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
       f. `sudo cp fstab fstab.original`  
       g. `sudo chmod 600 /etc/fstab`   \[to try protect any passwords in the file\]  
       h. `sudo vi fstab`  
-   2. If using NFS (seems easier):  
+   2. If using NFS (usually easier) put the following the fstab file:  
       1. \<NAS IP Address\>:/\<NAS Shared Drive Name\> /mnt/PiTracShare nfs \_netdev,auto 0 0  
       2. For example:  
          1. 10.0.0.100:/NAS\_Share\_Drive /mnt/PiTracShare nfs \_netdev,auto 0 0  
@@ -184,7 +185,7 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
    2. mount \-t cifs  
    3. Create the directory structure that the two Pis will share (this helps facilitate transfer of debugging images between the two Pis)  
       1. mkdir /home/\<PiTracUser\>/LM\_Shares  
-      2. mkdir /home/\<PiTracUser\>/LM\_Shares/GolfSim\_Share  
+      2. mkdir /home/\<PiTracUser\>/LM\_Shares/WebShare  
       3. mkdir /home/\<PiTracUser\>/LM\_Shares/Images  
    2. sudo vi /etc/samba/smb.conf   and add the following lines at the bottom  
       1. \[LM\_Shares\]  
@@ -201,7 +202,7 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
       1. //\<Pi 1’s IP Address\>/LM\_Shares /home/\<PiTracUser\>/LM\_Shares cifs username=\[PiTracUserName\],password=\[PWD\],workgroup=WORKGROUP,users,exec,auto,rw,file\_mode=0777,dir\_mode=0777,user\_xattr 0 0  
    2. sudo systemctl daemon-reload  
    3. sudo mount \-a  
-   4. Check to make sure the second Pi can “see” the other Pi’s LM\_Shares sub-directories (Images and GolfSim\_Share)
+   4. Check to make sure the second Pi can “see” the other Pi’s LM\_Shares sub-directories (Images and WebShare)
 
 #### SSH Stored Key
 
@@ -517,7 +518,7 @@ WantedBy=multi-user.target
 
    14. Add a new document base/root to allow access to the shared mounted drive:  
        1. Edit `~conf/server.xml` and just before the `</Host>` near the end of the file, put:  
-       2. `<Context docBase="/home/<user>/LM_Shares/Images" path="/golfsim/Images" />`  
+       2. \<Context docBase="/home/\<PiTracUserName\>/LM\_Shares/WebShare" path="/golfsim/WebShare" /\>  
        3. This will allow the Tomee system to access a directory that is outside of the main Tomee installation tree.  This directory will be used to get debugging images from the other Pi into the web-based GUI that this Pi will be serving up.  
        4. NOTE \- if the shared directory that is mounted off of the other Pi does not exist, Tomee may not be able to start  
    15. Allow symbolic linking.  In conf/context.xml, add before the end:  
@@ -530,7 +531,7 @@ WantedBy=multi-user.target
        5. Try the following to see how things are starting and to fix any problems:  
           1. `sudo tail -f /opt/tomee/logs/catalina.out`  
        6. Next login from a web console:   http://\<Pi-with-Tomee\>:8080/manager/html  
-          1. user-name/pwd is by default tomcat/tomcat
+          1. user-name/pwd is by default tomcat/tomcat.  Change if not in a private network.
 
 #### Install Launch Monitor Dependencies
 
@@ -602,7 +603,7 @@ WantedBy=multi-user.target
        6. cp $PITRAC\_ROOT//ImageProcessing/golfsim\_tomee\_webapp/src/main/webapp/\*.html ./src/main/webapp  
        7. cp $PITRAC\_ROOT//ImageProcessing/golfsim\_tomee\_webapp/pom.xml .  
        8. \# Also pull over the current .json configuration file to make sure that the webapp is looking at the correct version.  
-       9. cp $PITRAC\_ROOT//ImageProcessing/golf\_sim\_config.json  \~/LM\_Shares/GolfSim\_Share/  
+       9. cp $PITRAC\_ROOT//ImageProcessing/golf\_sim\_config.json  \~/LM\_Shares/WebShare/  
     2. Run the new script to bring over the java and other web-based GUI files:   
        1. . ./refresh\_from\_dev.sh  
        2. NOTE that the above script will also move a copy of the golf\_sim\_config.json file into the shared directory that the GUI can access in order to get information about its run-time environment.  
@@ -626,7 +627,7 @@ WantedBy=multi-user.target
           1. cd /opt/tomee/webapps  
           2. sudo cp \~/Dev/WebAppDev/target/golfsim.war .  
        10. Confirm you can see the PiTrac GUI by entering the following into your browser:  
-           1. http://\<The-Pi-2-name-or-IP\>:8080/golfsim/monitor?config\_filename=%2Fhome%2Fmleary%2FLM\_Shares/%2FGolfSim\_Share%2Fgolf\_sim\_config.json  
+           1. http://\<The-Pi-2-name-or-IP\>:8080/golfsim/monitor?config\_filename=%2Fhome%2Fmleary%2FLM\_Shares/%2FWebShare%2Fgolf\_sim\_config.json  
        11. You should see the PiTrac GUI
 
 **CONGRATULATIONS\!** \- At this point, you’ve (hopefully) built the PiTrac software.  Please see the [Startup Documentation](https://github.com/jamespilgrim/PiTrac/blob/main/Documentation/PiTrac%20Start-Up%20Documentation.md) for how to get PiTrac working\!

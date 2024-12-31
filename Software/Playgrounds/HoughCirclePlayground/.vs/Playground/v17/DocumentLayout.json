@@ -1,0 +1,227 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{2CC5C0F2-0DB6-4C55-B7EB-8CC7690A092C}|Playground.vcxproj|M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\cv_utils.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{2CC5C0F2-0DB6-4C55-B7EB-8CC7690A092C}|Playground.vcxproj|solutionrelative:cv_utils.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{2CC5C0F2-0DB6-4C55-B7EB-8CC7690A092C}|Playground.vcxproj|M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\colorsys.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{2CC5C0F2-0DB6-4C55-B7EB-8CC7690A092C}|Playground.vcxproj|solutionrelative:colorsys.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{2CC5C0F2-0DB6-4C55-B7EB-8CC7690A092C}|Playground.vcxproj|M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\colorsys.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{2CC5C0F2-0DB6-4C55-B7EB-8CC7690A092C}|Playground.vcxproj|solutionrelative:colorsys.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{2CC5C0F2-0DB6-4C55-B7EB-8CC7690A092C}|Playground.vcxproj|M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\Playground.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{2CC5C0F2-0DB6-4C55-B7EB-8CC7690A092C}|Playground.vcxproj|solutionrelative:Playground.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{2CC5C0F2-0DB6-4C55-B7EB-8CC7690A092C}|Playground.vcxproj|M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\logging_tools.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{2CC5C0F2-0DB6-4C55-B7EB-8CC7690A092C}|Playground.vcxproj|solutionrelative:logging_tools.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{2CC5C0F2-0DB6-4C55-B7EB-8CC7690A092C}|Playground.vcxproj|M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\cv_utils.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{2CC5C0F2-0DB6-4C55-B7EB-8CC7690A092C}|Playground.vcxproj|solutionrelative:cv_utils.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{2CC5C0F2-0DB6-4C55-B7EB-8CC7690A092C}|Playground.vcxproj|M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\logging_tools.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{2CC5C0F2-0DB6-4C55-B7EB-8CC7690A092C}|Playground.vcxproj|solutionrelative:logging_tools.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{2CC5C0F2-0DB6-4C55-B7EB-8CC7690A092C}|Playground.vcxproj|M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\gs_globals.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{2CC5C0F2-0DB6-4C55-B7EB-8CC7690A092C}|Playground.vcxproj|solutionrelative:gs_globals.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|M:\\Dev\\PiTrac\\Software\\LMSourceCode\\ImageProcessing\\golf_sim_config.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|E:\\Program Files\\Microsoft Visual Studio\\2022\\Preview\\VC\\Tools\\MSVC\\14.41.33901\\include\\vector||{3B902123-F8A7-4915-9F01-361F908088D0}|"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 1,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedHeight": 289,
+          "SelectedChildIndex": 10,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Playground.cpp",
+              "DocumentMoniker": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\Playground.cpp",
+              "RelativeDocumentMoniker": "Playground.cpp",
+              "ToolTip": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\Playground.cpp",
+              "RelativeToolTip": "Playground.cpp",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2024-05-26T16:02:07.916Z",
+              "IsPinned": true
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{e506b91c-c606-466a-90a9-123d1d1e12b3}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:129:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:1:0:{e8b06f52-6d01-11d2-aa7d-00c04f990343}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "colorsys.cpp",
+              "DocumentMoniker": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\colorsys.cpp",
+              "RelativeDocumentMoniker": "colorsys.cpp",
+              "ToolTip": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\colorsys.cpp",
+              "RelativeToolTip": "colorsys.cpp",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAQAAAAUAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2024-12-31T00:25:19.386Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "logging_tools.cpp",
+              "DocumentMoniker": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\logging_tools.cpp",
+              "RelativeDocumentMoniker": "logging_tools.cpp",
+              "ToolTip": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\logging_tools.cpp",
+              "RelativeToolTip": "logging_tools.cpp",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAUAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2024-12-31T00:23:05.617Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "gs_globals.h",
+              "DocumentMoniker": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\gs_globals.h",
+              "RelativeDocumentMoniker": "gs_globals.h",
+              "ToolTip": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\gs_globals.h",
+              "RelativeToolTip": "gs_globals.h",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAUAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2024-12-31T00:22:51.224Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "cv_utils.h",
+              "DocumentMoniker": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\cv_utils.h",
+              "RelativeDocumentMoniker": "cv_utils.h",
+              "ToolTip": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\cv_utils.h",
+              "RelativeToolTip": "cv_utils.h",
+              "ViewState": "AgIAAAgAAAAAAAAAAAAAADsAAAAUAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2024-12-31T00:22:47.028Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "colorsys.h",
+              "DocumentMoniker": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\colorsys.h",
+              "RelativeDocumentMoniker": "colorsys.h",
+              "ToolTip": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\colorsys.h",
+              "RelativeToolTip": "colorsys.h",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2024-12-31T00:22:42.426Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "golf_sim_config.json",
+              "DocumentMoniker": "M:\\Dev\\PiTrac\\Software\\LMSourceCode\\ImageProcessing\\golf_sim_config.json",
+              "RelativeDocumentMoniker": "..\\..\\LMSourceCode\\ImageProcessing\\golf_sim_config.json",
+              "ToolTip": "M:\\Dev\\PiTrac\\Software\\LMSourceCode\\ImageProcessing\\golf_sim_config.json",
+              "RelativeToolTip": "..\\..\\LMSourceCode\\ImageProcessing\\golf_sim_config.json",
+              "ViewState": "AgIAAPkAAAAAAAAAAAAAABABAAA6AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2024-12-30T17:56:53.516Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "vector",
+              "DocumentMoniker": "E:\\Program Files\\Microsoft Visual Studio\\2022\\Preview\\VC\\Tools\\MSVC\\14.41.33901\\include\\vector",
+              "ToolTip": "E:\\Program Files\\Microsoft Visual Studio\\2022\\Preview\\VC\\Tools\\MSVC\\14.41.33901\\include\\vector",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2024-06-03T19:06:32.978Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "logging_tools.h",
+              "DocumentMoniker": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\logging_tools.h",
+              "RelativeDocumentMoniker": "logging_tools.h",
+              "ToolTip": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\logging_tools.h",
+              "RelativeToolTip": "logging_tools.h",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAUAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2024-05-26T19:28:46.487Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "cv_utils.cpp",
+              "DocumentMoniker": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\cv_utils.cpp",
+              "RelativeDocumentMoniker": "cv_utils.cpp",
+              "ToolTip": "M:\\Dev\\PiTrac\\Software\\Playgrounds\\HoughCirclePlayground\\cv_utils.cpp",
+              "RelativeToolTip": "cv_utils.cpp",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAUAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2024-05-26T16:02:07.45Z"
+            }
+          ]
+        },
+        {
+          "DockedHeight": 178,
+          "SelectedChildIndex": -1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{3ae79031-e1bc-11d0-8f78-00a0c9110057}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c64b9c2-e352-428e-a56d-0ace190b99a6}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{c9c0ae26-aa77-11d2-b3f0-0000f87570ee}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{d78612c7-9962-4b83-95d9-268046dad23a}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

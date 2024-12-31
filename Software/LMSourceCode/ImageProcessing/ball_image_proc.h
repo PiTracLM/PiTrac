@@ -85,6 +85,8 @@ public:
     static int kPuttingPreHoughBlurSize;
 
     static bool kStrobedBallsUseAltHoughAlgorithm;
+    static double kStrobedBallsAltCannyLower;
+    static double kStrobedBallsAltCannyUpper;
     static int kStrobedBallsAltPreCannyBlurSize;
     static int kStrobedBallsAltPreHoughBlurSize;
     static double kStrobedBallsAltStartingParam2;
