@@ -7,7 +7,7 @@
 			"kLogWebserverImagesToFile": 1,
 			"kLogDiagnosticImagesToUniqueFiles": 0,
 			"kLinuxBaseImageLoggingDir": "/home/PiTracUserName/LM_Shares/Images/",
-			"kPCBaseImageLoggingDir": "M:\\Dev\\PiTrac\\Software\\LMSourceCode\\Images\\"
+			"kPCBaseImageLoggingDir": "D:\\GolfSim\\LM\\Images\\"
 		},
 
 		"modes": {
