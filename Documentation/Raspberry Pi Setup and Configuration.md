@@ -501,13 +501,9 @@ KillSignal=SIGCONT
 [Install]  
 WantedBy=multi-user.target
 ```
-11. Start the service `sudo systemctl start tomee.service`
-12. Check if service is running `sudo systemctl status tomee`
+11. Update /opt/tomee/webapps/manager/META-INF/context.xml to allow “.\*” instead of just 127.0….  Replace the whole regex string
 
-13. Update /opt/tomee/webapps/manager/META-INF/context.xml to allow “.\*” instead of just 127.0….  Replace the whole regex string
-
-14. The result should simply be allow=".\*" on that line  
-15. `sudo cp context.xml context.xml.ORIGINAL` [just in case]  
+12. The result should simply be allow=".\*" on that line  
 ```xml
 <Context antiResourceLocking="false" privileged="true" >
   <CookieProcessor className="org.apache.tomcat.util.http.Rfc6265CookieProcessor"
@@ -517,14 +513,16 @@ WantedBy=multi-user.target
   <Manager sessionAttributeValueClassNameFilter="java\.lang\.(?:Boolean|Integer|Long|Number|String)|org\.apache\.catalina\.filters\.CsrfPreventionFilter\$LruCache(?:\$1)?|java\.util\.(?:Linked)?HashMap"/>
 </Context>
 ```
-   16. Add a new document base/root to allow access to the shared mounted drive:  
+   13. `sudo cp context.xml context.xml.ORIGINAL` [just in case]  
+
+   14. Add a new document base/root to allow access to the shared mounted drive:  
        1. Edit `~conf/server.xml` and just before the `</Host>` near the end of the file, put:  
        2. `<Context docBase="/home/<user>/LM_Shares/Images" path="/golfsim/Images" />`  
        3. This will allow the Tomee system to access a directory that is outside of the main Tomee installation tree.  This directory will be used to get debugging images from the other Pi into the web-based GUI that this Pi will be serving up.  
        4. NOTE \- if the shared directory that is mounted off of the other Pi does not exist, Tomee may not be able to start  
-   17. Allow symbolic linking.  In conf/context.xml, add before the end:  
+   15. Allow symbolic linking.  In conf/context.xml, add before the end:  
        1. `<Resources allowLinking="true" />`
-   18. Install the systemctl siervice we just created and start it:  
+   16. Install the systemctl siervice we just created and start it:  
        1. `sudo systemctl daemon-reload`  
        2. `sudo systemctl enable tomee`  
        3. `sudo systemctl start tomee`  
