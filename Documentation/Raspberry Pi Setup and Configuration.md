@@ -459,7 +459,7 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
 #### Install Maven
 
 23. Install maven for building servlets on Tomcat/Tomee  
-    1. sudo apt \-y install maven
+    1. `sudo apt -y install maven`
 
 #### Install Tomee
 
@@ -469,51 +469,66 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
     3. cd /opt  
     4. sudo unzip /mnt/PiTracShare/tmp/apache-tomee-10.0.0-M3-plume.zip  (or whatever version you’re using)  
     5. sudo mv apache-tomee-plume-10.0.0-M3 tomee      \[or whatever version\]  
-    6. sudo chmod \-R 755 tomee  
+    6. `sudo chmod -R 755 tomee`  
        1. **WARNING** \- Only use this technique if you’re on a secure, private platform.  It’s easier to simply allow read-writes from other than the root user, but there’s other (better) ways of doing this too.  This is just a simple hack for a home system.  
-    7. cd tomee  
-    8. sudo chmod \-R go+w webapps (so that the tomcat uses can deploy webapps  
-    9. sudo vi conf/tomcat-users.xml and add before the last line (\</tomcat-users\>)  
-       1. \<role rolename="tomcat"/\>  
-       2. \<role rolename="admin-gui"/\>  
-       3. \<role rolename="manager-gui"/\>  
-       4. \<user username="tomcat" password="tomcat" roles="tomcat,admin-gui,manager-gui"/\>  
-    2. Add a systemctl daemon script to /etc/systemd/system/tomee.service so that tomee will start on boot. sudo vi /etc/systemd/system/tomee.service  
-       1. \[Unit\]  
-       2. Description=Apache TomEE  
-       3. After=network.target  
-       4. \[Service\]  
-       5. User=root  
-       6. Type=forking  
-       7. \#Environment=JAVA\_HOME=/usr/lib/jvm/default-java  
-       8. Environment=JAVA\_HOME=/usr/lib/jvm/java-1.17.0-openjdk-arm64  
-       9. Environment=CATALINA\_PID=/opt/tomee/temp/tomee.pid  
-       10. Environment=CATALINA\_HOME=/opt/tomee  
-       11. Environment=CATALINA\_BASE=/opt/tomee  
-       12. Environment=CATALINA\_OPTS='-server'  
-       13. Environment=JAVA\_OPTS='-Djava.awt.headless=true'  
-       14. ExecStart=/opt/tomee/bin/startup.sh  
-       15. ExecStop=/opt/tomee/bin/shutdown.sh  
-       16. KillSignal=SIGCONT  
-       17. \[Install\]  
-       18. WantedBy=multi-user.target  
-    2. Update /opt/tomee/webapps/manager/META-INF/context.xml to allow “.\*” instead of just 127.0….  Replace the whole regex string  
-       1. The result should simply be allow=".\*" on that line  
-       2. sudo cp context.xml context.xml.ORIGINAL    \[just in case\]  
-    2. Add a new document base/root to allow access to the shared mounted drive:  
-       1. Edit conf/server.xml and just before the /Host\> near the end of the file, put:  
-       2. \<Context docBase="/home/\<PiTracUserName\>/LM\_Shares/Images" path="/golfsim/Images" /\>  
+    7. `cd tomee`
+    8. `sudo chmod -R go+w webapps` (so that the tomcat uses can deploy webapps  
+    9. `sudo vi conf/tomcat-users.xml` and add before the last line (\</tomcat-users\>)  
+      ```xml
+      <role rolename="tomcat"/>
+      <role rolename="admin-gui"/>
+      <role rolename="manager-gui"/>
+      <user username="tomcat" password="tomcat" roles="tomcat,admin-gui,manager-gui"/>
+      ``` 
+      10. Add a systemctl daemon script to /etc/systemd/system/tomee.service so that tomee will start on boot. `sudo vi /etc/systemd/system/tomee.service
+```bash
+[Unit]  
+Description=Apache TomEE  
+After=network.target  
+[Service]  
+User=root  
+Type=forking  
+#Environment=JAVA_HOME=/usr/lib/jvm/default-java  
+Environment=JAVA_HOME=/usr/lib/jvm/java-1.17.0-openjdk-arm64  
+Environment=CATALINA_PID=/opt/tomee/temp/tomee.pid  
+Environment=CATALINA_HOME=/opt/tomee  
+Environment=CATALINA_BASE=/opt/tomee  
+Environment=CATALINA_OPTS='-server'  
+Environment=JAVA_OPTS='-Djava.awt.headless=true'  
+ExecStart=/opt/tomee/bin/startup.sh  
+ExecStop=/opt/tomee/bin/shutdown.sh  
+KillSignal=SIGCONT  
+[Install]  
+WantedBy=multi-user.target
+```
+11. Update /opt/tomee/webapps/manager/META-INF/context.xml to allow “.\*” instead of just 127.0….  Replace the whole regex string
+
+12. The result should simply be allow=".\*" on that line  
+```xml
+<Context antiResourceLocking="false" privileged="true" >
+  <CookieProcessor className="org.apache.tomcat.util.http.Rfc6265CookieProcessor"
+                   sameSiteCookies="strict" />
+  <Valve className="org.apache.catalina.valves.RemoteAddrValve"
+         allow=".*" />
+  <Manager sessionAttributeValueClassNameFilter="java\.lang\.(?:Boolean|Integer|Long|Number|String)|org\.apache\.catalina\.filters\.CsrfPreventionFilter\$LruCache(?:\$1)?|java\.util\.(?:Linked)?HashMap"/>
+</Context>
+```
+   13. `sudo cp context.xml context.xml.ORIGINAL` [just in case]  
+
+   14. Add a new document base/root to allow access to the shared mounted drive:  
+       1. Edit `~conf/server.xml` and just before the `</Host>` near the end of the file, put:  
+       2. `<Context docBase="/home/<user>/LM_Shares/Images" path="/golfsim/Images" />`  
        3. This will allow the Tomee system to access a directory that is outside of the main Tomee installation tree.  This directory will be used to get debugging images from the other Pi into the web-based GUI that this Pi will be serving up.  
        4. NOTE \- if the shared directory that is mounted off of the other Pi does not exist, Tomee may not be able to start  
-    2. Allow symbolic linking.  In conf/context.xml, add before the end:  
-       1. \<Resources allowLinking="true" /\>  
-    2. Install the systemctl siervice we just created and start it:  
-       1. sudo systemctl daemon-reload  
-       2. sudo systemctl enable tomee  
-       3. sudo systemctl start tomee  
-       4. sudo systemctl status tomee.service  
+   15. Allow symbolic linking.  In conf/context.xml, add before the end:  
+       1. `<Resources allowLinking="true" />`
+   16. Install the systemctl siervice we just created and start it:  
+       1. `sudo systemctl daemon-reload`  
+       2. `sudo systemctl enable tomee`  
+       3. `sudo systemctl start tomee`  
+       4. `sudo systemctl status tomee.service`  
        5. Try the following to see how things are starting and to fix any problems:  
-          1. sudo tail \-f /opt/tomee/logs/catalina.out  
+          1. `sudo tail -f /opt/tomee/logs/catalina.out`  
        6. Next login from a web console:   http://\<Pi-with-Tomee\>:8080/manager/html  
           1. user-name/pwd is by default tomcat/tomcat
 
