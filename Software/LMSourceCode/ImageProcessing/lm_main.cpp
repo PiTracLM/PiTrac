@@ -53,9 +53,9 @@ const double kLocationTolerancePercent = 10;
 static constexpr std::string_view TEST_IMAGE_PREFIX = "TEST_RESULT_GetBall_";
 
 #ifdef __unix__
-const std::string kBaseTestDir = "/mnt/VerdantShare/dev/GolfSim/LM/Images/";
+std::string kBaseTestDir = "/mnt/VerdantShare/dev/GolfSim/LM/Images/";
 #else
-const std::string kBaseTestDir = "V:\\Images\\";  // "D:\\GolfSim\\LM\\Images\\";
+std::string kBaseTestDir = "V:\\Images\\";  // "D:\\GolfSim\\LM\\Images\\";
 #endif
 
 
@@ -308,6 +308,13 @@ cv::Mat undistort_image(const cv::Mat& img, CameraHardware::CameraModel cameraMo
 
 bool read_test_images(const std::string& img1BaseFileName, const std::string& img2BaseFileName, cv::Mat& ball1Img, cv::Mat& ball2Img, cv::Mat& ball1ImgColor, cv::Mat& ball2ImgColor, 
                                 CameraHardware::CameraModel cameraModel, bool undistort = true) {
+
+#ifdef __unix__
+    GolfSimConfiguration::SetConstant("gs_config.logging.kLinuxBaseImageLoggingDir", kBaseTestDir);
+#else
+    GolfSimConfiguration::SetConstant("gs_config.logging.kPCBaseImageLoggingDir", kBaseTestDir); 
+#endif
+
 
     std::string img1FileName = kBaseTestDir + img1BaseFileName;
     std::string img2FileName = kBaseTestDir + img2BaseFileName;
@@ -839,7 +846,7 @@ bool testAnalyzeStrobedBalls() {
     cv::Mat ball1ImgGray;
     cv::Mat ball2ImgGray;
     cv::Mat ball1ImgColor;
-    cv::Mat ball2ImgColor;
+    cv::Mat ball2ImgColor; 
 
     CameraHardware::CameraModel  cameraModel = CameraHardware::PiGSCam6mmWideLens;
 

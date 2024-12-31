@@ -96,8 +96,10 @@ namespace golf_sim {
     double BallImageProc::kStrobedBallsParam2Increment = 4;
 
     bool  BallImageProc::kStrobedBallsUseAltHoughAlgorithm = true;
-    int BallImageProc::kStrobedBallsAltPreCannyBlurSize = 3;
-    int BallImageProc::kStrobedBallsAltPreHoughBlurSize = 13;
+    double BallImageProc::kStrobedBallsAltCannyLower = 35;
+    double BallImageProc::kStrobedBallsAltCannyUpper = 70;
+    int BallImageProc::kStrobedBallsAltPreCannyBlurSize = 11;
+    int BallImageProc::kStrobedBallsAltPreHoughBlurSize = 16;
     double BallImageProc::kStrobedBallsAltStartingParam2 = 0.95;
     double BallImageProc::kStrobedBallsAltMinParam2 = 0.6;
     double BallImageProc::kStrobedBallsAltMaxParam2 = 1.0;
@@ -221,6 +223,9 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsMaxHoughReturnCircles", kStrobedBallsMaxHoughReturnCircles);
 
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsUseAltHoughAlgorithm", kStrobedBallsUseAltHoughAlgorithm);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltCannyLower", kStrobedBallsAltCannyLower);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltCannyUpper", kStrobedBallsAltCannyUpper);
 
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltPreCannyBlurSize", kStrobedBallsAltPreCannyBlurSize);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltPreHoughBlurSize", kStrobedBallsAltPreHoughBlurSize);
@@ -435,7 +440,46 @@ namespace golf_sim {
 
             case kStrobed: {
 
-                cv::GaussianBlur(search_image, search_image, cv::Size(kStrobedBallsPreCannyBlurSize, kStrobedBallsPreCannyBlurSize), 0);
+                double canny_lower = 0.0;
+                double canny_upper = 0.0;
+                int pre_canny_blur_size = 0;
+                int pre_hough_blur_size = 0;
+
+                if (kStrobedBallsUseAltHoughAlgorithm) {
+                    canny_lower = kStrobedBallsAltCannyLower;
+                    canny_upper = kStrobedBallsAltCannyUpper;
+                    pre_canny_blur_size = kStrobedBallsAltPreCannyBlurSize;
+                    pre_hough_blur_size = kStrobedBallsAltPreHoughBlurSize;
+                }
+                else {
+                    canny_lower = kStrobedBallsCannyLower;
+                    canny_upper = kStrobedBallsCannyUpper;
+                    pre_canny_blur_size = kStrobedBallsPreCannyBlurSize;
+                    pre_hough_blur_size = kStrobedBallsPreHoughBlurSize;
+                }
+
+                // The size for the blur must be odd - force it up in value by 1 if necessary
+                if (pre_canny_blur_size > 0) {
+                    if (pre_canny_blur_size % 2 != 1) {
+                        pre_canny_blur_size++;
+                    }
+                }
+
+                if (pre_hough_blur_size > 0) {
+                    if (pre_hough_blur_size % 2 != 1) {
+                        pre_hough_blur_size++;
+                    }
+                }
+
+
+                GS_LOG_MSG(info, "Main HoughCircle Image Prep - Performing Pre-Hough Bur and Canny for kStrobed mode.");
+                GS_LOG_MSG(info, "  Blur Parameters are: pre_canny_blur_size = " + std::to_string(pre_canny_blur_size) +
+                        ", pre_hough_blur_size " + std::to_string(pre_hough_blur_size));
+                GS_LOG_MSG(info, "  Canny Parameters are: canny_lower = " + std::to_string(canny_lower) +
+                    ", canny_upper " + std::to_string(canny_upper));
+
+
+                cv::GaussianBlur(search_image, search_image, cv::Size(pre_canny_blur_size, pre_canny_blur_size), 0);
 
                 // TBD - REMOVED THIS FOR NOW
                 for (int i = 0; i < 0; i++) {
@@ -445,21 +489,14 @@ namespace golf_sim {
 
                 LoggingTools::DebugShowImage(image_name_ + "  Strobed Ball Image - Ready for Edge Detection", search_image);
 
-                /*
-                EDPF testEDPF = EDPF(search_image);
-                Mat edgePFImage = testEDPF.getEdgeImage();
-                edgePFImage = edgePFImage * -1 + 255;
-                search_image = edgePFImage;
-                */
                 cv::Mat cannyOutput_for_balls;
-                cv::Canny(search_image, cannyOutput_for_balls, kStrobedBallsCannyLower, kStrobedBallsCannyUpper);
+                cv::Canny(search_image, cannyOutput_for_balls, canny_lower, canny_upper);
 
                 LoggingTools::DebugShowImage(image_name_ + "  cannyOutput_for_balls", cannyOutput_for_balls);
 
                 // Blur the lines-only image back to the search_image that the code below uses
-                cv::GaussianBlur(cannyOutput_for_balls, search_image, cv::Size(kStrobedBallsPreHoughBlurSize, kStrobedBallsPreHoughBlurSize), 0);   // Nominal is 7x7
-                /*****  For a placed ball, the hough circle detector seems to perform better without any blurring
-                  ***/
+                cv::GaussianBlur(cannyOutput_for_balls, search_image, cv::Size(pre_hough_blur_size, pre_hough_blur_size), 0);   // Nominal is 7x7
+
                 break;
             }
 
@@ -604,7 +641,7 @@ namespace golf_sim {
                 // Don't want to get too crazy loose too fast in order to find more balls
                 param2_increment = use_alt ? kStrobedBallsAltParam2Increment : kStrobedBallsParam2Increment;
 
-                minDistance = minimumSearchRadius * 0.4;
+                minDistance = minimumSearchRadius * 0.18;  // TBD - Parameterize this!
 
                 // We have to have at least two candidate balls to do spin analysis
                 // Try for more tp make sure we get all the overlapped balls.
@@ -1375,7 +1412,7 @@ namespace golf_sim {
         int max_ball_radius = int(ballRadius * kBestCircleIdentificationMaxRadiusRatio);
 
 
-        // TBD - REMOVED THIS FOR NOW
+        // TBD - REMOVED THIS FOR NOW - it was decreasing accuracy.
         for (int i = 0; i < 0; i++) {
             cv::erode(finalChoiceSubImg, finalChoiceSubImg, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)), cv::Point(-1, -1), 3);
             cv::dilate(finalChoiceSubImg, finalChoiceSubImg, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)), cv::Point(-1, -1), 3);
@@ -1389,8 +1426,9 @@ namespace golf_sim {
         bool is_externally_strobed = GolfSimOptions::GetCommandLineOptions().lm_comparison_mode_;
 
         if (!is_externally_strobed) {
+
             // We're using the same image preparation as for a single, placed ball for now - 
-            // TBD - Ensure that's the best approach
+            // TBD - Ensure that's the best approach - Current turned off (see 0 at end)
             cv::GaussianBlur(finalChoiceSubImg, finalChoiceSubImg, cv::Size(kBestCirclePreCannyBlurSize, kBestCirclePreCannyBlurSize), 0);
 
             cv::Canny(finalChoiceSubImg, cannyOutput_for_balls, kBestCircleCannyLower, kBestCircleCannyUpper);
@@ -1440,7 +1478,7 @@ namespace golf_sim {
         cv::HoughCircles(
             finalChoiceSubImg,
             finalTargetedCircles,
-            cv::HOUGH_GRADIENT,  // sscv::HOUGH_GRADIENT_ALT,
+            cv::HOUGH_GRADIENT,  // cv::HOUGH_GRADIENT_ALT,
             currentDp,
             /*minDist = */ minimum_inter_ball_distance, 
             /*param1 = */ currentParam1,

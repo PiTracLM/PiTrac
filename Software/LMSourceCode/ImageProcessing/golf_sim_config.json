@@ -7,7 +7,7 @@
 			"kLogWebserverImagesToFile": 1,
 			"kLogDiagnosticImagesToUniqueFiles": 0,
 			"kLinuxBaseImageLoggingDir": "/home/PiTracUserName/LM_Shares/Images/",
-			"kPCBaseImageLoggingDir": "D:\\GolfSim\\LM\\Images\\"
+			"kPCBaseImageLoggingDir": "M:\\Dev\\PiTrac\\Software\\LMSourceCode\\Images\\"
 		},
 
 		"modes": {
@@ -15,8 +15,8 @@
 		},
 
 		"ball_identification": {
-			"kStrobedBallsCannyLower": 50,
-			"kStrobedBallsCannyUpper": 100,
+			"kStrobedBallsCannyLower": 33,
+			"kStrobedBallsCannyUpper": 90,
 			"kStrobedBallsMinHoughReturnCircles": 8,
 			"kStrobedBallsMaxHoughReturnCircles": 20,
 
@@ -30,16 +30,19 @@
 			"kStrobedBallsPreCannyBlurSize": 3,
 			"kStrobedBallsPreHoughBlurSize": 13,
 
-			"kStrobedBallsUseAltHoughAlgorithm": 0,
+			"kStrobedBallsUseAltHoughAlgorithm": 1,
 
-			"kStrobedBallsAltMinParam2": 0.6,
+			"kStrobedBallsAltCannyLower": 35,
+			"kStrobedBallsAltCannyUpper": 80,
+			"kStrobedBallsAltPreCannyBlurSize": 11,
+			"kStrobedBallsAltPreHoughBlurSize HAS TO BE ODD": 0,
+			"kStrobedBallsAltPreHoughBlurSize": 11,
+			"kStrobedBallsAltMinParam2": 0.5,
 			"kStrobedBallsAltMaxParam2": 1.0,
-			"kStrobedBallsAltStartingParam2": 0.60,
+			"kStrobedBallsAltStartingParam2": 0.65,
 			"kStrobedBallsAltParam2Increment": 0.05,
 			"kStrobedBallsAltCurrentParam1": 130.0,
-			"kStrobedBallsAltHoughDpParam1": 1.5,
-			"kStrobedBallsAltPreCannyBlurSize": 3,
-			"kStrobedBallsAltPreHoughBlurSize": 13,
+			"kStrobedBallsAltHoughDpParam1": 0.8,
 
 			"kPuttingBallMinParam2": 0.8,
 			"kPuttingBallMaxParam2": 1.0,
@@ -161,8 +164,8 @@
 		},
 
 		"user_interface": {
-			"kWebServerTomcatShareDirectory": "Images",
-			"kWebServerShareDirectory": "/home/PiTracUserName/LM_Shares/Images",
+			"kWebServerTomcatShareDirectory": "WebShare",
+			"kWebServerShareDirectory": "/home/PiTracUserName/LM_Shares/WebShare",
 			"kWebServerResultBallExposureCandidates": "ball_exposure_candidates",
 			"kWebServerResultSpinBall1Image": "spin_ball_1_gray_image1",
 			"kWebServerResultSpinBall2Image": "spin_ball_2_gray_image1",
@@ -269,11 +272,8 @@
 		},
 
 		"testing": {
-			"kTwoImageTestTeedBallImage": "gs_log_img__log_ball_final_found_ball_img_Shot_E1_2024-Jul-09_12.16.00.png",
-			"kTwoImageTestStrobedImage": "gs_log_img__log_cam2_last_strobed_img_Shot_0_2024-Jul-09_12.06.53.png",
-
-			"TEMP_kTwoImageTestTeedBallImage": "gs_log_img__log_ball_final_found_ball_img_Shot_27_2024-Jul-09_12.22.51.png",
-			"TEMP_kTwoImageTestStrobedImage": "gs_log_img__log_cam2_last_strobed_img_Shot_0_2024-Jul-09_12.23.08.png",
+			"kTwoImageTestTeedBallImage": "gs_log_img__log_ball_final_found_ball_img.png",
+			"kTwoImageTestStrobedImage": "log_cam2_last_strobed_img.png",
 
 			"kExternallyStrobedEnvNumber_bits_for_fast_on_pulse_": 5,
 
