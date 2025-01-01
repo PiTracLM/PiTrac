@@ -2704,19 +2704,24 @@ namespace golf_sim {
             return rotationResult;
         }
 
+        bool write_spin_analysis_CSV_files = false;
 
-        // This data export can be used for, say, Excel analysis - CSV format
-        std::string csv_fname_coarse = "spin_analysis_coarse.csv";
-        ofstream csv_file_coarse(csv_fname_coarse);
-        GS_LOG_TRACE_MSG(trace, "Writing CSV spin data to: " + csv_fname_coarse);
-        for (auto& element : comparison_csv_data)
-        {
-            // Don't use logging utility so that we don't have all the timing crap in the output
-            csv_file_coarse << element;
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kWriteSpinAnalysisCsvFiles", write_spin_analysis_CSV_files);
+        
+        if (write_spin_analysis_CSV_files) {
+            // This data export can be used for, say, Excel analysis - CSV format
+            std::string csv_fname_coarse = "spin_analysis_coarse.csv";
+            ofstream csv_file_coarse(csv_fname_coarse);
+            GS_LOG_TRACE_MSG(trace, "Writing CSV spin data to: " + csv_fname_coarse);
+            for (auto& element : comparison_csv_data)
+            {
+                // Don't use logging utility so that we don't have all the timing crap in the output
+                csv_file_coarse << element;
+            }
+            csv_file_coarse.close();
         }
-        csv_file_coarse.close();
 
-        // See which angle looked best and then iterate more closely near thos angles
+        // See which angle looked best and then iterate more closely near those angles
         RotationCandidate c = candidates[maxIndex];
 
         std::string s = "Best Coarse Initial Rotation Candidate was #" + std::to_string(maxIndex) + " - Rot: (" + std::to_string(c.x_rotation_degrees) + ", " + std::to_string(c.y_rotation_degrees) + ", " + std::to_string(c.z_rotation_degrees) + ") ";
@@ -2752,15 +2757,18 @@ namespace golf_sim {
         // TBD - change CompareCandidateAngleImages to work directly with the "3D" images
         maxIndex = CompareCandidateAngleImages(&ball_image2DimpleEdges, &finalOutputCandidateElementsMat, &finalOutputCandidateElementsMatSize, &finalCandidates, comparison_csv_data);
 
-        std::string csv_fname_fine = "spin_analysis_fine.csv";
-        ofstream csv_file_fine(csv_fname_fine);
-        GS_LOG_TRACE_MSG(trace, "Writing CSV spin data to: " + csv_fname_fine);
-        for (auto& element : comparison_csv_data)
-        {
-            // Don't use logging utility so that we don't have all the timing crap in the output
-            csv_file_fine << element;
+        if (write_spin_analysis_CSV_files) {
+
+            std::string csv_fname_fine = "spin_analysis_fine.csv";
+            ofstream csv_file_fine(csv_fname_fine);
+            GS_LOG_TRACE_MSG(trace, "Writing CSV spin data to: " + csv_fname_fine);
+            for (auto& element : comparison_csv_data)
+            {
+                // Don't use logging utility so that we don't have all the timing crap in the output
+                csv_file_fine << element;
+            }
+            csv_file_fine.close();
         }
-        csv_file_fine.close();
 
         // Analyze the results
         int bestRotX = 0;
