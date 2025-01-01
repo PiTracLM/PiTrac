@@ -7,7 +7,7 @@
 			"kLogWebserverImagesToFile": 1,
 			"kLogDiagnosticImagesToUniqueFiles": 0,
 			"kLinuxBaseImageLoggingDir": "/home/PiTracUserName/LM_Shares/Images/",
-			"kPCBaseImageLoggingDir": "D:\\GolfSim\\LM\\Images\\"
+			"kPCBaseImageLoggingDir": "L:/Images/"
 		},
 
 		"modes": {
@@ -68,6 +68,7 @@
 			"kPlacedBallHoughDpParam1": 1.5,
 			"kPlacedBallUseLargestBall": 0,
 
+			"Circle Refinement is not currently working - keep to 0": 0,
 			"kUseBestCircleRefinement": 0,
 			"kUseBestCircleLargestCircle": 0,
 
@@ -145,6 +146,7 @@
 
 		"spin_analysis": {
 
+			"kWriteSpinAnalysisCsvFiles": 0,
 			"kGaborMaxWhitePercent": 45,
 			"kGaborMinWhitePercent": 39,
 			"kCoarseXRotationDegreesIncrement": 3,
@@ -272,7 +274,7 @@
 		},
 
 		"testing": {
-			"kTwoImageTestTeedBallImage": "gs_log_img__log_ball_final_found_ball_img.png",
+			"kTwoImageTestTeedBallImage": "log_ball_final_found_ball_img.png",
 			"kTwoImageTestStrobedImage": "log_cam2_last_strobed_img.png",
 
 			"kExternallyStrobedEnvNumber_bits_for_fast_on_pulse_": 5,

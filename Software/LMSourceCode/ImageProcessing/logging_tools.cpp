@@ -21,7 +21,7 @@ namespace golf_sim {
 
 
     // Create a custom sink to save the last <n> log messages
-
+    /*** TBD - Not Completed yet
     class RecentMessageSink : public basic_formatted_sink_backend<
         char,
         combine_requirements< synchronized_feeding, flushing >::type
@@ -57,7 +57,7 @@ namespace golf_sim {
 
         BOOST_LOG_API void flush() {};
     };
-
+    ***/
 
 
 
@@ -68,6 +68,7 @@ namespace golf_sim {
     bool LoggingTools::logging_tool_wait_for_keypress_ = false;
 
     boost::circular_buffer<std::string> LoggingTools::RecentLogMessages(20);
+
 #ifdef __unix__
     std::string LoggingTools::kBaseImageLoggingDir = "/mnt/VerdantShare/dev/GolfSim/LM/Images/";
 #else
@@ -158,6 +159,7 @@ namespace golf_sim {
         fsSink->locked_backend()->auto_flush(true);
 
         // Add our custom recent-messages sink to the logger.
+        /*** TBD - Not Completed yet
         boost::shared_ptr <RecentMessageSink> RMSink = boost::make_shared<RecentMessageSink>();
 
         // Wrap it into the frontend and register in the core.
@@ -168,6 +170,8 @@ namespace golf_sim {
         // boost::log::sources::logger logger;
         boost::log::core::get()->add_sink(sink);
         sink->set_formatter(logFmt);
+        ***/
+
     }
 
     boost::circular_buffer<std::string> &LoggingTools::GetRecentLogMessagesQueue() {
