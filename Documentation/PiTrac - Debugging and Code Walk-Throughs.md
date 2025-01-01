@@ -45,11 +45,13 @@ In order to build the PiTrac code in a non-Pi environment, you’ll need to set 
      
    1. In VS, go to Project/ImageProcessing Properties:  
         
-   2. ![image][image1]  
+   2. ![image](https://github.com/user-attachments/assets/429ce409-f7b9-49de-83df-71835daf7bff)
+ 
         
       1. For example:    E:\\Dev\_Libs\\opencv\\build\\include;E:\\Dev\_Libs\\boost\_1\_87\_0  
    3. Point to the correct libraries:  
-      ![image][image2]  
+      ![image](https://github.com/user-attachments/assets/43ffd981-dac5-48ab-96c4-f412d42b0005)
+
         
       1. For example, E:\\Dev\_Libs\\opencv\\build\\x64\\vc16\\lib\\opencv\_world4100d.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)  
          * \[NOTE \-The \*d.lib is for debug libraries.  If not debugging, then remove the “d”.  And do not mix \* and \*d \!
@@ -57,21 +59,25 @@ In order to build the PiTrac code in a non-Pi environment, you’ll need to set 
       
 
    4. In the Linker→General→Additional Library Directories, add:  
-      1. ![][image3]  
+      1. ![image](https://github.com/user-attachments/assets/8ec82d6d-9508-4850-bf4e-887a3953f2b4)
+
       2. For example:  E:\\Dev\_Libs\\opencv\\build\\x64\\vc16\\lib;E:\\Dev\_Libs\\boost\_1\_87\_0\\stage\\lib  
    5. Set up the compiler defines that help pick the correct boost bindings:  
-      1. ![][image4]  
+      1. ![image](https://github.com/user-attachments/assets/5f68600d-4b34-4b7d-b3ee-492d08fa7d1f)
+
       2. BOOST\_BIND\_GLOBAL\_PLACEHOLDERS;BOOST\_ALL\_DYN\_LINK;BOOST\_USE\_WINAPI\_VERSION=0x0A00;\_DEBUG;\_CONSOLE;%(PreprocessorDefinitions)  
    6. Point to the correct run-time binaries and libraries:  (and note that the suggested opencv instructions cited above do not use this step and instead copy files around (less desirable)  
         
-   7. ![image][image5]  
+   7. ![image](https://github.com/user-attachments/assets/efe6f950-0868-48ea-934a-807c421162b6)
+  
         
       1. For example, PATH=%PATH%;E:\\Dev\_Libs\\opencv\\build\\x64\\vc16\\bin;E:\\Dev\_Libs\\boost\_1\_87\_0\\lib64-msvc-14.3
 
    
 
 2. Setup the command-line parameters (for example):  
-   1.![image][image6]  
+   1.![image](https://github.com/user-attachments/assets/b15657e8-d3d3-4c8f-a652-b6273d49e017)
+
      
    2. For example, the following is a good starting place for stepping through how the Pi1/Camera 1 system processes the golf ball images.  
       1. \--show\_images 1 \--lm\_comparison\_mode=0 \--logging\_level trace   \--artifact\_save\_level=all \--wait\_keys 1 \--system\_mode camera1\_test\_standalone  \--search\_center\_x 800  \--search\_center\_y 550  
@@ -109,18 +115,23 @@ Let’s try a real-life example from a problem in a relatively brightly-lit test
 With those settings, a particular shot produced on an actual PiTrac generated the following image files in \~/LM\_Shares/Images on the Pi’s.  If you don’t have any images, there are some similar examples in the PiTrac/Software/Images directory.
 
 log\_cam2\_last\_strobed\_img:  
-![image][image7]
+![image](https://github.com/user-attachments/assets/ea72116e-be62-4c55-9a48-7feb75c2e121)
+
 
 ball\_exposure\_candidates:  
-![image][image8]
+![image](https://github.com/user-attachments/assets/2b4a6aa1-0824-4bef-b8dd-4498ba0bf350)
+
 
 Spin\_ball\_1\_gray\_image1 and spin\_ball\_2\_gray\_image1:  
-![image][image9]![image][image10]
+![image](https://github.com/user-attachments/assets/4f104b52-071c-435d-accf-5164e31ccc33)![image](https://github.com/user-attachments/assets/882238d3-1924-45cc-9fc6-e6e2aaac7b94)
+
+
 
 You should also have an image of where the teed-up ball was, as this particular example is going to try to go through all the processing, including calculating where the ball was initially (and then, later, in comparison to the strobed balls.  A typical starting image is something like:  
 gs\_log\_img\_\_log\_ball\_final\_found\_ball\_img.png
 
-![image][image11] (we often just reuse some old starting image if we’re just focused on debugging the strobed image processing.  
+![image](https://github.com/user-attachments/assets/e1aec32b-2f87-4d34-b1cb-c899aa610b48)
+ (we often just reuse some old starting image if we’re just focused on debugging the strobed image processing.  
 NOTE \- The teed-up picture does have some interaction with the downstream strobed-image processing.  The teed-up image gives the system an idea of how far from the monitor the ball is starting.  That Z-axis value is then used to choose a range of ball-radii to be looking for in the strobed picture.
 
 The strobed picture looks fairly solid, but at least two questions come to mind:
@@ -155,19 +166,22 @@ The following instructions are for Visual Studio 2022 in Windows, but should be 
 2. Set a break-point at the start of the testAnalyzeStrobedBalls() function and hit F5 to run.  
      
    1. NOTE \- You may have to do a little debugging to make sure the code gets to that function first.  
-   2. ![image][image12]
+   2. ![image](https://github.com/user-attachments/assets/30d04ce0-45ee-44ce-ae89-540a7e912cae)
+
 
    
 
 2. Another good place to put a break-point to start is here at bool GolfSimCamera::ProcessReceivedCam2Image  
      
-3. ![image][image13]  
+3. ![image](https://github.com/user-attachments/assets/c261ba8a-b0a9-4015-aa11-67e38f6c924c)
+
      
 4. After stepping through the Teed-up ball processing in GetCalibratedBall(), the system will start into the strobed image processing.  
      
 5. In our case, the initial identification ball circles (which uses a technique called Hough identification) results in the following:  
      
-6. ![image][image14]  
+6. ![image](https://github.com/user-attachments/assets/0d74d288-ee73-4c1d-9a5d-2da3c8516cfb)
+  
      
 7. This is ***not*** a good start.  It’s likely there will be some missed-ball identifications, such as those near the bottom of the screen (which should be filtered out later), but we may want to see if we can provide better settings to improve this starting point.  
      
@@ -203,7 +217,8 @@ Hough Circle Detection Playground:
      
 4. The result was:  
      
-   1. ![image][image15]
+   1. ![image](https://github.com/user-attachments/assets/0b3e141c-ec35-4d35-8436-3766a87d4988)
+
 
    
 
