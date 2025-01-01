@@ -6,8 +6,8 @@
 			"kLogIntermediateSpinImagesToFile": 0,
 			"kLogWebserverImagesToFile": 1,
 			"kLogDiagnosticImagesToUniqueFiles": 0,
-			"kLinuxBaseImageLoggingDir": "/home/PiTracUserName/LM_Shares/Images/",
-			"kPCBaseImageLoggingDir": "L:/Images/"
+			"kLinuxBaseImageLoggingDir": "/home/mleary/LM_Shares/Images/",
+			"kPCBaseImageLoggingDir": "D:\\GolfSim\\LM\\Images\\"
 		},
 
 		"modes": {
@@ -68,7 +68,6 @@
 			"kPlacedBallHoughDpParam1": 1.5,
 			"kPlacedBallUseLargestBall": 0,
 
-			"Circle Refinement is not currently working - keep to 0": 0,
 			"kUseBestCircleRefinement": 0,
 			"kUseBestCircleLargestCircle": 0,
 
@@ -146,7 +145,6 @@
 
 		"spin_analysis": {
 
-			"kWriteSpinAnalysisCsvFiles": 0,
 			"kGaborMaxWhitePercent": 45,
 			"kGaborMinWhitePercent": 39,
 			"kCoarseXRotationDegreesIncrement": 3,
@@ -167,7 +165,7 @@
 
 		"user_interface": {
 			"kWebServerTomcatShareDirectory": "WebShare",
-			"kWebServerShareDirectory": "/home/PiTracUserName/LM_Shares/WebShare",
+			"kWebServerShareDirectory": "/home/mleary/LM_Shares/WebShare",
 			"kWebServerResultBallExposureCandidates": "ball_exposure_candidates",
 			"kWebServerResultSpinBall1Image": "spin_ball_1_gray_image1",
 			"kWebServerResultSpinBall2Image": "spin_ball_2_gray_image1",
@@ -274,7 +272,7 @@
 		},
 
 		"testing": {
-			"kTwoImageTestTeedBallImage": "log_ball_final_found_ball_img.png",
+			"kTwoImageTestTeedBallImage": "gs_log_img__log_ball_final_found_ball_img.png",
 			"kTwoImageTestStrobedImage": "log_cam2_last_strobed_img.png",
 
 			"kExternallyStrobedEnvNumber_bits_for_fast_on_pulse_": 5,
