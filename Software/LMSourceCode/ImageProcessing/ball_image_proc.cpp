@@ -2751,7 +2751,7 @@ namespace golf_sim {
         std::vector< RotationCandidate> finalCandidates;
 
         // After this, the finalOutputCandidateElementsMat will have X,Y,Z elements with an index into the finalCandidates vector.
-        // Each candidate in finalCandidates will have an image, assocaited X,Y,Z information and a place to put a score
+        // Each candidate in finalCandidates will have an image, associated X,Y,Z information and a place to put a score
         ComputeCandidateAngleImages(ball_image1DimpleEdges, finalSearchSpace, finalOutputCandidateElementsMat, finalOutputCandidateElementsMatSize, finalCandidates, local_ball1);
 
         // TBD - change CompareCandidateAngleImages to work directly with the "3D" images
