@@ -52,11 +52,7 @@ const double kLocationTolerancePercent = 10;
 // The result files we create will be prefixed with this
 static constexpr std::string_view TEST_IMAGE_PREFIX = "TEST_RESULT_GetBall_";
 
-#ifdef __unix__
-std::string kBaseTestDir = "/mnt/VerdantShare/dev/GolfSim/LM/Images/";
-#else
-std::string kBaseTestDir = "V:\\Images\\";  // "D:\\GolfSim\\LM\\Images\\";
-#endif
+std::string kBaseTestDir = "Will be set from the .json configuration file";
 
 
 BallImageProc *get_image_processor() {
@@ -237,7 +233,14 @@ bool testProjection() {
     GolfBall ball1, ball2;
 
 
-    const std::string kBaseTestDir = "D:\\GolfSim\\C++Code\\GolfSim\\ImageProcessing\\";
+    std::string kBaseTestDir = "D:\\GolfSim\\C++Code\\GolfSim\\ImageProcessing\\";
+
+#ifdef __unix__
+    GolfSimConfiguration::SetConstant("gs_config.logging.kLinuxBaseImageLoggingDir", kBaseTestDir);
+#else
+    GolfSimConfiguration::SetConstant("gs_config.logging.kPCBaseImageLoggingDir", kBaseTestDir);
+#endif
+
 
     const std::string k0_DegreeBallFileName_00 = kBaseTestDir + "test_ball_masked_0_deg_dulled.png";
     const std::string k45_DegreeBallFileName_00 = kBaseTestDir + "test_ball_masked_45_deg_dulled.png";
@@ -1113,9 +1116,9 @@ bool TestExternalSimMessage() {
     GsGSProResults test_result(ball);
     test_result.speed_mph_ = 99;
     test_result.vla_deg_ = 23.4F;
-    test_result.hla_deg_ = 1.23;
-    test_result.back_spin_rpm_ = 3456.0;
-    test_result.side_spin_rpm_ = -5.678;
+    test_result.hla_deg_ = 1.23F;
+    test_result.back_spin_rpm_ = 3456;
+    test_result.side_spin_rpm_ = -567;
 
 #ifdef __unix__   
 
@@ -1139,7 +1142,7 @@ bool TestExternalSimMessage() {
     }
 
     test_result.speed_mph_ = 55;
-    test_result.vla_deg_ = 12.3;
+    test_result.vla_deg_ = 12.3F;
 
     shot_number++;
 
@@ -1167,7 +1170,7 @@ bool TestBallDeltaCalculations() {
     ball1.set_x(ball1.ball_circle_[0]);
     ball1.ball_circle_[1] = 424;
     ball1.set_y(ball1.ball_circle_[1]);
-    ball1.ball_circle_[2] = 50.41;
+    ball1.ball_circle_[2] = 50;
     ball1.measured_radius_pixels_ = ball1.ball_circle_[2];
     ball1.distance_to_z_plane_from_lens_ = 0.761;
     ball1.distances_ortho_camera_perspective_[0] = -0.514;

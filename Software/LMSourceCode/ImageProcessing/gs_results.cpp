@@ -31,6 +31,9 @@ namespace golf_sim {
         // TBD - Not sure club type should be set here,
         // but this is a reasonable default for now
         club_type_ = GolfSimClubs::GetCurrentClubType();
+
+        // TBD - Even though this is a constructor, it might be a reasonable
+        // place to calculate the Carry yardarge.
     }
 
     float GsResults::GetSpinAxis() const {
@@ -51,6 +54,8 @@ namespace golf_sim {
         s += "Side Spin:        " + std::to_string(side_spin_rpm_) + "\n";
         s += "Spin Axis (deg.): " + std::to_string(GetSpinAxis()) + "\n";
         s += "Club Type: (1D 3P)" + std::to_string(club_type_) + "\n";
+
+        // TBD - Add internal carry value.
 
         return s;
     }

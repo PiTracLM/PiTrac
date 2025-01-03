@@ -62,11 +62,12 @@ import java.io.IOException;
 @WebServlet("/monitor")
 public class MonitorServlet extends HttpServlet {
 
-
+    // NOTE - these should reflect types in gs_ipc_result
     public enum GsIPCResultType { 
         kUnknown,
         kInitializing,
         kWaitingForBallToAppear,
+        kWaitingForSimulatorArmed,
         kPausingForBallStabilization,
         kMultipleBallsPresent,
         kBallPlacedAndReadyForHit,
@@ -363,6 +364,7 @@ public class MonitorServlet extends HttpServlet {
                 s += "       Log Messages:\n" + log_messages_console_str;
             }
 
+            // Set the GUI top color to be white as a default.  Special cases follow
             request.setAttribute("ball_ready_color", "\"item1 grid-item-text-center-white\"");
 
             // System.out.println("Checking for Ball placed");
@@ -371,6 +373,12 @@ public class MonitorServlet extends HttpServlet {
             {
                 System.out.println("Ball placed - setting ball_ready_color to 'item1 grid-item-text-center-green'");
                 request.setAttribute("ball_ready_color", "\"item1 grid-item-text-center-green\"");
+            }
+
+            if (result_type_ == GsIPCResultType.kWaitingForSimulatorArmed)
+            {
+                System.out.println("kWaitingForSimulatorArmed - setting ball_ready_color to 'item1 grid-item-text-center-yellow'");
+                request.setAttribute("ball_ready_color", "\"item1 grid-item-text-center-yellow\"");
             }
 
             // If the result is a hit, then include IMG images
@@ -397,6 +405,7 @@ public class MonitorServlet extends HttpServlet {
             }
             else if (result_type_ == GsIPCResultType.kWaitingForBallToAppear )
             {
+                // Make sure the user can see what the monitor is seeing, especially if the user may have placed the ball outside the ball search area
                 request.setAttribute("images", "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerBallSearchAreaImage + "\" alt=\"Ball Search Area\" width = \"360\" heigth=\"272\" />");        
             }
 
@@ -438,6 +447,11 @@ public class MonitorServlet extends HttpServlet {
             switch (t) {
                 case kWaitingForBallToAppear: {
                     s = "Waiting for ball to appear in view frame";
+                break;
+                }
+                
+                case kWaitingForSimulatorArmed: {
+                    s = "Waiting for the simulator to be armed";
                 break;
                 }
                 
@@ -905,6 +919,7 @@ public class MonitorServlet extends HttpServlet {
                             if (new_result.speed_mpers_ <= 0 && 
                                 (new_result.result_type_ != GsIPCResultType.kBallPlacedAndReadyForHit &&
                                  new_result.result_type_ != GsIPCResultType.kInitializing &&
+                                 new_result.result_type_ != GsIPCResultType.kWaitingForSimulatorArmed &&
                                  new_result.result_type_ != GsIPCResultType.kError
                                 )) {
                                 // Don't replace the current result, as the user may still be looking at it

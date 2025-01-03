@@ -28,13 +28,14 @@ namespace golf_sim {
     enum class GsIPCResultType { kUnknown = 0, 
         kInitializing = 1, 
         kWaitingForBallToAppear = 2,
-        kPausingForBallStabilization = 3,
-        kMultipleBallsPresent = 4,
-        kBallPlacedAndReadyForHit = 5,
-        kHit = 6,
-        kError = 7,
-        kCalibrationResults = 8,
-        kControlMessage = 9};
+        kWaitingForSimulatorArmed = 3,
+        kPausingForBallStabilization = 4,
+        kMultipleBallsPresent = 5,
+        kBallPlacedAndReadyForHit = 6,
+        kHit = 7,
+        kError = 8,
+        kCalibrationResults = 9,
+        kControlMessage = 10};
 
     class GsIPCResult {
 

@@ -36,6 +36,10 @@ namespace golf_sim {
             std::chrono::steady_clock::time_point startTime_;
         };
 
+        struct WaitingForSimulatorArmed {
+            std::chrono::steady_clock::time_point startTime_;
+        };
+
         struct WaitingForBallStabilization {
             std::chrono::steady_clock::time_point lastBallAcquisitionTime_;
             std::chrono::steady_clock::time_point startTime_;
@@ -85,6 +89,7 @@ namespace golf_sim {
     // Must contain each of the above states
     using GolfSimState = std::variant<  state::InitializingCamera1System,
                                         state::Exiting,
+                                        state::WaitingForSimulatorArmed,
                                         state::WaitingForBall,
                                         state::WaitingForBallStabilization,
                                         state::WaitingForBallHit,

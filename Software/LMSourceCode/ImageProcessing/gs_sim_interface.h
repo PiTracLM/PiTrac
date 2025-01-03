@@ -36,6 +36,9 @@ namespace golf_sim {
         // De-initialize and destory and sim interfaces that are configured
         static void DeInitializeSims();
 
+        // Returns true if at least one golf sim is connected to the system.
+        static bool SimIsConnected();
+
         // To be called from the launch monitor
         static bool SendResultsToGolfSims(const GsResults& results);
 
@@ -63,6 +66,8 @@ namespace golf_sim {
         // Returns the number of bytes written
         virtual int SendSimMessage(const std::string& message);
 
+        // Deals with whether or not ALL of the connected simulators are armed
+        // (ready to take a shot).  Some sims just return true.
         virtual void SetSimSystemArmed(const bool is_armed);
         virtual bool GetSimSystemArmed();
 

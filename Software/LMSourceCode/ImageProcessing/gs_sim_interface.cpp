@@ -93,6 +93,29 @@ namespace golf_sim {
     }
 
 
+    bool GsSimInterface::SimIsConnected() {
+
+        GS_LOG_TRACE_MSG(trace, "GsSimInterface::SimIsConnected()");
+
+        if (!sims_initialized_) {
+            // If we're not even initialized, there can't be any connected golf sims.
+            return false;
+        }
+
+        bool sim_is_connected = false;
+
+#ifdef __unix__  // Ignore in Windows environment
+
+        for (auto interface : interfaces_) {
+            if (interface != nullptr) {
+                sim_is_connected = true;
+                continue;
+            }
+        }
+#endif
+        return sim_is_connected;
+    }
+
     void GsSimInterface::DeInitializeSims() {
 
         GS_LOG_TRACE_MSG(trace, "GsSimInterface::DeInitializeSims()");
@@ -125,6 +148,11 @@ namespace golf_sim {
 
     bool GsSimInterface::GetSimSystemArmed() {
         boost::lock_guard<boost::mutex> lock(sim_arming_mutex_);
+
+        if (!SimIsConnected()) {
+            // If no sims, then consider the system armed as a reasonable fallback behavior
+            return true;
+        }
 
         return sim_system_is_armed_;
     }

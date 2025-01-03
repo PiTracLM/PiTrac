@@ -225,8 +225,8 @@ void GolfBall::PrintBallFlightResults() const {
 void GolfBall::AverageBalls(const std::vector<GolfBall>& ball_vector, GolfBall& averaged_ball) {
     double number_balls = (double)ball_vector.size();
 
-    averaged_ball.set_x(0);
-    averaged_ball.set_y(0);
+    averaged_ball.set_x(0.0F);
+    averaged_ball.set_y(0.0F);
     averaged_ball.velocity_ = 0;
     averaged_ball.position_deltas_ball_perspective_ = { 0, 0, 0 };
     averaged_ball.angles_ball_perspective_ = { 0,0 };
@@ -237,11 +237,11 @@ void GolfBall::AverageBalls(const std::vector<GolfBall>& ball_vector, GolfBall& 
         averaged_ball.velocity_ += b.velocity_ / number_balls;
 
         long x = averaged_ball.x();
-        x += b.x() / number_balls;
+        x += (long)(b.x() / number_balls);
         averaged_ball.set_x(x);
 
         long y = averaged_ball.y();
-        y += b.y() / number_balls;
+        y += (long)(b.y() / number_balls);
         averaged_ball.set_y(y);
 
         // NOTE - Not clear how often the position deltas should be averaged?

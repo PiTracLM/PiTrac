@@ -230,6 +230,8 @@ namespace golf_sim {
 
     bool GolfSimIpcSystem::DispatchResultsMessage(const GolfSimIPCMessage& message) {
 
+        // The LM system doesn't currently do anything if it gets a results message.
+        // These messages are mostly destined for the PiTrac GUI
         GS_LOG_TRACE_MSG(trace, "DispatchResultsMessage Received Ipc Message.");
 
         return true;
