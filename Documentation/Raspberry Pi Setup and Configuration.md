@@ -277,19 +277,21 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
     1. Install the current version of the boost development environment  
        1. sudo apt-get install libboost1.74-all  
     2. Create a boost.pc file to tell meson how to find boost files when PiTrac is compiled  
-       1. sudo vi  /usr/share/pkgconfig/boost.pc    and in it place:  
-          1. \# Package Information for pkg-config  
-          2. \# Path to where Boost is installed  
-          3. prefix=/usr  
-          4. \# Path to where libraries are  
-          5. libdir=${prefix}/lib  
-          6. \# Path to where include files are  
-          7. includedir=${prefix}/boost  
-          8. Name: Boost  
-          9. Description: Boost provides free peer-reviewed portable C++ source libraries  
-          10. Version: 1.74.0   \# ← OR WHATEVER VERSION YOU DOWNLOAD  
-          11. Libs: \-L${libdir} \-lboost\_filesystem \-lboost\_system \-lboost\_timer \-lboost\_log \-lboost\_chrono \-lboost\_regex \-lboost\_thread \-lboost\_program\_options  
-          12. Cflags: \-isystem ${includedir}  
+       1. sudo vi  /usr/share/pkgconfig/boost.pc    and in it place:
+       ```
+          \# Package Information for pkg-config  
+          \# Path to where Boost is installed  
+          prefix=/usr  
+          \# Path to where libraries are  
+          libdir=${prefix}/lib  
+          \# Path to where include files are  
+          includedir=${prefix}/boost  
+          Name: Boost  
+          Description: Boost provides free peer-reviewed portable C++ source libraries  
+          Version: 1.74.0   \# ← OR WHATEVER VERSION YOU DOWNLOAD  
+          Libs: \-L${libdir} \-lboost\_filesystem \-lboost\_system \-lboost\_timer \-lboost\_log \-lboost\_chrono \-lboost\_regex \-lboost\_thread \-lboost\_program\_options  
+          Cflags: \-isystem ${includedir}
+       ```
     2. Finally, because of a problem when compiling boost under C++20 (which PiTrac uses), add “\#include \<utility\> as the last include before the line that says “name space boost” in the awaitable.hpp file at /usr/include/boost/asio/awaitable.hpp”  
        1. sudo vi /usr/include/boost/asio/awaitable.hpp  
        2. This is a hack, but works for now.
@@ -333,7 +335,7 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
        6. sudo apt install **\-y** python3-yaml python3-ply  
        7. sudo apt install \-y libavdevice-dev  
        8. sudo apt install \-y qtbase5-dev libqt5core5a libqt5gui5 libqt5widgets5  
-    2. NEW \- MARCH 7 2024 \- Use [https://www.raspberrypi.com/documentation/computers/camera\_software.html\#building-libcamera-and-rpicam-apps](https://www.raspberrypi.com/documentation/computers/camera_software.html#building-libcamera-and-rpicam-apps)  
+    2. NEW \- MARCH 7 2024 \- Use [https://www.raspberrypi.com/documentation/computers/camera\_software.html\#building-libcamera-and-rpicam-apps](https://www.raspberrypi.com/documentation/computers/camera_software.html#build-libcamera-and-rpicam-apps)  
        1. BUT \-  
           1. Perform the git clone at \~/Dev where we’ve been building the other software  
           2. Do not install boost dev as a prerequisite- we built it already above  
