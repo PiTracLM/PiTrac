@@ -79,6 +79,10 @@ namespace golf_sim {
             results.message_ = "Ball teed.  Confirming ball is stable.";
             break;
 
+        case GsIPCResultType::kWaitingForSimulatorArmed:
+            results.message_ = "Waiting on the simulator to be armed (ready to accept a shot).";
+            break;
+
         case GsIPCResultType::kMultipleBallsPresent:
             results.message_ = "Multiple balls present.";
             break;

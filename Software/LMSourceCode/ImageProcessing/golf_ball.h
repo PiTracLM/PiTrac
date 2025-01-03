@@ -67,7 +67,11 @@ public:
     long y() const { return y_; };                         // In pixels in openCV coordinate system
 
     void set_x(long x) { x_ = x; ball_circle_[0] = (float)x; };
-    void set_y(long y) { y_ = y; ball_circle_[1] = (float)y;};
+    void set_y(long y) { y_ = y; ball_circle_[1] = (float)y; };
+
+    // Allows type-safe calls that use ball data to set ball data
+    void set_x(float x) { x_ = (long) x; ball_circle_[0] = x; };
+    void set_y(float y) { y_ = (long) y; ball_circle_[1] = y; };
 
     // The circle where the ball exists on the relevant image.  Could (in theory?) be different from the
     // more definitive x and y and radius_at_calibration_pixels_!

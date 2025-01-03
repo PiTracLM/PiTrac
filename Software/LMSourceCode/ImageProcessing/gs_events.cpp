@@ -50,6 +50,8 @@ namespace golf_sim {
         PossibleEvent possible_event;
 
         GolfSimEvent::BeginWaitingForBallPlaced* beginWaitingForBallPlaced = nullptr;
+        GolfSimEvent::SimulatorIsArmed* simulatorIsArmed = nullptr;
+        GolfSimEvent::BeginWaitingForSimulatorArmed* beginWaitingForSimulatorArmed = nullptr;
         GolfSimEvent::EventLoopTick* eventLoopTick = nullptr;
         GolfSimEvent::BallStabilized* ballStabilized = nullptr;
         GolfSimEvent::BallHit* ballHit = nullptr;
@@ -66,7 +68,13 @@ namespace golf_sim {
         GolfSimEvent::ArmCamera2MessageReceived* armCamera2MessageReceived = nullptr;
 
 
-        if ((beginWaitingForBallPlaced = dynamic_cast<GolfSimEvent::BeginWaitingForBallPlaced*>(event))) {
+        if ((beginWaitingForSimulatorArmed = dynamic_cast<GolfSimEvent::BeginWaitingForSimulatorArmed*>(event))) {
+            possible_event = *beginWaitingForSimulatorArmed;
+        }
+        else if ((simulatorIsArmed = dynamic_cast<GolfSimEvent::SimulatorIsArmed*>(event))) {
+            possible_event = *simulatorIsArmed;
+        }
+        else if ((beginWaitingForBallPlaced = dynamic_cast<GolfSimEvent::BeginWaitingForBallPlaced*>(event))) {
             possible_event = *beginWaitingForBallPlaced;
         }
         else if ((eventLoopTick = dynamic_cast<GolfSimEvent::EventLoopTick*>(event))) {

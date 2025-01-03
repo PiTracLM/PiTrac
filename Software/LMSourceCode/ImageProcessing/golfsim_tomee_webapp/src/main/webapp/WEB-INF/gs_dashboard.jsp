@@ -136,6 +136,18 @@
         border-radius: 10px;
     }
 
+    .grid-item-text-center-yellow {
+        background-color: #FFFF00;
+        border: 2px solid rgb(0, 0, 0);
+        border-width: medium;
+        font-size: 30px;
+        text-align: center;
+        padding: 10px;
+        padding-left: 20px;
+        font-size: 40px;
+        border-radius: 10px;
+    }
+
     .grid-item-empty-row {
         background-color: rgba(255, 255, 255, 0.8);
         text-align: center;

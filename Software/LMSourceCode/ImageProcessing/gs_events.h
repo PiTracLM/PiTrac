@@ -5,8 +5,9 @@
  */
 
 // This module defines the events, event queue, and associated processing for the various
-// types of events that occur in the launch monitor system.
+// types of events that occur within the launch monitor system.
 // These events largely drive the transitions in the system's finite state machine
+// These events are separate from IPC events that deal with external messaging.
 
 #pragma once
 
@@ -42,6 +43,15 @@ namespace golf_sim {
             ~EventLoopTick() {};
 
             virtual std::string Format() override { return "EventLoopTick"; };
+        };
+
+        class BeginWatchingForBallHit : public GolfSimEventBase
+        {
+        public:
+            BeginWatchingForBallHit() {};
+            ~BeginWatchingForBallHit() {};
+
+            virtual std::string Format() override { return "BeginWatchingForBallHit"; };
         };
 
         class BeginWaitingForBallPlaced : public GolfSimEventBase
@@ -96,14 +106,22 @@ namespace golf_sim {
             GsIPCControlMsgType message_type_;
         };
 
-
-        class BeginWatchingForBallHit : public GolfSimEventBase
+        class BeginWaitingForSimulatorArmed : public GolfSimEventBase
         {
         public:
-            BeginWatchingForBallHit() {};
-            ~BeginWatchingForBallHit() {};
+            BeginWaitingForSimulatorArmed() {};
+            ~BeginWaitingForSimulatorArmed() {};
 
-            virtual std::string Format() override { return "BeginWatchingForBallHit"; };
+            virtual std::string Format() override { return "BeginWaitingForSimulatorArmed"; };
+        };
+
+        class SimulatorIsArmed : public GolfSimEventBase
+        {
+        public:
+            SimulatorIsArmed() {};
+            ~SimulatorIsArmed() {};
+
+            virtual std::string Format() override { return "SimulatorIsArmed"; };
         };
 
         class CheckForCam2ImageReceived : public GolfSimEventBase
@@ -115,6 +133,7 @@ namespace golf_sim {
             virtual std::string Format() override { return "CheckForCam2ImageReceived"; };
         };
 
+        // TBD - this error event isn't really handled properly yet
         class FoundMultipleBalls : public GolfSimEventBase
         {
         public:
@@ -207,6 +226,8 @@ namespace golf_sim {
     }
 
     using PossibleEvent = std::variant< GolfSimEvent::EventLoopTick, 
+                                        GolfSimEvent::BeginWaitingForSimulatorArmed,
+                                        GolfSimEvent::SimulatorIsArmed,
                                         GolfSimEvent::BeginWaitingForBallPlaced,
                                         GolfSimEvent::CheckForBallStable, 
                                         GolfSimEvent::BallStabilized, 

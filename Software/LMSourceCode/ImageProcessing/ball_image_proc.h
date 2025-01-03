@@ -343,7 +343,7 @@ private:
 
     // If prior_binary_threshold < 0, then there is no prior threshold and a new one will be determined and returns 
     // in the calibrated_binary_threshold variable.
-    static cv::Mat ApplyGaborFilterToBall(const cv::Mat& img, const GolfBall& ball, int& calibrated_binary_threshold, int prior_binary_threshold = -1);
+    static cv::Mat ApplyGaborFilterToBall(const cv::Mat& img, const GolfBall& ball, float& calibrated_binary_threshold, float prior_binary_threshold = -1);
 
     // Applies the gabor filter with the specified parameters and returns the final image and white percentage
     static cv::Mat ApplyTestGaborFilter(const cv::Mat& img_f32,

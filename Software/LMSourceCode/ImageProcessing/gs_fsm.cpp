@@ -121,15 +121,24 @@ namespace golf_sim {
 
     GolfSimState onEvent(const state::InitializingCamera1System& initializing,
         const GolfSimEvent::Restart& restart) {
-        GS_LOG_MSG(debug, "GolfSim state transition: Initializing - Received Restart - Next state WaitingForBall. ");
-
-        GolfSimEventElement beginWaitingForBallPlacedEvent{ new GolfSimEvent::BeginWaitingForBallPlaced{ } };
-        GolfSimEventQueue::QueueEvent(beginWaitingForBallPlacedEvent);
+        GS_LOG_MSG(debug, "GolfSim state transition: Initializing - Received Restart - Next state WaitingForSimArmed or WaitingForBall. ");
 
         // Let the monitor interface know what's happening
         GsUISystem::SendIPCStatusMessage(GsIPCResultType::kInitializing);
 
-        return state::WaitingForBall{ std::chrono::steady_clock::now() };
+        // If we're already armed, just start waiting for a ball to appear.
+        if (GsSimInterface::GetAllSystemsArmed()) {
+            GolfSimEventElement beginWaitingForBallPlacedEvent{ new GolfSimEvent::BeginWaitingForBallPlaced{ } };
+            GolfSimEventQueue::QueueEvent(beginWaitingForBallPlacedEvent);
+
+            return state::WaitingForBall{ std::chrono::steady_clock::now() };
+        }
+
+        GolfSimEventElement beginWaitingForSimulatorArmedEvent{ new GolfSimEvent::BeginWaitingForSimulatorArmed{ } };
+        GolfSimEventQueue::QueueEvent(beginWaitingForSimulatorArmedEvent);
+
+        return state::WaitingForSimulatorArmed{ std::chrono::steady_clock::now() };
+
     }
 
 
@@ -301,6 +310,7 @@ namespace golf_sim {
         // to figure out what it needs to display
         GsUISystem::ClearWebserverImages();
 
+        // TBD - Probably remove.  Pre-image subtraction was an idea that never panned out as well as we'd hoped.
         if (GolfSimCamera::kUsePreImageSubtraction) {
             return state::WaitingForCamera2PreImage{ std::chrono::steady_clock::now(), ball, img };
         }
@@ -332,6 +342,50 @@ namespace golf_sim {
                                          waitingForCamera2PreImage.cam1_ball_,
                                          waitingForCamera2PreImage.ball_image_,
                                          camera2PreImageReceived.GetBallFlightPreImage() };
+    }
+
+    
+
+    /*********** WaitingForSimulatorArmed ************/
+
+        GolfSimState onEvent(const state::WaitingForSimulatorArmed& waitingForSimulatorArmed,
+            const GolfSimEvent::BeginWaitingForSimulatorArmed& beginWaitingForSimulatorArmed) {
+        GS_LOG_MSG(debug, "GolfSim state transition: WaitingForSimulatorArmed - Received SimulatorArmed.");
+
+        // Let the monitor interface know what's happening so it can alert the user
+        GsUISystem::SendIPCStatusMessage(GsIPCResultType::kWaitingForSimulatorArmed);
+
+        // Wait a moment so that we're not spinning too much
+        sleep(1);
+
+        if (GsSimInterface::GetAllSystemsArmed()) {
+            GolfSimEventElement beginWaitingForBallPlacedEvent{ new GolfSimEvent::BeginWaitingForBallPlaced{ } };
+            GolfSimEventQueue::QueueEvent(beginWaitingForBallPlacedEvent);
+
+            return state::WaitingForBall{ std::chrono::steady_clock::now() };
+        }
+
+        // Otherwise, keep in waiting state
+        GolfSimEventElement nextBeginWaitingForSimulatorArmed{ new GolfSimEvent::BeginWaitingForSimulatorArmed{ } };
+        GolfSimEventQueue::QueueEvent(nextBeginWaitingForSimulatorArmed);
+
+        return state::WaitingForSimulatorArmed{ std::chrono::steady_clock::now() };
+    }
+
+    // TBD - Not certain we are going to use this state
+    GolfSimState onEvent(const state::WaitingForSimulatorArmed& waitingForSimulatorArmed,
+        const GolfSimEvent::SimulatorIsArmed& simulatorArmed) {
+        GS_LOG_MSG(debug, "GolfSim state transition: WaitingForSimulatorArmed - Received SimulatorArmed.");
+
+        // Let the monitor interface know what's happening so it can alert the user
+        GsUISystem::SendIPCStatusMessage(GsIPCResultType::kWaitingForSimulatorArmed);
+
+        // The simulator is now armed.
+        // The following will cause the waitingForBall state to begin watching for the ball
+        GolfSimEventElement beginWaitingForSimulatorArmed{ new GolfSimEvent::BeginWaitingForSimulatorArmed{ } };
+        GolfSimEventQueue::QueueEvent(beginWaitingForSimulatorArmed);
+
+        return state::WaitingForBall{ std::chrono::steady_clock::now() };
     }
 
 
@@ -623,6 +677,9 @@ namespace golf_sim {
                             },
                             [](const state::WaitingForCamera2PreImage& waitingForCamera2PreImage) {
                             GS_LOG_TRACE_MSG(trace, "WaitingForCamera2PreImage.");
+                            },
+                            [](const state::WaitingForSimulatorArmed& waitingForSimulatorArmed) {
+                            GS_LOG_TRACE_MSG(trace, "WaitingForSimulatorArmed.");
                             },
                             [](const state::InitializingCamera2System& initializingCamera1System) {
                             GS_LOG_TRACE_MSG(trace, "InitializingCamera2System.");

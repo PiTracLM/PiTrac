@@ -2468,8 +2468,8 @@ namespace golf_sim {
 
         // Re-center the ball's x and y position in the new, smaller picture
         // This will change the ball that was sent in
-        ball.set_x( (int)std::round(rInc + ball.measured_radius_pixels_));
-        ball.set_y( (int)std::round(rInc + ball.measured_radius_pixels_));
+        ball.set_x( (float)std::round(rInc + ball.measured_radius_pixels_));
+        ball.set_y( (float)std::round(rInc + ball.measured_radius_pixels_));
 
         cv::Point offset_sub_to_full;
         cv::Point offset_full_to_sub;
@@ -2581,12 +2581,12 @@ namespace golf_sim {
         // Adjust relevant ball radius information accordingly
         local_ball1.measured_radius_pixels_ = local_ball1.measured_radius_pixels_ * ball1RadiusMultiplier;
         local_ball1.ball_circle_[2] = local_ball1.ball_circle_[2] * (float)ball1RadiusMultiplier;
-        local_ball1.set_x( (int)((double)local_ball1.x() * ball1RadiusMultiplier));
-        local_ball1.set_y( (int)((double)local_ball1.y() * ball1RadiusMultiplier));
+        local_ball1.set_x( (float)((double)local_ball1.x() * ball1RadiusMultiplier));
+        local_ball1.set_y( (float)((double)local_ball1.y() * ball1RadiusMultiplier));
         local_ball2.measured_radius_pixels_ = local_ball2.measured_radius_pixels_ * ball2RadiusMultiplier;
         local_ball2.ball_circle_[2] = local_ball2.ball_circle_[2] * (float)ball2RadiusMultiplier;
-        local_ball2.set_x( (int)((double)local_ball2.x() * ball2RadiusMultiplier));
-        local_ball2.set_y( (int)((double)local_ball2.y() * ball2RadiusMultiplier));
+        local_ball2.set_x( (float)((double)local_ball2.x() * ball2RadiusMultiplier));
+        local_ball2.set_y( (float)((double)local_ball2.y() * ball2RadiusMultiplier));
 
 
         std::vector < cv::Point > center1 = { cv::Point{(int)local_ball1.x(), (int)local_ball1.y()} };
@@ -2596,7 +2596,7 @@ namespace golf_sim {
         LoggingTools::DebugShowImage("Ball2 Image", ball_image2, center2);
         GS_LOG_TRACE_MSG(trace, "Updated (local) ball2 data: " + local_ball2.Format());
 
-        int calibrated_binary_threshold = 0;
+        float calibrated_binary_threshold = 0;
         cv::Mat ball_image1DimpleEdges = ApplyGaborFilterToBall(ball_image1, local_ball1, calibrated_binary_threshold);
         //  Suggest the same binary threshold between the images as a starting point for the second ball - they are probably similar
         cv::Mat ball_image2DimpleEdges = ApplyGaborFilterToBall(ball_image2, local_ball2, calibrated_binary_threshold, calibrated_binary_threshold);
@@ -3112,7 +3112,7 @@ namespace golf_sim {
         return kernel;
     }
 
-    cv::Mat BallImageProc::ApplyGaborFilterToBall(const cv::Mat& image_gray, const GolfBall& ball, int & calibrated_binary_threshold, int prior_binary_threshold) {
+    cv::Mat BallImageProc::ApplyGaborFilterToBall(const cv::Mat& image_gray, const GolfBall& ball, float & calibrated_binary_threshold, float prior_binary_threshold) {
         // TBD - Not sure we will ever need the ball information?
         CV_Assert( (image_gray.type() == CV_8UC1) );
 
@@ -3177,19 +3177,19 @@ namespace golf_sim {
                 if (ratheting_threshold_down)
                 {
                     if (kGaborMinWhitePercent - white_percent > 5) {
-                        binary_threshold = (float)binary_threshold - 1.0;
+                        binary_threshold = binary_threshold - 1.0F;
                     }
                     else {
-                        binary_threshold = (float)binary_threshold - 0.5;
+                        binary_threshold = binary_threshold - 0.5F;
                     }
                     GS_LOG_TRACE_MSG(trace, "Trying lower gabor binary_threshold setting of " + std::to_string(binary_threshold) + " for better balance.");
                 }
                 else {
                     if (white_percent - kGaborMaxWhitePercent > 5) {
-                        binary_threshold = (float)binary_threshold + 1.0;
+                        binary_threshold = binary_threshold + 1.0F;
                     }
                     else {
-                        binary_threshold = (float)binary_threshold + 0.5;
+                        binary_threshold = binary_threshold + 0.5F;
                     }
                     GS_LOG_TRACE_MSG(trace, "Trying higher gabor binary_threshold setting of " + std::to_string(binary_threshold) + " for better balance.");
                 }
