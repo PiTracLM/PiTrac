@@ -279,12 +279,12 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
     2. Create a boost.pc file to tell meson how to find boost files when PiTrac is compiled  
        1. sudo vi  /usr/share/pkgconfig/boost.pc    and in it place:
        ```
-          \# Package Information for pkg-config  
-          \# Path to where Boost is installed  
+          # Package Information for pkg-config  
+          # Path to where Boost is installed  
           prefix=/usr  
-          \# Path to where libraries are  
+          # Path to where libraries are  
           libdir=${prefix}/lib  
-          \# Path to where include files are  
+          # Path to where include files are  
           includedir=${prefix}/boost  
           Name: Boost  
           Description: Boost provides free peer-reviewed portable C++ source libraries  
@@ -305,17 +305,19 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
     4. cd lg  
     5. make  
     6. sudo make install  
-    7. Create a /usr/lib/pkgconfig/lgpio.pc containing the following:  
-       1. \# Package Information for pkg-config  
-       2. prefix=/usr/local  
-       3. exec\_prefix=${prefix}  
-       4. libdir=${exec\_prefix}/lib  
-       5. includedir=${prefix}/include/  
-       6. Name: lgpio  
-       7. Description: Open Source GPIO library  
-       8. Version: 1.0.0  
-       9. Libs: ${exec\_prefix}/lib/liblgpio.so  
-       10. Cflags: \-I${includedir}  
+    7. Create a /usr/lib/pkgconfig/lgpio.pc containing the following:
+    ```
+       # Package Information for pkg-config  
+       prefix=/usr/local  
+       exec\_prefix=${prefix}  
+       libdir=${exec\_prefix}/lib  
+       includedir=${prefix}/include/  
+       Name: lgpio  
+       Description: Open Source GPIO library  
+       Version: 1.0.0  
+       Libs: ${exec\_prefix}/lib/liblgpio.so  
+       Cflags: \-I${includedir}
+    ```
     2. Enable the SPI pins on the Pi  
        1. sudo raspi-config  
        2. Select 3 Interface Option  
