@@ -264,8 +264,8 @@
 				"kGSProConnectAddress": "10.0.0.47",
 				"kGSProConnectPort": "0921"
 			},
-			"DISABLED-E6": {
-				"kE6ConnectAddress": "10.0.0.10",
+			"E6": {
+				"kE6ConnectAddress": "10.0.0.29",
 				"kE6ConnectPort": "2483",
 				"kE6InterMessageDelayMs": 50
 			}
