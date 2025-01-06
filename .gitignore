@@ -11,7 +11,8 @@ out/
 *.war
 !**/src/main/**/target/
 !**/src/test/**/target/
-
+.DS_Store
+**/.DS_Store
 # Package Files #
 /Software/ImageProcessing/golfsim_tomee_webapp/target
 /Software/ImageProcessing/golfsim_tomee_webapp/.codesight
