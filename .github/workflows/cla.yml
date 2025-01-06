@@ -1,9 +1,10 @@
+---
 name: "CLA Assistant"
 on:
   issue_comment:
     types: [created]
   pull_request_target:
-    types: [opened,closed,synchronize]
+    types: [opened, closed, synchronize]
 
 # explicitly configure permissions, in case your GITHUB_TOKEN workflow permissions are set to read-only in repository settings
 permissions:
@@ -29,7 +30,7 @@ jobs:
           path-to-document: 'https://gist.github.com/jamespilgrim/e6996a438adc0919ebbe70561efbb600#file-verdant-contributor-license-agreement-md' # e.g. a CLA or a DCO document
           # branch should not be protected
           branch: 'main'
-          allowlist: user1,bot*
+          allowlist: bot*
 
          # the followings are the optional inputs - If the optional inputs are not given, then default values will be taken
           #remote-organization-name: enter the remote organization name where the signatures should be stored (Default is storing the signatures in the same repository)
