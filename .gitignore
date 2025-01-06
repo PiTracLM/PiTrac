@@ -18,6 +18,7 @@ out/
 /Software/ImageProcessing/golfsim_tomee_webapp/.codesight
 **/LMSourceCode/ImageProcessing/golfsim_tomee_webapp/target
 **/.war
+/signatures/
 
 ### STS ###
 .apt_generated
