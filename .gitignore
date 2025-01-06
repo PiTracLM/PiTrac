@@ -3,3 +3,43 @@
 .vscode/
 # Ignoring ~/build inside LMSourceCode
 /Software/LMSourceCode/ImageProcessing/build
+
+HELP.md
+out/
+**/target/
+!.mvn/wrapper/maven-wrapper.jar
+*.war
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Package Files #
+/Software/ImageProcessing/golfsim_tomee_webapp/target
+/Software/ImageProcessing/golfsim_tomee_webapp/.codesight
+**/LMSourceCode/ImageProcessing/golfsim_tomee_webapp/target
+**/.war
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+**/.idea
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
