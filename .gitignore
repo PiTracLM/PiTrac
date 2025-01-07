@@ -3,3 +3,6 @@
 .vscode/
 # Ignoring ~/build inside LMSourceCode
 /Software/LMSourceCode/ImageProcessing/build
+
+# .DS_Store files are created by Mac OS X Finder
+.DS_Store
