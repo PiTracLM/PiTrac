@@ -1,37 +1,22 @@
 package com.verdanttechs.jakarta.ee9;
 
 import java.util.Vector;
-import java.lang.Math;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.msgpack.core.MessagePack;
-import org.msgpack.core.MessagePack.PackerConfig;
-import org.msgpack.core.MessagePack.UnpackerConfig;
 import org.msgpack.core.MessageBufferPacker;
-import org.msgpack.core.MessageFormat;
-import org.msgpack.core.MessagePacker;
 import org.msgpack.core.MessageUnpacker;
 import org.msgpack.value.ArrayValue;
-import org.msgpack.value.ExtensionValue;
-import org.msgpack.value.FloatValue;
-import org.msgpack.value.IntegerValue;
-import org.msgpack.value.TimestampValue;
 import org.msgpack.value.Value;
-import org.msgpack.core.annotations.Nullable;
-import org.msgpack.core.annotations.VisibleForTesting;
 
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpSession;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.ServletContextListener;
-import jakarta.servlet.ServletContext;
-import jakarta.servlet.ServletContextEvent;
-import jakarta.servlet.ServletContextListener;
-import jakarta.servlet.annotation.WebListener;
 
 import jakarta.jms.Connection;
 import jakarta.jms.Session;
@@ -42,9 +27,6 @@ import jakarta.jms.MessageConsumer;
 import jakarta.jms.DeliveryMode;
 import jakarta.jms.TextMessage;
 import jakarta.jms.BytesMessage;
-import jakarta.jms.Topic;
-import jakarta.jms.Queue;
-import jakarta.jms.ConnectionFactory;
 import jakarta.jms.JMSException;
 import jakarta.jms.ExceptionListener;
 
@@ -62,7 +44,7 @@ import java.io.IOException;
 @WebServlet("/monitor")
 public class MonitorServlet extends HttpServlet {
 
-    // NOTE - these should reflect types in gs_ipc_result
+    private static Logger logger =  LogManager.getLogger(MonitorServlet.class);
     public enum GsIPCResultType { 
         kUnknown,
         kInitializing,
@@ -109,8 +91,9 @@ public class MonitorServlet extends HttpServlet {
     public static Session producer_session;
     public static Destination producer_destination;
 
-            public static void SetCurrentClubType(GsClubType club) {
-            System.out.println("SetClubType called with club type = " + String.valueOf(club));
+    public static void SetCurrentClubType(GsClubType club) {
+        logger.info("SetClubType called with club type = " + String.valueOf(club));
+        System.out.println("SetClubType called with club type = " + String.valueOf(club));
 
             try {
                 if (!producer_created) {

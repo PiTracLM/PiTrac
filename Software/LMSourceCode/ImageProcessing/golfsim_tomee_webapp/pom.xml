@@ -16,19 +16,57 @@
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
     <failOnMissingWebXml>false</failOnMissingWebXml>
+
+    <!-- tommee -->
+    <tommee-maven-plugin.version>8.0.9</tommee-maven-plugin.version>
+    <tommee.version>10.0.0</tommee.version>
+
+    <!-- maven -->
+    <maven-clean-plugin.version>3.1.0</maven-clean-plugin.version>
+    <maven-resources-plugin.version>3.0.2</maven-resources-plugin.version>
+    <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
+    <maven-sunfire-plugin.version>3.0.0-M7</maven-sunfire-plugin.version>
+    <maven-jar-plugin.version>3.0.2</maven-jar-plugin.version>
+    <maven-war-plugin.version>3.3.2</maven-war-plugin.version>
+    <maven-install-plugin.version>2.5.2</maven-install-plugin.version>
+    <maven-deploy-plugin.version>2.8.2</maven-deploy-plugin.version>
+    <maven-site-plugin.version>3.7.1</maven-site-plugin.version>
+    <maven-project-info-reports-plugin.version>3.0.0</maven-project-info-reports-plugin.version>
+
+    <!-- jakarta -->
+    <jakartaee-web-api.version>9.0.0</jakartaee-web-api.version>
+    <jakarta-servlet-api.version>6.1.0-M1</jakarta-servlet-api.version>
+
+    <!-- Apache ActiveMQ -->
+    <activemq-client.version>6.0.1</activemq-client.version>
+    <!-- activemq-camel, vulnerability found, upgrade on future PR -->
+    <activemq-camel.version>5.16.7</activemq-camel.version>
+    <activemq-pool.version>6.0.1</activemq-pool.version>
+    <activemq-broker.version>6.0.1</activemq-broker.version>
+
+    <!-- misc -->
+    <msgpack-core.version>0.9.6</msgpack-core.version>
+    <gson.version>2.9.0</gson.version>
+
+    <!-- logging -->
+    <log4j.version>2.24.3</log4j.version>
+
+    <!-- test -->
+    <junit-jupiter-api.version>5.11.4</junit-jupiter-api.version>
+    <mockito-junit-jupiter.version>5.15.2</mockito-junit-jupiter.version>
   </properties>
 
   <dependencies>
     <dependency>
       <groupId>jakarta.platform</groupId>
       <artifactId>jakarta.jakartaee-web-api</artifactId>
-      <version>9.0.0</version>
+      <version>${jakartaee-web-api.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
        <groupId>jakarta.servlet</groupId>
         <artifactId>jakarta.servlet-api</artifactId>
-        <version>6.1.0-M1</version>
+        <version>${jakarta-servlet-api.version}</version>
       <scope>provided</scope>
     </dependency>
 
@@ -36,39 +74,61 @@
     <dependency>
       <groupId>org.apache.activemq</groupId>
       <artifactId>activemq-client</artifactId>
-      <version>6.0.1</version>
+      <version>${activemq-client.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.activemq</groupId>
       <artifactId>activemq-camel</artifactId>
-      <version>5.16.7</version>
+      <version>${activemq-camel.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.activemq</groupId>
       <artifactId>activemq-pool</artifactId>
-      <version>6.0.1</version>
+      <version>${activemq-pool.version}</version>
     </dependency>
     <!-- the ActiveMQ broker is optional and can be removed if connecting to a remote broker on
 ly -->
     <dependency>
       <groupId>org.apache.activemq</groupId>
       <artifactId>activemq-broker</artifactId>
-      <version>6.0.1</version>
+      <version>${activemq-broker.version}</version>
     </dependency>
 
-	  <dependency>
-		  <groupId>org.msgpack</groupId>
-		  <artifactId>msgpack-core</artifactId>
-		  <version>0.9.6</version>
-	  </dependency>
+    <dependency>
+        <groupId>org.msgpack</groupId>
+        <artifactId>msgpack-core</artifactId>
+      <version>${msgpack-core.version}</version>
+    </dependency>
 
-	  <dependency>
-		  <groupId>com.google.code.gson</groupId>
-		  <artifactId>gson</artifactId>
-		  <version>2.9.0</version>
-	  </dependency>
+    <dependency>
+        <groupId>com.google.code.gson</groupId>
+        <artifactId>gson</artifactId>
+        <version>${gson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <version>${junit-jupiter-api.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-junit-jupiter</artifactId>
+      <version>${mockito-junit-jupiter.version}</version>
+      <scope>test</scope>
+    </dependency>
 
-	  
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-api</artifactId>
+      <version>${log4j.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+      <version>${log4j.version}</version>
+    </dependency>
+
 
   </dependencies>
 
@@ -79,57 +139,56 @@ ly -->
         <plugin>
           <groupId>org.apache.tomee.maven</groupId>
           <artifactId>tomee-maven-plugin</artifactId>
-          <version>8.0.9</version>
+          <version>${tommee-maven-plugin.version}</version>
           <configuration>
-            <tomeeVersion>10.0.0</tomeeVersion>
+            <tomeeVersion>${tommee.version}</tomeeVersion>
             <tomeeClassifier>plus</tomeeClassifier>
           </configuration>
         </plugin>
         <!-- clean lifecycle, see https://maven.apache.org/ref/current/maven-core/lifecycles.html#clean_Lifecycle -->
         <plugin>
           <artifactId>maven-clean-plugin</artifactId>
-          <version>3.1.0</version>
+          <version>${maven-clean-plugin.version}</version>
         </plugin>
         <!-- default lifecycle, jar packaging: see https://maven.apache.org/ref/current/maven-core/default-bindings.html#Plugin_bindings_for_jar_packaging -->
         <plugin>
           <artifactId>maven-resources-plugin</artifactId>
-          <version>3.0.2</version>
+          <version>${maven-resources-plugin.version}</version>
         </plugin>
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.8.0</version>
+          <version>${maven-compiler-plugin.version}</version>
         </plugin>
         <plugin>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>2.22.1</version>
+          <version>${maven-sunfire-plugin.version}</version>
         </plugin>
         <plugin>
           <artifactId>maven-jar-plugin</artifactId>
-          <version>3.0.2</version>
+          <version>${maven-jar-plugin.version}</version>
         </plugin>
         <plugin>
           <artifactId>maven-war-plugin</artifactId>
-          <version>3.3.2</version>
+          <version>${maven-war-plugin.version}</version>
           <configuration>
              <failOnMissingWebXml>false</failOnMissingWebXml>
           </configuration>
         </plugin>
         <plugin>
           <artifactId>maven-install-plugin</artifactId>
-          <version>2.5.2</version>
+          <version>${maven-install-plugin.version}</version>
         </plugin>
         <plugin>
           <artifactId>maven-deploy-plugin</artifactId>
-          <version>2.8.2</version>
+          <version>${maven-deploy-plugin.version}</version>
         </plugin>
-        <!-- site lifecycle, see https://maven.apache.org/ref/current/maven-core/lifecycles.html#site_Lifecycle -->
         <plugin>
           <artifactId>maven-site-plugin</artifactId>
-          <version>3.7.1</version>
+          <version>${maven-site-plugin.version}</version>
         </plugin>
         <plugin>
           <artifactId>maven-project-info-reports-plugin</artifactId>
-          <version>3.0.0</version>
+          <version>${maven-project-info-reports-plugin.version}</version>
         </plugin>
       </plugins>
     </pluginManagement>
