@@ -279,18 +279,18 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
     2. Create a boost.pc file to tell meson how to find boost files when PiTrac is compiled  
        1. sudo vi  /usr/share/pkgconfig/boost.pc    and in it place:
        ```
-          # Package Information for pkg-config  
-          # Path to where Boost is installed  
-          prefix=/usr  
-          # Path to where libraries are  
-          libdir=${prefix}/lib  
-          # Path to where include files are  
-          includedir=${prefix}/boost  
-          Name: Boost  
-          Description: Boost provides free peer-reviewed portable C++ source libraries  
-          Version: 1.74.0   \# ← OR WHATEVER VERSION YOU DOWNLOAD  
-          Libs: \-L${libdir} \-lboost\_filesystem \-lboost\_system \-lboost\_timer \-lboost\_log \-lboost\_chrono \-lboost\_regex \-lboost\_thread \-lboost\_program\_options  
-          Cflags: \-isystem ${includedir}
+       # Package Information for pkg-config  
+       # Path to where Boost is installed  
+       prefix=/usr  
+       # Path to where libraries are  
+       libdir=${prefix}/lib  
+       # Path to where include files are  
+       includedir=${prefix}/boost  
+       Name: Boost  
+       Description: Boost provides free peer-reviewed portable C++ source libraries  
+       Version: 1.74.0   #  OR WHATEVER VERSION YOU DOWNLOAD  
+       Libs: -L${libdir} -lboost_filesystem -lboost_system -lboost_timer -lboost_log -lboost_chrono -lboost_regex -lboost_thread -lboost_program_options  
+       Cflags: -isystem ${includedir}
        ```
     2. Finally, because of a problem when compiling boost under C++20 (which PiTrac uses), add “\#include \<utility\> as the last include before the line that says “name space boost” in the awaitable.hpp file at /usr/include/boost/asio/awaitable.hpp”  
        1. sudo vi /usr/include/boost/asio/awaitable.hpp  
@@ -307,16 +307,16 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
     6. sudo make install  
     7. Create a /usr/lib/pkgconfig/lgpio.pc containing the following:
     ```
-       # Package Information for pkg-config  
-       prefix=/usr/local  
-       exec\_prefix=${prefix}  
-       libdir=${exec\_prefix}/lib  
-       includedir=${prefix}/include/  
-       Name: lgpio  
-       Description: Open Source GPIO library  
-       Version: 1.0.0  
-       Libs: ${exec\_prefix}/lib/liblgpio.so  
-       Cflags: \-I${includedir}
+    # Package Information for pkg-config  
+    prefix=/usr/local  
+    exec_prefix=${prefix}  
+    libdir=${exec_prefix}/lib  
+    includedir=${prefix}/include/  
+    Name: lgpio  
+    Description: Open Source GPIO library  
+    Version: 1.0.0  
+    Libs: ${exec_prefix}/lib/liblgpio.so  
+    Cflags: -I${includedir}
     ```
     2. Enable the SPI pins on the Pi  
        1. sudo raspi-config  
