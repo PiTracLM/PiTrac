@@ -1,0 +1,4 @@
+# This is a global gitignore to complement the gitignore which is specifically in the Software directory.
+
+# DS_Store files are created by Mac OS X Finder
+.DS_Store
