@@ -183,9 +183,8 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
    3. sudo systemctl status smbd  
       1. Should show “active (running)”  
    2. mount \-t cifs  
-   3. Create the directory structure that the two Pis will share (this helps facilitate transfer of debugging images between the two Pis)  
-      1. mkdir /home/\<PiTracUser\>/LM\_Shares  
-      2. mkdir /home/\<PiTracUser\>/LM\_Shares/WebShare  
+   3. Create the directory structure that the two Pis will share (this helps facilitate transfer of debugging images between the two Pis, as well as images for the PiTrac GUI)  
+      2. mkdir -p /home/\<PiTracUser\>/LM\_Shares/WebShare  
       3. mkdir /home/\<PiTracUser\>/LM\_Shares/Images  
    2. sudo vi /etc/samba/smb.conf   and add the following lines at the bottom  
       1. \[LM\_Shares\]  
@@ -200,9 +199,10 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
       e. For the Pi to which the directory will be shared:  
    3. Add the following to /etc/fstab after the last non-comment line, replacing PWD and other things in \[\]’s with the real pwd and info for the PiTracUserName and password  
       1. //\<Pi 1’s IP Address\>/LM\_Shares /home/\<PiTracUser\>/LM\_Shares cifs username=\[PiTracUserName\],password=\[PWD\],workgroup=WORKGROUP,users,exec,auto,rw,file\_mode=0777,dir\_mode=0777,user\_xattr 0 0  
-   2. sudo systemctl daemon-reload  
-   3. sudo mount \-a  
-   4. Check to make sure the second Pi can “see” the other Pi’s LM\_Shares sub-directories (Images and WebShare)
+   3. mkdir /home/<PiTracUser>/LM_Shares      (this will be the Pi 2 mount point)
+   4. sudo systemctl daemon-reload  
+   5. sudo mount \-a  
+   6. Check to make sure the second Pi can “see” the other Pi’s LM\_Shares sub-directories (Images and WebShare)
 
 #### SSH Stored Key
 
@@ -321,7 +321,7 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
     2. Enable the SPI pins on the Pi  
        1. sudo raspi-config  
        2. Select 3 Interface Option  
-       3. Select 14 SPI Enable/Disable  
+       3. Select l4 SPI Enable/Disable  
        4. Select Yes on the next screen  
        5. Finish
 
@@ -342,7 +342,7 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
           1. Perform the git clone at \~/Dev where we’ve been building the other software  
           2. Do not install boost dev as a prerequisite- we built it already above  
           3. When done (after the install step), do sudo ldconfig to refresh the shared libraries  
-          4. On the Pi 4 (if it has less than 6GB memory), add “-j 2” at the end of the ninja \-C build command to limit the amount of memory used during the build.  E.g., ninja \-C build \-j2  
+          4. On the Pi 4 (if it has less than 6GB memory), add “-j 2” at the end of the ninja \-C build command to limit the amount of memory used during the build.  E.g., ninja \-C build \-j 2  
              - On low-memory Pi’s, if you run out of memory, the computer will often just freeze and hang, requiring a hard-reboot  
        2. If the build fails at the last install step, see: [https://github.com/mesonbuild/meson/issues/7345](https://github.com/mesonbuild/meson/issues/7345) for a possible solution.  Specifically, exporting the following environment variable and re-building.  
           1. `export PKEXEC\_UID=99999`  
@@ -438,7 +438,7 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
              2. Search for the line that begins with “ Enable this connector if you wish to use https with web console”  
              3. Uncomment the next section by removing the \!-- and → at the beginning and end of the bean  
           4. cd .. ; sudo ./bin/activemq start  
-          5. Log into the broker console from another machine by: https://\<Pi IP address or name\>:8161/admin  
+          5. Log into the broker console from another machine by: http://\<Pi IP address or name\>:8161/admin  
              1. If this works, the broker is setup correctly  
        2. Setup ActiveMQ to run automatically on startup  
           1. sudo vi /etc/systemd/system/activemq.service   and add:  
@@ -521,7 +521,7 @@ WantedBy=multi-user.target
    13. `sudo cp context.xml context.xml.ORIGINAL` [just in case]  
 
    14. Add a new document base/root to allow access to the shared mounted drive:  
-       1. Edit `~conf/server.xml` and just before the `</Host>` near the end of the file, put:  
+       1. Edit `/opt/tomee/conf/server.xml` and just before the `</Host>` near the end of the file, put:  
        2. \<Context docBase="/home/\<PiTracUserName\>/LM\_Shares/WebShare" path="/golfsim/WebShare" /\>  
        3. This will allow the Tomee system to access a directory that is outside of the main Tomee installation tree.  This directory will be used to get debugging images from the other Pi into the web-based GUI that this Pi will be serving up.  
        4. NOTE \- if the shared directory that is mounted off of the other Pi does not exist, Tomee may not be able to start  
