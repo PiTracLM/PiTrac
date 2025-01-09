@@ -6,6 +6,7 @@ on:
 
     paths:
       - 'Software/LMSourceCode/ImageProcessing/golfsim_tomee_webapp/**.java'
+      - 'Software/LMSourceCode/ImageProcessing/golfsim_tomee_webapp/**.xml'  
 
 
 jobs:
@@ -54,11 +55,6 @@ jobs:
         run: |
           echo $BRANCH_NAME
         shell: bash
-
-      - name: Ingress Path
-        id: GetIngressPath
-        run: |
-          echo "IngPth=$( sed -r 's/-/\//g' <<< '${{ steps.GetArtifactId.outputs.ARTIFACT_ID }}')" >> $GITHUB_OUTPUT
 
       - name: Maven Build
         run: mvn -B package --file pom.xml
