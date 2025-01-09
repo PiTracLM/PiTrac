@@ -275,9 +275,9 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
 
 15. Install Boost (a set of utilities that PiTrac uses)  
     1. Install the current version of the boost development environment  
-       1. sudo apt-get install libboost1.74-all  
+       1. `sudo apt-get install libboost1.74-all`  
     2. Create a boost.pc file to tell meson how to find boost files when PiTrac is compiled  
-       1. sudo vi  /usr/share/pkgconfig/boost.pc    and in it place:
+       1. `sudo vi  /usr/share/pkgconfig/boost.pc`    and in it place:
        ```
        # Package Information for pkg-config  
        # Path to where Boost is installed  
@@ -292,21 +292,21 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
        Libs: -L${libdir} -lboost_filesystem -lboost_system -lboost_timer -lboost_log -lboost_chrono -lboost_regex -lboost_thread -lboost_program_options  
        Cflags: -isystem ${includedir}
        ```
-    2. Finally, because of a problem when compiling boost under C++20 (which PiTrac uses), add “\#include \<utility\> as the last include before the line that says “name space boost” in the awaitable.hpp file at /usr/include/boost/asio/awaitable.hpp”  
-       1. sudo vi /usr/include/boost/asio/awaitable.hpp  
+    2. Finally, because of a problem when compiling boost under C++20 (which PiTrac uses), add `#include <utility>` as the last include before the line that says “name space boost” in the awaitable.hpp file at /usr/include/boost/asio/awaitable.hpp”  
+       1. `sudo vi /usr/include/boost/asio/awaitable.hpp`  
        2. This is a hack, but works for now.
 
 #### Build and Install LGPIO
 
 16. Install and build lgpio (this is a library to work with the GPIO pins of the Pi)  
-    1. cd \~/Dev  
+    1. `cd ~/Dev`  
     2. wget [http://abyz.me.uk/lg/lg.zip](http://abyz.me.uk/lg/lg.zip)  
-    3. unzip lg.zip  
-    4. cd lg  
-    5. make  
-    6. sudo make install  
-    7. Create a /usr/lib/pkgconfig/lgpio.pc containing the following:
-    ```
+    3. `unzip lg.zip`  
+    4. `cd lg`
+    5. `make`  
+    6. `sudo make install`  
+    7. Create `sudo touch /usr/lib/pkgconfig/lgpio.pc` containing the following:
+    ``` bash
     # Package Information for pkg-config  
     prefix=/usr/local  
     exec_prefix=${prefix}  
@@ -319,7 +319,7 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
     Cflags: -I${includedir}
     ```
     2. Enable the SPI pins on the Pi  
-       1. sudo raspi-config  
+       1. `sudo raspi-config`  
        2. Select 3 Interface Option  
        3. Select l4 SPI Enable/Disable  
        4. Select Yes on the next screen  
@@ -329,14 +329,14 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
 
 17. Install and build libcamera (for c++ camera control)  
     1. Install Prerequisites  
-       1. sudo apt-get install \-y libevent-dev  
-       2. sudo apt install \-y pybind11-dev  
-       3. sudo apt \-y install doxygen  
-       4. sudo apt install \-y python3-graphviz  
-       5. sudo apt install \-y python3-sphinx  
-       6. sudo apt install **\-y** python3-yaml python3-ply  
-       7. sudo apt install \-y libavdevice-dev  
-       8. sudo apt install \-y qtbase5-dev libqt5core5a libqt5gui5 libqt5widgets5  
+       1. `sudo apt-get install -y libevent-dev`  
+       2. `sudo apt install -y pybind11-dev`  
+       3. `sudo apt -y install doxygen`  
+       4. `sudo apt install -y python3-graphviz`  
+       5. `sudo apt install -y python3-sphinx`  
+       6. `sudo apt install -y python3-yaml python3-ply`  
+       7. `sudo apt install -y libavdevice-dev`  
+       8. `sudo apt install -y qtbase5-dev libqt5core5a libqt5gui5 libqt5widgets5`  
     2. NEW \- MARCH 7 2024 \- Use [https://www.raspberrypi.com/documentation/computers/camera\_software.html\#building-libcamera-and-rpicam-apps](https://www.raspberrypi.com/documentation/computers/camera_software.html#build-libcamera-and-rpicam-apps)  
        1. BUT \-  
           1. Perform the git clone at \~/Dev where we’ve been building the other software  
@@ -367,7 +367,7 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
 #### Install Java OpenJDK
 
 19. Install recent java (for activeMQ)  
-    1. sudo apt install openjdk-17-jdk openjdk-17-jre
+    1. `sudo apt install openjdk-17-jdk openjdk-17-jre`
 
 #### Install MsgPack
 
@@ -377,88 +377,91 @@ These instructions start with a Raspberry Pi with nothing on it, and are meant t
     3. git clone [https://github.com/msgpack/msgpack-c.git](https://github.com/msgpack/msgpack-c.git)  
     4. For some reason, the above does not grab all the necessary files. So, also go here: [https://github.com/msgpack/msgpack-c/tree/cpp\_master](https://github.com/msgpack/msgpack-c/tree/cpp_master) and click on “Code” and down load the zip file into the \~/Dev directory  
     5. unzip /mnt/PiTracShare/dev/tmp/msgpack-c-cpp\_master.zip  
-    6. cd msgpack-c-cpp\_master  
-    7. cmake \-DMSGPACK\_CXX20=ON .  
-    8. sudo cmake \--build . \--target install  
-    9. sudo /sbin/ldconfig
+    6. `cd msgpack-c-cpp_master`  
+    7. `cmake -DMSGPACK_CXX20=ON .`  
+    8. `sudo cmake --build . --target install`  
+    9. `sudo /sbin/ldconfig`
 
 #### Install ActiveMQ C++ CMS
 
 21. Install ActiveMQ C++ CMS messaging system (on both Pi’s)  
     1. This code allows PiTrac to talk to the ActiveMQ message broker  
     2. Pre-requisites:  
-       1. sudo apt \-y install libtool  
-       2. sudo apt-get \-y install libssl-dev  
-       3. sudo apt-get \-y install libapr1-dev  
-       4. sudo apt install \-y libcppunit-dev  
-       5. sudo apt-get install \-y autoconf  
+       1. `sudo apt -y install libtool`  
+       2. `sudo apt-get -y install libssl-dev`  
+       3. `sudo apt-get -y install libapr1-dev`  
+       4. `sudo apt install -y libcppunit-dev`  
+       5. `sudo apt-get install -y autoconf`  
     3. Download and unzip [activemq-cpp-library-3.9.5-src.tar.gz](http://www.apache.org/dyn/closer.lua/activemq/activemq-cpp/3.9.5/activemq-cpp-library-3.9.5-src.tar.gz)  
        1. This version is a little old, but we’re not aware of a newer one  
        2. May also able to do:  
           1. git clone [https://gitbox.apache.org/repos/asf/activemq-cpp.git](https://gitbox.apache.org/repos/asf/activemq-cpp.git) if the available version is new enough (3.9.5 or later)  
        3. ([https://activemq.apache.org/components/cms/developers/building](https://activemq.apache.org/components/cms/developers/building) has more information on the installation process, if necessary)  
-    2. cd \~/Dev  
-    3. gunzip /mnt/PiTracShare/tmp/activemq-cpp-library-3.9.5-src.tar.gz (or wherever you put the .gz zip file)  
-    4. cd activemq-cpp-library-3.9.5  
-    5. ./autogen.sh  
-    6. ./configure  
-    7. make  
-    8. sudo make install
+    2. `cd ~/Dev`  
+    3. `gunzip /mnt/PiTracShare/tmp/activemq-cpp-library-3.9.5-src.tar.gz` (or wherever you put the .gz zip file)  
+    4. `cd activemq-cpp-library-3.9.5`  
+    5. `./autogen.sh`  
+    6. `./configure`  
+    7. `make`  
+    8. `sudo make install`
 
 #### Install ActiveMQ Broker
 
 22. Install ActiveMQ Broker (need only do on the Pi 2 system, as it is the only system that will be running the broker ?)  
     1. We will install the binary (non-source code version)  
     2. Get Apache Pre-Reqs (most should already have been installed)  
-       1. sudo apt \-y install libapr1-dev  
-       2. sudo apt \-y install libcppunit-dev  
-       3. sudo apt \-y install doxygen  
-       4. sudo apt \-y install e2fsprogs  
-       5. sudo apt \-y install maven  
+       1. `sudo apt -y install libapr1-dev`  
+       2. `sudo apt -y install libcppunit-dev`  
+       3. `sudo apt -y install doxygen`  
+       4. `sudo apt -y install e2fsprogs`  
+       5. `sudo apt -y install maven`  
     3. [https://activemq.apache.org/components/classic/download/](https://activemq.apache.org/components/classic/download/) has the source code zip file that you will want to download with the ActiveMQ Broker  
        1. E.g., [apache-activemq-6.1.4-bin.tar.gz](https://www.apache.org/dyn/closer.cgi?filename=/activemq/6.1.4/apache-activemq-6.1.4-bin.tar.gz&action=download)  
     2. Follow these instructions to install:  
        1. [https://activemq.apache.org/version-5-getting-started.html\#installation-procedure-for-unix](https://activemq.apache.org/version-5-getting-started.html#installation-procedure-for-unix)  
        2. Set the following environment variable to ensure you don’t run out of memory:  
-          1. export MAVEN\_OPTS=-Xmx1024M  
-       3. We suggest you install activemq at /opt, so…  
-          1. cd /opt  
-          2. sudo tar xvf /mnt/PiTracShare/tmp/apache\*.tar  (or wherever you put the tarball file  
+          1. `export MAVEN_OPTS=-Xmx1024M` (ignore for RaspberryPi 5 8GB)
+       3. We suggest you install activemq at `/opt`, so…  
+          1. `cd /opt`  
+          2. `sudo tar xvf /mnt/PiTracShare/tmp/apache\*.tar`  (or wherever you put the tarball file  
        2. Test it manually once, and then we’ll start it automatically later:  
-          1. cd /opt/apache-activemq\*  
-          2. sudo ./bin/activemq start   (NOTE \- must start in main directory to ensure that the files like logs get created in the correct place)  
+          1. `cd /opt/apache-activemq` 
+          2. `sudo ./bin/activemq start`   (NOTE \- must start in main directory to ensure that the files like logs get created in the correct place)  
           3. Wait a half-minute and then check the data/activemq.log file to make sure everything is good  
-          4. netstat \-an|grep 61616      should then return “LISTEN”  
-          5. sudo ./bin/activemq stop  
+          4. `netstat -an|grep 61616` should then return “LISTEN”  
+          5. `sudo ./bin/activemq stop`  
        2. Setup for remote access  
-          1. cd conf  
-          2. sudo cp jetty.xml jetty.xml.ORIGINAL  
-          3. sudo vi jetty.xml jetty.xml  
-             1. Search for the line that has 127.0.0.1 and replace with whatever the IP address is for the Pi this is all  running on.  
+          1. `cd conf`  
+          2. `sudo cp jetty.xml jetty.xml.ORIGINAL`  
+          3. `sudo vi jetty.xml jetty.xml`  
+             1. Search for the line that has `127.0.0.1` and replace with whatever the IP address is for the Pi this is all  running on.  
              2. Search for the line that begins with “ Enable this connector if you wish to use https with web console”  
              3. Uncomment the next section by removing the \!-- and → at the beginning and end of the bean  
-          4. cd .. ; sudo ./bin/activemq start  
+          4. `cd .. && sudo ./bin/activemq start`  
           5. Log into the broker console from another machine by: http://\<Pi IP address or name\>:8161/admin  
              1. If this works, the broker is setup correctly  
        2. Setup ActiveMQ to run automatically on startup  
-          1. sudo vi /etc/systemd/system/activemq.service   and add:  
-             1. \[Unit\]  
-             2. Description=ActiveMQ  
-             3. After=network.target  
-             4. \[Service\]  
-             5. User=root  
-             6. Type=forking  
-             7. ExecStart=/opt/apache-activemq-6.1.4/bin/activemq start  
-             8. ExecStop=/opt/apache-activemq-6.1.4/bin/activemq stop  
-             9. KillSignal=SIGCONT  
-             10. \[Install\]  
-             11. WantedBy=multi-user.target  
-          2. sudo systemctl daemon-reload  
-          3. sudo systemctl start activemq  
-          4. sudo systemctl enable activemq  
-          5. sudo reboot now   (to test the auto-start)  
+          1. `sudo vi /etc/systemd/system/activemq.service` and add:
+            ```bash 
+            # Verify your version in the directory path name
+            [Unit]  
+            Description=ActiveMQ  
+            After=network.target  
+            [Service]  
+            User=root  
+            Type=forking  
+            ExecStart=/opt/apache-activemq/bin/activemq start  
+            ExecStop=/opt/apache-activemq/bin/activemq stop  
+            KillSignal=SIGCONT  
+            [Install]  
+            WantedBy=multi-user.target
+            ```
+          2. `sudo systemctl daemon-reload`  
+          3. `sudo systemctl start activemq`  
+          4. `sudo systemctl enable activemq`  
+          5. `sudo reboot now`   (to test the auto-start)  
           6. After the system comes back, do the following to verify it’s working:  
-             1. sudo /opt/apache-activemq-6.1.4/bin/activemq status  (should say it’s running)  
+             1. `sudo /opt/apache-activemq-6.1.4/bin/activemq status`  (should say it’s running)  
              2. And from a browser, check 
 
 #### Install Maven
@@ -536,12 +539,13 @@ WantedBy=multi-user.target
           1. `sudo tail -f /opt/tomee/logs/catalina.out`  
        6. Next login from a web console:   http://\<Pi-with-Tomee\>:8080/manager/html  
           1. user-name/pwd is by default tomcat/tomcat.  Change if not in a private network.
+       7. <font color=#ff0000>Warning:</font> On Mac Chrome may not allow you to connect from outside the hosted Raspberry Pi. Safari should work.
 
 #### Install Launch Monitor Dependencies
 
 25. Install other Launch Monitor dependencies  
     1. Formatting library because the currently-packaged gcc12.2 in Debian unix doesn’t have the c++20 format capability yet  
-       1. **`sudo apt`** `-y install libfmt-dev`
+       1. `sudo apt -y install libfmt-dev`
 
 #### Build Launch Monitor
 
@@ -549,41 +553,45 @@ WantedBy=multi-user.target
     1. Download the PiTrac repository, including the source code under the “Software” subdirectory if you haven’t already  
        1. We usually use a subdirectory called \~/Dev under the home directory of the PiTrac user to house any cloned repositories such as PiTrac.    
        2. You can do the copy by going to github and downloading the .zip  file, or from the command-line on the Pi using something like:  
-          1. cd \~/Dev  
-          2. git clone https://github.com/jamespilgrim/PiTrac.git  
+          1. `cd ~/Dev`  
+          2. `git clone https://github.com/jamespilgrim/PiTrac.git`  
        3. NOTE \- If you do you plan to do any code changes, you may want to create a fork from the main repository and then clone that into your Pi.  
     2. Install Remaining Prerequisites and Setup Environment:  
-       1. Setup the PITRAC\_ROOT environment variable to point to the “Software/LMSourceCode” directory of the PiTrac build.  That is one directory “up” from the “ImageProcessing” directory that contains the main PiTrac meson.build file.  
+       1. Setup the `PITRAC_ROOT` environment variable to point to the “Software/LMSourceCode” directory of the PiTrac build.  That is one directory “up” from the “ImageProcessing” directory that contains the main PiTrac meson.build file.  
           1. E.g., include in your .zshrc or .bashrc or whatever shell you use:  
-             1. export PITRAC\_ROOT=/Dev/PiTrac/Software/LMSourceCode  
-       2. sudo apt-get \-y install libraspberrypi-dev raspberrypi-kernel-headers  
-       3. Add extended timeout to  rpi\_apps.yaml file so that even if an external trigger doesn’t fire for a really long time, the libcamera library won’t time-out:  
-          1. (**NOTE** for Pi 5, use /usr/share/libcamera/pipeline/rpi/pisp instead of /usr/share/libcamera/pipeline/rpi/vc4, below)  
-          2. cd  /usr/share/libcamera/pipeline/rpi/vc4  
-          3. sudo cp  rpi\_apps.yaml  rpi\_apps.yaml.ORIGINAL  
-          4. In both /usr/local/share/libcamera/pipeline/rpi/vc4/rpi\_apps.yaml and /usr/share/libcamera/pipeline/rpi/vc4/rpi\_apps.yaml, at the end of the pipeline section, add the following (including the last comma\!)  
-             1. \# Custom timeout value (in ms) for camera to use. This overrides  
-             2. \# the value computed by the pipeline handler based on frame  
-             3. \# durations.  
-             4. \#  
-             5. \# Set this value to 0 to use the pipeline handler computed  
-             6. \# timeout value.  
-             7. \#  
-             8. "camera\_timeout\_value\_ms": 1000000,  
+             1. `export PITRAC_ROOT=/Dev/PiTrac/Software/LMSourceCode`  
+       2. `sudo apt-get -y install libraspberrypi-dev raspberrypi-kernel-headers`  
+       3. Add extended timeout to `rpi_apps.yaml` file so that even if an external trigger doesn’t fire for a really long time, the libcamera library won’t time-out:  
+          1. (**NOTE** for Pi 5, use `/usr/share/libcamera/pipeline/rpi/pisp` instead of `/usr/share/libcamera/pipeline/rpi/vc4`, below)  
+          2. `cd  /usr/share/libcamera/pipeline/rpi/vc4`  
+          3. `sudo cp  rpi_apps.yaml  rpi_apps.yaml.ORIGINAL`  
+          4. In both `/usr/local/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml` and `usr/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml`, at the end of the pipeline section, add the following (including the last comma\!)  
+             <font color=#ff0000>Warning:</font> If running `libcamera-vid -t 0` results in a blank screen. Something went wrong in this step, causing the camera to timeout.
+             As a result, use `ps -aux | grep libcamera` to kill the pid `sudo kill -9 <pid_num>`. This will also cause other errors/issues while attemping to use `pitrac_lm`. 
+             ``` bash
+             # Custom timeout value (in ms) for camera to use. This overrides  
+             # the value computed by the pipeline handler based on frame  
+             # durations.  
+             #  
+             # Set this value to 0 to use the pipeline handler computed  
+             # timeout value.  
+             #  
+             "camera_timeout_value_ms": 1000000,
+             ```  
           5. The first file deals with the local file from the libcamera build, and the second one is the for libcamera that is installed with the O/S.  We will set both, just in case.  
-       2. Get the latest imx296\_noir.json into /usr/share/libcamera/ipa/rpi/pisp  
+       2. Get the latest `imx296_noir.json` into `/usr/share/libcamera/ipa/rpi/pisp` (located inside ImageProcessing folder)
           1. For the Pi 4:  
-             1. sudo cp imx296\_noir.json /usr/share/libcamera/ipa/rpi/vc4  
+             1. `sudo cp imx296_noir.json /usr/share/libcamera/ipa/rpi/vc4`  
           2. For the Pi 5:  
-             1. sudo cp imx296\_noir.json /usr/share/libcamera/ipa/rpi/pisp  
-    2. Go to the directory called ImageProcessing below whatever PITRAC\_ROOT directory path you will be using to compile.  E.g.,   
-       1. cd $PITRAC\_ROOT/ImageProcessing  
-    3. chmod \+x create\_closed\_source\_objects.sh  
-    4. meson setup build  
+             1. `sudo cp imx296_noir.json /usr/share/libcamera/ipa/rpi/pisp`  
+    2. Go to the directory called ImageProcessing below whatever `PITRAC_ROOT` directory path you will be using to compile.  E.g.,   
+       1. `cd $PITRAC_ROOT/ImageProcessing`  
+    3. `chmod +x create_closed_source_objects.sh`  
+    4. `meson setup build`  
        1. If there are any missing libraries, ensure that the pre-requisites were all successfully built and installed and that any corresponding pkgconfig files were created correctly per the steps above.  
-    5. ninja \-C build       (add \-j 2 if compiling in 4GB or less)  
+    5. `ninja -C build`       (add \-j 2 if compiling in 4GB or less)  
     6. If the build completes successfully, try a quick sanity check to ensure that any shared libraries are correctly linked at that the PiTrac application can at least run:  
-       1. build/pitrac\_lm –help    
+       1. `build/pitrac_lm --help`    
        2. (that’s two ‘-’ characters before help)  
        3. The app should return the available command-line options
 
@@ -594,44 +602,48 @@ WantedBy=multi-user.target
 27. Setup the PiTrac-specific code package for the PiTrac GUI on the Tomee server  
     1. Log into the Pi 2 computer where the Tomee instance is running  
     2. Make sure Tomee is running:  
-       1. sudo systemctl status tomee   (hit ‘q’ to exit)  
-    3. cd \~/Dev   (or whatever the root of your development environment is)  
-    4. mkdir WebAppDev  
-    5. cd WebAppDev  
-    6. vi refresh\_from\_dev.sh     (a new file) and put this in it:  
-       1. \# After running this script, then do a "mvn package" to compile and then  
-       2. \# /opt/tomee/bin/restart.sh  
-       3. mkdir \-p src/main/{webapp/WEB-INF,java/com/verdanttechs/jakarta/ee9}  
-       4. cp $PITRAC\_ROOT/ImageProcessing/golfsim\_tomee\_webapp/src/main/java/com/verdanttechs/jakarta/ee9/MonitorServlet.java ./src/main/java/com/verdanttechs/jakarta/ee9/  
-       5. cp $PITRAC\_ROOT//ImageProcessing/golfsim\_tomee\_webapp/src/main/webapp/WEB-INF/\*.jsp ./src/main/webapp/WEB-INF  
-       6. cp $PITRAC\_ROOT//ImageProcessing/golfsim\_tomee\_webapp/src/main/webapp/\*.html ./src/main/webapp  
-       7. cp $PITRAC\_ROOT//ImageProcessing/golfsim\_tomee\_webapp/pom.xml .  
-       8. \# Also pull over the current .json configuration file to make sure that the webapp is looking at the correct version.  
-       9. cp $PITRAC\_ROOT//ImageProcessing/golf\_sim\_config.json  \~/LM\_Shares/WebShare/  
+       1. `sudo systemctl status tomee`   (hit ‘q’ to exit)  
+    3. `cd ~/Dev`   (or whatever the root of your development environment is)  
+    4. `mkdir WebAppDev`  
+    5. `cd WebAppDe`v  
+    6. `vi refresh_from_dev.sh`     (a new file) and put this in it:
+      <font color=#FF0000>Note:</font> Update your Broker IP address located in `MonitorServlet.java` class before creating the file below. <i>Will be improved in the future.</i>
+       ``` bash
+       # After running this script, then do a "mvn package" to compile and then  
+       # /opt/tomee/bin/restart.sh  
+       mkdir -p src/main/{webapp/WEB-INF,java/com/verdanttechs/jakarta/ee9}  
+       cp $PITRAC_ROOT/ImageProcessing/golfsim_tomee_webapp/src/main/java/com/verdanttechs/jakarta/ee9/MonitorServlet.java ./src/main/java/com/verdanttechs/jakarta/ee9/  
+       cp $PITRAC_ROOT/ImageProcessing/golfsim_tomee_webapp/src/main/webapp/WEB-INF/*.jsp ./src/main/webapp/WEB-INF  
+       cp $PITRAC_ROOT/ImageProcessing/golfsim_tomee_webapp/src/main/webapp/*.html ./src/main/webapp  
+       cp $PITRAC_ROOT/ImageProcessing/golfsim_tomee_webapp/pom.xml .  
+       # Also pull over the current .json configuration file to make sure that the webapp is looking at the correct version.  
+       cp $PITRAC_ROOT/ImageProcessing/golf_sim_config.json ~/LM_Shares/WebShare/  
+       ```
     2. Run the new script to bring over the java and other web-based GUI files:   
-       1. . ./refresh\_from\_dev.sh  
+       1. `./refresh_from_dev.sh`  
        2. NOTE that the above script will also move a copy of the golf\_sim\_config.json file into the shared directory that the GUI can access in order to get information about its run-time environment.  
     3. Tell the MonitorServlet where to find its configuration file  
-       1. vi ./src/main/webapp/index.html  
-       2. Change the FPITRAC\_USERNAME to be whatever the PiTrac user’s name is on the system.  That line in the index.html file tells the java servlet where to find the json configuration file.  
-          1. Alternatively, you can just create a browser bookmark to point to the servlet with the correct filename  
+       1. `vi ./src/main/webapp/index.html`  
+       2. Change the `FPITRAC_USERNAME` to be whatever the PiTrac user’s name is on the system.  That line in the index.html file tells the java servlet where to find the json configuration file.  
+          1. Alternatively, you can just create a browser bookmark to point to the servlet with the correct filename 
+      ![](snapshots/index_replace_name.png)
     2. Create the “.war” package for Tomee  
-       1. mvn package  
+       1. `mvn package`  
        2. NOTE:  The first time this is performed, it will take a few minutes to gather up all the required packages from the internet  
-       3. This process will create a “golfsim.war” file in the “target” directory.  That file will then have to be “deployed” into tomee by using the manager console at http://\<Name-or-IP-address-of-Pi-with-Tomee\>:8080/manager/html  
+       3. This process will create a “golfsim.war” file in the “target” directory.  That file will then have to be “deployed” into tomee by using the manager console at `http://<Name-or-IP-address-of-Pi-with-Tomee>:8080/manager/html`  
        4. Your browser should have a window titled “Tomcat Web Application Manager”.  You may have to use the default login of tomcat/tomcat  
        5. Copy the .war file to a place that is visible on the computer from where your browser is logged into the tomee console.  
        6. Select “Choose File” in the section in the Tomee manager console labeled “WAR file to deploy”.  Select the .war file and then wait a moment until it’s name is displayed.  Then push the “Deploy” button.  
        7. In a moment, the “golfsim” app should show up on the list.  Click it.  
        8. If you get a “HTTP Status 404 – Not Found” error, try:  
-          1. cd /opt/tomee/webapps  
-          2. sudo chmod \-R 777 golfsim  
-          3. sudo systemctl restart tomee  (the first error will ‘stick’ otherwise)  
+          1. `cd /opt/tomee/webapps`  
+          2. `sudo chmod -R 777 golfsim`  
+          3. `sudo systemctl restart tomee`  (the first error will ‘stick’ otherwise)  
        9. Alternatively, you can just manually move the .war file into place and Tomee should pick it up.  Wait 30 seconds or so after doing this to give Tomee a moment to see the new war file and deploy it.  
-          1. cd /opt/tomee/webapps  
-          2. sudo cp \~/Dev/WebAppDev/target/golfsim.war .  
+          1. `cd /opt/tomee/webapps`  
+          2. `sudo cp ~/Dev/WebAppDev/target/golfsim.war .`  
        10. Confirm you can see the PiTrac GUI by entering the following into your browser:  
-           1. http://\<The-Pi-2-name-or-IP\>:8080/golfsim/monitor?config\_filename=%2Fhome%2Fmleary%2FLM\_Shares/%2FWebShare%2Fgolf\_sim\_config.json  
+           1. `http://<The-Pi-2-name-or-IP>:8080/golfsim/monitor?config_filename=%2Fhome%2Fmleary%2FLM_Shares%2FWebShare%2Fgolf_sim_config.json`  
        11. You should see the PiTrac GUI
 
 **CONGRATULATIONS\!** \- At this point, you’ve (hopefully) built the PiTrac software.  Please see the [Startup Documentation](https://github.com/jamespilgrim/PiTrac/blob/main/Documentation/PiTrac%20Start-Up%20Documentation.md) for how to get PiTrac working\!
