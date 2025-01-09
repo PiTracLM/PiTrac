@@ -30,8 +30,6 @@ class HelloServletTest {
         request = mock(HttpServletRequest.class);
     }
 
-
-
     @Test
     void doGet_returnsTestMonitorCompleted() throws ServletException, IOException {
         helloServlet.doGet(request, response);
