@@ -32,26 +32,6 @@ jobs:
         with:
           maven-version: 3.9.2
 
-      - name: Extract branch name
-        id: GetBranchName
-        shell: bash
-        run: |
-          echo "GIT_BRANCH=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> "$GITHUB_OUTPUT"
-
-      - name: Extract Artifact Id
-        id: GetArtifactId
-        run: |
-          echo "ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_OUTPUT
-
-      - name: Extract Release Version
-        id: GetReleaseVersion
-        run: |
-          if [ "${{  inputs.version }}" == '' ]; then
-          echo "RELEASE_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_OUTPUT
-          else
-          echo "RELEASE_VERSION=${{ inputs.version }}" >> $GITHUB_OUTPUT
-          fi
-
       - name: Branch Name
         id: extract_branch
         run: |
@@ -59,4 +39,4 @@ jobs:
         shell: bash
 
       - name: Maven Build
-        run: mvn -B package --file pom.xml
+        run: mvn -B package --file Software/LMSourceCode/ImageProcessing/golfsim_tomee_webapp/pom.xml
