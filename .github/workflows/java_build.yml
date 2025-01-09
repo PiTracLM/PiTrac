@@ -1,0 +1,64 @@
+name: Java Build
+
+on:
+  pull_request:
+    types: [opened, reopened, edited, synchronize]
+
+    paths:
+      - 'Software/LMSourceCode/ImageProcessing/golfsim_tomee_webapp/**.java'
+
+
+jobs:
+  Setup:
+    name: Setup
+    runs-on: ubuntu-latest
+
+    steps: 
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: 17
+          cache: maven
+
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v.4.5
+        with:
+          maven-version: 3.9.2
+
+      - name: Extract branch name
+        id: GetBranchName
+        shell: bash
+        run: |
+          echo "GIT_BRANCH=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract Artifact Id
+        id: GetArtifactId
+        run: |
+          echo "ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_OUTPUT
+
+      - name: Extract Release Version
+        id: GetReleaseVersion
+        run: |
+          if [ "${{  inputs.version }}" == '' ]; then
+          echo "RELEASE_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_OUTPUT
+          else
+          echo "RELEASE_VERSION=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Branch Name
+        id: extract_branch
+        run: |
+          echo $BRANCH_NAME
+        shell: bash
+
+      - name: Ingress Path
+        id: GetIngressPath
+        run: |
+          echo "IngPth=$( sed -r 's/-/\//g' <<< '${{ steps.GetArtifactId.outputs.ARTIFACT_ID }}')" >> $GITHUB_OUTPUT
+
+      - name: Maven Build
+        run: mvn -B package --file pom.xml
