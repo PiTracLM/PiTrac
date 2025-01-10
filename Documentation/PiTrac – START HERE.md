@@ -10,7 +10,7 @@ With that said, here is what you need to do to make your own PiTrac:
 
 [1\. Download the PiTrac Repository](#1-download-the-pitrac-repository)
 
-[2\. Gather the Parts You’ll Need](#2-gather-the-parts-you’ll-need)
+[2\. Gather the Parts You’ll Need](#2-gather-the-parts-youll-need)
 
 [3\. Setup the Raspberry Pi Computers That You Will Use in the PiTrac](#3-setup-the-raspberry-pi-computers-that-you-will-use-in-the-pitrac)
 
