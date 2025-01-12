@@ -30,7 +30,14 @@ namespace golf_sim {
 
 
     GsGSProInterface::GsGSProInterface() {
-        GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress", socket_connect_address_);
+
+        // We prefer the command-line setting even if there's one in the .json config file
+        if (!GolfSimOptions::GetCommandLineOptions().gspro_host_address_.empty()) {
+            socket_connect_address_ = GolfSimOptions::GetCommandLineOptions().gspro_host_address_;
+        }
+        else {
+            GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress", socket_connect_address_);
+        }
         GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.GSPro.kGSProConnectPort", socket_connect_port_);
     }
 
@@ -39,13 +46,23 @@ namespace golf_sim {
     }
 
     bool GsGSProInterface::InterfaceIsPresent() {
-        // TBD - For now, just see if the JSON file has GSPro information.
+
+        // TBD - For now, just see if the command line has GSPro information.
         // If it does, assume that the interface is present and has been selected
-        // for use.
+        // for use.  We are not going to use the address in the .json file any more,
+        // though we will use the port and other settings that are not likely to change.
         std::string test_socket_connect_address;
 
-        GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress", test_socket_connect_address);
-        GS_LOG_TRACE_MSG(trace, "GsGSProInterface::InterfaceIsPresent - kGSProConnectAddress=" + test_socket_connect_address);
+        if (!GolfSimOptions::GetCommandLineOptions().gspro_host_address_.empty()) {
+            test_socket_connect_address = GolfSimOptions::GetCommandLineOptions().gspro_host_address_;
+            GS_LOG_TRACE_MSG(trace, "GsGSProInterface::InterfaceIsPresent - kGSProConnectAddress=" + test_socket_connect_address);
+            return true;
+        }
+        else {
+            GS_LOG_TRACE_MSG(trace, "GsGSProInterface::InterfaceIsPresent - Not Present");
+            return false;
+        }
+
         return (test_socket_connect_address != "");
     }
 

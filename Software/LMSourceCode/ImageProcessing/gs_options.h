@@ -96,7 +96,7 @@ namespace golf_sim {
 				("show_images", value<bool>(&show_images_)->default_value(false)->implicit_value(true),
 					"0 = Don't show any debug/trace images in windows on the screen, 1 = Do")
 				("use_non_IR_camera", value<bool>(&use_non_IR_camera_)->default_value(false)->implicit_value(true),
-					"1 = The camera in use by this system is not an IR camera (and will likely need less gain)")				
+					"1 = The camera in use by this system is not an IR camera (and will likely need less gain)")						
 				("search_center_x", value<unsigned int>(&search_center_x_)->default_value(0),
 					"Set the x coordinate of the center of the ball-search circle")
 				("search_center_y", value<unsigned int>(&search_center_y_)->default_value(0),
@@ -105,6 +105,16 @@ namespace golf_sim {
 					"Causes camera1 system to act as though a ball was found even if none is present.")
 				("camera_gain", value<double>(&camera_gain_)->default_value(1.0),
 					"Amount of gain for taking pictures")
+				("msg_broker_address", value<std::string>(&msg_broker_address_)->default_value(""),
+					"Specify the full hostname or ip address and port of the host of the Active MQ broker. For example: tcp://10.0.0.41:61616 . Default is: <empty string>")
+				("base_image_logging_dir", value<std::string>(&base_image_logging_dir_)->default_value("./"),
+					"Specify the full path (with an ending '/') where diagnostic images are to be written. Default is: ./   (current dir)")
+				("web_server_share_dir", value<std::string>(&web_server_share_dir_)->default_value("./"),
+					"Specify the full path (with an ending '/') where diagnostic images are to be written. Default is: ./   (current dir)")
+				("e6_host_address", value<std::string>(&e6_host_address_)->default_value(""),
+					"Specify the name or IP address of the host PC that is running the E6 simulator.  Default is: <empty string>, indicating no TruGolf sim is connected.")
+				("gspro_host_address", value<std::string>(&gspro_host_address_)->default_value(""),
+					"Specify the name or IP address of the host PC that is running the GSPro simulator.  Default is: <empty string>, indicating no GSPro sim is connected.")
 				("config_file", value<std::string>(&config_file_)->default_value("golf_sim_config.json"),
 					"Specify the filename with the JSON configuration.  Default is: golf_sim_config.json")
 				("cmd_file,cmd", value<std::string>(&command_line_file_)->implicit_value("config.txt"),
@@ -138,6 +148,11 @@ namespace golf_sim {
 		std::string artifact_save_level_string_;
 		std::string logging_level_string_;
 		std::string command_line_file_;
+		std::string msg_broker_address_;
+		std::string base_image_logging_dir_;
+		std::string web_server_share_dir_;
+		std::string e6_host_address_;
+		std::string gspro_host_address_;
 		std::string config_file_;
 		std::string golfer_orientation_string_;
 		SystemMode system_mode_;

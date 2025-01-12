@@ -159,7 +159,7 @@
 		},
 
 		"ipc_interface": {
-			"kWebActiveMQHostAddress": "tcp://10.0.0.41:61616",
+			"kWebActiveMQHostAddress": "USE CMD LINE - Example:  --msg_broker_address tcp://10.0.0.41:61616",
 			"kMaxCam2ImageReceivedTimeMs": 40000
 		},
 
@@ -212,6 +212,7 @@
 			"kCamera2FocalLength": 6.11,
 			"comment - kCamera1Gain = 6 and kCamera1Contrast=1.3 is good for practice ball. For regular ball, 3 and 1.5": 0,
 			"kCamera1Gain": 1.0,
+			"kCamera1HighFPSGain": 15.0,
 			"kCamera1Contrast": 1.0,
 			"kCamera2Gain": 3.0,
 			"kCamera2ComparisonGain": 0.8,
@@ -235,7 +236,7 @@
 				[ 0.000000000000000000e+00, 1.827901989005196810e+03, 5.319678162262430305e+02 ],
 				[ 0.000000000000000000e+00, 0.000000000000000000e+00, 1.000000000000000000e+00 ]
 			],
-			"kCamera1DistortionVector": [ -0.546987,	0.432329,	-0.006607, 0.008145, -0.344390 ],
+			"kCamera1DistortionVector": [ -0.546987, 0.432329, -0.006607, 0.008145, -0.344390 ],
 			"kCamera2CalibrationMatrix": [
 				[ 1.836374063510859514e+03, 0.000000000000000000e+00, 7.506562375932951454e+02 ],
 				[ 0.000000000000000000e+00, 1.842554330618142558e+03, 5.583207746468583537e+02 ],
@@ -260,15 +261,39 @@
 		"golf_simulator_interfaces": {
 			"kLaunchMonitorIdString": "PiTrac LM 0.1",
 			"kSkipSpinCalculation": 0,
-			"DISABLED-GSPro": {
-				"kGSProConnectAddress": "10.0.0.47",
+			"GSPro": {
+				"kGSProComment": "USE CMD LINE OPTION - Example:  --gspro_host_address 10.0.0.47",
+				"kGSProConnectAddress": "", 
 				"kGSProConnectPort": "0921"
 			},
 			"E6": {
-				"kE6ConnectAddress": "10.0.0.29",
+				"kE6Comment": "USE CMD LINE - Exampe:  --e6_host_address 10.0.0.29",
+				"kE6ConnectAddress": "",
 				"kE6ConnectPort": "2483",
 				"kE6InterMessageDelayMs": 50
 			}
+		},
+
+
+		"club_data": {
+			"kEnableClubImages": 0,
+			"kClubImageOutputDir": "/home/mleary/LM_Shares/Images/",
+			"kNumberFramesToSaveBeforeHit": 6,
+			"kNumberFramesToSaveAfterHit": 6,
+			"kClubImageWidthPixels": 96,
+			"kClubImageHeightPixels": 88,
+			"kClubImageCameraGain": 40,
+			"kClubImageShutterSpeedMultiplier": 0.4
+		},
+
+		"motion_detect_stage": {
+			"kDifferenceM": 0.55,
+			"kDifferenceC": 13.0,
+			"kRegionThreshold": 0.2,
+			"kMaxRegionThreshold": 0.2,
+			"kFramePeriod": 5,
+			"kHSkip": 5,
+			"kVSkip": 5
 		},
 
 		"testing": {

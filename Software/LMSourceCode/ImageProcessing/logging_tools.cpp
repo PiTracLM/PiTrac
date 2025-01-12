@@ -70,9 +70,9 @@ namespace golf_sim {
     boost::circular_buffer<std::string> LoggingTools::RecentLogMessages(20);
 
 #ifdef __unix__
-    std::string LoggingTools::kBaseImageLoggingDir = "/mnt/VerdantShare/dev/GolfSim/LM/Images/";
+    std::string LoggingTools::kBaseImageLoggingDir = "VALUE_NOT_SET";
 #else
-    std::string LoggingTools::kBaseImageLoggingDir = "D:\\GolfSim\\LM\\Images\\";
+    std::string LoggingTools::kBaseImageLoggingDir = "VALUE_NOT_SET";
 #endif
 
 

@@ -557,9 +557,18 @@ WantedBy=multi-user.target
           2. `git clone https://github.com/jamespilgrim/PiTrac.git`  
        3. NOTE \- If you do you plan to do any code changes, you may want to create a fork from the main repository and then clone that into your Pi.  
     2. Install Remaining Prerequisites and Setup Environment:  
-       1. Setup the `PITRAC_ROOT` environment variable to point to the “Software/LMSourceCode” directory of the PiTrac build.  That is one directory “up” from the “ImageProcessing” directory that contains the main PiTrac meson.build file.  
+       1. Setup the `PITRAC_ROOT` and other environment variable.  For example set PITRAC_ROOT to point to the “Software/LMSourceCode” directory of the PiTrac build.  That is one directory “up” from the “ImageProcessing” directory that contains the main PiTrac meson.build file. The other environment variables listed below (with example values) should be set according to your network and environment. 
           1. E.g., include in your .zshrc or .bashrc or whatever shell you use:  
-             1. `export PITRAC_ROOT=/Dev/PiTrac/Software/LMSourceCode`  
+	  ```
+export PITRAC_ROOT=/Dev/PiTrac/Software/LMSourceCode`  
+export PITRAC_BASE_IMAGE_LOGGING_DIR=~/LM_Shares/Images/
+export PITRAC_WEBSERVER_SHARE_DIR=~/LM_Shares/WebShare/
+export PITRAC_MSG_BROKER_FULL_ADDRESS=tcp://10.0.0.41:61616
+# Only uncomment and set the following if connecting to the
+# respective golf sim (e.g., E6/TruGolf, GSPro, etc.)
+export PITRAC_E6_HOST_ADDRESS=10.0.0.29
+#export PITRAC_GSPRO_HOST_ADDRESS=10.0.0.29
+	  ```
        2. `sudo apt-get -y install libraspberrypi-dev raspberrypi-kernel-headers`  
        3. Add extended timeout to `rpi_apps.yaml` file so that even if an external trigger doesn’t fire for a really long time, the libcamera library won’t time-out:  
           1. (**NOTE** for Pi 5, use `/usr/share/libcamera/pipeline/rpi/pisp` instead of `/usr/share/libcamera/pipeline/rpi/vc4`, below)  

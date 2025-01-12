@@ -104,6 +104,11 @@ namespace golf_sim {
 
 
 bool GolfSimConfiguration::ReadValues() {
+
+	// Many constants are read in the modules that own those constants.  But some are better 
+	// initialized here, early, before those modules may get to be initialized (if they even
+	// have an initialization).
+
 	SetConstant("gs_config.physical_constants.kBallRadiusMeters", GolfBall::kBallRadiusMeters);
 
 	SetConstant("gs_config.cameras.kCamera1PositionsFromOriginMeters", GolfSimCamera::kCamera1PositionsFromOriginMeters);
@@ -111,7 +116,7 @@ bool GolfSimConfiguration::ReadValues() {
 	SetConstant("gs_config.cameras.kCamera2OffsetFromCamera1OriginMeters", GolfSimCamera::kCamera2OffsetFromCamera1OriginMeters);
 
 #ifdef __unix__  // Ignore in Windows environment
-	SetConstant("gs_config.user_interface.kWebServerShareDirectory",GsUISystem::kWebServerShareDirectory);
+
 	SetConstant("gs_config.user_interface.kWebServerResultBallExposureCandidates",GsUISystem::kWebServerResultBallExposureCandidates);
 	SetConstant("gs_config.user_interface.kWebServerResultSpinBall1Image", GsUISystem::kWebServerResultSpinBall1Image);
 	SetConstant("gs_config.user_interface.kWebServerResultSpinBall2Image", GsUISystem::kWebServerResultSpinBall2Image);
@@ -122,6 +127,7 @@ bool GolfSimConfiguration::ReadValues() {
 	SetConstant("gs_config.image_capture.kMaxWatchingCropWidth", LibCameraInterface::kMaxWatchingCropWidth);
 	SetConstant("gs_config.image_capture.kMaxWatchingCropHeight", LibCameraInterface::kMaxWatchingCropHeight);
 	SetConstant("gs_config.cameras.kCamera1Gain", LibCameraInterface::kCamera1Gain);
+	SetConstant("gs_config.cameras.kCamera1HighFPSGain", LibCameraInterface::kCamera1HighFPSGain);
 	SetConstant("gs_config.cameras.kCamera1Contrast", LibCameraInterface::kCamera1Contrast);
 	SetConstant("gs_config.cameras.kCamera2Gain", LibCameraInterface::kCamera2Gain);
 	SetConstant("gs_config.cameras.kCamera2CalibrateOrLocationGain", LibCameraInterface::kCamera2CalibrateOrLocationGain);	
@@ -133,6 +139,22 @@ bool GolfSimConfiguration::ReadValues() {
 	SetConstant("gs_config.cameras.kCamera1StillShutterTimeuS", LibCameraInterface::kCamera1StillShutterTimeuS);
 	SetConstant("gs_config.cameras.kCamera2StillShutterTimeuS", LibCameraInterface::kCamera2StillShutterTimeuS);
 	SetConstant("gs_config.cameras.kCameraMotionDetectSettings", LibCameraInterface::kCameraMotionDetectSettings);
+
+	// The web server share directory isn't really a value we want to use from the .json configuration
+	// file anymore, but for now, let's allow it as a fall-back to the command line
+	if (!GolfSimOptions::GetCommandLineOptions().web_server_share_dir_.empty()) {
+		GsUISystem::kWebServerShareDirectory = GolfSimOptions::GetCommandLineOptions().web_server_share_dir_;
+	}
+	else {
+		// Attempt to get the image logging directory from the .json config file
+		SetConstant("gs_config.user_interface.kWebServerShareDirectory", GsUISystem::kWebServerShareDirectory);
+	}
+
+	// If the configuration file forgot to add a "/" at the end of the logging directory, we should add it here ourselves
+	if (GsUISystem::kWebServerShareDirectory.back() != '/') {
+		GsUISystem::kWebServerShareDirectory += '/';
+	}
+
 
 #endif
 	return true;

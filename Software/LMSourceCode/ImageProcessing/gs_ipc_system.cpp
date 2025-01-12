@@ -26,7 +26,7 @@ using namespace std;
 
 namespace golf_sim {
 
-    std::string GolfSimIpcSystem::kWebActiveMQHostAddress = "tcp://10.0.0.41:61616";
+    std::string GolfSimIpcSystem::kWebActiveMQHostAddress = "";
 
     const std::string GolfSimIpcSystem::kGolfSimMessageTypeTag = "Message Type";
     const std::string GolfSimIpcSystem::kGolfSimMessageType = "GolfSimIPCMessage";
@@ -40,7 +40,19 @@ namespace golf_sim {
 
     bool GolfSimIpcSystem::InitializeIPCSystem() {
 
-        GolfSimConfiguration::SetConstant("gs_config.ipc_interface.kWebActiveMQHostAddress", kWebActiveMQHostAddress);
+        // We prefer the command-line setting even if there's one in the .json config file
+        if (!GolfSimOptions::GetCommandLineOptions().msg_broker_address_.empty()) {
+            kWebActiveMQHostAddress = GolfSimOptions::GetCommandLineOptions().msg_broker_address_;
+        }
+        else {
+            // At least for now, we will still allow the message broker address to be set
+            // from the configuration .json file.
+            GolfSimConfiguration::SetConstant("gs_config.ipc_interface.kWebActiveMQHostAddress", kWebActiveMQHostAddress);
+            if (kWebActiveMQHostAddress.empty()) {
+                GS_LOG_TRACE_MSG(error, "GolfSimIpcSystem::InitializeIPCSystem - kWebActiveMQHostAddress not set.  Cannot connect with ActiveMQ system.");
+                return false;
+            }
+        }
 
         activemq::library::ActiveMQCPP::initializeLibrary();
 
