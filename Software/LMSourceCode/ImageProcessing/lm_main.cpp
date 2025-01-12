@@ -235,11 +235,19 @@ bool testProjection() {
 
     std::string kBaseTestDir = "D:\\GolfSim\\C++Code\\GolfSim\\ImageProcessing\\";
 
+
+    // We prefer the command-line setting even if there's one in the .json config file
+    if (!GolfSimOptions::GetCommandLineOptions().base_image_logging_dir_.empty()) {
+        kBaseTestDir = GolfSimOptions::GetCommandLineOptions().base_image_logging_dir_;
+    }
+    else {
+        // Attempt to get the image logging directory from the .json config file
 #ifdef __unix__
-    GolfSimConfiguration::SetConstant("gs_config.logging.kLinuxBaseImageLoggingDir", kBaseTestDir);
+        GolfSimConfiguration::SetConstant("gs_config.logging.kLinuxBaseImageLoggingDir", kBaseTestDir);
 #else
-    GolfSimConfiguration::SetConstant("gs_config.logging.kPCBaseImageLoggingDir", kBaseTestDir);
+        GolfSimConfiguration::SetConstant("gs_config.logging.kPCBaseImageLoggingDir", kBaseTestDir);
 #endif
+    }
 
 
     const std::string k0_DegreeBallFileName_00 = kBaseTestDir + "test_ball_masked_0_deg_dulled.png";
@@ -312,11 +320,18 @@ cv::Mat undistort_image(const cv::Mat& img, CameraHardware::CameraModel cameraMo
 bool read_test_images(const std::string& img1BaseFileName, const std::string& img2BaseFileName, cv::Mat& ball1Img, cv::Mat& ball2Img, cv::Mat& ball1ImgColor, cv::Mat& ball2ImgColor, 
                                 CameraHardware::CameraModel cameraModel, bool undistort = true) {
 
+    // We prefer the command-line setting even if there's one in the .json config file
+    if (!GolfSimOptions::GetCommandLineOptions().base_image_logging_dir_.empty()) {
+        kBaseTestDir = GolfSimOptions::GetCommandLineOptions().base_image_logging_dir_;
+    }
+    else {
+        // Attempt to get the image logging directory from the .json config file
 #ifdef __unix__
-    GolfSimConfiguration::SetConstant("gs_config.logging.kLinuxBaseImageLoggingDir", kBaseTestDir);
+        GolfSimConfiguration::SetConstant("gs_config.logging.kLinuxBaseImageLoggingDir", kBaseTestDir);
 #else
-    GolfSimConfiguration::SetConstant("gs_config.logging.kPCBaseImageLoggingDir", kBaseTestDir); 
+        GolfSimConfiguration::SetConstant("gs_config.logging.kPCBaseImageLoggingDir", kBaseTestDir);
 #endif
+    }
 
 
     std::string img1FileName = kBaseTestDir + img1BaseFileName;
@@ -1730,12 +1745,23 @@ int main(int argc, char *argv[])
         }
 
         LoggingTools::logging_tool_wait_for_keypress_ = GolfSimOptions::GetCommandLineOptions().wait_for_key_on_images_;
+
+        // We prefer the command-line setting even if there's one in the .json config file
+        if (!GolfSimOptions::GetCommandLineOptions().base_image_logging_dir_.empty()) {
+            kBaseTestDir = GolfSimOptions::GetCommandLineOptions().base_image_logging_dir_;
+        }
+        else {
+            // Attempt to get the image logging directory from the .json config file
 #ifdef __unix__
-        GolfSimConfiguration::SetConstant("gs_config.logging.kLinuxBaseImageLoggingDir", LoggingTools::kBaseImageLoggingDir);
+            GolfSimConfiguration::SetConstant("gs_config.logging.kLinuxBaseImageLoggingDir", kBaseTestDir);
 #else
-        GolfSimConfiguration::SetConstant("gs_config.logging.kPCBaseImageLoggingDir", LoggingTools::kBaseImageLoggingDir);
+            GolfSimConfiguration::SetConstant("gs_config.logging.kPCBaseImageLoggingDir", kBaseTestDir);
 #endif
-        // TBD - If the configuration file forgot to add a "/" at the end of the logging directory, we should add it here ourselves
+        }
+        // If the configuration file forgot to add a "/" at the end of the logging directory, we should add it here ourselves
+        if (kBaseTestDir.back() != '/') {
+            kBaseTestDir += '/';
+        }
 
 
         // TBD - consider if there is a better place for this?

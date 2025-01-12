@@ -17,6 +17,7 @@
 #include "ball_watcher.h"
 #include "ball_watcher_image_buffer.h"
 #include "still_image_libcamera_app.hpp"
+#include "gs_club_data.h"
 
 #include "image/image.hpp"
 
@@ -30,6 +31,7 @@
 #include "logging_tools.h"
 
 #include <libcamera/logging.h>
+#include "motion_detect.h"
 #include "libcamera_interface.h"
 
 
@@ -42,6 +44,7 @@ namespace golf_sim {
     uint LibCameraInterface::kMaxWatchingCropHeight = 88;
 
     double LibCameraInterface::kCamera1Gain = 6.0;
+    double LibCameraInterface::kCamera1HighFPSGain = 15.0;
     double LibCameraInterface::kCamera1Contrast = 1.0;
     double LibCameraInterface::kCamera2Gain = 6.0;
     double LibCameraInterface::kCamera2ComparisonGain = 0.8;
@@ -59,20 +62,26 @@ namespace golf_sim {
     // we set it up once just in case
     LibCameraInterface::CropConfiguration LibCameraInterface::camera_crop_configuration_ = kCropUnknown;
     cv::Vec2i LibCameraInterface::current_watch_resolution_;
+    cv::Vec2i LibCameraInterface::current_watch_offset_;
 
     LibCameraInterface::CameraConfiguration LibCameraInterface::libcamera_configuration_[] = {LibCameraInterface::CameraConfiguration::kNotConfigured, LibCameraInterface::CameraConfiguration::kNotConfigured};
 
     LibcameraJpegApp* LibCameraInterface::libcamera_app_[] = {nullptr, nullptr};
 
+
     void SetLibCameraLoggingOff() {
         GS_LOG_TRACE_MSG(trace, "SetLibCameraLoggingOff");
         libcamera::logSetTarget(libcamera::LoggingTargetNone);
+	/* TBD - Not working, so avoid the extra log message for now
         libcamera::logSetLevel("*", "ERROR");
         libcamera::logSetLevel("", "ERROR");
+	*/
         RPiCamApp::verbosity = 0;
     }
 
     bool WatchForHitAndTrigger(const GolfBall& ball, cv::Mat& image, bool& motion_detected) {
+
+        GS_LOG_TRACE_MSG(trace, "WatchForHitAndTrigger");
 
         CameraHardware::CameraModel  cameraModel = CameraHardware::PiGSCam6mmWideLens;
 
@@ -85,11 +94,21 @@ namespace golf_sim {
             return false;
         }
 
+        // We have access to the set of frames before and after the hit, so process
+        // club data here
+
+        if (!GolfSimClubData::ProcessClubStrikeData(RecentFrames) ) {
+            GS_LOG_MSG(warning, "Failed to GolfSimClubData::ProcessClubStrikeData(RecentFrames().");
+            // TBD - Ignore for now
+            // return false;
+        }
+
         return true;
     }
 
     bool LibCameraInterface::SendCamera2PreImage(const cv::Mat& raw_image) {
-        // We must undistort here, because we are going to immediately send the pre-image
+        // We must undistort here, because we are going to immediately send the pre-image and the receiver
+        // may not know what camera (and what distortion matrix) is in use.
         CameraHardware::CameraModel  cameraModel = CameraHardware::PiGSCam6mmWideLens;
         cv::Mat return_image = undistort_camera_image(raw_image, GsCameraNumber::kGsCamera2, cameraModel);
 
@@ -105,141 +124,405 @@ namespace golf_sim {
     }
 
 
-    bool WatchForBallMovement(GolfSimCamera& c, const GolfBall& ball, bool & motion_detected) {
+    bool WatchForBallMovement(GolfSimCamera& camera, const GolfBall& ball, bool & motion_detected) {
 
         GS_LOG_TRACE_MSG(trace, "WatchForBallMovement");
 
-        // Setup the camera to watch at a high FPS
-        cv::Vec2i watchResolution;
-        
-        if (!ConfigCameraForCropping(ball, c, watchResolution)) {
+        if (!GolfSimClubData::Configure()) {
+            GS_LOG_TRACE_MSG(warning, "Failed to GolfSimClubData::Configure()");
+            return false;
+        }
+
+        // Setup the camera to watch at a high FPS by reducing the portion of the sensor that will
+        // be processed in each frame (cropping)
+
+        // Will be setup when camera is configured for cropping, then is used in the ball-watcher-loop
+        RPiCamEncoder app;  
+
+        if (!ConfigCameraForCropping(ball, camera, app)) {
             GS_LOG_MSG(error, "Failed to ConfigCameraForCropping.");
             return false;
         }
-        
-
-        // Determine what the resulting frame rate is in the resulting camera mode  (and confirm the resolution)
-        // The camera was stopped after we took the first picture, so re-start for this call
-        cv::Vec2i croppedResolution;
-        uint croppedFrameRate;
-        if (!RetrieveCameraInfo(croppedResolution, croppedFrameRate, true)) {
-            GS_LOG_TRACE_MSG(trace, "Failed to RetrieveCameraInfo.");
-            return false;
-        }
-
-        GS_LOG_TRACE_MSG(trace, "Camera resolution is ( " + std::to_string(croppedResolution[0]) + ", " + std::to_string(croppedResolution[1]) + " ). FPS = " + std::to_string(croppedFrameRate) + ".");
 
         // Prepare the camera to watch the small ROI at a high frame rate
+        // This flag will be set here locally, but the sending of strobe 
+        // pulses will be done within the motion-detection stage to reduce
+        // latency.
         motion_detected = false;
 
         try
         {
-            RPiCamEncoder app;
-            VideoOptions* options = app.GetOptions();
-
-            char dummy_arguments[] = "DummyExecutableName";
-            char* argv[] = { dummy_arguments, NULL };
-
-            if (!options->Parse(1, argv))
-            {
-                GS_LOG_TRACE_MSG(trace, "failed to parse dummy command line.");;
-                return false;
-            }
-
-            SetLibCameraLoggingOff();
-
-            // Need to crank gain due to short exposure time at high FPS.
-            options->no_raw = true;  // See https://forums.raspberrypi.com/viewtopic.php?t=369927
-            options->gain = 15.0;
-            options->timeout.set("0ms"); 
-            options->denoise = "cdn_off";
-            options->framerate = croppedFrameRate;
-            options->nopreview = true;
-            options->lores_width = 0;
-            options->lores_height = 0;
-            options->viewfinder_width = 0;
-            options->viewfinder_height = 0;
-            options->shutter.set(std::to_string((int)(1. / croppedFrameRate * 1000000.)) + "us");   // TBD - should be 1,000,000 for uS setting
-            options->info_text = "";
-            options->level = "4.2";
-
-            // On the Pi5, there's no hardware H.264 encoding, so let's try to turn it off entirely
-            // TBD - See video_options.cpp to consider other options like libav
-            options->codec = "yuv420";    // was h.264, but that no longer works on Pi5
-
-            if (GolfSimConfiguration::GetPiModel() == GolfSimConfiguration::PiModel::kRPi5) {
-                GS_LOG_TRACE_MSG(trace, "Detected PiModel::kRPi5 and camera 1.");
-                options->tuning_file = "/usr/share/libcamera/ipa/rpi/pisp/imx296.json";
-            }
-            else {
-                GS_LOG_TRACE_MSG(trace, "Detected PiModel::kRPi4 and camera 1.");
-                options->tuning_file = "/usr/share/libcamera/ipa/rpi/vc4/imx296.json";
-            }
-            setenv("LIBCAMERA_RPI_TUNING_FILE", options->tuning_file.c_str(), 1);
-            options->post_process_file = LibCameraInterface::kCameraMotionDetectSettings;
-            GS_LOG_TRACE_MSG(trace, "ball_watcher_event_loop will use post-process file: " + options->post_process_file);
-
-            if (croppedResolution[0] > 0 && croppedResolution[1] > 0) {
-                options->width = croppedResolution[0];
-                options->height = croppedResolution[1];
-            }
-
-            if (options->verbose >= 2)
-                options->Print();
-
             if (!ball_watcher_event_loop(app, motion_detected)) {
                 GS_LOG_MSG(error, "ball_watcher_event_loop failed to process.");
             }
-    }
-    catch (std::exception const& e)
-    {
-        GS_LOG_MSG(error, "ERROR: *** " + std::string(e.what()) + " ***");
-        return false;
-    }
-
-    uint frameIndex = 0;
-    unsigned int numFramesToShow = 10;
-
-    if (motion_detected) {
-        std::string frame_information;
-        float average_frame_rate = 0.0;
-        float slowest_frame_rate = 10000.0;
-        float fastest_frame_rate = -10000.0;
-
-        for (auto& it : boost::adaptors::reverse(RecentFrames)) {
-            cv::Mat& mostRecentFrame = it.mat;
-
-            frame_information += "Frame " + std::to_string(frameIndex) + ": Framerate = " + std::to_string(it.frameRate) + "\n";
-            average_frame_rate += it.frameRate;
-
-            if (it.frameRate < slowest_frame_rate) {
-                slowest_frame_rate = it.frameRate;
-            }
-
-            if (it.frameRate > fastest_frame_rate) {
-                fastest_frame_rate = it.frameRate;
-            }
-
-            frameIndex++;
+        }
+        catch (std::exception const& e)
+        {
+            GS_LOG_MSG(error, "ERROR: *** " + std::string(e.what()) + " ***");
+            return false;
         }
 
-        average_frame_rate /= RecentFrames.size();
+        uint frameIndex = 0;
+        unsigned int numFramesToShow = 10;
 
-        GS_LOG_TRACE_MSG(trace, frame_information);
-        GS_LOG_TRACE_MSG(trace, "Average framerate = " + std::to_string(average_frame_rate) + "\n");
-        GS_LOG_TRACE_MSG(trace, "Slowest framerate = " + std::to_string(slowest_frame_rate) + "\n");
-        GS_LOG_TRACE_MSG(trace, "Fastest framerate = " + std::to_string(fastest_frame_rate) + "\n");
+        if (motion_detected) {
+            std::string frame_information;
+            float average_frame_rate = 0.0;
+            float slowest_frame_rate = 10000.0;
+            float fastest_frame_rate = -10000.0;
+
+            for (auto& it : boost::adaptors::reverse(RecentFrames)) {
+                cv::Mat& mostRecentFrameMat = it.mat;
+
+                frame_information += "Frame " + std::to_string(frameIndex) + ": Framerate = " + std::to_string(it.frameRate) + "\n";
+                average_frame_rate += it.frameRate;
+
+                if (it.frameRate < slowest_frame_rate) {
+                    slowest_frame_rate = it.frameRate;
+                }
+
+                if (it.frameRate > fastest_frame_rate) {
+                    fastest_frame_rate = it.frameRate;
+                }
+
+                if (mostRecentFrameMat.empty()) {
+                    GS_LOG_TRACE_MSG(warning, "Sequence No. " + std::to_string(it.requestSequence) + " was empty.");
+                }
+
+
+                frameIndex++;
+            }
+
+            average_frame_rate /= RecentFrames.size();
+
+            GS_LOG_TRACE_MSG(trace, frame_information);
+            GS_LOG_TRACE_MSG(trace, "Average framerate = " + std::to_string(average_frame_rate) + "\n");
+            GS_LOG_TRACE_MSG(trace, "Slowest framerate = " + std::to_string(slowest_frame_rate) + "\n");
+            GS_LOG_TRACE_MSG(trace, "Fastest framerate = " + std::to_string(fastest_frame_rate) + "\n");
+        }
+
+        return true;
     }
+
+
+
+    bool ConfigCameraForCropping(GolfBall ball, GolfSimCamera& camera, RPiCamEncoder& app) {
+
+        GS_LOG_TRACE_MSG(trace, "ConfigCameraForCropping");
+        GS_LOG_TRACE_MSG(trace, "   ball: " + ball.Format());
+
+        // First, determine the cropping window size
+
+        // watching_crop_width & Height defines the size of the cropping window, which will be a sub-region of the
+        // camera's full resolution.
+        float watching_crop_width = 0;
+        float watching_crop_height = 0;
+
+        // If we're trying to get club strike image data, we'll need to expand the image size beyond
+        // whatever small cropping window we would otherwise have used.
+        // Doing so is likely to slow down the frame rate, however.
+        if (GolfSimClubData::kGatherClubData) {
+            watching_crop_width = GolfSimClubData::kClubImageWidthPixels;
+            watching_crop_height = GolfSimClubData::kClubImageHeightPixels;
+            GS_LOG_TRACE_MSG(trace, "Setting initial crop width/height for club data to: " + std::to_string(watching_crop_width) + "/" + std::to_string(watching_crop_height) + ".");
+        }
+        else {
+            // If we're not trying to gather club-strike image data, use the largest
+            // cropping area that will still allow for the maximum FPS
+            watching_crop_width = LibCameraInterface::kMaxWatchingCropWidth;
+            watching_crop_height = LibCameraInterface::kMaxWatchingCropHeight;
+        }
+
+        // Starting with Pi 5, the crop height and width have to be divisible by 2. 
+        // Enforce that here
+        watching_crop_width += ((int)watching_crop_width % 2);
+        watching_crop_height += ((int)watching_crop_height % 2);
+
+        // Ensure the ball is not so small that the inscribed watching area ( for high FPS )
+        // is larger than the ball and could pick up unrelated movement outside of the ball
+        uint largest_inscribed_square_side_length_of_ball = (double)(CvUtils::CircleRadius(ball.ball_circle_)) * sqrt(2);
+        GS_LOG_TRACE_MSG(trace, "largest_inscribed_square_side_length_of_ball is: " + std::to_string(largest_inscribed_square_side_length_of_ball));
+
+        // If we are not gathering club data, then the cropping window is a fixed size.  And if that size
+        // is too large, reduce it to the size of the ball.
+        if (!GolfSimClubData::kGatherClubData) {
+            if (largest_inscribed_square_side_length_of_ball > watching_crop_width) {
+                GS_LOG_TRACE_MSG(trace, "Increasing cropping window width because largest ball square side = " + std::to_string(largest_inscribed_square_side_length_of_ball));
+                watching_crop_width = largest_inscribed_square_side_length_of_ball;
+            }
+            if (largest_inscribed_square_side_length_of_ball > watching_crop_width) {
+                GS_LOG_TRACE_MSG(trace, "Increasing cropping window length because largest ball square side = " + std::to_string(largest_inscribed_square_side_length_of_ball));
+                watching_crop_width = largest_inscribed_square_side_length_of_ball;
+            }
+        }
+
+        GS_LOG_TRACE_MSG(trace, "Final crop width/height is: " + std::to_string(watching_crop_width) + "/" + std::to_string(watching_crop_height) + ".");
+
+
+        // Now determine the cropping window's offset within the full camera resolution image
+        // This offset will be based on the position of the ball
+        // The cropOffset is where, within the full-resolution image, the top-left corner of the 
+        // cropping window is.
+
+        float ball_x = CvUtils::CircleX(ball.ball_circle_);
+        float ball_y = CvUtils::CircleY(ball.ball_circle_);
+
+
+        // Assume first is that the ball will be centered in the cropping window, then tweak
+        // it next if we're in club strike mode. Club strike imaging may require an offset.
+        // NOTE - the crop offset is from the bottom right!  Not the top-left.
+        float crop_offset_x = camera.camera_.resolution_x_ - (ball_x + watching_crop_width / 2.0);
+        float crop_offset_y = camera.camera_.resolution_y_ - (ball_y + watching_crop_height / 2.0);
+
+        // If we're trying to get club images, then skew the image so that the golf ball "watch" ROI is
+        // all the way at the bottom right (to give more room so see the club)
+        if (GolfSimClubData::kGatherClubData) {
+            crop_offset_x += (0.5 * watching_crop_width - 0.5 * largest_inscribed_square_side_length_of_ball);
+            crop_offset_y += (0.5 * watching_crop_height - 0.5 * largest_inscribed_square_side_length_of_ball);
+        }
+
+        cv::Vec2i watching_crop_size = cv::Vec2i((uint)watching_crop_width, (uint)watching_crop_height);
+        cv::Vec2i watching_crop_offset = cv::Vec2i((uint)crop_offset_x, (uint)crop_offset_y);
+
+        // Check to see if this resolution is the same as we currently have
+        if (LibCameraInterface::camera_crop_configuration_ == LibCameraInterface::kCropped &&
+            LibCameraInterface::current_watch_resolution_ == watching_crop_size &&
+            LibCameraInterface::current_watch_offset_ == watching_crop_offset
+            ) {
+            GS_LOG_TRACE_MSG(trace, "Skipping cropping setup because already cropped.");
+            // Don't reset the crop if we don't need to.  It takes time, especially the kernel-based cropping command lines
+            return true;
+        }
+
+
+        // Check for and correct if the resulting crop window would be outside the full resolution image
+        // If we need to correct something, preserve the crop width and correct the offset.
+        // NOTE - Camera resolutions are 1 greater than the greatest pixel position
+        if ((((camera.camera_.resolution_x_ - 1) - crop_offset_x) + watching_crop_width) >= camera.camera_.resolution_x_) {
+            crop_offset_x = (camera.camera_.resolution_x_ - crop_offset_x) - 1;
+        }
+
+        if ((((camera.camera_.resolution_y_ - 1) - crop_offset_y) + watching_crop_height) >= camera.camera_.resolution_y_) {
+            crop_offset_y = (camera.camera_.resolution_y_ - crop_offset_y) - 1;
+        }
+
+        GS_LOG_TRACE_MSG(trace, "Final (adjusted) crop offset x/y is: " + std::to_string(crop_offset_x) + "/" + std::to_string(crop_offset_y) + ".");
+
+        if (!SendCameraCroppingCommand(watching_crop_size, watching_crop_offset)) {
+            GS_LOG_TRACE_MSG(error, "Failed to SendCameraCroppingCommand.");
+            return false;
+        }
+
+
+        // Determine what the resulting frame rate is in the resulting camera mode  (and confirm the resolution)
+        // The camera would have been stopped after we took the first picture, so need re-start for this call
+        cv::Vec2i cropped_resolution;
+        uint cropped_frame_rate_fps;
+        if (!RetrieveCameraInfo(cropped_resolution, cropped_frame_rate_fps, true)) {
+            GS_LOG_TRACE_MSG(trace, "Failed to RetrieveCameraInfo.");
+            return false;
+        }
+
+        GS_LOG_TRACE_MSG(info, "Camera FPS = " + std::to_string(cropped_frame_rate_fps) + ".");
+
+        if (!ConfigureLibCameraOptions(app, watching_crop_size, cropped_frame_rate_fps)) {
+            GS_LOG_TRACE_MSG(error, "Failed to ConfigureLibCameraOptions.");
+            return false;
+        }
+
+        // For the post processing, we also need to know what portion of the cropped window
+        // is of interest in terms of determining ball movement.
+        // Offsets are from the top-left corner of the cropped window
+        // NOTE - We have to convert from the center of the ROI to the top-left
+        float roi_offset_x = (ball_x - (camera.camera_.resolution_x_ - crop_offset_x)) - largest_inscribed_square_side_length_of_ball / 2.0 + watching_crop_width;
+        float roi_offset_y = (ball_y - (camera.camera_.resolution_y_ - crop_offset_y)) - largest_inscribed_square_side_length_of_ball / 2.0 + watching_crop_height;
+
+        GS_LOG_TRACE_MSG(trace, "Final roi x/y offset is: " + std::to_string(roi_offset_x) + "/" + std::to_string(roi_offset_y) + ".");
+
+        cv::Vec2i roi_offset = cv::Vec2i((uint)roi_offset_x, (uint)roi_offset_y);
+
+        // Assume the ball is perfectly round, so the roi is square.  We don't want to watch for movement
+        // anywhere but within the ball.
+        float roi_size_x = largest_inscribed_square_side_length_of_ball;
+        float roi_size_y = largest_inscribed_square_side_length_of_ball;
+
+        // Clamp the offset if necessary
+        roi_offset_x = std::clamp(roi_offset_x, 0.0f, watching_crop_width - roi_size_x);
+        roi_offset_y = std::clamp(roi_offset_y, 0.0f, watching_crop_height - roi_size_y);
+
+        GS_LOG_TRACE_MSG(trace, "Final roi width/height is: " + std::to_string(roi_size_x) + "/" + std::to_string(roi_size_y) + ".");
+
+        cv::Vec2i roi_size = cv::Vec2i((uint)roi_size_x, (uint)roi_size_y);
+
+        if (!ConfigurePostProcessing(roi_size, roi_offset)) {
+            GS_LOG_TRACE_MSG(error, "Failed to ConfigurePostProcessing.");
+            return false;
+        }
+
+
+        // Save the current cropping setup in hopes that we might be able to
+        // avoid another media-ctl call next time if we are going to use the same
+        // values next time.
+        LibCameraInterface::current_watch_resolution_ = watching_crop_size;
+        LibCameraInterface::current_watch_offset_ = watching_crop_offset;
+
+        // Signal that the cropping setup has changed so that we know to change it 
+        // back to full-screen later when we're watching for the ball to first appear..
+        LibCameraInterface::camera_crop_configuration_ = LibCameraInterface::kCropped;
+
+        return true;
+    }
+
+
+bool SendCameraCroppingCommand(cv::Vec2i& cropping_window_size, cv::Vec2i& cropping_window_offset) {
+
+    GS_LOG_TRACE_MSG(trace, "SendCameraCroppingCommand.");
+    GS_LOG_TRACE_MSG(trace, "   cropping_window_size: (width, height) = " + std::to_string(cropping_window_size[0]) + ", " + std::to_string(cropping_window_size[1]) + ".");
+    GS_LOG_TRACE_MSG(trace, "   cropping_window_offset: (X, Y) = " + std::to_string(cropping_window_offset[0]) + ", " + std::to_string(cropping_window_offset[1]) + ".");
+
+    std::string mediaCtlCmd = GetCmdLineForMediaCtlCropping(cropping_window_size, cropping_window_offset);
+    GS_LOG_TRACE_MSG(trace, "mediaCtlCmd = " + mediaCtlCmd);
+    int cmdResult = system(mediaCtlCmd.c_str());
+
+    if (cmdResult != 0) {
+        GS_LOG_TRACE_MSG(trace, "system(mediaCtlCmd) failed.");
+        return false;
+    }
+    return true;
+}
+
+
+bool ConfigurePostProcessing(const cv::Vec2i& roi_size, const cv::Vec2i& roi_offset ) {
+
+    GS_LOG_TRACE_MSG(trace, "ConfigurePostProcessing.");
+    GS_LOG_TRACE_MSG(trace, "   roi_size: (width, height) = " + std::to_string(roi_size[0]) + ", " + std::to_string(roi_size[1]) + ".");
+    GS_LOG_TRACE_MSG(trace, "   roi_offset: (X, Y) = " + std::to_string(roi_offset[0]) + ", " + std::to_string(roi_offset[1]) + ".");
+
+    float kDifferenceM = 0.;
+    float kDifferenceC = 0.;
+    float kRegionThreshold = 0.;
+    float kMaxRegionThreshold = 0.;
+    uint kFramePeriod = 0;
+    uint kHSkip = 0;
+    uint kVSkip = 0;
+
+
+    GolfSimConfiguration::SetConstant("gs_config.motion_detect_stage.kDifferenceM", kDifferenceM);
+    GolfSimConfiguration::SetConstant("gs_config.motion_detect_stage.kDifferenceC", kDifferenceC);
+    GolfSimConfiguration::SetConstant("gs_config.motion_detect_stage.kRegionThreshold", kRegionThreshold);
+    GolfSimConfiguration::SetConstant("gs_config.motion_detect_stage.kMaxRegionThreshold", kMaxRegionThreshold);
+    GolfSimConfiguration::SetConstant("gs_config.motion_detect_stage.kFramePeriod", kFramePeriod);
+    GolfSimConfiguration::SetConstant("gs_config.motion_detect_stage.kHSkip", kHSkip);
+    GolfSimConfiguration::SetConstant("gs_config.motion_detect_stage.kVSkip", kVSkip);
+
+    // These values will be used within the motion-detect post-processing
+
+    MotionDetectStage::incoming_configuration.use_incoming_configuration = true;  // Don't use .json file values -- use the following
+
+    
+    MotionDetectStage::incoming_configuration.roi_x = roi_offset[0];
+    MotionDetectStage::incoming_configuration.roi_y = roi_offset[1];
+
+    MotionDetectStage::incoming_configuration.roi_width = roi_size[0];
+    MotionDetectStage::incoming_configuration.roi_height = roi_size[1];
+
+    MotionDetectStage::incoming_configuration.difference_m = kDifferenceM;
+    MotionDetectStage::incoming_configuration.difference_c = kDifferenceC;
+    MotionDetectStage::incoming_configuration.region_threshold = kRegionThreshold;
+    MotionDetectStage::incoming_configuration.max_region_threshold = kMaxRegionThreshold;
+    MotionDetectStage::incoming_configuration.frame_period = kFramePeriod;
+    MotionDetectStage::incoming_configuration.hskip = kHSkip; // TBD - don't hard code the skip factor
+    MotionDetectStage::incoming_configuration.vskip = kVSkip;
+    MotionDetectStage::incoming_configuration.verbose = 2;
+    MotionDetectStage::incoming_configuration.showroi = true;
 
     return true;
 }
 
 
+bool ConfigureLibCameraOptions(RPiCamEncoder& app, const cv::Vec2i& cropping_window_size, uint cropped_frame_rate_fps) {
+
+    GS_LOG_TRACE_MSG(trace, "ConfigureLibCameraOptions.  cropping_window_size: (width, height) = " + std::to_string(cropping_window_size[0]) + ", " + std::to_string(cropping_window_size[1]) + ".");
+
+    VideoOptions* options = app.GetOptions();
+
+    char dummy_arguments[] = "DummyExecutableName";
+    char* argv[] = { dummy_arguments, NULL };
+
+    if (!options->Parse(1, argv))
+    {
+        GS_LOG_TRACE_MSG(trace, "failed to parse dummy command line.");
+        return false;
+    }
+
+    SetLibCameraLoggingOff();
+
+    options->no_raw = true;  // See https://forums.raspberrypi.com/viewtopic.php?t=369927 - cameras won't work unless this is set.
+
+    std::string shutter_speed_string;
+    // Generally need to crank up gain due to short exposure time at high FPS.
+    float camera_gain = 0.0;
+
+    if (GolfSimClubData::kGatherClubData) {
+        camera_gain = GolfSimClubData::kClubImageCameraGain;
+        shutter_speed_string = std::to_string((int)(GolfSimClubData::kClubImageShutterSpeedMultiplier * (1. / cropped_frame_rate_fps * 1000000.))) + "us";   // TBD - should be 1,000,000 for uS setting
+    }
+    else {
+        camera_gain = LibCameraInterface::kCamera1HighFPSGain;
+        shutter_speed_string = std::to_string((int)(1. / cropped_frame_rate_fps * 1000000.)) + "us";   // TBD - should be 1,000,000 for uS setting
+    }
+
+    GS_LOG_TRACE_MSG(trace, "Camera gain is: " + std::to_string(camera_gain));
+    GS_LOG_TRACE_MSG(trace, "Shutter speed string is: " + shutter_speed_string);
+
+    options->gain = camera_gain;
+    options->shutter.set(shutter_speed_string);   // TBD - should be 1,000,000 for uS setting
+
+    options->timeout.set("0ms");
+    options->denoise = "cdn_off";
+    options->framerate = cropped_frame_rate_fps;
+    options->nopreview = true;
+    options->lores_width = 0;
+    options->lores_height = 0;
+    options->viewfinder_width = 0;
+    options->viewfinder_height = 0;
+    options->info_text = "";
+    options->level = "4.2";
+
+    // On the Pi5, there's no hardware H.264 encoding, so let's try to turn it off entirely
+    // TBD - See video_options.cpp to consider other options like libav
+    options->codec = "yuv420";    // was h.264, but that no longer works on Pi5
+
+    if (GolfSimConfiguration::GetPiModel() == GolfSimConfiguration::PiModel::kRPi5) {
+        GS_LOG_TRACE_MSG(trace, "Detected PiModel::kRPi5 and camera 1.");
+        options->tuning_file = "/usr/share/libcamera/ipa/rpi/pisp/imx296.json";
+    }
+    else {
+        GS_LOG_TRACE_MSG(trace, "Detected PiModel::kRPi4 and camera 1.");
+        options->tuning_file = "/usr/share/libcamera/ipa/rpi/vc4/imx296.json";
+    }
+    setenv("LIBCAMERA_RPI_TUNING_FILE", options->tuning_file.c_str(), 1);
+    options->post_process_file = LibCameraInterface::kCameraMotionDetectSettings;
+
+    if (!GolfSimClubData::kGatherClubData) {
+    	GS_LOG_TRACE_MSG(trace, "ball_watcher_event_loop will use post-process file: " + options->post_process_file);
+    }
+
+    if (cropping_window_size[0] > 0 && cropping_window_size[1] > 0) {
+        options->width = cropping_window_size[0];
+        options->height = cropping_window_size[1];
+    }
+
+    if (options->verbose >= 2)
+        options->Print();
+
+    return true;
+}
 
 
 // For example, to set the GS cam back to its default, use  "(0, 0)/1456x1088"
 // 128x96 can deliver 532 FPS on the GS cam.
-std::string GetCmdLineForMediaCtlCropping(cv::Vec2i croppedHW, cv::Vec2i cropOffsetXY) {
+std::string GetCmdLineForMediaCtlCropping(cv::Vec2i croppedHW, cv::Vec2i crop_offset_xY) {
 
     std::string s;
 
@@ -247,7 +530,7 @@ std::string GetCmdLineForMediaCtlCropping(cv::Vec2i croppedHW, cv::Vec2i cropOff
 
     s += "#!/bin/sh\n";
     for (int m = 0; m <= 5; m++) {
-        s += "if  media-ctl -d \"/dev/media" + std::to_string(m) + "\" --set-v4l2 \"'imx296 " + std::to_string(device_number) + "-001a':0 [fmt:SBGGR10_1X10/" + std::to_string(croppedHW[0]) + "x" + std::to_string(croppedHW[1]) + " crop:(" + std::to_string(cropOffsetXY[0]) + "," + std::to_string(cropOffsetXY[1]) + ")/" + std::to_string(croppedHW[0]) + "x" + std::to_string(croppedHW[1]) + "]\" > /dev/null;  then  echo -e \"/dev/media" + std::to_string(m) + "\" > /dev/null; break;  fi\n";
+        s += "if  media-ctl -d \"/dev/media" + std::to_string(m) + "\" --set-v4l2 \"'imx296 " + std::to_string(device_number) + "-001a':0 [fmt:SBGGR10_1X10/" + std::to_string(croppedHW[0]) + "x" + std::to_string(croppedHW[1]) + " crop:(" + std::to_string(crop_offset_xY[0]) + "," + std::to_string(crop_offset_xY[1]) + ")/" + std::to_string(croppedHW[0]) + "x" + std::to_string(croppedHW[1]) + "]\" > /dev/null;  then  echo -e \"/dev/media" + std::to_string(m) + "\" > /dev/null; break;  fi\n";
     }
 
     return s;
@@ -594,61 +877,6 @@ bool TakeLibcameraStill(cv::Mat& img) {
 }
 
 
-bool ConfigCameraForCropping(GolfBall ball1, GolfSimCamera& c, cv::Vec2i& watchResolution) {
-
-    if (LibCameraInterface::camera_crop_configuration_ == LibCameraInterface::kCropped  &&
-        LibCameraInterface::current_watch_resolution_ == watchResolution) {
-        // Don't reset the crop if we don't need to
-        return true;
-    }
-
-    uint largestInscribedSquareSideLength = (double)(CvUtils::CircleRadius(ball1.ball_circle_)) * sqrt(2);
-
-    float watchingCropWidth = LibCameraInterface::kMaxWatchingCropWidth;
-    float watchingCropHeight = LibCameraInterface::kMaxWatchingCropHeight;
-
-    // Ensure the ball is not so big that the inscribed watching area is larger than what we want for high FPS
-    if (watchingCropWidth > largestInscribedSquareSideLength) {
-        GS_LOG_TRACE_MSG(trace, "Reducing cropping window because largest ball square side = " + std::to_string(largestInscribedSquareSideLength));
-        watchingCropHeight *= (largestInscribedSquareSideLength / watchingCropWidth);
-        watchingCropWidth = largestInscribedSquareSideLength;
-    }
-    
-    // Starting with Pi 5, the crop height and width have to be divisible by 2
-    watchingCropWidth += ((int)watchingCropWidth % 2);
-    watchingCropHeight += ((int)watchingCropHeight % 2);
-
-    float ballRadius = CvUtils::CircleRadius(ball1.ball_circle_);
-    float ballX = CvUtils::CircleX(ball1.ball_circle_);
-    float ballY = CvUtils::CircleY(ball1.ball_circle_);
-
-    float cropOffsetX = c.camera_.resolution_x_ - ballX - watchingCropWidth / 2.0;
-    float cropOffsetY = c.camera_.resolution_y_ - ballY - watchingCropHeight / 2.0;
-
-
-
-    std::string mediaCtlCmd = GetCmdLineForMediaCtlCropping(cv::Vec2i((uint)watchingCropWidth, (uint)watchingCropHeight), cv::Vec2i((uint)cropOffsetX, (uint)cropOffsetY));
-    GS_LOG_TRACE_MSG(trace, "mediaCtlCmd = " + mediaCtlCmd);
-    int cmdResult = system(mediaCtlCmd.c_str());
-
-    if (cmdResult != 0) {
-        GS_LOG_TRACE_MSG(trace, "system(mediaCtlCmd) failed.");
-        return false;
-    }
-
-    // Setup return information so that the camera can be set to a matching resolution
-    watchResolution[0] = watchingCropWidth;
-    watchResolution[1] = watchingCropHeight;
-
-    // Save the curr\ent cropping setup in hopes that we might be able to
-    // avoid another media-ctl call next time
-    LibCameraInterface::current_watch_resolution_ = watchResolution;
-    // Signal that the cropping setup has changed so that we know to change it back later.
-    LibCameraInterface::camera_crop_configuration_ = LibCameraInterface::kCropped;
-
-    return true;
-}
-
 // TBD - This really seems like it should exist in the gs_camera module?
 bool CheckForBall(GolfBall& ball, cv::Mat& img) {
     GS_LOG_TRACE_MSG(trace, "CheckForBall called.");
@@ -656,11 +884,11 @@ bool CheckForBall(GolfBall& ball, cv::Mat& img) {
     CameraHardware::CameraModel  cameraModel = CameraHardware::PiGSCam6mmWideLens;
 
     // TBD - refactor this to get rid of the dummy camera necessity
-    GolfSimCamera c;
-    c.camera_.init_camera_parameters(GolfSimOptions::GetCommandLineOptions().GetCameraNumber(), cameraModel);
+    GolfSimCamera camera;
+    camera.camera_.init_camera_parameters(GolfSimOptions::GetCommandLineOptions().GetCameraNumber(), cameraModel);
 
     // Ensure we have full resolution
-    ConfigCameraForFullScreenWatching(c);
+    ConfigCameraForFullScreenWatching(camera);
 
     cv::Mat initialImg;
     if (!TakeLibcameraStill(initialImg)) {
@@ -678,13 +906,13 @@ bool CheckForBall(GolfBall& ball, cv::Mat& img) {
 
     // Figure out where the ball is
 
-    c.camera_.firstCannedImageFileName = std::string("/mnt/VerdantShare/dev/GolfSim/LM/Images/") + "FirstWaitingImage";
-    c.camera_.firstCannedImage = img;
+    camera.camera_.firstCannedImageFileName = std::string("/mnt/VerdantShare/dev/GolfSim/LM/Images/") + "FirstWaitingImage";
+    camera.camera_.firstCannedImage = img;
 
-    cv::Vec2i search_area_center = c.GetExpectedBallCenter();
+    cv::Vec2i search_area_center = camera.GetExpectedBallCenter();
 
     bool expectBall = false;
-    bool success = c.GetCalibratedBall(c, img, ball, search_area_center, expectBall);
+    bool success = camera.GetCalibratedBall(camera, img, ball, search_area_center, expectBall);
 
     if (!success) {
         GS_LOG_TRACE_MSG(trace, "Failed to GetCalibratedBall.");

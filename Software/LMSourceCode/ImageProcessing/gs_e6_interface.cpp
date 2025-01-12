@@ -35,7 +35,14 @@ namespace golf_sim {
     long GsE6Interface::kE6InterMessageDelayMs = 50;
 
     GsE6Interface::GsE6Interface() {
-        GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress", socket_connect_address_);
+
+        if (!GolfSimOptions::GetCommandLineOptions().e6_host_address_.empty()) {
+            socket_connect_address_ = GolfSimOptions::GetCommandLineOptions().e6_host_address_;
+        }
+        else {
+            GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress", socket_connect_address_);
+        }
+
         GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6ConnectPort", socket_connect_port_);
         GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6InterMessageDelayMs", kE6InterMessageDelayMs);
     }
@@ -49,8 +56,15 @@ namespace golf_sim {
         // If it does, assume that the interface is present and has been selected
         // for use.
         std::string test_socket_connect_address;
-        GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress", test_socket_connect_address);
-        GS_LOG_TRACE_MSG(trace, "GsE6Interface::InterfaceIsPresent - kE6ConnectAddress=" + test_socket_connect_address);
+        if (!GolfSimOptions::GetCommandLineOptions().e6_host_address_.empty()) {
+            test_socket_connect_address = GolfSimOptions::GetCommandLineOptions().e6_host_address_;
+            GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress", test_socket_connect_address);
+            return true;
+        }
+        else {
+            GS_LOG_TRACE_MSG(trace, "GsE6Interface::InterfaceIsPresent - Not Present.");
+            return false;
+        }
         return (test_socket_connect_address != "");
     }
 
@@ -61,7 +75,14 @@ namespace golf_sim {
         // setup a keep-alive ping to the E6 system.
         GS_LOG_TRACE_MSG(trace, "GsE6Interface Initialize called.");
 
-        GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress", socket_connect_address_);
+	// Get the connection address from the command line if possible
+        if (!GolfSimOptions::GetCommandLineOptions().e6_host_address_.empty()) {
+            socket_connect_address_ = GolfSimOptions::GetCommandLineOptions().e6_host_address_;
+        }
+        else {
+            GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress", socket_connect_address_);
+        }
+
         GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6ConnectPort", socket_connect_port_);
 
         if (!GsSimSocketInterface::Initialize()) {

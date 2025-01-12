@@ -4,6 +4,7 @@
   - [Project Page](#project-page)
 - [PiTrac - Start Here](#getting-started)
 - [PiTrac - Setup and Configuration](#setup-and-configuration)
+- [PiTrac - Join the Discord](#join-the-discord)
 
 ## Introducing PiTrac
 Introducing [PiTrac](https://hackaday.io/project/195042-pitrac-the-diy-golf-launch-monitor) \- the world’s first (free\!) open-source golf launch monitor (as far as we know). 
@@ -30,3 +31,6 @@ The process of building your own PiTrac DIY Launch Monitor is described here at 
 
 ## [Setup and Configuration](/Documentation/Raspberry%20Pi%20Setup%20and%20Configuration.md)
 The instructions which are targeted toward getting setup on a step-by-step basis. These instructions start with a Raspberry Pi with nothing on it, and are meant to describe all the steps to get from that point to a working, compiled version of PiTrac.  PiTrac currently requires two Raspberry Pi’s, so the majority of these instructions will have to be repeated twice.  Because the ‘smaller’ Pi system that connects to Camera 2 is the only Pi that handles the Tomcat/Tomee web-based GUI for the system, there are a few more steps for that system.
+
+## [Join the Discord](https://discord.gg/EUFQqC6c)
+The PiTrac discord is where you can get help or show off your PiTrac build, discuss features and get to know other PiTrac builders. PiTrac is still a new project, so the Discord is a way to clear up any fuzzy parts of the initial ecosystem. Click the link above or copy this invite link in Discord: `https://discord.gg/f2uesqM4`.

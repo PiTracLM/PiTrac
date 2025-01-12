@@ -151,6 +151,7 @@ pitrac_lm_sources += ([
 			'golf_ball.cpp',
 			'gs_camera.cpp',
 			'gs_clubs.cpp',
+			'gs_club_data.cpp',
 			'gs_options.cpp',
 			'gs_config.cpp',
 			'gs_sim_interface.cpp',

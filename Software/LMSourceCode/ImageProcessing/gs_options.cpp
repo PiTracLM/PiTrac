@@ -128,6 +128,16 @@ void GolfSimOptions::Print() const
 	std::cout << "    send_test_results: " << std::to_string(send_test_results_) << std::endl;
 	if (!output_filename_.empty())
 		std::cout << "    output_filename: " << output_filename_ << std::endl;
+	if (!msg_broker_address_.empty())
+		std::cout << "    msg_broker_address_: " << msg_broker_address_ << std::endl;
+	if (!base_image_logging_dir_.empty())
+		std::cout << "    base_image_logging_dir_: " << base_image_logging_dir_ << std::endl;
+	if (!web_server_share_dir_.empty())
+			std::cout << "    web_server_share_dir: " << web_server_share_dir_ << std::endl;
+	if (!e6_host_address_.empty())
+		std::cout << "    e6_host_address: " << e6_host_address_ << std::endl;
+	if (!gspro_host_address_.empty())
+		std::cout << "    gspro_host_address: " << gspro_host_address_ << std::endl;
 	if (!config_file_.empty())
 		std::cout << "    configuration file: " << config_file_ << std::endl;
 	std::cout << "    pulse_test: " << std::to_string(perform_pulse_test_) << std::endl;

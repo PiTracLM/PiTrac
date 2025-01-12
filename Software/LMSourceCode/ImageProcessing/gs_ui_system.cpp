@@ -174,7 +174,9 @@ namespace golf_sim {
             file_name += ".png";
         }
 
-        std::string fname = kWebServerShareDirectory + "/" + file_name;
+
+        // The kWebServerShareDirectory is already setup to have a trailing "/"
+        std::string fname = kWebServerShareDirectory + file_name;
 
         try {
             if (cv::imwrite(fname, img)) {
@@ -216,7 +218,8 @@ namespace golf_sim {
     }
 
     void GsUISystem::ClearWebserverImages() {
-        std::string command = "rm -f " + kWebServerShareDirectory + "/" + "*.png";
+        // The kWebServerShareDirectory is already setup to have a trailing "/"
+        std::string command = "rm -f " + kWebServerShareDirectory + "*.png";
 
         int cmdResult = system(command.c_str());
 
