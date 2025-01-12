@@ -10,6 +10,7 @@
 #ifdef __unix__  // Ignore in Windows environment
 
 #include "core/rpicam_app.hpp"
+#include "core/rpicam_encoder.hpp"
 #include "core/still_options.hpp"
 
 #include <opencv2/core.hpp>
@@ -29,6 +30,9 @@ namespace golf_sim {
 	class LibCameraInterface {
 	public:
 
+		// The Camera 1 operates in a cropped mode only when watching the teed-up ball for a 
+		// hit.  Otherwise, while watching for the ball to be teed up in the first place, the
+		// camera operates at full resolution.
 		enum CropConfiguration {
 			kCropUnknown,
 			kFullScreen,
@@ -64,6 +68,8 @@ namespace golf_sim {
 
 		static CropConfiguration camera_crop_configuration_;
 		static cv::Vec2i current_watch_resolution_;
+		static cv::Vec2i current_watch_offset_;
+
 
 		// The first (0th) element in the array is for camera1, the second for camera2
 		static CameraConfiguration libcamera_configuration_[];
@@ -72,10 +78,27 @@ namespace golf_sim {
 
 	bool CheckForBall(GolfBall& ball, cv::Mat& return_image);
 
-	bool WatchForBallMovement(GolfSimCamera& c, const GolfBall& ball, bool & motion_detected);
+	// Configures the camera and the rest of the system to sit in a tight loop, waiting for the
+	// ball to move.  Blocks until movement or some other even that causes the loop to stop
+	// Returns whether or not motion was detected
+	// Lower-level methods in the loop will try to trigger the external shutter of the camera 2
+	// as soon as possible after motion has been detected.
+	bool WatchForBallMovement(GolfSimCamera& camera, const GolfBall& ball, bool & motion_detected);
+
+	// Do everything necessary to get the system ready to use a tightly-cropped camera video
+	// mode (in order to allow high FPS)
+	bool ConfigCameraForCropping(GolfBall ball, GolfSimCamera& camera, RPiCamEncoder& app);
 
 	// Uses media-ctl to setup a cropping mode to allow for high FPS.  Requires GS camera.
-	bool ConfigCameraForCropping(GolfBall ball1, GolfSimCamera& c, cv::Vec2i& watchResolution);
+	bool SendCameraCroppingCommand(cv::Vec2i& cropping_window_size, cv::Vec2i& cropping_window_offset);
+
+	// Sets up the rpicam-app-based post-processing pipeline so that the motion-detection stage knows 
+	// how to analyze the cropped image
+	bool ConfigurePostProcessing(const cv::Vec2i& roi_size, const cv::Vec2i& roi_offset);
+
+	// Sets up a libcamera encoder with options necessary for a high FPS video loop in a cropped part of
+	// the camera sensor.
+	bool ConfigureLibCameraOptions(RPiCamEncoder& app, const cv::Vec2i& cropping_window_size, uint cropped_frame_rate_fps_fps);
 
 	std::string GetCmdLineForMediaCtlCropping(cv::Vec2i croppedHW, cv::Vec2i cropOffsetXY);
 
@@ -88,7 +111,7 @@ namespace golf_sim {
 
 	bool WatchForHitAndTrigger(const GolfBall& ball, cv::Mat& return_image, bool& motion_detected);
 
-	bool ConfigCameraForCropping(const GolfSimCamera& c);
+	// TBD - REMOVE bool ConfigCameraForCropping(const GolfSimCamera& c);
 
 	bool WaitForCam2Trigger(cv::Mat& return_image);
 
