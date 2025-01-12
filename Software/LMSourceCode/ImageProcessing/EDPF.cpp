@@ -44,7 +44,7 @@ void EDPF::validateEdgeSegments()
 	// What's the correct value?
 	np = 0;
 	for (int i = 0; i < segmentNos; i++) {
-		int len = segmentPoints[i].size();
+		int len = (int)segmentPoints[i].size();
 		np += (len * (len - 1)) / 2;
 	} //end-for
 

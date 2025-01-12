@@ -65,10 +65,10 @@ public:
     static double kPlacedBallMaxParam2;
     static double kPlacedBallCurrentParam1;
     static double kPlacedBallParam2Increment;
-    static double kPlacedMinHoughReturnCircles;
+    static int kPlacedMinHoughReturnCircles;
+    static int kPlacedMaxHoughReturnCircles;
     static int kPlacedPreHoughBlurSize;
     static int kPlacedPreCannyBlurSize;
-    static double kPlacedMaxHoughReturnCircles;
 
     static double kStrobedBallsCannyLower;
     static double kStrobedBallsCannyUpper;
@@ -80,8 +80,8 @@ public:
     static double kStrobedBallsMaxParam2;
     static double kStrobedBallsCurrentParam1;
     static double kStrobedBallsParam2Increment;
-    static double kStrobedBallsMinHoughReturnCircles;
-    static double kStrobedBallsMaxHoughReturnCircles;
+    static int kStrobedBallsMinHoughReturnCircles;
+    static int kStrobedBallsMaxHoughReturnCircles;
     static int kPuttingPreHoughBlurSize;
 
     static bool kStrobedBallsUseAltHoughAlgorithm;
@@ -102,8 +102,8 @@ public:
     static double kPuttingBallMaxParam2;
     static double kPuttingBallCurrentParam1;
     static double kPuttingBallParam2Increment;
-    static double kPuttingMinHoughReturnCircles;
-    static double kPuttingMaxHoughReturnCircles;
+    static int kPuttingMinHoughReturnCircles;
+    static int kPuttingMaxHoughReturnCircles;
     static double kPuttingHoughDpParam1;
 
     // TBD - Some of these are redundant - put 'em all in ball_image_proc or in gs_camera, but not both
@@ -115,18 +115,18 @@ public:
     static double kExternallyStrobedEnvBallNarrowingDpParam;
 
     static double kExternallyStrobedEnvBallParam2Increment;
-    static double kExternallyStrobedEnvMinHoughReturnCircles;
-    static double kExternallyStrobedEnvMaxHoughReturnCircles;
-    static double kExternallyStrobedEnvPreHoughBlurSize;
-    static double kExternallyStrobedEnvPreCannyBlurSize;
+    static int kExternallyStrobedEnvMinHoughReturnCircles;
+    static int kExternallyStrobedEnvMaxHoughReturnCircles;
+    static int kExternallyStrobedEnvPreHoughBlurSize;
+    static int kExternallyStrobedEnvPreCannyBlurSize;
 
     static double kExternallyStrobedEnvHoughDpParam1;
-    static double kExternallyStrobedEnvMinimumSearchRadius;
-    static double kExternallyStrobedEnvMaximumSearchRadius;
+    static int kExternallyStrobedEnvMinimumSearchRadius;
+    static int kExternallyStrobedEnvMaximumSearchRadius;
     static double kStrobedNarrowingRadiiDpParam;
     static double kStrobedNarrowingRadiiParam2;
-    static double kExternallyStrobedEnvBallNarrowingPreCannyBlurSize;
-    static double kExternallyStrobedEnvBallNarrowingPreHoughBlurSize;
+    static int kExternallyStrobedEnvBallNarrowingPreCannyBlurSize;
+    static int kExternallyStrobedEnvBallNarrowingPreHoughBlurSize;
 
 
     static bool kUseDynamicRadiiAdjustment;
@@ -149,16 +149,16 @@ public:
 
     static double kBestCircleCannyLower;
     static double kBestCircleCannyUpper;
-    static double kBestCirclePreCannyBlurSize;
-    static double kBestCirclePreHoughBlurSize;
+    static int kBestCirclePreCannyBlurSize;
+    static int kBestCirclePreHoughBlurSize;
     static double kBestCircleParam1;
     static double kBestCircleParam2;
     static double kBestCircleHoughDpParam1;
 
     static double kExternallyStrobedBestCircleCannyLower;
     static double kExternallyStrobedBestCircleCannyUpper;
-    static double kExternallyStrobedBestCirclePreCannyBlurSize;
-    static double kExternallyStrobedBestCirclePreHoughBlurSize;
+    static int kExternallyStrobedBestCirclePreCannyBlurSize;
+    static int kExternallyStrobedBestCirclePreHoughBlurSize;
     static double kExternallyStrobedBestCircleParam1;
     static double kExternallyStrobedBestCircleParam2;
     static double kExternallyStrobedBestCircleHoughDpParam1;

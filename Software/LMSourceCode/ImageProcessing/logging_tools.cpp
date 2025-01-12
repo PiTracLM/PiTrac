@@ -497,7 +497,7 @@ namespace golf_sim {
             cv::imwrite(fname, imgToLog);
         }
         catch (std::exception& ex) {
-            GS_LOG_TRACE_MSG(warning, "Exception! - failed to imwrite with fname = " + fname);
+            GS_LOG_TRACE_MSG(warning, "Exception! - failed to imwrite with fname = " + fname + " - " + ex.what());
             return true;
         }
 
@@ -546,7 +546,7 @@ namespace golf_sim {
         for (size_t i = 0; i < contours.size(); i++)
         {
             cv::Scalar c1{ 0, 255, 0 };
-            cv::drawContours(debugImage, contours, i, c1, 2);
+            cv::drawContours(debugImage, contours, (int)i, c1, 2);
         }
 
         DebugShowImage(name, debugImage);
@@ -598,7 +598,7 @@ namespace golf_sim {
             cv::imwrite(std::string{ kDefaultSaveFileName }, final_image);
         }
         catch (std::exception& ex) {
-            GS_LOG_TRACE_MSG(warning, "Exception! - failed to imwrite with fname = " + std::string{ kDefaultSaveFileName });
+            GS_LOG_TRACE_MSG(warning, "Exception! - failed to imwrite with fname = " + std::string{ kDefaultSaveFileName } + " - " + ex.what());
         }
     }
 
@@ -630,7 +630,7 @@ namespace golf_sim {
         }
         cv::circle(img, cv::Point((int)circle[0], (int)circle[1]), (int)circle[2], c1, thickness);
         cv::circle(img, cv::Point((int)circle[0], (int)circle[1]), 2, c2, 4);
-        cv::putText(img, label, cv::Point((int)circle[0] + 2 + ((float)(ordinal) * .2), (int)circle[1] + ((float)(ordinal) * .2)), cv::FONT_HERSHEY_SIMPLEX, 1, c3, 2, cv::LINE_AA);
+        cv::putText(img, label, cv::Point((int)(circle[0] + 2 + ((float)(ordinal) * .2)), (int)(circle[1] + ((float)(ordinal) * .2))), cv::FONT_HERSHEY_SIMPLEX, 1, c3, 2, cv::LINE_AA);
 
     }
 

@@ -53,7 +53,7 @@ namespace golf_sim {
 	int PulseStrobe::spiHandle_ = -1;
 	int PulseStrobe::lggpio_chip_handle_ = -1;
 	bool PulseStrobe::spiOpen_ = false;
-	bool PulseStrobe::kRecordAllImages = false;
+	bool PulseStrobe::kRecordAllImages = true;
 	bool PulseStrobe::gpio_system_initialized_ = false;
 	int PulseStrobe::kPuttingStrobeDelayMs = 0;
 
@@ -178,7 +178,7 @@ namespace golf_sim {
 					off_bits = 0;
 				}				
 
-				int one_pulse_cycle_length_bytes = std::floor(off_bits / 8);
+				int one_pulse_cycle_length_bytes = (int)std::floor(off_bits / 8);
 
 				next_pattern_zero_bits_pad = off_bits - (one_pulse_cycle_length_bytes * 8);
 
@@ -219,7 +219,7 @@ namespace golf_sim {
 		char* return_buffer = new char[result_length];
 		memcpy(return_buffer, buf, result_length);
 
-		last_pulse_off_time = intervals.back();
+		last_pulse_off_time = (long)std::round(intervals.back());
 
 		return return_buffer;
 	}

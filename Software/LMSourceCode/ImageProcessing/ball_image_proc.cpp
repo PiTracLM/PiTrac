@@ -77,14 +77,14 @@ namespace golf_sim {
     double BallImageProc::kPlacedBallCurrentParam1 = 120.0;
     double BallImageProc::kPlacedBallParam2Increment = 4;
 
-    double BallImageProc::kPlacedMinHoughReturnCircles = 1;
-    double BallImageProc::kPlacedMaxHoughReturnCircles = 4;
+    int BallImageProc::kPlacedMinHoughReturnCircles = 1;
+    int BallImageProc::kPlacedMaxHoughReturnCircles = 4;
     double BallImageProc::kStrobedBallsCannyLower = 50;
     double BallImageProc::kStrobedBallsCannyUpper = 110;
 
 
-    double BallImageProc::kStrobedBallsMaxHoughReturnCircles = 12;
-    double BallImageProc::kStrobedBallsMinHoughReturnCircles = 1;
+    int BallImageProc::kStrobedBallsMaxHoughReturnCircles = 12;
+    int BallImageProc::kStrobedBallsMinHoughReturnCircles = 1;
 
     int BallImageProc::kStrobedBallsPreCannyBlurSize = 5;
     int BallImageProc::kStrobedBallsPreHoughBlurSize = 13;
@@ -113,8 +113,8 @@ namespace golf_sim {
     double BallImageProc::kPuttingBallMaxParam2 = 60;
     double BallImageProc::kPuttingBallCurrentParam1 = 120.0;
     double BallImageProc::kPuttingBallParam2Increment = 4;
-    double BallImageProc::kPuttingMaxHoughReturnCircles = 12;
-    double BallImageProc::kPuttingMinHoughReturnCircles = 1;
+    int BallImageProc::kPuttingMaxHoughReturnCircles = 12;
+    int BallImageProc::kPuttingMinHoughReturnCircles = 1;
     double BallImageProc::kPuttingHoughDpParam1 = 1.5;
 
     double BallImageProc::kExternallyStrobedEnvBallCurrentParam1 = 130.0;
@@ -124,15 +124,15 @@ namespace golf_sim {
     double BallImageProc::kExternallyStrobedEnvBallNarrowingParam2 = 0.6;
     double BallImageProc::kExternallyStrobedEnvBallNarrowingDpParam = 1.1;
     double BallImageProc::kExternallyStrobedEnvBallParam2Increment = 4;
-    double BallImageProc::kExternallyStrobedEnvMinHoughReturnCircles = 3;
-    double BallImageProc::kExternallyStrobedEnvMaxHoughReturnCircles = 20;
-    double BallImageProc::kExternallyStrobedEnvPreHoughBlurSize = 11;
-    double BallImageProc::kExternallyStrobedEnvPreCannyBlurSize = 3;
+    int BallImageProc::kExternallyStrobedEnvMinHoughReturnCircles = 3;
+    int BallImageProc::kExternallyStrobedEnvMaxHoughReturnCircles = 20;
+    int BallImageProc::kExternallyStrobedEnvPreHoughBlurSize = 11;
+    int BallImageProc::kExternallyStrobedEnvPreCannyBlurSize = 3;
     double BallImageProc::kExternallyStrobedEnvHoughDpParam1 = 1.0;
-    double BallImageProc::kExternallyStrobedEnvBallNarrowingPreCannyBlurSize = 3;
-    double BallImageProc::kExternallyStrobedEnvBallNarrowingPreHoughBlurSize = 9;
-    double BallImageProc::kExternallyStrobedEnvMinimumSearchRadius = 60;
-    double BallImageProc::kExternallyStrobedEnvMaximumSearchRadius = 80;
+    int BallImageProc::kExternallyStrobedEnvBallNarrowingPreCannyBlurSize = 3;
+    int BallImageProc::kExternallyStrobedEnvBallNarrowingPreHoughBlurSize = 9;
+    int BallImageProc::kExternallyStrobedEnvMinimumSearchRadius = 60;
+    int BallImageProc::kExternallyStrobedEnvMaximumSearchRadius = 80;
     
     bool BallImageProc::kUseDynamicRadiiAdjustment = true;
     int BallImageProc::kNumberRadiiToAverageForDynamicAdjustment = 3;
@@ -161,16 +161,16 @@ namespace golf_sim {
     
     double BallImageProc::kBestCircleCannyLower = 55;
     double BallImageProc::kBestCircleCannyUpper = 110;
-    double BallImageProc::kBestCirclePreCannyBlurSize = 5;
-    double BallImageProc::kBestCirclePreHoughBlurSize = 13;
+    int BallImageProc::kBestCirclePreCannyBlurSize = 5;
+    int BallImageProc::kBestCirclePreHoughBlurSize = 13;
     double BallImageProc::kBestCircleParam1 = 120.;
     double BallImageProc::kBestCircleParam2 = 35.;
     double BallImageProc::kBestCircleHoughDpParam1 = 1.5;
 
     double BallImageProc::kExternallyStrobedBestCircleCannyLower = 55;
     double BallImageProc::kExternallyStrobedBestCircleCannyUpper = 110;
-    double BallImageProc::kExternallyStrobedBestCirclePreCannyBlurSize = 5;
-    double BallImageProc::kExternallyStrobedBestCirclePreHoughBlurSize = 13;
+    int BallImageProc::kExternallyStrobedBestCirclePreCannyBlurSize = 5;
+    int BallImageProc::kExternallyStrobedBestCirclePreHoughBlurSize = 13;
     double BallImageProc::kExternallyStrobedBestCircleParam1 = 120.;
     double BallImageProc::kExternallyStrobedBestCircleParam2 = 35.;
     double BallImageProc::kExternallyStrobedBestCircleHoughDpParam1 = 1.5;
@@ -600,11 +600,11 @@ namespace golf_sim {
 
         // If we are in strobed mode, allow for circles that are overlapping and of lower quality, etc.
 
-        int minDistance;
+        double minDistance;
 
-        float currentParam1;    // nominal is 200.  Touchy - higher values sometimes do not work - CURRENT = 100
+        double currentParam1;    // nominal is 200.  Touchy - higher values sometimes do not work - CURRENT = 100
         double param2_increment;
-        float currentDp;
+        double currentDp;
 
         // Otherwise,if highly-certain we will find just one ball, crank the requirements to prevent false positives, otherwise, relax them
         switch (search_mode) {
@@ -621,7 +621,7 @@ namespace golf_sim {
                 max_circles_to_return_from_hough = kPlacedMaxHoughReturnCircles;
 
                 // In the expected image, there should be only one candidate anywhere near the ball
-                minDistance = minimumSearchRadius * 0.5;
+                minDistance = (double)minimumSearchRadius * 0.5;
 
                 currentDp = kPlacedBallHoughDpParam1;         // Must be between 0 and 2 (double).Nominal is 2, CURRENT = 1.2
                 break;
@@ -710,7 +710,7 @@ namespace golf_sim {
         }
 
 
-        float currentParam2 = (float)starting_param2;
+        double currentParam2 = starting_param2;
 
         int priorNumCircles = 0;
         int finalNumberOfFoundCircles = 0;
@@ -1356,7 +1356,7 @@ namespace golf_sim {
         cv::Vec2i xy = CvUtils::CircleXY(reference_ball_circle);
         int circleX = xy[0]; 
         int circleY = xy[1];
-        int ballRadius = std::round(CvUtils::CircleRadius(reference_ball_circle));
+        int ballRadius = (int)std::round(CvUtils::CircleRadius(reference_ball_circle));
 
         GS_LOG_TRACE_MSG(trace, "DetermineBestCircle using reference_ball_circle with radius = " + std::to_string(ballRadius) + 
         ".  (X,Y) center = (" + std::to_string(circleX) + "," + std::to_string(circleY) + ")");
@@ -1565,7 +1565,7 @@ namespace golf_sim {
 
         int circleX = CvUtils::CircleX(reference_ball_circle);
         int circleY = CvUtils::CircleY(reference_ball_circle);
-        int ballRadius = std::round(CvUtils::CircleRadius(reference_ball_circle));
+        int ballRadius = (int)std::round(CvUtils::CircleRadius(reference_ball_circle));
 
         const double cannySubImageSizeMultiplier = 1.35;
         int expandedRadiusForCanny = (int)(cannySubImageSizeMultiplier * (double)ballRadius);
@@ -1669,7 +1669,7 @@ namespace golf_sim {
         // given the ball that we are looking for
         for (auto& es : ellipses) {
             Ellipse ellipseStruct = es;
-            RotatedRect e(Point(cvRound(es._xc), cvRound(es._yc)), Size(cvRound(2.0 * es._a), cvRound(2.0 * es._b)), es._rad * 180.0 / CV_PI);
+            RotatedRect e(Point(cvRound(es._xc), cvRound(es._yc)), Size(cvRound(2.0 * es._a), cvRound(2.0 * es._b)), (float)(es._rad * 180.0 / CV_PI));
 
             cv::Scalar color = cv::Scalar(rng.uniform(0, 256), rng.uniform(0, 256), rng.uniform(0, 256));
 
@@ -1762,7 +1762,7 @@ namespace golf_sim {
 
         int circleX = CvUtils::CircleX(reference_ball_circle);
         int circleY = CvUtils::CircleY(reference_ball_circle);
-        int ballRadius = std::round(CvUtils::CircleRadius(reference_ball_circle));
+        int ballRadius = (int)std::round(CvUtils::CircleRadius(reference_ball_circle));
 
         // Canny is expensive - use it only in the region of interest
         const double cannySubImageSizeMultiplier = 1.35;
@@ -2632,8 +2632,8 @@ namespace golf_sim {
         // Find the differences between the offset angles, as they may be similar.
         // These will be the angles that the image will have to be rotated in order
         // to make it appear as it would if it were in the center of the image
-        cv::Vec3f angleOffset1 = cv::Vec3f(ball1.angles_camera_ortho_perspective_[0], ball1.angles_camera_ortho_perspective_[1], 0);
-        cv::Vec3f angleOffset2 = cv::Vec3f(ball2.angles_camera_ortho_perspective_[0], ball2.angles_camera_ortho_perspective_[1], 0);
+        cv::Vec3f angleOffset1 = cv::Vec3f((float)ball1.angles_camera_ortho_perspective_[0], (float)ball1.angles_camera_ortho_perspective_[1], 0);
+        cv::Vec3f angleOffset2 = cv::Vec3f((float)ball2.angles_camera_ortho_perspective_[0], (float)ball2.angles_camera_ortho_perspective_[1], 0);
 
 
         // We will split the difference in the angles so that the amount of de-rotation we need to do is spread evenly
@@ -2730,16 +2730,16 @@ namespace golf_sim {
         // Now iterate more cloesely in the area that looks best
         RotationSearchSpace finalSearchSpace;
 
-        int anglex_window_width = ceil(initialSearchSpace.anglex_rotation_degrees_increment / 2.);
-        int angley_window_width = ceil(initialSearchSpace.angley_rotation_degrees_increment / 2.);
-        int anglez_window_width = ceil(initialSearchSpace.anglez_rotation_degrees_increment / 2.);
+        int anglex_window_width = (int)std::round(ceil(initialSearchSpace.anglex_rotation_degrees_increment / 2.));
+        int angley_window_width = (int)std::round(ceil(initialSearchSpace.angley_rotation_degrees_increment / 2.));
+        int anglez_window_width = (int)std::round(ceil(initialSearchSpace.anglez_rotation_degrees_increment / 2.));
 
 
         finalSearchSpace.anglex_rotation_degrees_increment = 1;
         finalSearchSpace.anglex_rotation_degrees_start = c.x_rotation_degrees - anglex_window_width;
         finalSearchSpace.anglex_rotation_degrees_end = c.x_rotation_degrees + anglex_window_width;
         // Probably not worth it to be too fine-grained on the Y axis.
-        finalSearchSpace.angley_rotation_degrees_increment = std::round(kCoarseYRotationDegreesIncrement / 2.);
+        finalSearchSpace.angley_rotation_degrees_increment = (int) std::round(kCoarseYRotationDegreesIncrement / 2.);
         finalSearchSpace.angley_rotation_degrees_start = c.y_rotation_degrees - angley_window_width;
         finalSearchSpace.angley_rotation_degrees_end = c.y_rotation_degrees + angley_window_width;
         finalSearchSpace.anglez_rotation_degrees_increment = 1;
@@ -2805,9 +2805,9 @@ namespace golf_sim {
         double spin_offset_angle_radians_Y = CvUtils::DegreesToRadians(spin_offset_angle[1]);
         double spin_offset_angle_radians_Z = CvUtils::DegreesToRadians(spin_offset_angle[2]);
 
-        int normalizedRotX = round( (double)bestRotX * cos(spin_offset_angle_radians_Y) + (double)bestRotZ * sin(spin_offset_angle_radians_Y) );
-        int normalizedRotY = round( (double)bestRotY * cos(spin_offset_angle_radians_X) - (double)bestRotZ * sin(spin_offset_angle_radians_Y) );
-        int normalizedRotZ = round( (double)bestRotZ * cos(spin_offset_angle_radians_X) - (double)bestRotY * sin(spin_offset_angle_radians_X) );
+        int normalizedRotX = (int)round( (double)bestRotX * cos(spin_offset_angle_radians_Y) + (double)bestRotZ * sin(spin_offset_angle_radians_Y) );
+        int normalizedRotY = (int)round( (double)bestRotY * cos(spin_offset_angle_radians_X) - (double)bestRotZ * sin(spin_offset_angle_radians_Y) );
+        int normalizedRotZ = (int)round( (double)bestRotZ * cos(spin_offset_angle_radians_X) - (double)bestRotY * sin(spin_offset_angle_radians_X) );
 
         GS_LOG_TRACE_MSG(trace, "Normalized spin angles (X,Y,Z) = (" + std::to_string(normalizedRotX) + ", " + std::to_string(normalizedRotY) + ", " + std::to_string(normalizedRotZ) + ").");
 
@@ -3242,11 +3242,11 @@ namespace golf_sim {
         cv::Mat dimpleEdges = cv::Mat::zeros(accum.rows, accum.cols, accum.type());
 
         // Threshold the image to either 0 or 255
-        const int edgeThresholdLow = binary_threshold * 10.;
+        const int edgeThresholdLow = (int)std::round(binary_threshold * 10.);
         const int edgeThresholdHigh = 255;
         cv::threshold(accumGray, dimpleEdges, edgeThresholdLow, edgeThresholdHigh, cv::THRESH_BINARY);
 
-        white_percent = ((double)cv::countNonZero(dimpleEdges) * 100.) / ((double)dimpleEdges.rows * dimpleEdges.cols);
+        white_percent = (int)std::round(((double)cv::countNonZero(dimpleEdges) * 100.) / ((double)dimpleEdges.rows * dimpleEdges.cols));
 
         return dimpleEdges;
     }
@@ -3556,7 +3556,8 @@ namespace golf_sim {
 
 
                     // If the final, new pixel came from an invalid place, don't allow it to pollute the rotated image
-                    projectedImg_.at<cv::Vec2i>(roundedImageX, roundedImageY)[0] = ball3dZOfRotatedPoint;
+                    // Not rounding here helped increase performance
+                    projectedImg_.at<cv::Vec2i>(roundedImageX, roundedImageY)[0] = (int)(ball3dZOfRotatedPoint);
 
                     /** TBD - DEBUG ONLY 
                     if (currentBall_->PointIsInsideBall(roundedImageX, roundedImageY) && pixelValue == kPixelIgnoreValue) {

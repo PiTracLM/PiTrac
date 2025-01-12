@@ -30,7 +30,7 @@
 
 #include <string>
 
-#include "golf_ball.h"   // TBD - Something wrong here architectrally - why does logging know about specific golf types?  Does that make sense?
+#include "golf_ball.h"   // TBD - Something wrong here architecturally - why does logging know about specific golf types?  Does that make sense?
 #include "gs_globals.h"
 
 namespace golf_sim {

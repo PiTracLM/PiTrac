@@ -79,14 +79,14 @@ namespace golf_sim {
     double GolfSimCamera::kMinQualityExposureLaunchAngle = -5.0;
     double GolfSimCamera::kMaxPuttingQualityExposureLaunchAngle = +10.0;
     double GolfSimCamera::kMinPuttingQualityExposureLaunchAngle = -10.0;
-    double GolfSimCamera::kNumberAngleCheckExposures = 3;
+    int GolfSimCamera::kNumberAngleCheckExposures = 3;
 
     double GolfSimCamera::kStandardBallSpeedSlowdownPercentage = 0.5;
     double GolfSimCamera::kPracticeBallSpeedSlowdownPercentage = 2.0;
     double GolfSimCamera::kPuttingBallSpeedSlowdownPercentage = 5.0;
     bool GolfSimCamera::kCameraRequiresFlushPulse = true;
 
-    double GolfSimCamera::kMaxBallsToRetain = 18;
+    int GolfSimCamera::kMaxBallsToRetain = 18;
 
     bool GolfSimCamera::kExternallyStrobedEnvFilterImage = true;
     int GolfSimCamera::kExternallyStrobedEnvBottomIgnoreHeight = 70;
@@ -1212,11 +1212,11 @@ namespace golf_sim {
                 int x_distance = (int)(std::abs(CvUtils::CircleX(b.ball_circle_) - (camera_.resolution_x_ / 2.)));
                 int y_distance = (int)(std::abs(CvUtils::CircleY(b.ball_circle_) - (camera_.resolution_y_ / 2.)));
 
-                int distance_from_center = std::sqrt(x_distance * x_distance + y_distance * y_distance);
+                int distance_from_center = (int)std::round(std::sqrt(x_distance * x_distance + y_distance * y_distance));
 
 
                 if (distance_from_center < smallest_distance_from_center) {
-                    most_centered_ball_index = i;
+                    most_centered_ball_index = (int)i;
                     smallest_distance_from_center = distance_from_center;
 
                     GS_LOG_TRACE_MSG(trace, "GetMostCenteredBallIndex - Best current candidate with distance from center of " +
@@ -2036,10 +2036,10 @@ namespace golf_sim {
 
             bool result = ip->GetBall(strobed_balls_color_image, non_const_ball, initial_balls, roi, processing_mode, useLargestFoundBall, dontReportErrors);
 
-            int number_of_initial_balls = initial_balls.size();
+            int number_of_initial_balls = (int)initial_balls.size();
 
             if (!result || number_of_initial_balls < 2) {
-                ReportBallSearchError(initial_balls.size());
+                ReportBallSearchError((int)initial_balls.size());
 
                 return false;
             }
@@ -2362,7 +2362,7 @@ namespace golf_sim {
 
             non_overlapping_balls_and_timing = return_balls_and_timings;
 
-            for (int i = non_overlapping_balls_and_timing.size() - 1; i >= 0; i--) {
+            for (int i = (int)non_overlapping_balls_and_timing.size() - 1; i >= 0; i--) {
                 GsBallAndTimingElement& be = non_overlapping_balls_and_timing[i];
 
                 bool ball_is_in_non_overlapping_vector = false;
@@ -2569,7 +2569,7 @@ namespace golf_sim {
                 // that we consider possible collapsed pulses all the way to the end
 
                 std::vector<float>best_pulse_intervals;
-                long best_ratio_distance = 999999.;
+                double best_ratio_distance = 999999.;
                 int best_final_offset_of_distance_ratios = -1;
                 int best_pulses_to_collapse = -1;
                 int best_collapse_offset = -1;
@@ -2592,7 +2592,7 @@ namespace golf_sim {
 
                         // We will retrieve the actual pulse interval (in uS) from the list of such intervals.
                         // Just need to figure out WHICH interval coresponds to the two balls of interest.
-                        bool result = GetPulseIntervalsAndRatios(pulse_intervals, pulse_ratios, pulses_to_collapse, collapse_offset);
+                        bool result = GetPulseIntervalsAndRatios(pulse_intervals, pulse_ratios, pulses_to_collapse, (int)collapse_offset);
 
                         LoggingTools::Trace("The (potentially collapsed) pulse_intervals were (ignore last '0' interval): ", pulse_intervals);
                         LoggingTools::Trace("The (potentially collapsed) pulse_ratios were : ", pulse_ratios);
@@ -2617,7 +2617,7 @@ namespace golf_sim {
                             best_ratio_distance = delta_to_closest_ratio;
                             best_final_offset_of_distance_ratios = best_local_offset_of_distance_ratios;
                             best_pulses_to_collapse = pulses_to_collapse;
-                            best_collapse_offset = collapse_offset;
+                            best_collapse_offset = (int)collapse_offset;
 
                             GS_LOG_TRACE_MSG(trace, "------------> Found best (so far) pulse ratio pattern match.  best_ratio_distance= " + std::to_string(best_ratio_distance)
                                 + " best_final_offset_of_distance_ratios= " + std::to_string(best_ratio_distance)
@@ -2662,11 +2662,11 @@ namespace golf_sim {
                 if (second_ball_index > most_centered_ball_index) {
                     // The correct interval is the right one, as ball2 is to the right
                     // of the middle ball.
-                    time_between_ball_images_uS = 1000 * pulse_intervals[most_centered_ball_index + best_final_offset_of_distance_ratios];
+                    time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[most_centered_ball_index + best_final_offset_of_distance_ratios]);
                 }
                 else {
                     // Ball2 is to the left of the middle ball.
-                    time_between_ball_images_uS = 1000 * pulse_intervals[most_centered_ball_index + best_final_offset_of_distance_ratios - 1];
+                    time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[most_centered_ball_index + best_final_offset_of_distance_ratios - 1]);
                 }
 
             }
@@ -2699,8 +2699,8 @@ namespace golf_sim {
 
                     if (input_balls.size() == 2) {
                         // We didn't see ANYTHING except two balls
-                        int last_ball_index = input_balls.size() - 1;
-                        time_between_ball_images_uS = 1000 * pulse_intervals[pulse_intervals.size() - 2];
+                        int last_ball_index = (int)input_balls.size() - 1;
+                        time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[pulse_intervals.size() - 2]);
 
                         GsBallAndTimingElement be1;
                         be1.ball = input_balls[last_ball_index-1];
@@ -2743,7 +2743,7 @@ namespace golf_sim {
 
                         if (input_balls.size() == 2) {
                             // We didn't see ANYTHING except two balls
-                            time_between_ball_images_uS = 1000 * pulse_intervals[0];
+                            time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[0]);
 
                             GsBallAndTimingElement be1;
                             be1.ball = input_balls[0];
@@ -3213,9 +3213,9 @@ namespace golf_sim {
             // TBD - Find the interval between spin_ball1 and spin_ball2
             // 
             // Calculate the spin RPMs into the result ball
-            camera.CalculateBallSpinRates(result_ball, rotationResults, (long)spin_timing_interval_uS);
+            camera.CalculateBallSpinRates(result_ball, rotationResults, (long)std::round(spin_timing_interval_uS));
 
-            result_ball.time_between_angle_measures_for_rpm_uS_ = spin_timing_interval_uS;
+            result_ball.time_between_angle_measures_for_rpm_uS_ = (long)std::round(spin_timing_interval_uS);
 
             return true;
         }

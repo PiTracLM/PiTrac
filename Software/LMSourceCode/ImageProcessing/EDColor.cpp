@@ -381,13 +381,13 @@ void EDColor::validateEdgeSegments()
 	// Compute np: # of segment pieces
 	np = 0;
 	for (int i = 0; i < (int)segments.size(); i++) {
-		int len = segments[i].size();
+		int len = (int)segments[i].size();
 		np += (len * (len - 1)) / 2;
 	} //end-for
 
 	// Validate segments
 	for (int i = 0; i < (int)segments.size(); i++) {
-		testSegment(i, 0, segments[i].size() - 1);
+		testSegment(i, 0, (int)(segments[i].size() - 1));
 	} //end-for
 
 	// clear space

@@ -34,8 +34,8 @@ namespace golf_sim {
 	 uint GolfSimClubData::kNumberFramesToSaveBeforeHit = 4;
 	 uint GolfSimClubData::kNumberFramesToSaveAfterHit = 4;
 
-	 float GolfSimClubData::kClubImageCameraGain = 30.0;
-	 float GolfSimClubData::kClubImageShutterSpeedMultiplier = 0.4;
+	 float GolfSimClubData::kClubImageCameraGain = 30.0F;
+	 float GolfSimClubData::kClubImageShutterSpeedMultiplier = 0.4F;
 
 
 	bool GolfSimClubData::Configure() {

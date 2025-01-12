@@ -64,8 +64,8 @@ GolfBall::~GolfBall()
 
 void GolfBall::set_circle(const GsCircle& c){ 
     ball_circle_ = c;  
-    x_ = c[0];
-    y_ = c[1];
+    x_ = (int)std::round(c[0]);
+    y_ = (int)std::round(c[1]);
     measured_radius_pixels_ = c[2];
 }
 

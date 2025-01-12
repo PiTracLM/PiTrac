@@ -23,11 +23,11 @@ namespace golf_sim {
 
     GsResults::GsResults(const GolfBall& ball) {
         shot_number_ = 0;
-        speed_mph_ = CvUtils::MetersPerSecondToMPH(ball.velocity_);
+        speed_mph_ = (float)CvUtils::MetersPerSecondToMPH((float)ball.velocity_);
         hla_deg_ = (float)(ball.angles_ball_perspective_[0]);
         vla_deg_ = (float)(ball.angles_ball_perspective_[1]);
-        back_spin_rpm_ = ball.rotation_speeds_RPM_[2];
-        side_spin_rpm_ = ball.rotation_speeds_RPM_[0];
+        back_spin_rpm_ = (int)ball.rotation_speeds_RPM_[2];
+        side_spin_rpm_ = (int)ball.rotation_speeds_RPM_[0];
         // TBD - Not sure club type should be set here,
         // but this is a reasonable default for now
         club_type_ = GolfSimClubs::GetCurrentClubType();
@@ -40,7 +40,7 @@ namespace golf_sim {
         if (std::abs(side_spin_rpm_) <= 0.0001) {
             return 0.0;
         }
-        float spin_axis = atan((float)side_spin_rpm_ / (float)back_spin_rpm_ + 0.00001) * (180. / kPi);
+        float spin_axis = (float)atan((float)side_spin_rpm_ / (float)back_spin_rpm_ + 0.00001) * (180.F / (float)kPi);
         return spin_axis;
     }
 

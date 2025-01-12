@@ -149,14 +149,14 @@ namespace golf_sim {
         static double kMinQualityExposureLaunchAngle;
         static double kMaxPuttingQualityExposureLaunchAngle;
         static double kMinPuttingQualityExposureLaunchAngle;
-        static double kNumberAngleCheckExposures;
+        static int kNumberAngleCheckExposures;
 
         static double kStandardBallSpeedSlowdownPercentage;
         static double kPracticeBallSpeedSlowdownPercentage;
         static double kPuttingBallSpeedSlowdownPercentage;
         static bool kCameraRequiresFlushPulse;
 
-        static double kMaxBallsToRetain;
+        static int kMaxBallsToRetain;
 
         // The following group of constants configure the system that attempts to 
         // overcome problems associated with using the LM with another (also strobed)

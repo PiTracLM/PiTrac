@@ -87,7 +87,7 @@ namespace golf_sim {
 
     bool CvUtils::IsDarker(const GsColorTriplet& rgb1, const GsColorTriplet& rgb2)
     {
-        float rgbDiff = (rgb1[0] - rgb2[0]) + (rgb1[1] - rgb2[1]) + (rgb1[2] - rgb2[2]);
+        double rgbDiff = (rgb1[0] - rgb2[0]) + (rgb1[1] - rgb2[1]) + (rgb1[2] - rgb2[2]);
         return (rgbDiff < 0);
     }
 
@@ -100,7 +100,7 @@ namespace golf_sim {
     {
         BOOST_LOG_FUNCTION();
 
-        int r = CircleRadius(circle);
+        int r = (int)CircleRadius(circle);
         cv::Vec2i xy = CircleXY(circle);
         int x = xy[0];
         int y = xy[1];
