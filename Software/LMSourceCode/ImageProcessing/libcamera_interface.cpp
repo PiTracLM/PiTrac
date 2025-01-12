@@ -42,6 +42,7 @@ namespace golf_sim {
     uint LibCameraInterface::kMaxWatchingCropHeight = 88;
 
     double LibCameraInterface::kCamera1Gain = 6.0;
+    double LibCameraInterface::kCamera1HighFPSGain = 15.0;
     double LibCameraInterface::kCamera1Contrast = 1.0;
     double LibCameraInterface::kCamera2Gain = 6.0;
     double LibCameraInterface::kCamera2ComparisonGain = 0.8;
