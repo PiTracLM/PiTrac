@@ -6,7 +6,7 @@
 			"kLogIntermediateSpinImagesToFile": 0,
 			"kLogWebserverImagesToFile": 1,
 			"kLogDiagnosticImagesToUniqueFiles": 0,
-			"kLinuxBaseImageLoggingDir": "/home/mleary/LM_Shares/Images/",
+			"kLinuxBaseImageLoggingDir": "./",
 			"kPCBaseImageLoggingDir": "D:\\GolfSim\\LM\\Images\\"
 		},
 
@@ -165,7 +165,7 @@
 
 		"user_interface": {
 			"kWebServerTomcatShareDirectory": "WebShare",
-			"kWebServerShareDirectory": "/home/mleary/LM_Shares/WebShare",
+			"kWebServerShareDirectory": "USE CMD LINE - Example:  --web_server_share_dir /home/PiTracUser/LM_Shares/Images/",
 			"kWebServerResultBallExposureCandidates": "ball_exposure_candidates",
 			"kWebServerResultSpinBall1Image": "spin_ball_1_gray_image1",
 			"kWebServerResultSpinBall2Image": "spin_ball_2_gray_image1",
@@ -277,7 +277,7 @@
 
 		"club_data": {
 			"kEnableClubImages": 0,
-			"kClubImageOutputDir": "/home/mleary/LM_Shares/Images/",
+			"kClubImageOutputDir": "/home/PiTracUserName/LM_Shares/Images/",
 			"kNumberFramesToSaveBeforeHit": 6,
 			"kNumberFramesToSaveAfterHit": 6,
 			"kClubImageWidthPixels": 96,
