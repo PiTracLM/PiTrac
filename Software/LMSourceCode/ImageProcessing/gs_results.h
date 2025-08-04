@@ -13,6 +13,7 @@
 #include "logging_tools.h"
 #include "golf_ball.h"
 #include "gs_clubs.h"
+#include "gs_trajectory_calc.h"
 
 // Base class for representing and transferring Golf Sim results
 
@@ -40,6 +41,10 @@ namespace golf_sim {
         // will remove extraneous quotes.
         static std::string GenerateStringFromJsonTree(const boost::property_tree::ptree& root);
 
+    private:
+        // Calculate carry distance using trajectory physics
+        void calculateCarryDistance();
+
 
     public:
         long shot_number_ = 0;
@@ -48,6 +53,7 @@ namespace golf_sim {
         float vla_deg_ = 0.;
         int back_spin_rpm_ = 0;
         int side_spin_rpm_ = 0;     // Negative is left (counter-clockwise from above ball)
+        float carry_distance_yards_ = 0.0;  // Calculated carry distance
         GolfSimClubs::GsClubType club_type_ = GolfSimClubs::GsClubType::kNotSelected;
 
         // Some systems need a keep-alive

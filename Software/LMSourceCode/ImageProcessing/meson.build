@@ -188,6 +188,7 @@ pitrac_lm_sources += ([
                         'gs_ipc_message.cpp',
                         'gs_ipc_control_msg.cpp',
                         'gs_results.cpp',
+                        'gs_trajectory_calc.cpp',
                         'gs_gspro_results.cpp',
                         'gs_ui_system.cpp',
                         'gs_ipc_mat.cpp',
