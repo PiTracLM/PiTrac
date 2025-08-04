@@ -502,7 +502,7 @@ namespace golf_sim {
             auto velocity_time_period_string = GS_FORMATLIB_FORMAT("{: <6.2f}", velocity_time_period);
             s = " Time between chosen images for velocity calculation: " + velocity_time_period_string + " ms.";
 
-            GsUISystem::SendIPCHitMessage(result_ball, s);
+            GsUISystem::SendIPCHitMessage(result_ball, results, s);
 
 #ifdef __unix__ 
             if (exposures_image.empty()) {

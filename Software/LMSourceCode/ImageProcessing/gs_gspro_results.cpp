@@ -55,7 +55,7 @@ namespace golf_sim {
         ball_data_child.put("SideSpin", FormatDoubleAsString(side_spin_rpm_));
         ball_data_child.put("HLA", FormatDoubleAsString(hla_deg_));
         ball_data_child.put("VLA", FormatDoubleAsString(vla_deg_));
-        // ball_data_child.put("CarryDistance", 0.0);
+        ball_data_child.put("CarryDistance", FormatDoubleAsString(carry_distance_yards_));
 
         // Club data - we don't currently implement any of this, but
         // just to be safe, we will still send the information

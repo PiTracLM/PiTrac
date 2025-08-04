@@ -236,7 +236,12 @@ public class MonitorServlet extends HttpServlet {
             }
 
             if (Math.abs(speed_mph) > 0.001) {
-                carry_yards_str = "--";  // TBD  - Not implemented yet.   String.valueOf(carry_yards) + " yards";
+                // Use calculated carry distance from trajectory calculator
+                if (carry_yards > 0) {
+                    carry_yards_str = String.valueOf(carry_yards) + " yards";
+                } else {
+                    carry_yards_str = "--";  // No carry data available
+                }
 
                 if (club_type_ != GsClubType.kPutter) {
                     int speed_mph_int = (int) speed_mph;

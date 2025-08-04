@@ -14,6 +14,7 @@
 
 #include "logging_tools.h"
 #include "golf_ball.h"
+#include "gs_results.h"
 
 
 // The primary object for communications to the Golf Sim user interface
@@ -37,7 +38,7 @@ namespace golf_sim {
 
         static bool SendIPCStatusMessage(const GsIPCResultType message_type, const std::string& custom_message = "");
 
-        static void SendIPCHitMessage(const GolfBall& result_ball, const std::string& secondary_message = "");
+        static void SendIPCHitMessage(const GolfBall& result_ball, const GsResults& gs_results, const std::string& secondary_message = "");
 
         // Save the image into the shared web-server directory so that the web-based 
         // golf-sim user interface can access it.  

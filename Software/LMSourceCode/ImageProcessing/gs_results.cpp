@@ -32,8 +32,8 @@ namespace golf_sim {
         // but this is a reasonable default for now
         club_type_ = GolfSimClubs::GetCurrentClubType();
 
-        // TBD - Even though this is a constructor, it might be a reasonable
-        // place to calculate the Carry yardarge.
+        // Calculate carry distance using trajectory calculator
+        calculateCarryDistance();
     }
 
     float GsResults::GetSpinAxis() const {
@@ -54,8 +54,7 @@ namespace golf_sim {
         s += "Side Spin:        " + std::to_string(side_spin_rpm_) + "\n";
         s += "Spin Axis (deg.): " + std::to_string(GetSpinAxis()) + "\n";
         s += "Club Type: (1D 3P)" + std::to_string(club_type_) + "\n";
-
-        // TBD - Add internal carry value.
+        s += "Carry (yards):    " + std::to_string(carry_distance_yards_) + "\n";
 
         return s;
     }
@@ -108,6 +107,37 @@ namespace golf_sim {
         boost::replace_all(result, subStringToRemove, subStringToReplace);
 
         return result;
+    }
+
+    void GsResults::calculateCarryDistance() {
+        try {
+            // Create trajectory calculator
+            PiTracTrajectoryCalculator calculator;
+            
+            // Prepare input from current shot data
+            TrajectoryInput input;
+            input.initial_velocity_mph = speed_mph_;
+            input.vertical_launch_angle_deg = vla_deg_;
+            input.horizontal_launch_angle_deg = hla_deg_;
+            input.backspin_rpm = back_spin_rpm_;
+            input.sidespin_rpm = side_spin_rpm_;
+            
+            // Calculate trajectory
+            TrajectoryResult result = calculator.calculateCarry(input);
+            
+            if (result.calculation_successful) {
+                carry_distance_yards_ = (float)result.carry_distance_yards;
+                LoggingTools::Info("GsResults::calculateCarryDistance - Calculated carry: " + 
+                                 std::to_string(carry_distance_yards_) + " yards");
+            } else {
+                carry_distance_yards_ = 0.0;
+                LoggingTools::Warning("GsResults::calculateCarryDistance - Calculation failed: " + 
+                                    result.error_message);
+            }
+        } catch (const std::exception& e) {
+            carry_distance_yards_ = 0.0;
+            LoggingTools::Error("GsResults::calculateCarryDistance - Exception: " + std::string(e.what()));
+        }
     }
 
 }
