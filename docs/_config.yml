@@ -2,7 +2,8 @@ title: PiTrac
 description: Documentation for PiTrac
 theme: just-the-docs
 
-url: https://jamespilgrim.github.io/PiTrac
+url: https://jamespilgrim.github.io
+baseurl: /PiTrac
 
 aux_links:
   Edit Me: https://github.com/jamespilgrim/PiTrac/tree/main/docs
