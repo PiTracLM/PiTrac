@@ -8,6 +8,13 @@ on:
   #   branches-ignore: ["main"]
   #   paths: ["docs/**"]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build Docs (no deploy)
