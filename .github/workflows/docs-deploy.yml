@@ -1,10 +1,12 @@
+---
 name: Build & Deploy PiTrac Docs to GitHub Pages
-
-on:
+"on":
   push:
-    branches: ["main"]
-    paths: ["docs/**"]
-  workflow_dispatch:
+    branches:
+      - "main"
+    paths:
+      - "docs/**"
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -72,4 +74,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-

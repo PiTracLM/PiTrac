@@ -1,12 +1,9 @@
+---
 name: Docs CI (build only)
-
-on:
+"on":
   pull_request:
-    paths: ["docs/**"]
-  # If you also want CI on branch pushes (not main), uncomment:
-  # push:
-  #   branches-ignore: ["main"]
-  #   paths: ["docs/**"]
+    paths:
+      - "docs/**"
 
 permissions:
   contents: read
@@ -43,4 +40,3 @@ jobs:
         env:
           JEKYLL_ENV: production
         run: bundle exec jekyll build
-
