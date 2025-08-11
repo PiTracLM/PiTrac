@@ -6,7 +6,7 @@ url: https://jamespilgrim.github.io
 baseurl: /PiTrac
 
 # Logo
-logo: "/assets/images/PiTrac_logo.svg"
+logo: "/assets/images/logos/PiTrac.svg"
 
 aux_links:
   Edit Me: https://github.com/jamespilgrim/PiTrac/tree/main/docs
@@ -22,7 +22,6 @@ favicon_ico: "/assets/images/favicon.ico"
 # For copy button on code
 enable_copy_code_button: true
 
-
 # Back to top link
 back_to_top: true
 back_to_top_text: "Back to top"
@@ -32,9 +31,9 @@ last_edit_timestamp: true # show or hide edit time - page must have `last_modifi
 last_edit_time_format: "%b %e %Y at %I:%M %p" # uses ruby's time format: https://ruby-doc.org/stdlib-2.7.0/libdoc/time/rdoc/Time.html
 
 plugins:
-  - jekyll-seo-tag
-  - jekyll-sitemap
-  - jekyll-feed
+- jekyll-seo-tag
+- jekyll-sitemap
+- jekyll-feed
 
 # RSS feed
 feed:

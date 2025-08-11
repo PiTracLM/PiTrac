@@ -6,7 +6,7 @@ description: PiTrac - Open source DIY golf launch monitor using Raspberry Pi and
 keywords: golf launch monitor, DIY golf simulator, raspberry pi golf, open source launch monitor, golf ball tracking, launch angle measurement, spin rate measurement
 ---
 
-![PiTrac Logo](/assets/images/PiTrac_logo.svg){: width="300"}
+![PiTrac Logo]({{ '/assets/images/logos/PiTrac.png' | relative_url }}){: width="300"}
 
 ### PiTrac - The DIY Golf Launch Monitor
 
