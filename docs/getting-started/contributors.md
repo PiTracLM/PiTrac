@@ -52,6 +52,7 @@ We are also thankful for individual contributors who—even if we haven't used t
 14. @[broschb](https://github.com/jamespilgrim/PiTrac/commits?author=broschb) and others on GitHub
 15. Merrygrin, Scuzzy On Discord
 16. Ron Heywood
+17. Connor Gallopo (@gallapagos on Discord)
 
 ## Golf Simulator Interface Support
 
