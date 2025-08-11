@@ -33,44 +33,47 @@ When this document refers to types such as String or Float, those are to be unde
 
 Each ActiveMQ IPC message sent to/from PiTrac has a particular message type that allows the receiver to determine how to de-serialize and parse the payload of the message.  The potential types and their meanings are described below:
 
-| Value | Message Type | Notes |
-| :---- | :---- | :---- |
-| 0 | Unknown  | Essentially an error \- should not occur |
-| 1 | RequestForCamera2Image  | Sent by the Pi 1 system to signal the Pi 2 system to be ready to take a picture.  This also signals to the Pi 2 that the Pi 1 system is going to expect a picture in a Camera2Image \- type message, and that the Pi 1  will be sending an external trigger to the Pi 2 camera. |
-| 2 | Camera2Image  | Sent by the Pi 2 system when it takes a picture.  The message will include the picture itself.  The picture is an OpenCV Mat object packed as a MsgPack serialized data type.  See gpc\_ipc\_mat.\* in the PiTrac C++ source code.  |
-| 3 | RequestForCamera2TestStillImage | Reserved for testing modes.  |
-| 4 | Results | The result of the current system's operation, such as a ball hit |
-| 5 | Shutdown  | Tells the PiTrac system to shutdown and exit  |
-| 6 | Camera2ReturnPreImage  | Picture of the 'hit' area before the ball is actually hit.  Can be used for, e.g., subtractive filtering |
-| 7 | ControlMessage  | A control message such as a club selection. |
+| Value | Message Type                | Notes |
+|------:|-----------------------------|-------|
+| 0     | `Unknown`                   | Essentially an error – should not occur |
+| 1     | `RequestForCamera2Image`    | Sent by the Pi 1 system to signal the Pi 2 system to be ready to take a picture. This also signals to the Pi 2 that the Pi 1 system is going to expect a picture in a `Camera2Image`–type message, and that the Pi 1 will be sending an external trigger to the Pi 2 camera. |
+| 2     | `Camera2Image`              | Sent by the Pi 2 system when it takes a picture. The message will include the picture itself. The picture is an OpenCV Mat object packed as a MsgPack serialized data type. See `gpc_ipc_mat.*` in the PiTrac C++ source code. |
+| 3     | `RequestForCamera2TestStillImage` | Reserved for testing modes. |
+| 4     | `Results`                   | The result of the current system's operation, such as a ball hit |
+| 5     | `Shutdown`                  | Tells the PiTrac system to shutdown and exit |
+| 6     | `Camera2ReturnPreImage`     | Picture of the “hit” area before the ball is actually hit. Can be used for, e.g., subtractive filtering |
+| 7     | `ControlMessage`            | A control message such as a club selection |
 
-| Element | Field Name | MsgPack Type | Notes |
-| :---- | :---- | :---- | :---- |
-| 0 | Carry\_meters  (\*) | Integer OR Float | Not currently computed.  The carry is calculated by external golf sims like GSPro. |
-| 1 | speed\_mpers  (\*) | Integer OR Float | Ball speed in MPH |
-| 2 | launch\_angle\_deg  (\*) | Integer OR Float | Positive degrees are from the ground up to the line of flight. Must check type before decoding, due to an apparent issue in MsgPack for float values that are integer-like (e.g., 123.0). |
-| 3 | side\_angle\_deg  (\*) | Integer OR Float | Must check type before decoding. A positive side angle number means the ball will land to the right of the target, while a negative number means it will land to the left |
-| 4 | back\_spin\_rpm  (\*) | Integer | Generally positive.  The spin that occurs from, e.g., a chip shot. |
-| 5 | side\_spin\_rpm  (\*) | Integer | Negative is left spin (counter-clockwise from above ball) |
-| 6 | confidence  (\*) | Integer | A value between 0 and 10\.  10 \- the results are as confident as the system can be.  0 \- no confidence at all, and probably an error occurred.  |
-| 7 | club\_type  (\*) | Integer | kNotSelected \= 0, kDriver \= 1, kIron \= 2, kPutter \= 3  |
-| 8 | result\_type | Integer |  See Result Types, below  |
-| 9 | message | String | Can be NilValue |
-| 10 | log\_messages | Array of Strings | Array and each string can be NilValue |
+
+| Element | Field Name                 | MsgPack Type       | Notes |
+|-------:|-----------------------------|--------------------|-------|
+| 0      | `Carry_meters` (\*)         | Integer OR Float   | Not currently computed. The carry is calculated by external golf sims like GSPro. |
+| 1      | `speed_mpers` (\*)          | Integer OR Float   | Ball speed in MPH |
+| 2      | `launch_angle_deg` (\*)     | Integer OR Float   | Positive degrees are from the ground up to the line of flight. Must check type before decoding, due to an apparent issue in MsgPack for float values that are integer-like (e.g., 123.0). |
+| 3      | `side_angle_deg` (\*)       | Integer OR Float   | Must check type before decoding. A positive side angle number means the ball will land to the right of the target, while a negative number means it will land to the left. |
+| 4      | `back_spin_rpm` (\*)        | Integer            | Generally positive. The spin that occurs from, e.g., a chip shot. |
+| 5      | `side_spin_rpm` (\*)        | Integer            | Negative is left spin (counter-clockwise from above ball). |
+| 6      | `confidence` (\*)           | Integer            | A value between 0 and 10 — 10 means results are as confident as the system can be; 0 means no confidence and likely an error. |
+| 7      | `club_type` (\*)            | Integer            | `kNotSelected` = 0, `kDriver` = 1, `kIron` = 2, `kPutter` = 3 |
+| 8      | `result_type`               | Integer            | See Result Types below |
+| 9      | `message`                   | String             | Can be `NilValue` |
+| 10     | `log_messages`              | Array of Strings   | Array and each string can be `NilValue` |
+
 
 The elements with asterisks and highlighted in green, above, are only set when the result\_type \= kHit (= 6).
 
 In the IPC Result message, the Integer result type can be any one of the following:
 
-| Integer Value | Value | Notes |
-| :---- | :---- | :---- |
-| 1 | Initializing | TBD |
-| 2 | WaitingForBallToAppear |  |
-| 3 | PausingForBallStabilization |  |
-| 4 | MultipleBallsPresent |  |
-| 5 | BallPlacedAndReadyForHit |  |
-| 6 | Hit |  |
-| 7 | Error |  |
-| 8 | CalibrationResults |  |
-| 9 | ControlMessage |  |
+| Integer Value | Value                  | Notes |
+|--------------:|------------------------|-------|
+| 1             | `Initializing`         | TBD |
+| 2             | `WaitingForBallToAppear` |  |
+| 3             | `PausingForBallStabilization` |  |
+| 4             | `MultipleBallsPresent` |  |
+| 5             | `BallPlacedAndReadyForHit` |  |
+| 6             | `Hit`                  |  |
+| 7             | `Error`                |  |
+| 8             | `CalibrationResults`   |  |
+| 9             | `ControlMessage`       |  |
+
 

@@ -10,48 +10,85 @@ parent: Integration
 ![TruGolf Integration](https://github.com/user-attachments/assets/e67be93e-dcd3-499c-803f-0fab11ae232c)
 
 
-1. First, ensure that TruGolf \- E6 Connect is set up on whatever computer you are using for it.  Third-party Golf Simulators do not run on the PiTrac’s Pi processors, and are typically installed on a PC with a higher-quality graphics card.  Do not start the simulator yet.  
-2. Determine the IP address of the PC.  If you’re not certain, watch [this video](https://www.youtube.com/watch?v=znEWmcrpoUc).  
-3. Login to the Pi1 system on the PiTrac \- that is the cd $PITRAC\_ROOT/ImageProcessing  
-4. vi golf\_sim\_config.json and search down for "golf\_simulator\_interfaces": {  
-   1. Add the following to that section:  
-      1. “E6": {  
-      2.      "kE6ConnectAddress": "10.0.0.10",  
-      3.      "kE6ConnectPort": "2483",  
-      4.      "kE6InterMessageDelayMs":  50  
-      5.   },  
-   2. Set the ConnectAddress to the IP address just determined for the PC running TruGolf.  This information tells PiTrac how to connect to TruGolf.  
-5. Install the PiTrac assets into the TruGolf installation  
-   1. Move the .png and .json files from the $PITRAC\_ROOT/ImageAssets/TruGolf directory to a location accessible from the PC.  
-   2. Move those .png files to \<TruGolfInstallDir\>/Tracking/TruSimAPI/Images”   
-   3. Move TruSimAPICustomSettings.json to \<TruGolfInstallDir\>/Tracking/TruSimAPI   
-   4. Configure TruGolf to use the PiTrac icons  
-      1. Edit the TruSimAPICustomSettings.json and ensure these are set:  
-         1. "Logo": "PiTracImagesPath", "PiTracImagesPath":   
-         2. "\<TruGolfInstallDir\>/Tracking/TruSimAPI/Images/PiTrac\_Logo\_256x50.png",  
-   5.    
-6. Start E6/TruGolf  
-   1. Click on the "gears" settings icon  
-      1. ![image](https://github.com/user-attachments/assets/053d73d3-c5fd-45f5-9e47-35a107f914a9)
- 
-   2. Select Simulator/Tracking System and then “Configure” for the TruSimAPI  
-      1. ![image](https://github.com/user-attachments/assets/b0a7be7a-8afd-484a-9ccb-d6b1dc95d5bb)
-  
-   3. Ensure that the IP address is the IP for the PC and that the port is 2483  
-7. Test Playing  
-   1. Start TruGolf  
-   2. Select “Practice” and log in  
-   3. Click Next a few times to start the Tee-Off process  
-   4. On the Pi 1 system, run RunScripts/runTestExternalSimMessage.sh to send a test shot to the sim.  This test program will wait for a message from TruGolf saying that it is ready for the next shot.  As soon as TruGolf is ready, the PiTrac test program will send a first shot.  
-   5. After the first shot, PiTrac will wait for TruGolf to re-arm.  To do that, just select the club (button in lower-left), and PiTrac will send a second shot.  
-      1. ![image](https://github.com/user-attachments/assets/a93c86c9-36fd-4039-b695-36f0295ede1c)
+1. First, ensure that TruGolf – E6 Connect is set up on whatever computer you are using for it.  
+   Third-party Golf Simulators do not run on the PiTrac’s Pi processors, and are typically installed on a PC with a higher-quality graphics card.  
+   **Do not start the simulator yet.**
 
+2. Determine the IP address of the PC.  
+   If you’re not certain, watch [this video](https://www.youtube.com/watch?v=znEWmcrpoUc).
 
-   6. TruGolf should show the shot in its display.  If that works, the simulator interface is working.  
-   7. If there are any issues, turn on the logging level in the RunScripts/runTestExternalSimMessage.sh to “trace”:   \--logging\_level=trace  and see where that leads.
+3. Login to the Pi1 system on the PiTrac – that is:
+   ```bash
+   cd $PITRAC_ROOT/ImageProcessing
+   ```
+
+4. Edit `golf_sim_config.json` and search for:
+   ```json
+   "golf_simulator_interfaces": {
+   ```
+   1. Add the following to that section:
+      ```json
+      "E6": {
+          "kE6ConnectAddress": "10.0.0.10",
+          "kE6ConnectPort": "2483",
+          "kE6InterMessageDelayMs": 50
+      },
+      ```
+   2. Set the `kE6ConnectAddress` value to the IP address you determined for the PC running TruGolf.  
+      This tells PiTrac how to connect to TruGolf.
+
+5. Install the PiTrac assets into the TruGolf installation:
+   1. Move the `.png` and `.json` files from the `$PITRAC_ROOT/ImageAssets/TruGolf` directory to a location accessible from the PC.
+   2. Move those `.png` files to:
+      ```
+      <TruGolfInstallDir>/Tracking/TruSimAPI/Images
+      ```
+   3. Move `TruSimAPICustomSettings.json` to:
+      ```
+      <TruGolfInstallDir>/Tracking/TruSimAPI
+      ```
+   4. Configure TruGolf to use the PiTrac icons:
+      1. Edit the `TruSimAPICustomSettings.json` file and ensure these are set:
+         ```json
+         "Logo": "PiTracImagesPath",
+         "PiTracImagesPath": "<TruGolfInstallDir>/Tracking/TruSimAPI/Images/PiTrac_Logo_256x50.png",
+         ```
+
+6. Start E6 / TruGolf:
+   1. Click on the **gears** settings icon:  
+      ![image](https://github.com/user-attachments/assets/053d73d3-c5fd-45f5-9e47-35a107f914a9)
+   2. Select **Simulator / Tracking System** and then **Configure** for the TruSimAPI:  
+      ![image](https://github.com/user-attachments/assets/b0a7be7a-8afd-484a-9ccb-d6b1dc95d5bb)
+   3. Ensure that the IP address is the IP for the PC and that the port is `2483`.
+
+7. Test Playing:
+   1. Start TruGolf.
+   2. Select **Practice** and log in.
+   3. Click **Next** a few times to start the Tee-Off process.
+   4. On the Pi 1 system, run:
+      ```bash
+      RunScripts/runTestExternalSimMessage.sh
+      ```
+      This sends a test shot to the sim. The test program will wait for a message from TruGolf saying it is ready for the next shot. As soon as TruGolf is ready, the PiTrac test program will send a first shot.
+   5. After the first shot, PiTrac will wait for TruGolf to re-arm.  
+      To do that, select the club (button in lower-left), and PiTrac will send a second shot:  
+      ![image](https://github.com/user-attachments/assets/a93c86c9-36fd-4039-b695-36f0295ede1c)
+   6. TruGolf should show the shot in its display. If that works, the simulator interface is working.
+   7. If there are any issues, turn on the logging level in:
+      ```bash
+      RunScripts/runTestExternalSimMessage.sh
+      ```
+      to:
+      ```bash
+      --logging_level=trace
+      ```
+      and see where that leads.
+
+---
 
 (\*) "TruGolf Simulators" and other marks such as E6 may be trademarked by TruGolf, Inc.  
-The PiTrac project is not endorsed, sponsored by or associated with TrueGolf products or services
+The PiTrac project is not endorsed, sponsored by, or associated with TruGolf products or services.
+
 
 [image1]: <data:image/png;base64,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>
 

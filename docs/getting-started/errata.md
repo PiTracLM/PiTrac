@@ -16,7 +16,7 @@ parent: Getting Started
 
 **New Features:**
 
-1. Slow-motion motion club impact (GitHub Issue \#34)  
+1. Slow-motion motion club impact (GitHub Issue #34)  
 2. Auto-calibration.  Set the cameras off in some reasonable directions, place a ball at a known spot, and let the system do the rest.
 
 **Future Hopes:**
@@ -31,7 +31,7 @@ parent: Getting Started
   * Perform side-by-side testing with a good radar-based LM  
 * Power Supply  
   * The current retail-power-adapter strategy isn’t working well, and is probably much more expensive than it needs to be.  We need a custom-ish power supply that can plug into wall-outlet AC and put out all the various voltages that are needed.  Would be great if this power supply could put out the constant-current DC 12V needed for the strobe light as well.  
-  * We need a power switch\!  And a switch for the external LED strip, too.   
+  * We need a power switch!  And a switch for the external LED strip, too.   
 * Enclosure  
   * Easier-to-join enclosure halves.  It’s hard to get to the bolts to tighten the halves together  
   * The supports for the lower-power-side floor’s overlap joint are a pain to remove.  Maybe print at a different angle?  
@@ -39,17 +39,17 @@ parent: Getting Started
   * Access to the Pi’s is difficult even with the ports..   
   * The inter-floor screws currently overhang into the layer interiors, which might present a safety issue.  Perhaps add a little bump on the side of the inner wall that the screws can end into.  
   * Removing the supports on the power-side floor lap joint is painful.  Is there a better design or way to print?  
-  * Mount the Pi(s) to a tray we can slide them into the enclosure on rails, and use a screw to hold it in.  Note \- We'd need longer camera ribbons  
+  * Mount the Pi(s) to a tray we can slide them into the enclosure on rails, and use a screw to hold it in.  Note - We'd need longer camera ribbons  
 * Cameras  
   * Calibration is too difficult and takes too much time.  How to improve?  
-  * As new, higher-resolution global shutters come onto the market, it will be great to integrate them into the system.   Maybe we won’t need the angled Camera 1 in order to watch the teed-up ball\!  
+  * As new, higher-resolution global shutters come onto the market, it will be great to integrate them into the system.   Maybe we won’t need the angled Camera 1 in order to watch the teed-up ball!  
   * The field of focus is too narrow.  A better lens might help.  
   * Having a variant of PiTrac that uses a high frame-rate / low shutter time would be a great option for builders who don’t mind paying a little more for the LM.  This could obviate the need for a second camera and Pi, and would also make it a lot easier to switch between right and left-hand golfers.  
     * In fact, as GS cameras come down in price, this may be the direction the entire project heads to.  
 * Documentation  
   * Switch to something like Doxygen for a lot of the project documents  
   * Create UML-like class structure definitions.  
-  * Document the top 5 issues and see if we can get folks to fix them\!  
+  * Document the top 5 issues and see if we can get folks to fix them!  
     * An easy add would be to figure out the Carry value.  
 * Strobe:  
   * The 12V power supply for the LEDs seems like overkill given the short pulses that PiTrac uses.  Do we even need a constant-current  supply?  Could we just use a cheap 12V AC adapter for a couple dollars?    

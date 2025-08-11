@@ -11,7 +11,7 @@ This document covers configuration files and environment variables for PiTrac.
 
 ## Environment Variables
 
-PiTrac requires several environment variables to be set. Add these to your shell configuration file (`.zshrc`, `.bashrc`, etc.):
+PiTrac requires several environment variables to be set. Add these to your shell configuration file (`.zshrc`, `.bashrc`, etc.):  
 
 ### Required Variables
 
