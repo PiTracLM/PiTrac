@@ -1641,11 +1641,21 @@ namespace golf_sim {
                     GolfBall& b = initial_balls[i];
 
                     double ball_distance = current_ball.PixelDistanceFromBall(b);
-                    int quality_difference = b.quality_ranking - current_ball.quality_ranking;
+                    
+                    // For ONNX balls, use position-based quality instead of HoughCircles quality ranking
+                    int quality_difference;
+                    if (b.ball_color_ == GolfBall::BallColor::kONNXDetected && 
+                        current_ball.ball_color_ == GolfBall::BallColor::kONNXDetected) {
+                        // For ONNX balls, all have high confidence - use position difference as quality proxy
+                        quality_difference = std::abs(i - (int)outer_index); // Position difference in sorted list
+                    } else {
+                        // Legacy HoughCircles quality ranking
+                        quality_difference = b.quality_ranking - current_ball.quality_ranking;
+                    }
 
                     if (ball_distance < max_ball_proximity && quality_difference > max_quality_difference) {
                         GS_LOG_TRACE_MSG(trace, "Not analyzing ball " + std::to_string(i) + " due to its proximity of : " 
-                                    + std::to_string(ball_distance) + " and poor quality of " + std::to_string(b.quality_ranking));
+                                    + std::to_string(ball_distance) + " and quality difference of " + std::to_string(quality_difference));
                         initial_balls.erase(initial_balls.begin() + i);
                     }
                 }
@@ -1981,6 +1991,12 @@ namespace golf_sim {
             for (int i = (int)initial_balls.size() - 1; i >= 0; i--) {
                 GolfBall& b = initial_balls[i];
 
+                // Skip color analysis for ONNX-detected balls
+                if (b.ball_color_ == GolfBall::BallColor::kONNXDetected) {
+                    GS_LOG_TRACE_MSG(trace, "Skipping color analysis for ONNX-detected ball " + std::to_string(i));
+                    continue;
+                }
+
                 std::vector<GsColorTriplet> statistics = CvUtils::GetBallColorRgb(rgbImg, b.ball_circle_);
                 GsColorTriplet avg_RGB{ statistics[0] };
                 GsColorTriplet median_RGB{ statistics[1] };
@@ -2213,6 +2229,27 @@ namespace golf_sim {
             // TBD - let's try the putter way for the strobed balls as well?
 
             double max_color_difference = (GolfSimClubs::GetCurrentClubType() == GolfSimClubs::kPutter) ? kMaxPuttingBallColorDifferenceRelaxed : kMaxStrobedBallColorDifferenceRelaxed;
+            
+            // *** ONNX PHYSICS CALCULATION - Essential distance/angle calculations for ONNX balls ***
+            for (auto& ball : initial_balls) {
+                if (ball.ball_color_ == GolfBall::BallColor::kONNXDetected) {
+                    GS_LOG_TRACE_MSG(trace, "Adding physics calculations for ONNX ball at (" + 
+                                   std::to_string(ball.x()) + "," + std::to_string(ball.y()) + ")");
+                    
+                    // 1. Compute essential distance/angle/calibration data
+                    if (!ComputeSingleBallXYZOrthoCamPerspective(*this, ball)) {
+                        GS_LOG_MSG(warning, "Failed to compute spatial physics for ONNX ball - continuing anyway");
+                    }
+                    
+                    // 2. Get color information for display/logging (avgC, stdC fields)
+                    GetBallColorInformation(strobed_balls_color_image, ball);
+                    
+                    GS_LOG_TRACE_MSG(trace, "ONNX ball physics complete: DistFromLens=" + 
+                                   std::to_string(ball.distance_to_z_plane_from_lens_) + "m, CalFocLen=" + 
+                                   std::to_string(ball.calibrated_focal_length_));
+                }
+            }
+            
             RemoveWrongColorBalls(strobed_balls_color_image, initial_balls, expected_best_ball, max_color_difference);
             ShowAndLogBalls("AnalyzeStrobedBall_After_RemoveWrongColorBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
             LoggingTools::Trace("Initial_balls after RemoveWrongColorBalls: ", initial_balls);

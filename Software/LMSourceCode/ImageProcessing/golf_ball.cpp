@@ -32,6 +32,7 @@ void GolfBall::InitMembers()
         BallHSVRangeDict[BallColor::kYellow] = BallColorRange(cv::Vec3b(20, 50, 70), cv::Vec3b(70, 255, 255), cv::Vec3b(12, 123, 210));
         BallHSVRangeDict[BallColor::kOpticGreen] = BallColorRange(cv::Vec3b(10, 80, 130), cv::Vec3b(35, 165, 255), cv::Vec3b(20, 124, 208));
         BallHSVRangeDict[BallColor::kUnknown] = BallColorRange(cv::Vec3b(0, 0, 40), cv::Vec3b(180, 255, 255), cv::Vec3b(0, 0, 0));
+        BallHSVRangeDict[BallColor::kONNXDetected] = BallColorRange(cv::Vec3b(0, 0, 40), cv::Vec3b(180, 255, 255), cv::Vec3b(0, 0, 0));
     }
 
     // All zero's signifies thaht there is no average color set yet

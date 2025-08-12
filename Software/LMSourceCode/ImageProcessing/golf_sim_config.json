@@ -1,17 +1,27 @@
 {
     "gs_config": {
         "logging": {
-            "kLogIntermediateExposureImagesToFile": "0",
-            "kLogIntermediateSpinImagesToFile": "0",
+            "kLogIntermediateExposureImagesToFile": "1",
+            "kLogIntermediateSpinImagesToFile": "1",
             "kLogWebserverImagesToFile": "1",
             "kLogDiagnosticImagesToUniqueFiles": "1",
             "kLinuxBaseImageLoggingDir": ".\/",
-            "kPCBaseImageLoggingDir": "D:\\GolfSim\\LM\\Images\\"
+            "kPCBaseImageLoggingDir": "c:\/Users\/conno\/source\/repos\/connorgallopo\/PiTrac\/Software\/LMSourceCode\/Images\/"
         },
         "modes": {
             "kStartInPuttingMode": "0"
         },
         "ball_identification": {
+            "kDetectionMethod": "legacy",
+            "DETECTION_METHOD_OPTIONS": "legacy=HoughCircles(stable), experimental=ONNX/YOLO(fast), experimental_sahi=ONNX/YOLO+SAHI(accurate)",
+            "kONNXModelPath": "../../Software/GroundTruthAnnotator/experiments/high_performance_300e2/weights/best.onnx",
+            "kONNXConfidenceThreshold": "0.5",
+            "kONNXNMSThreshold": "0.4", 
+            "kONNXInputSize": "1472",
+            "kSAHISliceHeight": "320",
+            "kSAHISliceWidth": "320",
+            "kSAHIOverlapRatio": "0.2",
+            "kONNXDeviceType": "CPU",
             "kStrobedBallsCannyLower": "33",
             "kStrobedBallsCannyUpper": "90",
             "kStrobedBallsMinHoughReturnCircles": "6",
@@ -491,11 +501,11 @@
             "kCroppedImagePixelOffsetUp": "-3"
         },
         "testing": {
-            "kBaseTestImageDir": "M:\/GolfSim\/TestImages\/Elks_Enclosure_2_Images\/",
-            "kTwoImageTestTeedBallImage": "gs_log_img__log_ball_final_found_ball_img_Shot_1_2025-Jul-28_11.26.53.png",
-            "kTwoImageTestStrobedImage": "gs_log_img__log_cam2_last_strobed_img_Shot_3_2025-Jul-30_15.14.32.png",
-            "OLD_kTwoImageTestTeedBallImage": "gs_log_img__log_ball_final_found_ball_img_Shot_2_2025-Jun-24_13.45.32-60cm-out-20-back.png",
-            "OLD_kTwoImageTestStrobedImage": "gs_log_img__log_cam2_last_strobed_img_Shot_2_2025-Jun-24_13.45.43.png",
+            "kBaseTestImageDir": "c:\/Users\/conno\/source\/repos\/connorgallopo\/PiTrac\/Software\/LMSourceCode\/Images\/",
+            "kTwoImageTestTeedBallImage": "gs_log_img__log_ball_final_found_ball_img.png",
+            "kTwoImageTestStrobedImage": "gs_log_img__log_cam2_last_strobed_img_Shot_2_2025-Aug-05_09.40.44.png",
+            "OLD_kTwoImageTestTeedBallImage": "log_ball_final_found_ball_img.png",
+            "OLD_kTwoImageTestStrobedImage": "log_cam2_last_strobed_img.png",
             "kAutomatedTestSuiteDirectory": "\/home\/<PiTrac-Username>\/Dev\/PiTrac\/Software\/LMSourceCode\/Testing\/TestSuite_2025_02_07\/",
             "OLDkAutomatedTestSuiteDirectory": "M:\/Dev\/PiTrac\/Software\/LMSourceCode\/Testing\/TestSuite_2025_02_07\/",
             "kAutomatedTestExpectedResultsCSV": "Uneekor Comparison 2025-02-07_Small_Test.csv",

@@ -16,6 +16,7 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
+#include <opencv2/dnn.hpp>
 
 #include "logging_tools.h"
 #include "gs_camera.h"
@@ -180,6 +181,16 @@ public:
     static int kGaborMaxWhitePercent;
     static int kGaborMinWhitePercent;
 
+    // ONNX Detection Configuration
+    static std::string kDetectionMethod;
+    static std::string kONNXModelPath;
+    static float kONNXConfidenceThreshold;
+    static float kONNXNMSThreshold;
+    static int kONNXInputSize;
+    static int kSAHISliceHeight;
+    static int kSAHISliceWidth;
+    static float kSAHIOverlapRatio;
+    static std::string kONNXDeviceType;
 
     // This determines which potential 3D angles will be searched for spin processing
     struct RotationSearchSpace {
@@ -307,6 +318,11 @@ public:
         double wideningAmount = 0.0);
 
     bool PreProcessStrobedImage(cv::Mat& search_image, BallSearchMode search_mode);
+
+    // ONNX Detection Methods
+    static bool DetectBalls(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
+    static bool DetectBallsHoughCircles(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
+    static bool DetectBallsONNX(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
 
 private:
 

@@ -199,6 +199,18 @@ namespace golf_sim {
     int BallImageProc::kGaborMaxWhitePercent = 44; // Nominal 46;
     int BallImageProc::kGaborMinWhitePercent = 38; // Nominal 40;
 
+    // ONNX Detection Configuration
+    // TODO: Fix defaults or remove these entirely
+    std::string BallImageProc::kDetectionMethod = "legacy";
+    std::string BallImageProc::kONNXModelPath = "../GroundTruthAnnotator/experiments/maximum_performance_v3/weights/best.onnx";
+    float BallImageProc::kONNXConfidenceThreshold = 0.5f;
+    float BallImageProc::kONNXNMSThreshold = 0.4f;
+    int BallImageProc::kONNXInputSize = 640;
+    int BallImageProc::kSAHISliceHeight = 320;
+    int BallImageProc::kSAHISliceWidth = 320;
+    float BallImageProc::kSAHIOverlapRatio = 0.2f;
+    std::string BallImageProc::kONNXDeviceType = "CPU";
+
     BallImageProc::BallImageProc() {
         min_ball_radius_ = -1;
         max_ball_radius_ = -1;
@@ -333,6 +345,16 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingStartingParam2", kPlacedNarrowingStartingParam2);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingRadiiDpParam", kPlacedNarrowingRadiiDpParam);
 
+        // ONNX Detection Configuration
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kDetectionMethod", kDetectionMethod);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXModelPath", kONNXModelPath);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXConfidenceThreshold", kONNXConfidenceThreshold);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXNMSThreshold", kONNXNMSThreshold);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXInputSize", kONNXInputSize);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kSAHISliceHeight", kSAHISliceHeight);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kSAHISliceWidth", kSAHISliceWidth);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kSAHIOverlapRatio", kSAHIOverlapRatio);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXDeviceType", kONNXDeviceType);
 
         GolfSimConfiguration::SetConstant("gs_config.logging.kLogIntermediateSpinImagesToFile", kLogIntermediateSpinImagesToFile);
     }
@@ -509,7 +531,42 @@ namespace golf_sim {
             return false;
         }
 
+        // *** ONNX DETECTION INTEGRATION - Process through full trajectory analysis pipeline ***
+        if (kDetectionMethod == "experimental" || kDetectionMethod == "experimental_sahi") {
+            GS_LOG_TRACE_MSG(trace, "ONNX Detection Mode - Using ONNX detection, will process through full trajectory analysis");
+            
+            std::vector<GsCircle> onnx_circles;
+            if (DetectBallsONNX(rgbImg, search_mode, onnx_circles)) {
+                GS_LOG_TRACE_MSG(trace, "ONNX detected " + std::to_string(onnx_circles.size()) + " circles - converting to GolfBall objects");
+                
+                // Convert GsCircle results to GolfBall objects for trajectory analysis
+                return_balls.clear();
+                for (size_t i = 0; i < onnx_circles.size(); ++i) {
+                    GolfBall ball;
+                    ball.quality_ranking = static_cast<int>(i); // ONNX confidence-based ranking
+                    ball.set_circle(onnx_circles[i]);
+                    ball.ball_color_ = GolfBall::BallColor::kONNXDetected; // Mark as ONNX-detected
+                    ball.measured_radius_pixels_ = onnx_circles[i][2];
+                    ball.radius_at_calibration_pixels_ = baseBallWithSearchParams.radius_at_calibration_pixels_;
+                    
+                    // Set color info - ONNX doesn't analyze color but we need placeholders
+                    ball.average_color_ = baseBallWithSearchParams.average_color_;
+                    ball.median_color_ = baseBallWithSearchParams.average_color_;
+                    ball.std_color_ = GsColorTriplet(0, 0, 0); // Zero std indicates no color analysis
+                    
+                    return_balls.push_back(ball);
+                }
+                
+                GS_LOG_TRACE_MSG(trace, "ONNX detection complete - returning " + 
+                               std::to_string(return_balls.size()) + " balls for trajectory analysis");
+                return !return_balls.empty();
+            } else {
+                GS_LOG_MSG(warning, "ONNX detection failed - no balls found");
+                return false;
+            }
+        }
 
+        GS_LOG_TRACE_MSG(trace, "Using legacy HoughCircles detection");
         GS_LOG_TRACE_MSG(trace, "Looking for a ball with color{ " + LoggingTools::FormatGsColorTriplet(baseBallWithSearchParams.average_color_));
         LoggingTools::DebugShowImage(image_name_ + "  rgbImg", rgbImg);
 
@@ -924,7 +981,8 @@ namespace golf_sim {
                 // TBD - Need to set minDist to rows / 8, roughly ?
                 // The _ALT mode seems to work best for this purpose
                 std::vector<GsCircle> test_circles;
-                cv::HoughCircles(final_search_image,
+                
+                    cv::HoughCircles(final_search_image,
                     test_circles,
                     cv::HOUGH_GRADIENT_ALT,
                     narrowing_dp_param,
@@ -995,6 +1053,56 @@ namespace golf_sim {
 
         }
 
+        // NEW: ONNX detection bypass - skip adaptive parameter tuning for ONNX
+        if (kDetectionMethod == "experimental" || kDetectionMethod == "experimental_sahi") {
+            GS_LOG_TRACE_MSG(trace, "Using ONNX detection - bypassing adaptive parameter tuning");
+            
+            std::vector<GsCircle> test_circles;
+            if (DetectBalls(final_search_image, search_mode, test_circles)) {
+                // Apply radius filtering to ONNX results
+                auto it = test_circles.begin();
+                while (it != test_circles.end()) {
+                    if ((*it)[2] < minimum_search_radius || (*it)[2] > maximum_search_radius) {
+                        it = test_circles.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+                
+                if (!test_circles.empty()) {
+                    circles.assign(test_circles.begin(), test_circles.end());
+                    
+                    // ⚠️  WARNING: This old ONNX coordinate offset logic should NEVER execute 
+                    // with the new early bypass. If you see this, the early bypass failed!
+                    GS_LOG_MSG(error, "OLD ONNX path executed - this indicates early bypass failure!");
+                    
+                    // Apply coordinate transformation if using sub-image
+                    for (auto& c : circles) {
+                        c[0] += offset_sub_to_full.x;
+                        c[1] += offset_sub_to_full.y;
+                    }
+                    
+                    finalNumberOfFoundCircles = (int)circles.size();
+                    GS_LOG_TRACE_MSG(trace, "ONNX detected " + std::to_string(finalNumberOfFoundCircles) + " circles");
+                } else {
+                    GS_LOG_TRACE_MSG(trace, "ONNX found circles but all filtered out by radius constraints");
+                    if (report_find_failures) {
+                        GS_LOG_MSG(warning, "ONNX detection found no balls within radius constraints");
+                    }
+                    return false;
+                }
+            } else {
+                GS_LOG_TRACE_MSG(trace, "ONNX detection found no balls");
+                if (report_find_failures) {
+                    GS_LOG_MSG(warning, "ONNX detection failed to find any balls");
+                }
+                return false;
+            }
+            
+            // Skip to post-processing (jump past the HoughCircles adaptive loop)
+            goto post_detection_processing;
+        }
+
         // Adaptive algorithm to dynamically adjust the (very touchy) Hough circle parameters depending on how things are going
         while (!done) {
 
@@ -1010,6 +1118,7 @@ namespace golf_sim {
             // NOTE - Param 1 may be sensitive as well - needs to be 100 for large pictures ?
             // TBD - Need to set minDist to rows / 8, roughly ?
             std::vector<GsCircle> test_circles;
+            
             cv::HoughCircles(final_search_image,
                 test_circles,
                 hough_mode,
@@ -1151,7 +1260,8 @@ namespace golf_sim {
             GS_LOG_TRACE_MSG(trace, "Found " + std::to_string(numCircles) + " circles.");
         }
 
-
+    post_detection_processing:
+        // Post-detection processing continues here for both HoughCircles and ONNX
 
         cv::Mat candidates_image_ = rgbImg.clone();
 
@@ -3941,6 +4051,220 @@ namespace golf_sim {
         */
 
         // LoggingTools::DebugShowImage("(closed) destination_image_gray", destination_image_gray);
+    }
+
+    /**
+     * Detection Algorithm Dispatcher
+     * Routes detection to HoughCircles or ONNX based on kDetectionMethod configuration
+     */
+    bool BallImageProc::DetectBalls(const cv::Mat& preprocessed_img, BallSearchMode search_mode, 
+                                   std::vector<GsCircle>& detected_circles) {
+        GS_LOG_TRACE_MSG(trace, "BallImageProc::DetectBalls - Method: " + kDetectionMethod);
+        
+        if (kDetectionMethod == "legacy") {
+            return DetectBallsHoughCircles(preprocessed_img, search_mode, detected_circles);
+        } else if (kDetectionMethod == "experimental" || kDetectionMethod == "experimental_sahi") {
+            return DetectBallsONNX(preprocessed_img, search_mode, detected_circles);
+        } else {
+            GS_LOG_MSG(error, "Unknown detection method: " + kDetectionMethod + ". Falling back to legacy.");
+            return DetectBallsHoughCircles(preprocessed_img, search_mode, detected_circles);
+        }
+    }
+
+    /**
+     * Legacy HoughCircles Detection (placeholder - will be extracted from existing GetBall method)
+     */
+    bool BallImageProc::DetectBallsHoughCircles(const cv::Mat& preprocessed_img, BallSearchMode search_mode, 
+                                               std::vector<GsCircle>& detected_circles) {
+        GS_LOG_TRACE_MSG(trace, "BallImageProc::DetectBallsHoughCircles");
+        
+        // TODO: Extract existing HoughCircles detection logic from GetBall method
+        // This will be implemented when we refactor GetBall to use the dispatcher
+        GS_LOG_MSG(error, "HoughCircles detection not yet extracted to separate method");
+        return false;
+    }
+
+    /**
+     * ONNX/YOLO Detection Pipeline
+     */
+    bool BallImageProc::DetectBallsONNX(const cv::Mat& preprocessed_img, BallSearchMode search_mode, 
+                                       std::vector<GsCircle>& detected_circles) {
+        GS_LOG_TRACE_MSG(trace, "BallImageProc::DetectBallsONNX");
+        
+        try {
+            // Load ONNX model
+            cv::dnn::Net net = cv::dnn::readNetFromONNX(kONNXModelPath);
+            if (net.empty()) {
+                GS_LOG_MSG(error, "Failed to load ONNX model: " + kONNXModelPath);
+                return false;
+            }
+            
+            // Set backend and target
+            if (kONNXDeviceType == "CPU") {
+                net.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+                net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+            } else {
+                net.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+                net.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+            }
+            
+            // Prepare input image
+            cv::Mat input_image;
+            if (preprocessed_img.channels() == 1) {
+                cv::cvtColor(preprocessed_img, input_image, cv::COLOR_GRAY2RGB);
+            } else if (preprocessed_img.channels() == 3) {
+                input_image = preprocessed_img.clone();
+            } else {
+                GS_LOG_MSG(error, "Unsupported number of channels: " + std::to_string(preprocessed_img.channels()));
+                return false;
+            }
+            
+            // SAHI slicing for experimental_sahi mode
+            bool use_sahi = (kDetectionMethod == "experimental_sahi");
+            std::vector<cv::Rect> slices;
+            
+            if (use_sahi) {
+                // Create overlapping slices
+                int overlap = static_cast<int>(kSAHISliceWidth * kSAHIOverlapRatio);
+                for (int y = 0; y < input_image.rows; y += kSAHISliceHeight - overlap) {
+                    for (int x = 0; x < input_image.cols; x += kSAHISliceWidth - overlap) {
+                        cv::Rect slice(x, y, 
+                                      std::min(kSAHISliceWidth, input_image.cols - x),
+                                      std::min(kSAHISliceHeight, input_image.rows - y));
+                        slices.push_back(slice);
+                    }
+                }
+                GS_LOG_TRACE_MSG(trace, "SAHI: Created " + std::to_string(slices.size()) + " slices");
+            } else {
+                // Single slice = whole image
+                slices.push_back(cv::Rect(0, 0, input_image.cols, input_image.rows));
+            }
+            
+            // Run inference on each slice
+            std::vector<cv::Rect> all_boxes;
+            std::vector<float> all_confidences;
+            
+            for (const auto& slice : slices) {
+                cv::Mat slice_img = input_image(slice);
+                
+                GS_LOG_TRACE_MSG(trace, "Processing slice: " + std::to_string(slice.x) + "," + 
+                               std::to_string(slice.y) + " size=" + std::to_string(slice.width) + "x" + 
+                               std::to_string(slice.height) + " slice_img=" + std::to_string(slice_img.cols) + "x" + 
+                               std::to_string(slice_img.rows));
+                
+                // Create letterboxed input to match rect=True training format
+                cv::Mat letterboxed_img;
+                float scale = std::min(float(kONNXInputSize) / slice_img.cols, 
+                                     float(kONNXInputSize) / slice_img.rows);
+                int new_width = int(slice_img.cols * scale);
+                int new_height = int(slice_img.rows * scale);
+                
+                // Resize maintaining aspect ratio
+                cv::Mat resized_img;
+                cv::resize(slice_img, resized_img, cv::Size(new_width, new_height));
+                
+                // Create letterboxed image with gray padding (114, 114, 114) like YOLOv8
+                letterboxed_img = cv::Mat::ones(kONNXInputSize, kONNXInputSize, CV_8UC3) * 114;
+                int x_offset = (kONNXInputSize - new_width) / 2;
+                int y_offset = (kONNXInputSize - new_height) / 2;
+                resized_img.copyTo(letterboxed_img(cv::Rect(x_offset, y_offset, new_width, new_height)));
+                
+                // Create blob from letterboxed image
+                cv::Mat blob;
+                cv::dnn::blobFromImage(letterboxed_img, blob, 1.0/255.0, 
+                                      cv::Size(kONNXInputSize, kONNXInputSize), 
+                                      cv::Scalar(), false, false);  // swapRB=false for YOLOv8 BGR input
+                
+                // Run inference
+                net.setInput(blob);
+                std::vector<cv::Mat> outputs;
+                net.forward(outputs, net.getUnconnectedOutLayersNames());
+                
+                // Parse YOLOv8 ONNX output format [1, 5, 44436] -> transpose to [44436, 5]
+                if (!outputs.empty()) {
+                    cv::Mat output = outputs[0];
+                    
+                    // Reshape and transpose YOLOv8 output to [detections, features] format
+                    if (output.dims == 3 && output.size[0] == 1) {
+                        output = output.reshape(1, output.size[1]); // [5, 44436]
+                        cv::transpose(output, output);              // [44436, 5]
+                    }
+                    
+                    float* data = (float*)output.data;
+                    int num_detections = output.rows;
+                    int num_features = output.cols; // Should be 5 for single-class: cx,cy,w,h,confidence
+                    
+                    GS_LOG_TRACE_MSG(trace, "ONNX output: " + std::to_string(num_detections) + " detections, " + 
+                                   std::to_string(num_features) + " features (output dims: " + 
+                                   std::to_string(output.rows) + "x" + std::to_string(output.cols) + ")");
+                    
+                    for (int i = 0; i < num_detections; ++i) {
+                        float* detection = data + i * output.cols;
+                        
+                        // YOLOv8 format: [center_x, center_y, width, height, confidence] (in letterboxed space)
+                        float cx_letterbox = detection[0];
+                        float cy_letterbox = detection[1];
+                        float w_letterbox = detection[2];
+                        float h_letterbox = detection[3];
+                        float confidence = detection[4];
+                        
+                        // Debug: Log first few detections with their confidence scores
+                        if (i < 10) {
+                            GS_LOG_TRACE_MSG(trace, "Detection " + std::to_string(i) + ": conf=" + 
+                                           std::to_string(confidence) + ", cx_letterbox=" + std::to_string(cx_letterbox) + 
+                                           ", cy_letterbox=" + std::to_string(cy_letterbox) + ", w_letterbox=" + std::to_string(w_letterbox) + 
+                                           ", h_letterbox=" + std::to_string(h_letterbox));
+                        }
+                        
+                        if (confidence >= kONNXConfidenceThreshold) {
+                            // ONNX coordinates are already in letterboxed space, not normalized
+                            
+                            // Remove letterbox padding and scale back to slice dimensions
+                            float cx_slice = (cx_letterbox - x_offset) / scale;
+                            float cy_slice = (cy_letterbox - y_offset) / scale;
+                            float w_slice = w_letterbox / scale;
+                            float h_slice = h_letterbox / scale;
+                            
+                            // Convert center format to top-left format
+                            int x = static_cast<int>(cx_slice - w_slice/2) + slice.x;
+                            int y = static_cast<int>(cy_slice - h_slice/2) + slice.y;
+                            int w = static_cast<int>(w_slice);
+                            int h = static_cast<int>(h_slice);
+                            
+                            // Bounds checking to ensure valid cv::Rect
+                            if (w > 0 && h > 0 && x >= 0 && y >= 0 && 
+                                x + w <= input_image.cols && y + h <= input_image.rows) {
+                                all_boxes.push_back(cv::Rect(x, y, w, h));
+                                all_confidences.push_back(confidence);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Apply NMS to remove overlapping detections
+            std::vector<int> indices;
+            cv::dnn::NMSBoxes(all_boxes, all_confidences, kONNXConfidenceThreshold, kONNXNMSThreshold, indices);
+            
+            // Convert bounding boxes to circles
+            detected_circles.clear();
+            for (int idx : indices) {
+                const cv::Rect& box = all_boxes[idx];
+                GsCircle circle;
+                circle[0] = box.x + box.width / 2;
+                circle[1] = box.y + box.height / 2;
+                circle[2] = std::max(box.width, box.height) / 2;
+                // Store confidence in unused field (we can add this to GsCircle later if needed)
+                detected_circles.push_back(circle);
+            }
+            
+            GS_LOG_TRACE_MSG(trace, "ONNX detected " + std::to_string(detected_circles.size()) + " balls");
+            return !detected_circles.empty();
+            
+        } catch (const cv::Exception& e) {
+            GS_LOG_MSG(error, "ONNX detection failed: " + std::string(e.what()));
+            return false;
+        }
     }
 
 }

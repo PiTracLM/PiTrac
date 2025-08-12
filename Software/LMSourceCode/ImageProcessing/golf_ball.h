@@ -4,7 +4,7 @@
  */
 
 
-// Holds information about a ball, as well as the ball’s relation to other balls, 
+// Holds information about a ball, as well as the ballï¿½s relation to other balls, 
 // such as its angles and relative velocity to that other ball.
 
 #pragma once
@@ -110,7 +110,8 @@ public:
         kOrange = 2,
         kYellow = 3,
         kOpticGreen = 4,
-        kUnknown = 5
+        kUnknown = 5,
+        kONNXDetected = 6     // Ball detected using ONNX/YOLO model
     };
 
     // If the ball's hsv range is known (at it really better be!), ball_color_ should be set to kCalibrated
