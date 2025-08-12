@@ -63,3 +63,40 @@ out/
 build/
 !**/src/main/**/build/
 !**/src/test/**/build/
+
+# GroundTruthAnnotator - AI Training System
+# Pre-trained models (auto-downloaded by YOLO)
+Software/GroundTruthAnnotator/yolo11n.pt
+Software/GroundTruthAnnotator/yolov8n.pt
+
+# Training temporary files and artifacts
+Software/GroundTruthAnnotator/experiments/*/weights/epoch*.pt
+Software/GroundTruthAnnotator/experiments/*/weights/last.pt
+Software/GroundTruthAnnotator/experiments/*/train_batch*.jpg
+Software/GroundTruthAnnotator/experiments/*/val_batch*.jpg
+Software/GroundTruthAnnotator/experiments/*/confusion_matrix*.png
+Software/GroundTruthAnnotator/experiments/*/Box*.png
+Software/GroundTruthAnnotator/experiments/*/labels.jpg
+Software/GroundTruthAnnotator/experiments/*/results.png
+Software/GroundTruthAnnotator/experiments/*/predictions.json
+
+# Keep only best weights (final trained models)
+!Software/GroundTruthAnnotator/experiments/*/weights/best.pt
+!Software/GroundTruthAnnotator/experiments/*/weights/best.onnx
+
+# Build artifacts
+Software/GroundTruthAnnotator/build/
+Software/GroundTruthAnnotator/__pycache__/
+
+# Runtime outputs
+Software/GroundTruthAnnotator/runs/
+Software/GroundTruthAnnotator/test_output/
+Software/GroundTruthAnnotator/complete_benchmark_output/
+Software/GroundTruthAnnotator/training_log.json
+
+# Working directories (should remain empty in repo)
+Software/GroundTruthAnnotator/unprocessed_training_images/*
+!Software/GroundTruthAnnotator/unprocessed_training_images/README.md
+
+# Cache files
+Software/GroundTruthAnnotator/yolo/labels/*.cache

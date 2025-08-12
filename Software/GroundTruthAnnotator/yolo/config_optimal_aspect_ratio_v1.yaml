@@ -1,0 +1,25 @@
+# PiTrac Golf Ball Detection - optimal_aspect_ratio_v1
+path: ..\yolo
+train: images
+val: images # Same as train for small datasets
+
+names:
+  0: golf_ball
+
+nc: 1
+
+# Optimized augmentation for small golf ball detection
+augment: true
+hsv_h: 0.005 # Minimal hue changes (preserve ball color)
+hsv_s: 0.3 # Moderate saturation changes  
+hsv_v: 0.2 # Small brightness variations (preserve strobe lighting)
+degrees: 2.0 # Minimal rotations (preserve ball shape)
+translate: 0.05 # Small translations (preserve trajectory context)
+scale: 0.2 # Small scale variations (critical for small objects)
+shear: 0.0 # No shear (maintain perfect circles)
+perspective: 0.0 # No perspective (maintain ball shape)
+flipud: 0.0 # No vertical flip (trajectory direction matters)
+fliplr: 0.5 # Horizontal flip OK
+mosaic: 0.9 # Strong mosaic (excellent for small multi-object scenes)
+mixup: 0.0 # No mixup (can blur small objects)
+copy_paste: 0.1 # Small copy-paste augmentation for multiple balls

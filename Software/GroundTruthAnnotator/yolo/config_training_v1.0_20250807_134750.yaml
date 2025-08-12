@@ -1,0 +1,24 @@
+# PiTrac Golf Ball Detection - training_v1.0_20250807_134750
+path: ..\yolo
+train: images
+val: images # Same as train for small datasets
+
+names:
+  0: golf_ball
+
+nc: 1
+
+# Optimized augmentation for golf balls
+augment: true
+hsv_h: 0.01 # Minimal hue changes (lighting variations)
+hsv_s: 0.5 # Moderate saturation changes  
+hsv_v: 0.3 # Brightness variations for strobe differences
+degrees: 5.0 # Small rotations (balls can be at slight angles)
+translate: 0.1 # Translation for position robustness
+scale: 0.3 # Scale variations for distance changes
+shear: 0.0 # No shear (balls don't deform)
+perspective: 0.0 # No perspective (maintain ball shape)
+flipud: 0.0 # No vertical flip (trajectory direction matters)
+fliplr: 0.5 # Horizontal flip OK
+mosaic: 0.8 # Mosaic augmentation (good for multiple balls)
+mixup: 0.1 # Light mixup for robustness

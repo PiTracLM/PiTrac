@@ -1,0 +1,6 @@
+path: ..\yolo
+train: images # Will be updated for train/val split
+val: images # Will be updated for train/val split
+names:
+  0: golf_ball
+nc: 1
