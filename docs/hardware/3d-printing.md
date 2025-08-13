@@ -51,4 +51,4 @@ Refer to the individual part files for specific print settings. Generally:
 - Sand contact surfaces if needed (especially lap joints)
 - Some parts may require drilling or trimming for proper fit
 
-For detailed printing and assembly instructions, see the [Assembly Guide](assembly-guide.md).
+For detailed printing and assembly instructions, see the [Assembly Guide]({% link hardware/assembly-guide.md %}).

@@ -40,7 +40,7 @@ Popular PCB manufacturers include:
 
 ### Required Components
 
-See the detailed component list in the [Parts List](parts-list.md#connector-board-components).
+See the detailed component list in the [Parts List]({% link hardware/parts-list.md %}).
 
 Key components include:
 - H11L1 optocouplers (2x)
@@ -64,7 +64,7 @@ Key components include:
 
 ## Connection Diagram
 
-Refer to the PCB wiring diagram in the [Assembly Guide](assembly-guide.md#connect-wiring) for proper connections to:
+Refer to the PCB wiring diagram in the [Assembly Guide]({% link hardware/assembly-guide.md %}) for proper connections to:
 - Pi GPIO pins
 - LED power supply
 - Camera trigger signals
@@ -76,4 +76,4 @@ Refer to the PCB wiring diagram in the [Assembly Guide](assembly-guide.md#connec
 - **Camera not triggering:** Verify optocoupler installation and GPIO connections  
 - **System instability:** Ensure proper grounding and power isolation
 
-For detailed wiring instructions, see the [Assembly Guide](assembly-guide.md).
+For detailed wiring instructions, see the [Assembly Guide]({% link hardware/assembly-guide.md %}).

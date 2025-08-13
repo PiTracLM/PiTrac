@@ -13,7 +13,7 @@ toc: true
 This document explains the process of building a typical PiTrac DIY Launch Monitor (LM). This process includes the assembly of all physical components, including the 3D-printed parts and hardware such as cameras and Raspberry Pi computers.
 
 {: .note }
-**Important:** This document refers to the calibration steps for the camera sub-system, which should be consulted prior to building the enclosure. Calibration is most easily done *as the LM is being assembled* because it allows easier access to cameras and camera mounts before the LM is completed. See [Camera Calibration](../camera/) for details.
+**Important:** This document refers to the calibration steps for the camera sub-system, which should be consulted prior to building the enclosure. Calibration is most easily done *as the LM is being assembled* because it allows easier access to cameras and camera mounts before the LM is completed. See [Camera Calibration]({% link camera/cameras.md %}) for details.
 
 ## Overview
 

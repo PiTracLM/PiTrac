@@ -12,7 +12,7 @@ keywords: PiTrac parts list, DIY golf monitor components, raspberry pi 5, global
 This document provides a comprehensive list of all components needed to build a PiTrac launch monitor.
 
 {: .highlight }
-📋 **Before ordering parts**, check the [Roadmap](../getting-started/roadmap.md) to understand which version you should build and any recent updates to hardware requirements.
+📋 **Before ordering parts**, check the [Roadmap]({% link getting-started/roadmap.md %}) to understand which version you should build and any recent updates to hardware requirements.
 
 ## Computing Hardware
 
@@ -119,4 +119,4 @@ This document provides a comprehensive list of all components needed to build a 
 - IR filter must allow 730nm light through (not 850nm filters)
 - LED strip must produce NO infrared light
 - Verify all IR components are compatible with 730nm wavelength
-- Check [Roadmap](../getting-started/roadmap.md) before ordering to ensure you're building the right version
+- Check [Roadmap]({% link getting-started/roadmap.md %}) before ordering to ensure you're building the right version
