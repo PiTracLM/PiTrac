@@ -1,0 +1,5 @@
+[wrap-file]
+directory = libshotscope
+
+[provide]
+libshotscope = libshotscope_dep
