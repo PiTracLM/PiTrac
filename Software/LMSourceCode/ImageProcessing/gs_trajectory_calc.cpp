@@ -7,11 +7,13 @@
 #include <libshotscope.hpp>
 
 PiTracTrajectoryCalculator::PiTracTrajectoryCalculator() {
-    // Constructor - future libshotscope initialization
+    // Constructor - libshotscope objects are created locally in each method call
+    // No persistent state to initialize
 }
 
 PiTracTrajectoryCalculator::~PiTracTrajectoryCalculator() {
-    // Destructor - future libshotscope cleanup
+    // Destructor - libshotscope objects are stack-allocated and auto-cleanup
+    // No persistent state to cleanup
 }
 
 TrajectoryResult PiTracTrajectoryCalculator::calculateCarry(const TrajectoryInput& input) {
