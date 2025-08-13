@@ -88,7 +88,7 @@ private:
      * @param input PiTrac trajectory input
      * @return libshotscope compatible structures
      */
-    std::pair<void*, void*> convertToLibshotscopeFormat(const TrajectoryInput& input);
+    std::pair<struct golfBall, struct atmosphericData> convertToLibshotscopeFormat(const TrajectoryInput& input);
     
     /**
      * Apply default atmospheric conditions for missing sensor data
