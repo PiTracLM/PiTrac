@@ -18,4 +18,4 @@ PiTrac is an open-source DIY golf launch monitor that uses Raspberry Pi computer
 - **[Roadmap]({% link getting-started/roadmap.md %})** - Current status and future plans
 - **[Contributors]({% link getting-started/contributors.md %})** - Acknowledgments and attributions
 
-Once you're familiar with the project, you can move on to the [Hardware](../hardware/) section to start planning your build.
+Once you're familiar with the project, you can move on to the [Hardware]({% link hardware/hardware.md %}) section to start planning your build.

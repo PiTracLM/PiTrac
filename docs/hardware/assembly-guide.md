@@ -13,7 +13,7 @@ toc: true
 This document explains the process of building a typical PiTrac DIY Launch Monitor (LM). This process includes the assembly of all physical components, including the 3D-printed parts and hardware such as cameras and Raspberry Pi computers.
 
 {: .note }
-**Important:** This document refers to the calibration steps for the camera sub-system, which should be consulted prior to building the enclosure. Calibration is most easily done *as the LM is being assembled* because it allows easier access to cameras and camera mounts before the LM is completed. See [Camera Calibration]({% link camera/cameras.md %}) for details.
+**Important:** This document refers to the calibration steps for the camera sub-system, which should be consulted prior to building the enclosure. Calibration is most easily done *as the LM is being assembled* because it allows easier access to cameras and camera mounts before the LM is completed. See [Camera Calibration]({% link camera/camera-calibration.md %}) for details.
 
 ## Overview
 
@@ -45,7 +45,7 @@ The LM is not a simple, complete kit that just requires attaching Part A to Part
 
 ## Parts and Materials
 
-1. See the [Parts List](parts-list.md) for complete component list
+1. See the [Parts List]({% link hardware/parts-list.md %}) for complete component list
 2. 3D-printed enclosure parts
 3. Solder, flux, flux-cleaner
 4. Wires (stereo-speaker wire recommended for higher-voltage portions)
@@ -192,7 +192,7 @@ Route these cables to the right side for easier middle layer installation.
 
 ### 8. Camera 2 Calibration
 
-**Important:** Calibrate Camera 2 now while easily accessible. See [Camera Calibration Guide](../camera/camera-calibration.md).
+**Important:** Calibrate Camera 2 now while easily accessible. See [Camera Calibration Guide]({% link camera/camera-calibration.md %}).
 
 ## Middle Layer Assembly
 
@@ -289,7 +289,7 @@ Secure base and middle layers with M3 x 6mm self-tapping screws in 4 interface h
 
 ## Camera 1 Calibration
 
-Before installing the ceiling, calibrate Camera 1 using the [Camera Calibration Guide](../camera/camera-calibration.md).
+Before installing the ceiling, calibrate Camera 1 using the [Camera Calibration Guide]({% link camera/camera-calibration.md %}).
 
 ## Top Wall (Ceiling) Assembly
 

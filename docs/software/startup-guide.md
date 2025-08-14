@@ -7,7 +7,7 @@ parent: Software
 
 # PiTrac Testing and Start-Up Documentation
 
-If you are at this point, you should have PiTrac compiled on both Pi's, your enclosure built, and your cameras calibrated. If that's not quite done yet, see the [Raspberry Pi Setup]({% link software/pi-setup.md %}) document first.
+If you are at this point, you should have PiTrac compiled on both Pi's, your enclosure built, and your cameras calibrated. If that's not quite done yet, see the [Automated Setup]({% link software/automated-setup.md %}) for the quickest path, or the [Raspberry Pi Setup]({% link software/pi-setup.md %}) for manual installation.
 
 ## Environment Setup
 
@@ -117,7 +117,9 @@ When running normally, Pi 1 triggers Camera 2's shutter. Confirm this signal pat
 
 ### Running PiTrac
 
-To run PiTrac, start both camera scripts:
+For the easiest way to run PiTrac, see the [Running PiTrac]({% link software/running-pitrac.md %}) guide which covers the menu system, background processes, and all runtime options.
+
+To run PiTrac manually, start both camera scripts:
 
 1. **Start Pi 2 first:**
    ```bash
@@ -154,6 +156,6 @@ For problems, see the [Troubleshooting Guide]({% link troubleshooting/troublesho
 
 Once the system is running reliably:
 
-1. **Calibration:** Fine-tune camera calibration if needed ([Camera Calibration]({% link camera/cameras.md %}))
-2. **Integration:** Set up simulator connections ([Integration](%{ link integration/integration.md %}))
+1. **Calibration:** Fine-tune camera calibration if needed ([Camera Calibration]({% link camera/camera-calibration.md %}))
+2. **Integration:** Set up simulator connections ([Integration]({% link integration/integration.md %}))
 3. **Optimization:** Adjust settings for your specific setup and environment

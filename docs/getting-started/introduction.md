@@ -13,7 +13,7 @@ Introducing [PiTrac](https://hackaday.io/project/195042-pitrac-the-diy-golf-laun
 
 PiTrac uses low-cost Raspberry Pi(\*) computers and cameras to determine golf ball launch speed, angles and spin in three dimensions.  PiTrac interfaces with both GSPro and E6/TruGolf simulators, and its output is also accessible on a stand-alone web-based app.  [We've reached out to 2k/TopGolf, but no response yet.]
 
-PiTrac uses off-the-shelf hardware, and includes a [parts list](../hardware/parts-list.md) with links to potential suppliers.  The only custom part is a small printed circuit board.  The fabrication instructions for that PCB are included in the open-source distribution and it can be manufactured for a few dollars.  The two Pi computers and cameras are the most expensive parts, and cost around $250 in total.
+PiTrac uses off-the-shelf hardware, and includes a [parts list]({% link hardware/parts-list.md %}) with links to potential suppliers.  The only custom part is a small printed circuit board.  The fabrication instructions for that PCB are included in the open-source distribution and it can be manufactured for a few dollars.  The two Pi computers and cameras are the most expensive parts, and cost around $250 in total.
 
 PiTrac is not a commercial product for sale–the full design is being released as open source on GitHub for folks to build themselves.  It's not easy, but if you're handy with a soldering iron, can figure out how to 3D print the parts, and are willing to burrow into the Linux operating system to compile and install software, you should be able to create your own PiTrac!
 

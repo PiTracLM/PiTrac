@@ -173,4 +173,4 @@ ping $PITRAC_MSG_BROKER_FULL_ADDRESS
 ls -la $PITRAC_ROOT
 ```
 
-For additional configuration help, see the [Troubleshooting Guide](../troubleshooting/).
+For additional configuration help, see the [Troubleshooting Guide]({% link troubleshooting/troubleshooting.md %}).
