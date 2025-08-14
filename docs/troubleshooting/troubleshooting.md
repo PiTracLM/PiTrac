@@ -11,7 +11,6 @@ This section covers debugging, troubleshooting, and development guides for PiTra
 
 ## What you'll find here:
 
-- **[Debugging Guide](debugging-guide.md)** - Code walk-throughs and debugging techniques
-- **[Common Issues](common-issues.md)** - Frequently encountered problems and solutions
+- **[Debugging Guide]({% link troubleshooting/debugging-guide.md %})** - Code walk-throughs and debugging techniques
 
-For immediate help during setup, also refer to the testing sections in the [Startup Guide](../software/startup-guide.md).
+For immediate help during setup, also refer to the testing sections in the [Startup Guide]({% link software/startup-guide.md %}).

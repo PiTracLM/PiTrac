@@ -1,0 +1,19 @@
+# MessagePack C++ installation defaults
+# These values are used as:
+# - Default suggestions in interactive mode (shown in prompts)
+# - Automatic values in non-interactive mode (--non-interactive flag)
+
+# MessagePack version
+msgpack_version: "6.1.1"
+
+# Installation method (apt or source)
+install_method: "apt"
+
+# Force reinstall (0=no, 1=yes)
+force: 0
+
+# Build directory if building from source
+build_dir: "/tmp/msgpack_build"
+
+# Install prefix
+install_prefix: "/usr/local"

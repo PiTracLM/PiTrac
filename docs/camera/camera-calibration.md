@@ -16,9 +16,9 @@ Camera 2 Calibration Setup:
 **Camera Setup & Calibration Guide**
 
 {: .warning }
-🔧 **Difficulty:** Camera calibration is noted in the project errata as being "too difficult and takes too much time." Consider using the [Auto-Calibration](auto-calibration.md) process instead for a more streamlined experience.
+🔧 **Difficulty:** Camera calibration is noted in the project errata as being "too difficult and takes too much time." Consider using the [Auto-Calibration]({% link camera/auto-calibration.md %}) process instead for a more streamlined experience.
 
-NOTE:  As of May 6, 2025, the portion of this guide that deals with measuring the focal length and camera angles is deprecated.  The focusing and de-distortion information is still correct (and necessary).  However, once the cameras are focused and you have generated the de-distortion matrices and entered them into your golf_sim_config.json file, please perform the rest of the calibration by following the [Auto-Calibration Instructions](auto-calibration.md).
+NOTE:  As of May 6, 2025, the portion of this guide that deals with measuring the focal length and camera angles is deprecated.  The focusing and de-distortion information is still correct (and necessary).  However, once the cameras are focused and you have generated the de-distortion matrices and entered them into your golf_sim_config.json file, please perform the rest of the calibration by following the [Auto-Calibration Instructions]({% link camera/auto-calibration.md %}).
 1. Overview  
    1. The PiTrac system needs to know the angles of the cameras and the relative distances between them in order to locate the ball in space.  Camera calibration helps establish these values.  
    2. During this calibration, various distances are measured from each camera to a test point in front of the camera.  Those values are used, along with the calibration spreadsheet (which computes additional, derived values) to determine a set of calibration values.  Those values are then given to the PiTrac monitor by entering them in the golf\_sim\_config.json configuration file, which PiTrac reads when it starts up.

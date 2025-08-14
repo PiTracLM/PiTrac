@@ -1,0 +1,50 @@
+# Test Processor defaults
+# Settings for running image processing tests without camera hardware
+
+# Test directories (relative to PITRAC_ROOT)
+test_base_dir: "TestImages"
+test_results_dir: "TestImages/results"
+test_default_dir: "TestImages/default"
+test_custom_dir: "TestImages/custom"
+
+# Test image names
+default_teed_image: "test_teed_ball.png"
+default_strobed_image: "test_strobed_ball.png"
+
+# Custom image defaults (for dialog input boxes)
+custom_teed_default: "custom/teed.png"
+custom_strobed_default: "custom/strobed.png"
+
+# Web server configuration
+web_server_port: 8080
+web_server_host: "0.0.0.0"
+web_auto_open_browser: 0
+
+# Processing settings
+test_timeout_seconds: 30
+test_log_level: "info"
+test_artifact_level: "all"
+test_system_mode: "kTest"
+
+# Test image generation (for creating default test images)
+test_image_width: 1440
+test_image_height: 1080
+test_ball_radius: 60
+test_ball_color: "white"
+test_background_color: "black"
+test_blur_sigma: 2
+
+# Performance thresholds
+perf_warn_threshold_ms: 1000
+perf_fail_threshold_ms: 5000
+
+# Results retention
+results_retention_days: 7
+max_results_to_display: 10
+
+# Expected results tolerances (for validation)
+tolerance_ball_speed_mph: 4
+tolerance_hla_degrees: 3
+tolerance_vla_degrees: 2
+tolerance_backspin_rpm: 250
+tolerance_sidespin_rpm: 300

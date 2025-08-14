@@ -7,7 +7,7 @@ parent: Software
 
 # PiTrac Testing and Start-Up Documentation
 
-If you are at this point, you should have PiTrac compiled on both Pi's, your enclosure built, and your cameras calibrated. If that's not quite done yet, see the [Raspberry Pi Setup](pi-setup.md) document first.
+If you are at this point, you should have PiTrac compiled on both Pi's, your enclosure built, and your cameras calibrated. If that's not quite done yet, see the [Raspberry Pi Setup]({% link software/pi-setup.md %}) document first.
 
 ## Environment Setup
 
@@ -34,7 +34,7 @@ export PITRAC_MSG_BROKER_FULL_ADDRESS=tcp://10.0.0.41:61616
 
 ### Configuration File
 
-Ensure the `golf_sim_config.json` file is correctly set up. If unsure, follow the [Configuration File documentation](configuration.md).
+Ensure the `golf_sim_config.json` file is correctly set up. If unsure, follow the [Configuration File documentation]({% link software/configuration.md %}).
 
 ### Basic Executable Test
 
@@ -141,11 +141,11 @@ Start Pi 2 executable first so it's ready to take pictures as soon as Pi 1 deter
 
 ### Troubleshooting
 
-For problems, see the [Troubleshooting Guide](../troubleshooting/).
+For problems, see the [Troubleshooting Guide]({% link troubleshooting/troubleshooting.md %}).
 
 ## Performance Tips
 
-- **Memory:** Ensure adequate swap space for compilation (see Pi Setup guide)
+- **Memory:** Ensure adequate swap space for compilation (see [Pi Setup Guide]({% link software/pi-setup.md %}))
 - **Network:** Use wired Ethernet for stability during operation
 - **Storage:** NVMe drives significantly improve performance over SD cards
 - **Cooling:** Active cooling helps maintain consistent performance during long sessions
@@ -154,6 +154,6 @@ For problems, see the [Troubleshooting Guide](../troubleshooting/).
 
 Once the system is running reliably:
 
-1. **Calibration:** Fine-tune camera calibration if needed ([Camera Calibration](../camera/))
-2. **Integration:** Set up simulator connections ([Integration](../integration/))
+1. **Calibration:** Fine-tune camera calibration if needed ([Camera Calibration]({% link camera/cameras.md %}))
+2. **Integration:** Set up simulator connections ([Integration](%{ link integration/integration.md %}))
 3. **Optimization:** Adjust settings for your specific setup and environment

@@ -1,0 +1,64 @@
+# Development environment configuration defaults
+# These values are used as:
+# - Default suggestions in interactive mode (shown in prompts)
+# - Automatic values in non-interactive mode (--non-interactive flag)
+
+# Install ZSH and Oh-My-ZSH (0=no, 1=yes)
+install_zsh: 1
+
+# Set ZSH as default shell (0=no, 1=yes)
+set_zsh_default: 1
+
+# Oh-My-ZSH theme
+omz_theme: "robbyrussell"
+
+# Oh-My-ZSH plugins (comma-separated)
+omz_plugins: "git,docker,kubectl,npm,python,pip,sudo,command-not-found"
+
+# Install Neovim (0=no, 1=yes)
+install_neovim: 1
+
+# Neovim configuration (none, basic, lazyvim, nvchad)
+nvim_config: "basic"
+
+# Install development tools (0=no, 1=yes)
+install_dev_tools: 1
+
+# Development tools to install (comma-separated)
+dev_tools: "htop,ncdu,tree,jq,ripgrep,fd-find,bat,fzf,tmux"
+
+# Install Docker (0=no, 1=yes)
+install_docker: 0
+
+# Add user to docker group (0=no, 1=yes)
+docker_user_group: 1
+
+# Install VS Code server (0=no, 1=yes)
+install_vscode_server: 0
+
+# Configure Git (0=no, 1=yes)
+configure_git: 1
+
+# Git user name (empty to skip)
+git_user_name: ""
+
+# Git user email (empty to skip)
+git_user_email: ""
+
+# Git default branch
+git_default_branch: "main"
+
+# Install Python development tools (0=no, 1=yes)
+install_python_dev: 1
+
+# Python packages to install (comma-separated)
+python_packages: "pip,setuptools,wheel,virtualenv,ipython,black,pylint"
+
+# Install Node.js via NVM (0=no, 1=yes)
+install_nodejs: 0
+
+# Node.js version to install
+nodejs_version: "lts"
+
+# Force reconfiguration (0=no, 1=yes)
+force: 0

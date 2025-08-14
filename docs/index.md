@@ -19,11 +19,11 @@ PiTrac determines ball speed, launch angles, and spin in 3 axes. Its output is a
 
 ## Documentation Sections
 
-- **[Getting Started](getting-started/)** - Learn about PiTrac, project status, and roadmap
-- **[Hardware](hardware/)** - Parts list, assembly guides, and 3D printing
-- **[Software](software/)** - Raspberry Pi setup, configuration, and startup
-- **[Integration](integration/)** - Connect to golf simulators and third-party systems
-- **[Troubleshooting](troubleshooting/)** - Debugging guides and common issues
+- **[Getting Started]({% link getting-started/getting-started.md %})** - Learn about PiTrac, project status, and roadmap
+- **[Hardware]({% link hardware/hardware.md %})** - Parts list, assembly guides, and 3D printing
+- **[Software]({% link software/software.md %})** - Raspberry Pi setup, configuration, and startup
+- **[Integration]({% link integration/integration.md %})** - Connect to golf simulators and third-party systems
+- **[Troubleshooting]({% link troubleshooting/troubleshooting.md %})** - Debugging guides and common issues
 
 <p align="center">Introduction to PiTrac's Enclosure
 &nbsp;

@@ -63,7 +63,6 @@ out/
 build/
 !**/src/main/**/build/
 !**/src/test/**/build/
-
 # GroundTruthAnnotator - AI Training System
 # Pre-trained models (auto-downloaded by YOLO)
 Software/GroundTruthAnnotator/yolo11n.pt
@@ -100,3 +99,6 @@ Software/GroundTruthAnnotator/unprocessed_training_images/*
 
 # Cache files
 Software/GroundTruthAnnotator/yolo/labels/*.cache
+
+# Dev scripts cache
+Dev/scripts/__pycache__

@@ -1,0 +1,22 @@
+# Camera configuration defaults
+# These values are used as:
+# - Default suggestions in interactive mode (shown in prompts)
+# - Automatic values in non-interactive mode (--non-interactive flag)
+
+# Libcamera timeout in milliseconds
+camera_timeout_value_ms: 1000000
+
+# Install IPA sensor files (0=no, 1=yes)
+install_ipa_files: 1
+
+# IPA file source directory (relative to script dir)
+assets_dir: "assets"
+
+# Force configuration even if already set (0=no, 1=yes)
+force: 0
+
+# Camera tuning file to use (empty for default)
+tuning_file: ""
+
+# Enable camera debugging (0=no, 1=yes)
+enable_debug: 0

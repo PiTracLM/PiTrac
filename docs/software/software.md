@@ -11,8 +11,8 @@ This section covers the software setup and operation of PiTrac, from initial Ras
 
 ## What you'll find here:
 
-- **[Raspberry Pi Setup](pi-setup.md)** - Complete guide for preparing your Raspberry Pi computers
-- **[Startup Guide](startup-guide.md)** - Testing and launching your PiTrac system
-- **[Configuration](configuration.md)** - System configuration and environment variables
+- **[Raspberry Pi Setup]({% link software/pi-setup.md %})** - Complete guide for preparing your Raspberry Pi computers
+- **[Startup Guide]({% link software/startup-guide.md %})** - Testing and launching your PiTrac system
+- **[Configuration]({% link software/configuration.md %})** - System configuration and environment variables
 
-Before starting software setup, ensure you have completed the [Hardware Assembly](../hardware/assembly-guide.md) and have all required parts from the [Parts List](../hardware/parts-list.md).
+Before starting software setup, ensure you have completed the [Assembly Guide]({% link hardware/assembly-guide.md %}) and have all required parts from the [Parts List](%{ link hardware/parts-list.md %}).

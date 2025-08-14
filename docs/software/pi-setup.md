@@ -17,7 +17,7 @@ toc: true
     2. [Operating System](#operating-system)  
     3. [Log Into Pi](#log-into-pi)  
     4. [Remote Log Into Pi](#remote-log-into-pi)  
-    5. [Sudo Priviledges](#sudo-priviledges)  
+    5. [Sudo Privileges](#sudo-privileges)  
     6. [Install NVME Board](#install-nvme-board)  
     7. [NAS Drive Setup and Mounting](#nas-drive-setup-and-mounting)  
     8. [Samba Server Setup](#samba-server-setup)  
@@ -42,9 +42,9 @@ toc: true
 
 ## Summary
 
-These instructions are targeted toward folks who do not have a lot of experience building software systems in the Pi Operating System and who could benefit from more step-by-step direction. Someone who’s familiar with using tools like meson and ninja to build software can likely skip over many of these steps. However, the instructions contain a number of idiosyncratic steps and configuration requirements that are particular to PiTrac.
-r
-These instructions start with a Raspberry Pi with nothing on it, and are meant to describe all the steps to get from that point to a working, compiled version of PiTrac.  PiTrac currently requires two Raspberry Pi’s, so the majority of these instructions will have to be repeated twice.  Because the ‘smaller’ Pi system that connects to Camera 2 is the only Pi that handles the Tomcat/Tomee web-based GUI for the system, there are a few more steps for that system.
+These instructions are targeted toward folks who do not have a lot of experience building software systems in the Pi Operating System and who could benefit from more step-by-step direction. Someone who's familiar with using tools like meson and ninja to build software can likely skip over many of these steps. However, the instructions contain a number of idiosyncratic steps and configuration requirements that are particular to PiTrac.
+
+These instructions start with a Raspberry Pi with nothing on it, and are meant to describe all the steps to get from that point to a working, compiled version of PiTrac.  PiTrac currently requires two Raspberry Pi's, so the majority of these instructions will have to be repeated twice.  Because the 'smaller' Pi system that connects to Camera 2 is the only Pi that handles the Tomcat/Tomee web-based GUI for the system, there are a few more steps for that system.
 
 NOTE - The new "single-pi" version of PiTrac does not have its own documentation yet.  Until then, please note that these instructions can work when using only a single Pi.  You just need to do everything with what we consider here to be the "Pi 1" system even if the instructions refer to the Pi 2 system.  For example, if a step in this document says "Log into the Pi 2 computer...", you will just log into the (only) Pi 1 system.
 
@@ -472,11 +472,11 @@ NOTE - The new "single-pi" version of PiTrac does not have its own documentation
 #### Install MsgPack
 
 20. Install msgpack  
-    1. Info at:  [https://github.com/msgpack/msgpack-c/wiki/v1\_1\_cpp\_packer\#sbuffer](https://github.com/msgpack/msgpack-c/wiki/v1_1_cpp_packer#sbuffer)  
-    2. cd \~/Dev  
-    3. git clone [https://github.com/msgpack/msgpack-c.git](https://github.com/msgpack/msgpack-c.git)  
-    4. For some reason, the above does not grab all the necessary files. So, also go here: [https://github.com/msgpack/msgpack-c/tree/cpp\_master](https://github.com/msgpack/msgpack-c/tree/cpp_master) and click on “Code” and down load the zip file into the \~/Dev directory  
-    5. unzip /mnt/PiTracShare/dev/tmp/msgpack-c-cpp\_master.zip  
+    1. Info at: [https://github.com/msgpack/msgpack-c/wiki/v1_1_cpp_packer#sbuffer](https://github.com/msgpack/msgpack-c/wiki/v1_1_cpp_packer#sbuffer)  
+    2. `cd ~/Dev`  
+    3. `git clone https://github.com/msgpack/msgpack-c.git`  
+    4. For some reason, the above does not grab all the necessary files. So, also go here: [https://github.com/msgpack/msgpack-c/tree/cpp_master](https://github.com/msgpack/msgpack-c/tree/cpp_master) and click on "Code" and down load the zip file into the ~/Dev directory  
+    5. `unzip /mnt/PiTracShare/dev/tmp/msgpack-c-cpp_master.zip`  
     6. `cd msgpack-c-cpp_master`  
     7. `cmake -DMSGPACK_CXX20=ON .`  
     8. `sudo cmake --build . --target install`  
@@ -518,15 +518,15 @@ NOTE - The new "single-pi" version of PiTrac does not have its own documentation
     3. [https://activemq.apache.org/components/classic/download/](https://activemq.apache.org/components/classic/download/) has the source code zip file that you will want to download with the ActiveMQ Broker  
        1. E.g., [apache-activemq-6.1.4-bin.tar.gz](https://www.apache.org/dyn/closer.cgi?filename=/activemq/6.1.4/apache-activemq-6.1.4-bin.tar.gz&action=download)  
     2. Follow these instructions to install (but NOT the source-install option - we're just installing the executables, not building them):  
-       1. [https://activemq.apache.org/version-5-getting-started.html\#installation-procedure-for-unix](https://activemq.apache.org/version-5-getting-started.html#installation-procedure-for-unix)  
+       1. [https://activemq.apache.org/version-5-getting-started.html#installation-procedure-for-unix](https://activemq.apache.org/version-5-getting-started.html#installation-procedure-for-unix)  
        2. Set the following environment variable to ensure you don’t run out of memory:  
           1. `export MAVEN_OPTS=-Xmx1024M` (ignore for RaspberryPi 5 8GB)
        3. We suggest you install activemq at `/opt`, so…  
           1. `cd /opt`  
-          2. `sudo tar xvf /mnt/PiTracShare/tmp/apache\*.tar`  (or wherever you put the tarball file  
+          2. `sudo tar xvf /mnt/PiTracShare/tmp/apache*.tar` (or wherever you put the tarball file)  
        2. Test it manually once, and then we’ll start it automatically later:  
-          1. `cd /opt/apache-activemq` 
-          2. `sudo ./bin/activemq start`   (NOTE \- must start in main directory to ensure that the files like logs get created in the correct place)  
+          1. `cd /opt/apache-activemq`  
+          2. `sudo ./bin/activemq start` (NOTE - must start in main directory to ensure that the files like logs get created in the correct place)  
           3. Wait a half-minute and then check the data/activemq.log file to make sure everything is good  
           4. `netstat -an|grep 61616` should then return “LISTEN”  
           5. `sudo ./bin/activemq stop`  
@@ -534,12 +534,12 @@ NOTE - The new "single-pi" version of PiTrac does not have its own documentation
           1. `cd conf`  
           2. `sudo cp jetty.xml jetty.xml.ORIGINAL`  
           3. `sudo vi jetty.xml jetty.xml`  
-             1. Search for the line that has `127.0.0.1` and replace with whatever the IP address is for the Pi this is all  running on.  
-             2. Search for the line that begins with “ Enable this connector if you wish to use https with web console”  
-             3. Uncomment the next section by removing the \!-- and -- at the beginning and end of the bean.  The section should then look like  \<bean id="Secure blah blah blah, and then at the end, \</bean\>  
+             1. Search for the line that has `127.0.0.1` and replace with whatever the IP address is for the Pi this is all running on.  
+             2. Search for the line that begins with "Enable this connector if you wish to use https with web console"  
+             3. Uncomment the next section by removing the <!-- and --> at the beginning and end of the bean. The section should then look like <bean id="Secure blah blah blah, and then at the end, </bean>  
           4. `cd .. && sudo ./bin/activemq start`  
-          5. Log into the broker console from another machine by: http://\<Pi IP address or name\>:8161/admin  
-             1.The default login is typically admin/admin
+          5. Log into the broker console from another machine by: `http://<Pi IP address or name>:8161/admin`  
+             1. The default login is typically admin/admin
              2. If this works, the broker is setup correctly  
        2. Setup ActiveMQ to run automatically on startup  
           1. `sudo vi /etc/systemd/system/activemq.service` and add:
@@ -561,10 +561,10 @@ NOTE - The new "single-pi" version of PiTrac does not have its own documentation
           2. `sudo systemctl daemon-reload`  
           3. `sudo systemctl start activemq`  
           4. `sudo systemctl enable activemq`  
-          5. `sudo reboot now`   (to test the auto-start) (use whatewver apache directory you chose, of course) 
-          6. After the system comes back, do the following to verify it’s working:  
-             1. `sudo /opt/apache-activemq-6.1.4/bin/activemq status`  (should say it’s running)  
-             2. And from a browser, check 
+          5. `sudo reboot now` (to test the auto-start) (use whatever apache directory you chose, of course)  
+          6. After the system comes back, do the following to verify it's working:  
+             1. `sudo /opt/apache-activemq-6.1.4/bin/activemq status` (should say it's running)  
+             2. And from a browser, check `http://<Pi IP>:8161/admin` 
 
 #### Install Maven
 
@@ -574,126 +574,126 @@ NOTE - The new "single-pi" version of PiTrac does not have its own documentation
 #### Install Tomee
 
 24. Install Tomee (on the cam2 system only)  
-    1. Use the “Plume” version that supports JMS  
-    2. Get the Tomee binary here:  [https://tomee.apache.org/download.html](https://tomee.apache.org/download.html)  
-    3. cd /opt  
-    4. sudo unzip /mnt/PiTracShare/tmp/apache-tomee-10.0.0-M3-plume.zip  (or whatever version you’re using)  
-    5. sudo mv apache-tomee-plume-10.0.0-M3 tomee      \[or whatever version\]  
+    1. Use the "Plume" version that supports JMS  
+    2. Get the Tomee binary here: [https://tomee.apache.org/download.html](https://tomee.apache.org/download.html)  
+    3. `cd /opt`  
+    4. `sudo unzip /mnt/PiTracShare/tmp/apache-tomee-10.0.0-M3-plume.zip` (or whatever version you're using)  
+    5. `sudo mv apache-tomee-plume-10.0.0-M3 tomee` [or whatever version]  
     6. `sudo chmod -R 755 tomee`  
-       1. **WARNING** \- Only use this technique if you’re on a secure, private platform.  It’s easier to simply allow read-writes from other than the root user, but there’s other (better) ways of doing this too.  This is just a simple hack for a home system.  
+       1. **WARNING** - Only use this technique if you're on a secure, private platform. It's easier to simply allow read-writes from other than the root user, but there's other (better) ways of doing this too. This is just a simple hack for a home system.  
     7. `cd tomee`
-    8. `sudo chmod -R go+w webapps` (so that the tomcat uses can deploy webapps  
-    9. `sudo vi conf/tomcat-users.xml` and add before the last line (\</tomcat-users\>)  
-      ```xml
-      <role rolename="tomcat"/>
-      <role rolename="admin-gui"/>
-      <role rolename="manager-gui"/>
-      <user username="tomcat" password="tomcat" roles="tomcat,admin-gui,manager-gui"/>
-      ``` 
-      10. Add a systemctl daemon script to /etc/systemd/system/tomee.service so that tomee will start on boot. `sudo vi /etc/systemd/system/tomee.service
-```bash
-[Unit]  
-Description=Apache TomEE  
-After=network.target  
-[Service]  
-User=root  
-Type=forking  
-#Environment=JAVA_HOME=/usr/lib/jvm/default-java  
-Environment=JAVA_HOME=/usr/lib/jvm/java-1.17.0-openjdk-arm64  
-Environment=CATALINA_PID=/opt/tomee/temp/tomee.pid  
-Environment=CATALINA_HOME=/opt/tomee  
-Environment=CATALINA_BASE=/opt/tomee  
-Environment=CATALINA_OPTS='-server'  
-Environment=JAVA_OPTS='-Djava.awt.headless=true'  
-ExecStart=/opt/tomee/bin/startup.sh  
-ExecStop=/opt/tomee/bin/shutdown.sh  
-KillSignal=SIGCONT  
-[Install]  
-WantedBy=multi-user.target
-```
+    8. `sudo chmod -R go+w webapps` (so that the tomcat users can deploy webapps)  
+    9. `sudo vi conf/tomcat-users.xml` and add before the last line (</tomcat-users>)  
+       ```xml
+       <role rolename="tomcat"/>
+       <role rolename="admin-gui"/>
+       <role rolename="manager-gui"/>
+       <user username="tomcat" password="tomcat" roles="tomcat,admin-gui,manager-gui"/>
+       ```  
+    10. Add a systemctl daemon script to `/etc/systemd/system/tomee.service` so that tomee will start on boot. `sudo vi /etc/systemd/system/tomee.service`:
+       ```bash
+       [Unit]  
+       Description=Apache TomEE  
+       After=network.target  
+       [Service]  
+       User=root  
+       Type=forking  
+       #Environment=JAVA_HOME=/usr/lib/jvm/default-java  
+       Environment=JAVA_HOME=/usr/lib/jvm/java-1.17.0-openjdk-arm64  
+       Environment=CATALINA_PID=/opt/tomee/temp/tomee.pid  
+       Environment=CATALINA_HOME=/opt/tomee  
+       Environment=CATALINA_BASE=/opt/tomee  
+       Environment=CATALINA_OPTS='-server'  
+       Environment=JAVA_OPTS='-Djava.awt.headless=true'  
+       ExecStart=/opt/tomee/bin/startup.sh  
+       ExecStop=/opt/tomee/bin/shutdown.sh  
+       KillSignal=SIGCONT  
+       [Install]  
+       WantedBy=multi-user.target
+       ```
 
-11. `cd webapps/manager/META-INF; sudo cp context.xml context.xml.ORIGINAL` [just in case]  
+    11. `cd webapps/manager/META-INF; sudo cp context.xml context.xml.ORIGINAL` [just in case]  
 
-12. Update /opt/tomee/webapps/manager/META-INF/context.xml to allow ".*" instead of just 127.0…. Replace the whole regex string. The result should simply be allow=".*" on that line  
-```xml
-<Context antiResourceLocking="false" privileged="true" >
-  <CookieProcessor className="org.apache.tomcat.util.http.Rfc6265CookieProcessor"
-                   sameSiteCookies="strict" />
-  <Valve className="org.apache.catalina.valves.RemoteAddrValve"
-         allow=".*" />
-  <Manager sessionAttributeValueClassNameFilter="java\.lang\.(?:Boolean|Integer|Long|Number|String)|org\.apache\.catalina\.filters\.CsrfPreventionFilter\$LruCache(?:\$1)?|java\.util\.(?:Linked)?HashMap"/>
-</Context>
-```
+    12. Update `/opt/tomee/webapps/manager/META-INF/context.xml` to allow ".*" instead of just 127.0…. Replace the whole regex string. The result should simply be allow=".*" on that line  
+        ```xml
+        <Context antiResourceLocking="false" privileged="true" >
+          <CookieProcessor className="org.apache.tomcat.util.http.Rfc6265CookieProcessor"
+                           sameSiteCookies="strict" />
+          <Valve className="org.apache.catalina.valves.RemoteAddrValve"
+                 allow=".*" />
+          <Manager sessionAttributeValueClassNameFilter="java\.lang\.(?:Boolean|Integer|Long|Number|String)|org\.apache\.catalina\.filters\.CsrfPreventionFilter\$LruCache(?:\$1)?|java\.util\.(?:Linked)?HashMap"/>
+        </Context>
+        ```
 
-13. Disable local host access logging. Otherwise, it will fill up that log quickly. To do so, comment out the following section in /opt/tomee/conf/server.xml:  
-```xml
-<Valve className="org.apache.catalina.valves.AccessLogValve" directory="logs" prefix="localhost_access_log" suffix=".txt" pattern="%h %l %u %t &quot;%r&quot; %s %b" />
-```
+    13. Disable local host access logging. Otherwise, it will fill up that log quickly. To do so, comment out the following section in `/opt/tomee/conf/server.xml`:  
+        ```xml
+        <Valve className="org.apache.catalina.valves.AccessLogValve" directory="logs" prefix="localhost_access_log" suffix=".txt" pattern="%h %l %u %t &quot;%r&quot; %s %b" />
+        ```
 
-14. Comment out this section by adding <!-- to the beginning of the section and --> to the end of the section.  
-15. For more details, see https://help.harmanpro.com/disabling-local-host-access-logs-in-tomcat.  
+    14. Comment out this section by adding `<!--` to the beginning of the section and `-->` to the end of the section.  
+    15. For more details, see https://help.harmanpro.com/disabling-local-host-access-logs-in-tomcat.  
 
-16. Add a new document base/root to allow access to the shared mounted drive:  
-    1. Edit `/opt/tomee/conf/server.xml` and just before the `</Host>` near the end of the file, insert the following, with the <PiTracUserName> replaced with the name you use:  
-    2. `<Context docBase="/home/<PiTracUserName>/LM_Shares/WebShare" path="/golfsim/WebShare" />`  
-    3. This will allow the Tomee system to access a directory that is outside of the main Tomee installation tree.  
-    4. NOTE - if the shared directory that is mounted off of the other Pi does not exist, Tomee may not be able to start  
+    16. Add a new document base/root to allow access to the shared mounted drive:  
+        1. Edit `/opt/tomee/conf/server.xml` and just before the `</Host>` near the end of the file, insert the following, with the <PiTracUserName> replaced with the name you use:  
+        2. `<Context docBase="/home/<PiTracUserName>/LM_Shares/WebShare" path="/golfsim/WebShare" />`  
+        3. This will allow the Tomee system to access a directory that is outside of the main Tomee installation tree.  
+        4. NOTE - if the shared directory that is mounted off of the other Pi does not exist, Tomee may not be able to start  
 
-    Example section in server.xml:  
-```xml
-      <Host name="localhost"  appBase="webapps"
-            unpackWARs="true" autoDeploy="true">
+        Example section in server.xml:  
+        ```xml
+              <Host name="localhost"  appBase="webapps"
+                    unpackWARs="true" autoDeploy="true">
 
-        <!-- SingleSignOn valve, share authentication between web applications -->
-        <!--
-        <Valve className="org.apache.catalina.authenticator.SingleSignOn" />
-        -->
+                <!-- SingleSignOn valve, share authentication between web applications -->
+                <!--
+                <Valve className="org.apache.catalina.authenticator.SingleSignOn" />
+                -->
 
-        <!-- Access log processes all example. -->
-        <!-- <Valve className="org.apache.catalina.valves.AccessLogValve" directory="logs"
-               prefix="localhost_access_log" suffix=".txt"
-               pattern="%h %l %u %t &quot;%r&quot; %s %b" />  -->
+                <!-- Access log processes all example. -->
+                <!-- <Valve className="org.apache.catalina.valves.AccessLogValve" directory="logs"
+                       prefix="localhost_access_log" suffix=".txt"
+                       pattern="%h %l %u %t &quot;%r&quot; %s %b" />  -->
 
-        <Context docBase="/home/pitrac/LM_Shares/WebShare" path="/golfsim/WebShare" />
+                <Context docBase="/home/pitrac/LM_Shares/WebShare" path="/golfsim/WebShare" />
 
-      </Host>
-    </Engine>
-  </Service>
-</Server>
-```
+              </Host>
+            </Engine>
+          </Service>
+        </Server>
+        ```
 
-17. Allow symbolic linking. In conf/context.xml, add before the end:  
-    1. `<Resources allowLinking="true" />`  
+    17. Allow symbolic linking. In `conf/context.xml`, add before the end:  
+        1. `<Resources allowLinking="true" />`  
 
-Example context.xml:  
-```xml
-<!-- The contents of this file will be loaded for each web application -->
-<Context>
+        Example context.xml:  
+        ```xml
+        <!-- The contents of this file will be loaded for each web application -->
+        <Context>
 
-    <!-- Default set of monitored resources. If one of these changes, the web application will be reloaded. -->
-    <WatchedResource>WEB-INF/web.xml</WatchedResource>
-    <WatchedResource>WEB-INF/tomcat-web.xml</WatchedResource>
-    <WatchedResource>${catalina.base}/conf/web.xml</WatchedResource>
+            <!-- Default set of monitored resources. If one of these changes, the web application will be reloaded. -->
+            <WatchedResource>WEB-INF/web.xml</WatchedResource>
+            <WatchedResource>WEB-INF/tomcat-web.xml</WatchedResource>
+            <WatchedResource>${catalina.base}/conf/web.xml</WatchedResource>
 
-    <!-- Uncomment this to enable session persistence across Tomcat restarts -->
-    <!--
-    <Manager pathname="SESSIONS.ser" />
-    -->
+            <!-- Uncomment this to enable session persistence across Tomcat restarts -->
+            <!--
+            <Manager pathname="SESSIONS.ser" />
+            -->
 
-    <Resources allowLinking="true" />
+            <Resources allowLinking="true" />
 
-</Context>
-```
+        </Context>
+        ```
 
-18. Install the systemctl service we just created and start it:  
-    1. `sudo systemctl daemon-reload`  
-    2. `sudo systemctl enable tomee`  
-    3. `sudo systemctl start tomee`  
-    4. `sudo systemctl status tomee.service`  
-    5. Check startup logs with: `sudo tail -f /opt/tomee/logs/catalina.out`  
-    6. Login from a web console: `http://<Pi-with-Tomee>:8080/manager/html` (default user/pass: tomcat/tomcat — change if not in a private network).  
+    18. Install the systemctl service we just created and start it:  
+        1. `sudo systemctl daemon-reload`  
+        2. `sudo systemctl enable tomee`  
+        3. `sudo systemctl start tomee`  
+        4. `sudo systemctl status tomee.service`  
+        5. Check startup logs with: `sudo tail -f /opt/tomee/logs/catalina.out`  
+        6. Login from a web console: `http://<Pi-with-Tomee>:8080/manager/html` (default user/pass: tomcat/tomcat — change if not in a private network).  
 
-19. <font color=#ff0000>Warning:</font> On Mac Chrome may not allow you to connect from outside the hosted Raspberry Pi. Safari should work.
+    19. **Warning:** On Mac Chrome may not allow you to connect from outside the hosted Raspberry Pi. Safari should work.
 
 #### Install Launch Monitor Dependencies
 
@@ -712,43 +712,43 @@ Example context.xml:
           2. `git clone https://github.com/jamespilgrim/PiTrac.git`  
        3. NOTE - If you do you plan to do any code changes, you may want to create a fork from the main repository and then clone that into your Pi.  
     2. Install Remaining Prerequisites and Setup Environment:  
-       1. Setup the `PITRAC_ROOT` and other environment variables.  For example set PITRAC_ROOT to point to the “Software/LMSourceCode” directory of the PiTrac build.  That is one directory “up” from the “ImageProcessing” directory that contains the main PiTrac meson.build file. The other environment variables listed below (with example values) should be set according to your network and environment. 
+       1. Setup the `PITRAC_ROOT` and other environment variables. For example set PITRAC_ROOT to point to the "Software/LMSourceCode" directory of the PiTrac build. That is one directory "up" from the "ImageProcessing" directory that contains the main PiTrac meson.build file. The other environment variables listed below (with example values) should be set according to your network and environment. 
           1. E.g., include in your .zshrc or .bashrc (or whatever shell you use) the following, with the camera types set to your equipment type:  
-```
-export PITRAC_ROOT=/Dev/PiTrac/Software/LMSourceCode  
-export PITRAC_BASE_IMAGE_LOGGING_DIR=~/LM_Shares/Images/
-export PITRAC_WEBSERVER_SHARE_DIR=~/LM_Shares/WebShare/
-export PITRAC_MSG_BROKER_FULL_ADDRESS=tcp://10.0.0.41:61616
-# Only uncomment and set the following if connecting to the
-# respective golf sim (e.g., E6/TruGolf, GSPro, etc.)
-#export PITRAC_E6_HOST_ADDRESS=10.0.0.29
-#export PITRAC_GSPRO_HOST_ADDRESS=10.0.0.29
+             ```bash
+             export PITRAC_ROOT=/Dev/PiTrac/Software/LMSourceCode  
+             export PITRAC_BASE_IMAGE_LOGGING_DIR=~/LM_Shares/Images/
+             export PITRAC_WEBSERVER_SHARE_DIR=~/LM_Shares/WebShare/
+             export PITRAC_MSG_BROKER_FULL_ADDRESS=tcp://10.0.0.41:61616
+             # Only uncomment and set the following if connecting to the
+             # respective golf sim (e.g., E6/TruGolf, GSPro, etc.)
+             #export PITRAC_E6_HOST_ADDRESS=10.0.0.29
+             #export PITRAC_GSPRO_HOST_ADDRESS=10.0.0.29
+             
+             # Tell any rpicam apps where to get their configuration info (including, e.g., any timeout settings)
+             export LIBCAMERA_RPI_CONFIG_FILE=/usr/share/libcamera/pipeline/rpi/pisp/rpi_apps.yaml
+             
+             # For Single-Pi configurations (most) specify that both cameras are Official Pi GS cameras with 6mm lenses
+             export PITRAC_SLOT1_CAMERA_TYPE=4
+             export PITRAC_SLOT2_CAMERA_TYPE=4
+             
+             # Specify that both cameras are (for now) Innomaker GS cameras with 3.6mm lenses
+             #export PITRAC_SLOT1_CAMERA_TYPE=6
+             #export PITRAC_SLOT2_CAMERA_TYPE=6
+             ```
 
-# Tell any rpicam apps where to get their configuration info (including, e.g., any timeout settings)
-export LIBCAMERA_RPI_CONFIG_FILE=/usr/share/libcamera/pipeline/rpi/pisp/rpi_apps.yaml
-
-# For Single-Pi configurations (most) specify that both cameras are Official Pi GS cameras with 6mm lenses
-export PITRAC_SLOT1_CAMERA_TYPE=4
-export PITRAC_SLOT2_CAMERA_TYPE=4
-
-# Specify that both cameras are (for now) Innomaker GS cameras with 3.6mm lenses
-#export PITRAC_SLOT1_CAMERA_TYPE=6
-#export PITRAC_SLOT2_CAMERA_TYPE=6
-```
-
-       2. sudo apt-get -y install libraspberrypi-dev raspberrypi-kernel-headers
-       3. Add extended timeout to `rpi_apps.yaml` file so that even if an external trigger doesn’t fire for a really long time, the libcamera library won’t time-out:  
+       2. `sudo apt-get -y install libraspberrypi-dev raspberrypi-kernel-headers`
+       3. Add extended timeout to `rpi_apps.yaml` file so that even if an external trigger doesn't fire for a really long time, the libcamera library won't time-out:  
           1. (**NOTE** for Pi 5, use `/usr/share/libcamera/pipeline/rpi/pisp` instead of `/usr/share/libcamera/pipeline/rpi/vc4`, below)  
-```
-          2. `cd  /usr/share/libcamera/pipeline/rpi/vc4`  
-          3. `sudo cp  rpi_apps.yaml  rpi_apps.yaml.ORIGINAL`
-```
-          4. In both `/usr/local/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml` and `usr/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml`, (to the extent they exist) at the end of the pipeline section, add the following (including the last comma!)  
-             ``` bash
+             ```bash
+             cd /usr/share/libcamera/pipeline/rpi/vc4  
+             sudo cp rpi_apps.yaml rpi_apps.yaml.ORIGINAL
+             ```
+          2. In both `/usr/local/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml` and `usr/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml`, (to the extent they exist) at the end of the pipeline section, add the following (including the last comma!)  
+             ```bash
              "camera_timeout_value_ms": 1000000,
              ```  
-             NOTE - For the Pi 5, you may only have an "example.yaml" file in the above directories.  If so, just copy it to rpi_apps.yaml.
-       2. Get the latest `imx296_noir.json` into `/usr/share/libcamera/ipa/rpi/pisp or ...rpt/vc4` (located inside ImageProcessing folder)
+             NOTE - For the Pi 5, you may only have an "example.yaml" file in the above directories. If so, just copy it to rpi_apps.yaml.
+       4. Get the latest `imx296_noir.json` into `/usr/share/libcamera/ipa/rpi/pisp` or `...rpi/vc4` (located inside ImageProcessing folder)
           1. For the Pi 4:  
              1. `sudo cp imx296_noir.json.PI_4_FOR_VC4_DIRECTORY /usr/share/libcamera/ipa/rpi/vc4/imx296_noir.json`  
           2. For the Pi 5:  

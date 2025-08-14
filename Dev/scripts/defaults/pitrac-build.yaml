@@ -1,0 +1,10 @@
+# PiTrac Build Configuration
+pitrac-repo: https://github.com/jamespilgrim/PiTrac.git
+pitrac-branch: main  # Branch to checkout (main, develop, feature/xxx, etc)
+build-dir: ~/Dev
+force-clone: 0  # Set to 1 to delete existing repo and re-clone
+setup-gui: 1  # Build and deploy web GUI to TomEE
+configure-shell: 0  # Add environment vars to shell (0=no since pitrac-environment already does this)
+build-cores: 0  # 0 = auto-detect optimal core count
+clean-build: 0  # Set to 1 to clean build directory before building
+# Note: Camera types and paths are read from environment variables set by pitrac-environment

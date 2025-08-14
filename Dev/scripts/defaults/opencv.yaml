@@ -1,0 +1,19 @@
+# OpenCV installation defaults
+# These values are used as:
+# - Default suggestions in interactive mode (shown in prompts)
+# - Automatic values in non-interactive mode (--non-interactive flag)
+
+# Version of OpenCV to install
+required_opencv_version: "4.11.0"
+
+# Force rebuild even if already installed (0=no, 1=yes)
+force: 0
+
+# OpenCV installer script URL
+opencv_script_url: "https://github.com/Qengineering/Install-OpenCV-Raspberry-Pi-64-bits/raw/main/OpenCV-4-11-0.sh"
+
+# Build directory for compilation
+build_dir: "/tmp/opencv_build"
+
+# Installation prefix
+install_prefix: "/usr/local"
