@@ -34,6 +34,7 @@
 #include "libcamera_interface.h"
 #include "logging_tools.h"
 #include "ball_watcher.h"
+#include "pulse_strobe.h"
 #include "core/rpicam_app.hpp"
 #include "core/still_options.hpp"
 
@@ -57,6 +58,30 @@ enum FlightCameraState {
 	kWaitingForFinalImageFlush,
 	kFinalImageReceived
 };
+
+
+void SetExternalTrigger(bool& flag) {
+
+	GS_LOG_TRACE_MSG(trace, "SetExternalTrigger - flag = " + std::to_string((int)flag));
+
+	const gs::CameraHardware::CameraModel  camera_model = gs::GolfSimCamera::kSystemSlot2CameraType;
+
+	// This will take a moment to complete, so the waiting time to deal with it is dealt with elsehwere in the code
+	if (!flag && camera_model == gs::CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+
+		flag = true;
+
+		std::string trigger_mode_command = "$PITRAC_ROOT/ImageProcessing/CameraTools/imx296_trigger 4 1";
+
+		GS_LOG_TRACE_MSG(trace, "ball_flight_camera_event_loop - Camera 2 trigger_mode_command = " + trigger_mode_command);
+		int command_result = system(trigger_mode_command.c_str());
+
+		if (command_result != 0) {
+			GS_LOG_TRACE_MSG(trace, "system(trigger_mode_command) failed.");
+			return;
+		}
+	}
+}
 
 // The main event loop for the the externally-triggered camera.
 
@@ -91,7 +116,18 @@ bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 
 	auto start_time = std::chrono::high_resolution_clock::now();
 
-	const long kQuiesceTimeMs = 1500; 
+	// This should be slightly more time than it takes to get all of the timing pulses
+	long kQuiesceTimeMs = (gs::PulseStrobe::kNumberPrimingPulses + 1) * (1000 / gs::PulseStrobe::kPrimingPulseFPS);
+
+	// If appropriate, add the time we allow to setup external trigginer for the InnoMaker cameras
+	const gs::CameraHardware::CameraModel  camera_model = gs::GolfSimCamera::kSystemSlot2CameraType;
+
+	if (camera_model == gs::CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+		kQuiesceTimeMs += gs::PulseStrobe::kPauseToSetUpInnoMakerExternalTriggerMilliseconds;
+	}
+
+	GS_LOG_TRACE_MSG(trace, "kQuiesceTimeMs to wait for the priming pulses to arrive = " + std::to_string(kQuiesceTimeMs) + " milliseconds");
+
 
 	// Set the starting time to now, even though we will override it when the first trigger is received
 	std::chrono::steady_clock::time_point timeOfFirstTrigger = std::chrono::steady_clock::now();
@@ -103,6 +139,17 @@ bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 	// Check here, once, to see if we are going to expect to produce a pre-image for later subtraction
 	golf_sim::GolfSimConfiguration::SetConstant("gs_config.ball_exposure_selection.kUsePreImageSubtraction", 
 												golf_sim::GolfSimCamera::kUsePreImageSubtraction);
+
+
+    // True if the InnoMaker camera external trigger script has not been called yet
+    // Note - The InnoMaker camera needs its trigger script to be called AFTER the camera
+    // has already started up.  No idea why.
+	bool innomaker_first_external_trigger_is_set = false;
+
+	// We want to make sure we are externally triggered here every time just in case we're using an InnoMaker camera
+
+	bool dummy = false;
+	SetExternalTrigger(dummy);
 
 	bool return_status = true;
 
@@ -148,6 +195,9 @@ bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 		case kWaitingForFinalImageTrigger: {
 
 			GS_LOG_TRACE_MSG(trace, "Received Final Image Trigger - Image will be de-queued after next (flush) trigger.");
+			// Create a completed request to make sure that the buffer(s) get re-used.
+			CompletedRequestPtr& completed_request = std::get<CompletedRequestPtr>(msg.payload);
+
 			state = kWaitingForFinalImageFlush;
 			break;
 		}
@@ -185,13 +235,7 @@ bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 								", " + std::to_string(info.width) + ". Stride = " + std::to_string(info.stride));
 
 
-			// TBD - Need to figure out how to get this picture to be in color again!!
 			cv::Mat frame = cv::Mat(info.height, info.width, CV_8UC3, image, info.stride);
-			// cv::Mat frame = cv::Mat(info.height, info.width, CV_8U, image, info.stride);
-
-			// golf_sim::LoggingTools::LogImage("", frame, std::vector < cv::Point >{}, true, "Cam2_FinalImageFlush_Image.png");
-
-
 
 			GS_LOG_TRACE_MSG(trace, "Created Mat frame");
 
@@ -226,6 +270,9 @@ bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 			// Create a completed request to make sure that the buffer(s) get re-used.
 			CompletedRequestPtr& completed_request = std::get<CompletedRequestPtr>(msg.payload);
 
+			// (Re)set external triggering if we have not already done so
+			SetExternalTrigger(innomaker_first_external_trigger_is_set);
+
 			state = kWaitingForFirstPrimingTimeEnd;
 			break;
 		}
@@ -241,21 +288,20 @@ bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 
 			GS_LOG_TRACE_MSG(trace, "		Time since last trigger: " + std::to_string(timeLapsed) + " ms.");
 
+			// Create a completed request to make sure that the buffer(s) get re-used.
+			CompletedRequestPtr& completed_request = std::get<CompletedRequestPtr>(msg.payload);
+
 			if (timeLapsed < kQuiesceTimeMs) {
 				GS_LOG_TRACE_MSG(trace, "Ignoring trigger - still quiescing...");
-
-				// Create a completed request to make sure that the buffer(s) get re-used.
-				CompletedRequestPtr& completed_request = std::get<CompletedRequestPtr>(msg.payload);
-
 				state = kWaitingForFirstPrimingTimeEnd;
 			}
 			else {
-
+				// We've waited long enough for priming pulses
 				if (!golf_sim::GolfSimCamera::kUsePreImageSubtraction) {
 
 					if (!golf_sim::GolfSimCamera::kCameraRequiresFlushPulse) {
 						// If no flush is required, jump straight to the final state
-						GS_LOG_TRACE_MSG(trace, "Priming period complete.  Ready for Final Image Trigger and Flush.");
+						GS_LOG_TRACE_MSG(trace, "Priming period complete.  Ready for Final Image Trigger.");
 						state = kWaitingForFinalImageFlush;
 					}
 					else {
@@ -459,6 +505,8 @@ bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 			}
 		}
 }
+
+
 
 
 #endif // #ifdef __unix__  // Ignore in Windows environment

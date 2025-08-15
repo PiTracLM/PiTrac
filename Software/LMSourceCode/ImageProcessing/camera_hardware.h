@@ -32,11 +32,16 @@ namespace golf_sim {
         enum CameraModel {
             PiCam13 = 1,
             PiCam2 = 2,
-            PiHQCam6mmWideLens = 3,
-            PiGSCam6mmWideLens = 4,
-            PiGSCam3_6mmLens = 5,
-            InnoMakerIMX296GS3_6mmM12Lens = 6,
-            kUnknown = 100
+            PiHQ = 3,
+            PiGS = 4,
+            InnoMakerIMX296GS_Mono = 5,
+            kCameraUnknown = 100
+        };
+
+        enum LensType {
+            Lens_6mm = 1,
+            Lens_3_6mm_M12 = 2,
+            kLensUnknown = 100
         };
 
         // An initial set of states to simulate a camera repeatedly taking pictures until
@@ -54,7 +59,8 @@ namespace golf_sim {
         // kGsCamera2 is the camera that images the ball in flight
         GsCameraNumber camera_number_ = GsCameraNumber::kGsCamera1;
 
-        CameraModel camera_model_ = CameraModel::PiHQCam6mmWideLens;
+        CameraModel camera_model_ = CameraModel::PiGS;
+        LensType lens_type_ = LensType::Lens_6mm;
         float focal_length_ = 0;        // In millimeters
         float horizontalFoV_ = 0;        // In degrees
         float verticalFoV_ = 0;          // In degrees
@@ -83,8 +89,6 @@ namespace golf_sim {
         // kExpectedBallRadiusPixelsAt40cmCamera1 or 2
         int expected_ball_radius_pixels_at_40cm_ = 0;
 
-        bool is_mono_camera_ = false;
-
         // if set, the camera will use this image (file) as if (it were the image that the
         // camera took on the Pi, regardless of operating system.  First will be used first, then
         // if another picture is needed, the second will be used.
@@ -101,6 +105,9 @@ namespace golf_sim {
         ~CameraHardware();
 
         static CameraModel string_to_camera_model(const std::string& model_enum_value_string);
+        static LensType string_to_lens_type(const std::string& lens_enum_value_string);
+        
+        bool camera_is_mono() const;
 
         // Used when using test images instead of live photos
         // Pre-loads the test images to allow for faster simulated returns of them
@@ -111,6 +118,7 @@ namespace golf_sim {
 
         void init_camera_parameters(const GsCameraNumber camera_number, 
                                     const CameraModel model, 
+                                    const LensType lens_type,
                                     const bool use_default_focal_length = false);
 
         bool prepareToTakePhoto();

@@ -1,0 +1,58 @@
+# Network services configuration defaults
+# These values are used as:
+# - Default suggestions in interactive mode (shown in prompts)
+# - Automatic values in non-interactive mode (--non-interactive flag)
+
+# NAS Configuration
+# Enable NAS mounting (0=no, 1=yes)
+enable_nas: 0
+
+# NAS server address (IP or hostname)
+nas_server: ""
+
+# NAS share name
+nas_share: "PiTrac"
+
+# Local mount point
+nas_mount_point: "/mnt/nas"
+
+# NAS username (empty for guest access)
+nas_username: ""
+
+# NAS password (empty for no password)
+nas_password: ""
+
+# Mount options
+nas_mount_options: "vers=3.0,uid=1000,gid=1000,iocharset=utf8"
+
+# Samba Server Configuration
+# Enable Samba server (0=no, 1=yes)
+enable_samba: 0
+
+# Samba share name
+samba_share_name: "PiTrac"
+
+# Samba share path
+samba_share_path: "/home/pi/LM_Shares"
+
+# Samba user (empty to use current user)
+samba_user: ""
+
+# Allow guest access (0=no, 1=yes)
+samba_guest_ok: 0
+
+# SSH Configuration
+# Enable SSH key setup (0=no, 1=yes)
+setup_ssh_keys: 0
+
+# GitHub username for SSH keys
+github_username: ""
+
+# Generate new SSH key if none exists (0=no, 1=yes)
+generate_ssh_key: 1
+
+# SSH key type (rsa, ed25519)
+ssh_key_type: "ed25519"
+
+# Force reconfiguration (0=no, 1=yes)
+force: 0

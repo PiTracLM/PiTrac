@@ -5,5 +5,5 @@
 
 . $PITRAC_ROOT/ImageProcessing/RunScripts/runPiTracCommon.sh
 
-$PITRAC_ROOT/ImageProcessing/build/pitrac_lm --pulse_test --system_mode camera1  --logging_level trace
+$PITRAC_ROOT/ImageProcessing/build/pitrac_lm --pulse_test --system_mode camera1   $PITRAC_COMMON_CMD_LINE_ARGS  --logging_level trace
 

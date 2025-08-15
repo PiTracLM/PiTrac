@@ -2811,7 +2811,7 @@ namespace golf_sim {
         // The second rotation deltas will be the remainder of (approximately) the other half of the necessary degrees to get everything to be the same perspective
         cv::Vec3i angleOffsetDeltas2 = CvUtils::Round(  -(( angleOffset2 - angleOffset1) - angleOffsetDeltas1Float) );
         if (GolfSimOptions::GetCommandLineOptions().golfer_orientation_ == GolferOrientation::kLeftHanded) {
-            angleOffsetDeltas2[1] = std::round( - ((angleOffset1[1] - angleOffset2[1]) - angleOffsetDeltas1Float[1]) );
+            angleOffsetDeltas2[1] = (int)std::round( - ((angleOffset1[1] - angleOffset2[1]) - angleOffsetDeltas1Float[1]) );
         }
 
 

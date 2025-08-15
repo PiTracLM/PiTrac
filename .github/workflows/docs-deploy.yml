@@ -1,0 +1,76 @@
+---
+name: Build & Deploy PiTrac Docs to GitHub Pages
+"on":
+  push:
+    branches:
+      - "main"
+    paths:
+      - "docs/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Docs
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'      # or omit to use docs/.ruby-version
+          bundler-cache: true
+          cache-version: 0
+        env:
+          # Ensure bundler resolves against the docs Gemfile
+          BUNDLE_GEMFILE: ${{ github.workspace }}/docs/Gemfile
+
+      - name: Generate Just the Docs search index
+        run: bundle exec just-the-docs rake search:init
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Build with Jekyll
+        env:
+          JEKYLL_ENV: production
+        run: bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
+
+      - name: Verify build output
+        run: |
+          pwd
+          ls -la _site || true
+          ls -la docs/_site || true
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/_site
+
+  deploy:
+    name: Deploy Docs to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

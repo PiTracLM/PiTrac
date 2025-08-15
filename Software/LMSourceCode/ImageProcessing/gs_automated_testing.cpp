@@ -284,7 +284,7 @@ bool GsAutomatedTesting::TestFinalShotResultData() {
     int numTotalTests = 0;
     int numTestsFailed = 0;
 
-    CameraHardware::CameraModel  camera_model = CameraHardware::PiGSCam6mmWideLens;
+    CameraHardware::CameraModel  camera_model = CameraHardware::PiGS;
 
     for (auto& test : tests) {
 
@@ -419,12 +419,12 @@ bool GsAutomatedTesting::TestFinalShotResultData() {
 
 
 
-cv::Mat GsAutomatedTesting::UndistortImage(const cv::Mat& img, CameraHardware::CameraModel camera_model) {
+cv::Mat GsAutomatedTesting::UndistortImage(const cv::Mat& img, CameraHardware::CameraModel camera_model, CameraHardware::LensType lens_type) {
     // Get a camera object just to be able to get the calibration values
     GolfSimCamera c;
     c.camera_hardware_.resolution_x_override_ = img.cols;
     c.camera_hardware_.resolution_y_override_ = img.rows;
-    c.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera1, camera_model);
+    c.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera1, camera_model, lens_type);
     cv::Mat cameracalibrationMatrix_ = c.camera_hardware_.calibrationMatrix_;
     cv::Mat cameraDistortionVector_ = c.camera_hardware_.cameraDistortionVector_;
 
@@ -489,8 +489,9 @@ bool GsAutomatedTesting::ReadTestImages(const std::string& img_1_base_filename, 
     cv::Mat unDistortedBall2Img;
 
     if (undistort) {
-        unDistortedBall1Img = GsAutomatedTesting::UndistortImage(ball1Img, camera_model);
-        unDistortedBall2Img = GsAutomatedTesting::UndistortImage(ball2Img, camera_model);
+        // TBD - Parametersize the lens_type later
+        unDistortedBall1Img = GsAutomatedTesting::UndistortImage(ball1Img, camera_model, CameraHardware::LensType::Lens_6mm);
+        unDistortedBall2Img = GsAutomatedTesting::UndistortImage(ball2Img, camera_model, CameraHardware::LensType::Lens_6mm);
 
         // Show the center point to help aim the camera
         LoggingTools::DebugShowImage("Undistorted " + img1FileName, unDistortedBall1Img, std::vector<cv::Point>({ cv::Point(ball1Img.cols / 2, ball1Img.rows / 2) }));
@@ -581,7 +582,8 @@ bool GsAutomatedTesting::TestBallPosition() {
         c.camera_hardware_.secondCannedImageFileName = kAutomatedBaseTestDir + strobed_balls_image_filename;
         c.camera_hardware_.firstCannedImage = ball1ImgColor;
         c.camera_hardware_.secondCannedImage = ball2ImgColor;
-        c.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera1, t.camera_model);
+        // TBD - Add the lens type to the tests
+        c.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera1, t.camera_model, CameraHardware::LensType::Lens_6mm);
 
         long timeDelayuS = 7000;
         GolfBall result_ball;

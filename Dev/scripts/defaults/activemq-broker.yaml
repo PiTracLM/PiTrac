@@ -1,0 +1,13 @@
+# ActiveMQ Broker installation defaults
+# These values are used as:
+# - Default suggestions in interactive mode (shown in prompts)
+# - Automatic values in non-interactive mode (--non-interactive flag)
+
+# Version of ActiveMQ to install
+activemq_version: "6.1.7"
+
+# Installation directory
+install_dir: "/opt/apache-activemq"
+
+# Force reinstall/upgrade even if already installed (0=no, 1=yes)
+force: 0

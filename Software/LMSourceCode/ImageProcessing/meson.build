@@ -51,7 +51,6 @@ endif
 ssl_dep = dependency('openssl', required : true)
 activemq_dep = dependency('activemq-cpp', required : true)
 apr_dep = cxx.find_library('apr-1', required : true)
-bcm_host_dep = cxx.find_library('bcm_host', required : true)
 
 libcamera_dep = dependency('libcamera', required : true)
 thread_dep = dependency('threads', required : true)
@@ -74,8 +73,7 @@ rpicam_app_dep = [libcamera_dep, lgpio_dep]
 
 pitrac_lm_module_deps = [
 	libcamera_dep, thread_dep, opencv_dep, lgpio_dep, rpicam_app_dep, 
-	fmt_dep, boost_dep, activemq_dep, ssl_dep, apr_dep, bcm_host_dep, msgpack_dep, 
-	libshotscope_dep,]
+	fmt_dep, boost_dep, activemq_dep, ssl_dep, apr_dep, msgpack_dep,]
 
 
 

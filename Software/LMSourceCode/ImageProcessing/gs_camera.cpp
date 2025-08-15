@@ -90,7 +90,7 @@ namespace golf_sim {
     double GolfSimCamera::kStandardBallSpeedSlowdownPercentage = 0.5;
     double GolfSimCamera::kPracticeBallSpeedSlowdownPercentage = 2.0;
     double GolfSimCamera::kPuttingBallSpeedSlowdownPercentage = 5.0;
-    bool GolfSimCamera::kCameraRequiresFlushPulse = true;
+    bool GolfSimCamera::kCameraRequiresFlushPulse = false;
 
     int GolfSimCamera::kMaxBallsToRetain = 18;
 
@@ -115,8 +115,11 @@ namespace golf_sim {
 
     bool GolfSimCamera::kPlacedBallUseLargestBall = true;
 
-    CameraHardware::CameraModel GolfSimCamera::kSystemSlot1CameraType = CameraHardware::CameraModel::PiGSCam6mmWideLens;
-    CameraHardware::CameraModel GolfSimCamera::kSystemSlot2CameraType = CameraHardware::CameraModel::PiGSCam6mmWideLens;
+    CameraHardware::CameraModel GolfSimCamera::kSystemSlot1CameraType = CameraHardware::CameraModel::PiGS;
+    CameraHardware::CameraModel GolfSimCamera::kSystemSlot2CameraType = CameraHardware::CameraModel::PiGS;
+
+    CameraHardware::LensType GolfSimCamera::kSystemSlot1LensType = CameraHardware::LensType::Lens_6mm;
+    CameraHardware::LensType GolfSimCamera::kSystemSlot2LensType = CameraHardware::LensType::Lens_6mm;
 
     BallImageProc* get_image_processor() {
         static BallImageProc* ip = nullptr;
@@ -163,6 +166,16 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.strobing.kPuttingBallSpeedSlowdownPercentage", kPuttingBallSpeedSlowdownPercentage);
         GolfSimConfiguration::SetConstant("gs_config.strobing.kCameraRequiresFlushPulse", kCameraRequiresFlushPulse);
         
+        /* TBD - InnoMaker cameras do not appear to need a flush image
+        const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot2CameraType;
+
+        if (camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+            GS_LOG_TRACE_MSG(trace, "Overriding kCameraRequiresFlushPulse to true.");
+            kCameraRequiresFlushPulse = true;
+        }
+        ***/
+        kCameraRequiresFlushPulse = false;
+
 
         GolfSimConfiguration::SetConstant("gs_config.ball_exposure_selection.kMaxIntermediateBallRadiusChangePercent", kMaxIntermediateBallRadiusChangePercent);
         GolfSimConfiguration::SetConstant("gs_config.ball_exposure_selection.kMaxPuttingIntermediateBallRadiusChangePercent", kMaxPuttingIntermediateBallRadiusChangePercent);
@@ -3229,13 +3242,14 @@ namespace golf_sim {
 
             cv::cvtColor(strobed_balls_color_image, strobed_balls_gray_image, cv::COLOR_BGR2GRAY);
 
-            CameraHardware::CameraModel  camera_1_model = GolfSimCamera::kSystemSlot1CameraType;
+            const CameraHardware::CameraModel  camera_1_model = GolfSimCamera::kSystemSlot1CameraType;
+            const CameraHardware::LensType  camera_lens_type = GolfSimCamera::kSystemSlot1LensType;
 
             // Get the ball data.  We will calibrate based on the first ball and then get the second one
             // using that calibrated data from the first ball.
 
             GolfSimCamera camera_1;
-            camera_1.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera1, camera_1_model);
+            camera_1.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera1, camera_1_model, camera_lens_type);
 
             // One set of positions, below describes the relationship of camera2 to itself and the z-plane of the ball.
             // That set does not contain any displacement in the X,Y plane.
@@ -3295,8 +3309,9 @@ namespace golf_sim {
 
             GolfSimCamera camera_2;
             CameraHardware::CameraModel  camera_2_model = GolfSimCamera::kSystemSlot2CameraType;
+            CameraHardware::LensType  camera_2_lens_type = GolfSimCamera::kSystemSlot2LensType;
 
-            camera_2.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera2, camera_2_model);
+            camera_2.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera2, camera_2_model, camera_2_lens_type);
 
 
             success = camera_2.AnalyzeStrobedBalls(strobed_balls_color_image,
@@ -4037,8 +4052,10 @@ namespace golf_sim {
                 // We will need a camera for context
                 // TBD - Refactor to avoid having to hard-set the camera model
                 CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot1CameraType;
+                CameraHardware::LensType  camera_2_lens_type = GolfSimCamera::kSystemSlot2LensType;
+
                 GolfSimCamera camera;
-                camera.camera_hardware_.init_camera_parameters(camera_number, camera_model);
+                camera.camera_hardware_.init_camera_parameters(camera_number, camera_model, camera_2_lens_type);
 
                 if (!TakeRawPicture(camera, color_image)) {
                     GS_LOG_MSG(error, "Failed to TakeRawPicture.");
@@ -4287,10 +4304,13 @@ namespace golf_sim {
             // We will need a camera for context
             const CameraHardware::CameraModel  camera_model = (camera_number == GsCameraNumber::kGsCamera1) ? GolfSimCamera::kSystemSlot1CameraType : GolfSimCamera::kSystemSlot2CameraType;
             GS_LOG_TRACE_MSG(trace, "AutoCalibrateCamera called with camera model = " + std::to_string(camera_model));
+            const CameraHardware::LensType  camera_lens_type = (camera_number == GsCameraNumber::kGsCamera1) ? GolfSimCamera::kSystemSlot1LensType : GolfSimCamera::kSystemSlot2LensType;
+            GS_LOG_TRACE_MSG(trace, "AutoCalibrateCamera called with camera lens type = " + std::to_string(camera_lens_type));
+
             GolfSimCamera camera;
             // Use the default focal length for the camera, as the focal length is one parameter
             // that this function is being called to re-set
-            camera.camera_hardware_.init_camera_parameters(camera_number, camera_model, true /* Use default, not .json focal-length*/);
+            camera.camera_hardware_.init_camera_parameters(camera_number, camera_model, camera_lens_type, true /* Use default, not .json focal-length*/);
 
             cv::Mat color_image;
 

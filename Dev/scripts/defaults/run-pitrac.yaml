@@ -1,0 +1,53 @@
+# PiTrac runtime configuration defaults
+# These values are used for running the PiTrac launch monitor
+
+# Pi configuration mode (single or dual)
+pi_mode: "single"
+
+# Logging level (trace, debug, info, warning, error)
+logging_level: "info"
+
+# System mode (kNormal, kTest, kCalibration)
+system_mode: "kNormal"
+
+# Artifact save level (none, minimal, all)
+artifact_save_level: "minimal"
+
+# Test mode timeout in seconds
+test_timeout: 30
+
+# Camera indices for dual-pi mode
+camera1_index: 1
+camera2_index: 2
+
+# Run scripts directory (relative to ImageProcessing)
+run_scripts_dir: "RunScripts"
+
+# Enable web server (0=no, 1=yes)
+enable_web_server: 1
+
+# Web server port
+web_server_port: 8080
+
+# Enable message broker connection (0=no, 1=yes)
+enable_msg_broker: 1
+
+# Enable golf simulator connections (0=no, 1=yes)
+enable_e6: 0
+enable_gspro: 0
+
+# Strobe test parameters
+strobe_test_duration: 10
+strobe_test_frequency: 50
+
+# Camera trigger test mode
+trigger_test_mode: "external"
+
+# Auto-restart on failure (0=no, 1=yes)
+auto_restart: 0
+
+# Max restart attempts
+max_restarts: 3
+
+# Restart delay in seconds
+restart_delay: 5

@@ -1,0 +1,56 @@
+" Enable line numbers
+set number
+
+" Relative line numbers (optional, good for navigation)
+" set relativenumber
+
+" Highlight current line
+set cursorline
+
+" Enable syntax highlighting
+syntax on
+
+" Better search
+set ignorecase        " Ignore case when searching...
+set smartcase         " ...unless search has capital letters
+set hlsearch          " Highlight search matches
+set incsearch         " Show matches as you type
+
+" Indentation settings
+set tabstop=4         " Number of spaces that a <Tab> counts for
+set shiftwidth=4      " Number of spaces for each step of (auto)indent
+set expandtab         " Use spaces instead of tabs
+set autoindent        " Auto-indent new lines
+set smartindent       " Smarter indentation
+
+" Show matching brackets
+set showmatch
+
+" Enable mouse support
+set mouse=a
+
+" Show line and column number in status bar
+set ruler
+
+" Always show status line
+set laststatus=2
+
+" Enable filetype plugins and indentation
+filetype plugin indent on
+
+" Remember last position in file
+augroup resume_cursor
+    autocmd!
+    autocmd BufReadPost * if line("'\"") > 0 && line("'\"") <= line("$") | exe "normal! g`\"" | endif
+augroup END
+
+" Show invisible characters (tabs, trailing spaces)
+set list
+set listchars=tab:?\ ,trail:Â·
+
+" Better command-line completion
+set wildmenu
+set wildmode=longest:full,full
+
+" Allow backspacing over everything in insert mode
+set backspace=indent,eol,start

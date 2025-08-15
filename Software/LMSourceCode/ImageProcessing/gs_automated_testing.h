@@ -74,7 +74,7 @@ namespace golf_sim {
                                     bool undistort = true, 
                                     bool do_not_alter_filenames = false);
 
-        static cv::Mat UndistortImage(const cv::Mat& img, CameraHardware::CameraModel camera_model);
+        static cv::Mat UndistortImage(const cv::Mat& img, CameraHardware::CameraModel camera_model, CameraHardware::LensType lens_type);
 
         static bool ReadExpectedResults(const std::string& expected_results_filename, std::vector<FinalResultsTestScenario>& shots);
 

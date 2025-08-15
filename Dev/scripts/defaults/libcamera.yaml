@@ -1,0 +1,19 @@
+# Libcamera and RpiCam Apps installation defaults
+# These values are used as:
+# - Default suggestions in interactive mode (shown in prompts)
+# - Automatic values in non-interactive mode (--non-interactive flag)
+
+# Required rpicam-apps version
+required_rpicam_apps_version: "1.5.3"
+
+# Build from source if version not met (0=no, 1=yes)
+build_from_source: 1
+
+# Build directory for compilation
+build_dir: "/tmp/rpicam_build"
+
+# Number of CPU cores to use for compilation
+cpu_cores: 4
+
+# Enable proprietary GPU libraries
+enable_proprietary: 0

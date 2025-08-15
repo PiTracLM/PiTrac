@@ -1,0 +1,22 @@
+# LGPIO library installation defaults
+# These values are used as:
+# - Default suggestions in interactive mode (shown in prompts)
+# - Automatic values in non-interactive mode (--non-interactive flag)
+
+# Configuration file paths
+config_file: "/boot/firmware/config.txt"
+
+# Enable SPI interface
+enable_spi: 1
+
+# LGPIO download URL
+lgpio_url: "http://abyz.me.uk/lg/lg.zip"
+
+# Build directory
+build_dir: "/tmp/lgpio-build"
+
+# Force reinstall (0=no, 1=yes)
+force: 0
+
+# Install location
+install_prefix: "/usr/local"

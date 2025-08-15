@@ -1,0 +1,22 @@
+# Apache TomEE installation defaults
+# These values are used as:
+# - Default suggestions in interactive mode (shown in prompts)
+# - Automatic values in non-interactive mode (--non-interactive flag)
+
+# Version of TomEE to install
+tomee_version: "10.1.0"
+
+# Installation directory
+install_dir: "/opt/tomee"
+
+# TomEE distribution type (plume has the most features)
+distribution: "plume"
+
+# Force reinstall even if already installed (0=no, 1=yes)
+force: 0
+
+# Port configurations
+http_port: 8080
+https_port: 8443
+ajp_port: 8009
+shutdown_port: 8005

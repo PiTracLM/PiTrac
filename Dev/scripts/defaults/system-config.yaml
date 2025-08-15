@@ -1,0 +1,40 @@
+# System configuration defaults
+# These values are used as:
+# - Default suggestions in interactive mode (shown in prompts)
+# - Automatic values in non-interactive mode (--non-interactive flag)
+
+# Configuration file location
+config_file: "/boot/firmware/config.txt"
+
+# Force turbo mode for consistent timing (0=no, 1=yes)
+force_turbo: 1
+
+# ARM boost for Pi 5 (0=no, 1=yes)
+arm_boost: 1
+
+# Enable SPI interface (0=no, 1=yes)
+enable_spi: 1
+
+# Enable I2C interface (0=no, 1=yes)
+enable_i2c: 0
+
+# Enable PCIe/NVME support if hardware detected (0=no, 1=yes)
+enable_nvme: 1
+
+# GPU memory split (MB)
+gpu_mem: 128
+
+# Camera auto-detect (0=disabled, 1=enabled)
+camera_auto_detect: 1
+
+# Display auto-detect (0=disabled, 1=enabled)
+display_auto_detect: 1
+
+# Over-voltage setting (0-6, 0=default)
+over_voltage: 0
+
+# Swap file size (MB, 0=disable swap)
+swap_size: 2048
+
+# Force configuration even if already set (0=no, 1=yes)
+force: 0

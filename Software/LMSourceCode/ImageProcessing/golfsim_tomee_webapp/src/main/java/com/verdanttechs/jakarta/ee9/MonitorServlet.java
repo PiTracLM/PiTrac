@@ -584,7 +584,7 @@ public class MonitorServlet extends HttpServlet {
     private static String kGolfSimTopic = "Golf.Sim";
     // Set from environment variable or default. This can be overidden from config file later
     private static String kWebActiveMQHostAddress = System.getenv("PITRAC_MSG_BROKER_FULL_ADDRESS") != null ?
-            System.getenv("PITRAC_MSG_BROKER_FULL_ADDRESS") : "";
+            System.getenv("PITRAC_MSG_BROKER_FULL_ADDRESS") : "tcp://127.0.0.1:61616";
     private static String kWebServerTomcatShareDirectory;
     private static String kWebServerResultBallExposureCandidates;
     private static String kWebServerResultSpinBall1Image;
@@ -704,114 +704,61 @@ public class MonitorServlet extends HttpServlet {
         request.getRequestDispatcher("/WEB-INF/gs_dashboard.jsp").forward(request, response);
     }
 
+	@Override
+	public void init() throws ServletException {
+		super.init();
+		try {
+			if (!consumerIsCreated) {
+				ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(kWebActiveMQHostAddress);
+				Connection connection = connectionFactory.createConnection();
+				connection.start();
+
+				Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+				Destination destination = session.createTopic(kGolfSimTopic);
+
+				System.out.println("Started consumer.");
+                logger.info("Starting GolfSimConsumer thread.");
+				thread(new GolfSimConsumer(), false);
+				consumerIsCreated = true;
+			}
+		} catch (Exception e) {
+			throw new ServletException("Failed to initialize ActiveMQ consumer", e);
+		}
+	}
+
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
+	protected void doGet(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
+
+		String configFilename = request.getParameter("config_filename");
+		String displayImagesStr = request.getParameter("display_images");
 
 
-        String config_filename = request.getParameter("config_filename");
-        String display_images_str = request.getParameter("display_images");
-        // System.out.println("config_filename: " + config_filename);
-        // System.out.println("display_images_str: " + display_images_str);
+		display_images = !"0".equals(displayImagesStr);
 
-        if (display_images_str == "0") {
-            display_images = false;
-        } else {
-            display_images = true;
-        }
+		if (!initializeMonitor(configFilename)) {
+			System.err.println("Failed to initialize the monitor.");
+            logger.error("Failed to initialize the monitor with config file: " + configFilename);
+		}
 
-        if (!initializeMonitor(config_filename)) {
-            System.out.println("Failed to initialize the monitor.");
-        }
+		HttpSession httpSession = request.getSession();
+		Long times = (Long) httpSession.getAttribute("times");
+		if (times == null) times = 0L;
+		httpSession.setAttribute("times", ++times);
 
-        Runtime.getRuntime().addShutdownHook(new Thread() {
-            public void run() {
-                monitorIsRunning = false;
-                System.out.println("Caught contextDestroyed - shutting down the monitor.");
-            }
-        });
+		time_since_last_reset_seconds += kRefreshTimeSeconds;
+		if (time_since_last_reset_seconds > max_time_to_reset_seconds) {
+			time_since_last_reset_seconds = 0;
+			current_result_ = new GsIPCResult();
+		}
 
+		response.addHeader("Refresh", String.valueOf(kRefreshTimeSeconds));
+		response.setContentType("text/html");
 
-        try {
-            if (!consumerIsCreated) {
-
-
-                // Create a ConnectionFactory
-                ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(kWebActiveMQHostAddress);
-
-                // Create a PooledConnectionFactory
-                // PooledConnectionFactory pooledConnectionFactory = new PooledConnectionFactory(connectionFactory);
-                // ConnectionFactory connectionFactory = new connectionFactory(connectionFactory);
-
-                // Connection connection = connectionFactory.createConnection();
-                Connection connection = connectionFactory.createConnection();
-                connection.start();
-
-                // Create a Session
-                Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-
-                Destination destination = session.createTopic(kGolfSimTopic);
-
-                // Create a MessageProducer from the Session to the Topic or Queue
-                /* TBD - we are not producing any messages yet
-                MessageProducer producer = session.createProducer(destination);
-                producer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
-                // Tell the producer to send the message
-                // producer.send(message);
-
-                // Create a message
-                TextMessage message = session.createTextMessage("Hello ActiveMQ World!");
-                */
-
-                // Start a thread to try to receive the message
-                System.out.println("Started consumer.");
-                thread(new GolfSimConsumer(), false);
-                consumerIsCreated = true;
-                // Give the consumer a chance to wake up
-                Thread.sleep(500);
-            }
-
-            HttpSession httpSession = request.getSession();
-            Long times = (Long) httpSession.getAttribute("times");
-            if (times == null) {
-                httpSession.setAttribute("times", 0L);
-            }
-
-            long value = 1;
-            if (times != null) {
-                value = (times.longValue()) + 1;
-            }
-
-            time_since_last_reset_seconds += kRefreshTimeSeconds;
-
-            if (time_since_last_reset_seconds > max_time_to_reset_seconds) {
-                time_since_last_reset_seconds = 0;
-
-                // Reset the result so we're not still looking at the results
-                // of an old message
-                current_result_ = new GsIPCResult();
-            }
-
-            response.addHeader("Refresh", String.valueOf(kRefreshTimeSeconds));
-
-            response.setContentType("text/html");
-
-            String debugDashboard = current_result_.Format(request);
-
-            request.getRequestDispatcher("/WEB-INF/gs_dashboard.jsp").forward(request, response);
-
-            // System.out.println("Received data:\n" + debugDashboard);
-
-        } catch (Exception e) {
-            response.getOutputStream().println(e.getMessage());
-            return;
-        }
-
-        response.getOutputStream().println("Started ActiveMQ messaging.");
-        System.out.println("Sent ActiveMQ message (system out).!");
-
-
-    }
+		// Forward to JSP for rendering (no more writes after this)
+		request.setAttribute("debugDashboard", current_result_.Format(request));
+		request.getRequestDispatcher("/WEB-INF/gs_dashboard.jsp").forward(request, response);
+	}
 
     private static class GolfSimConsumer implements Runnable, ExceptionListener {
         public void run() {

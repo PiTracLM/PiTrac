@@ -4,12 +4,13 @@
  */
 
 #ifdef __unix__  // Ignore in Windows environment
-#include <bcm_host.h>
 #endif
 #include <boost/foreach.hpp>
 #include <cstdlib>
 #include <memory>
-
+#include <fstream>
+#include <string>
+#include <sstream>
 #include "logging_tools.h"
 #include "gs_camera.h"
 #include "gs_ui_system.h"
@@ -104,35 +105,27 @@ namespace golf_sim {
 
 	// TBD - Will need to be improved to adapt to having two cameras on the same
 	// Pi.
-	GolfSimConfiguration::PiModel GolfSimConfiguration::GetPiModel() {
-		GolfSimConfiguration::PiModel pi_model  = kRPi5;
+GolfSimConfiguration::PiModel GolfSimConfiguration::GetPiModel() {
+     GolfSimConfiguration::PiModel pi_model = kRPi5; // default fallback
 
-#ifdef __unix__  // Ignore in Windows environment
-		int processor_type = bcm_host_get_processor_id();
+    std::ifstream cpuinfo("/proc/cpuinfo");
+    std::string line;
 
-		GS_LOG_TRACE_MSG(trace, "GolfSimConfiguration - bcm_host_get_processor_id returned:" + std::to_string(processor_type));
+    while (std::getline(cpuinfo, line)) {
+        // Check for 'Model' field
+        if (line.find("Model") != std::string::npos) {
+            if (line.find("Raspberry Pi 4") != std::string::npos) {
+                pi_model = kRPi4;
+            } else if (line.find("Raspberry Pi 5") != std::string::npos) {
+                pi_model = kRPi5;
+            }
+            break;
+        }
 
-		switch (processor_type) {
-			/** NOT IMPLEMENTED YET 
-			case BCM_HOST_PROCESSOR_BCM2712:
-				pi_model = kRPi5;
-				break;
-			**/
-			case BCM_HOST_PROCESSOR_BCM2837:
-				pi_model = kRPi5;
-				break;
+    }
 
-			case BCM_HOST_PROCESSOR_BCM2711:
-					pi_model = kRPi4;
-					break;
-
-			default:
-				pi_model = kRPi5;
-				break;
-		}
-#endif	
-		return pi_model;
-	}
+    return pi_model;
+}
 
 
 bool GolfSimConfiguration::ReadValues() {
@@ -213,6 +206,7 @@ bool GolfSimConfiguration::ReadValues() {
     }
 
     std::string slot2_env = safe_getenv("PITRAC_SLOT2_CAMERA_TYPE");
+    GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT2_CAMERA_TYPE environment variable was: " + slot2_env );
     if (slot2_env.empty()) {
         if (GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
             // We somewhat arbitrarily require the slot2 camera type to be set if we're running in single-pi mode.
@@ -229,6 +223,38 @@ bool GolfSimConfiguration::ReadValues() {
         GolfSimCamera::kSystemSlot2CameraType = CameraHardware::string_to_camera_model(slot2_env);
     }
 
+	std::string slot1_lens_env = safe_getenv("PITRAC_SLOT1_LENS_TYPE");
+	GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT1_LENS_TYPE environment variable was: " + slot1_lens_env);
+	if (slot1_lens_env.empty()) {
+		GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT1_LENS_TYPE environment variable was not set.  Assuming default of: " + std::to_string(GolfSimCamera::kSystemSlot1LensType));
+	}
+	else {
+#ifndef __unix__  // Ignore in Windows environment
+		// Ensure we don't have any trailing spaces.  Visual Studio seems to add them?
+		slot1_lens_env = slot1_lens_env.substr(0, 1);
+#endif
+		GolfSimCamera::kSystemSlot1LensType = CameraHardware::string_to_lens_type(slot1_lens_env);
+	}
+
+	std::string slot2_lens_env = safe_getenv("PITRAC_SLOT2_LENS_TYPE");
+	GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT2_LENS_TYPE environment variable was: " + slot2_lens_env);
+	if (slot2_lens_env.empty()) {
+		if (GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
+			// We somewhat arbitrarily require the slot2 camera type to be set if we're running in single-pi mode.
+			GS_LOG_TRACE_MSG(error, "GolfSimConfiguration - PITRAC_SLOT2_LENS_TYPE environment variable must be set when running in single-pi mode, but was not.  Exiting.");
+			return false;
+		}
+		else {
+#ifndef __unix__  // Ignore in Windows environment
+			// Ensure we don't have any trailing spaces
+			slot2_lens_env = slot2_lens_env.substr(0, 1);
+#endif
+			GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT2_LENS_TYPE environment variable was not set.  Assuming default of: " + std::to_string(GolfSimCamera::kSystemSlot2LensType));
+		}
+	}
+	else {
+		GolfSimCamera::kSystemSlot2LensType = CameraHardware::string_to_lens_type(slot2_lens_env);
+	}
 
 
 	return true;

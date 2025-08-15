@@ -1,0 +1,42 @@
+---
+name: Docs CI (build only)
+"on":
+  pull_request:
+    paths:
+      - "docs/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Docs (no deploy)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'      # or omit to use docs/.ruby-version
+          bundler-cache: true
+          cache-version: 0
+        env:
+          BUNDLE_GEMFILE: ${{ github.workspace }}/docs/Gemfile
+
+      - name: Generate Just the Docs search index
+        run: bundle exec just-the-docs rake search:init
+
+      - name: Build with Jekyll
+        env:
+          JEKYLL_ENV: production
+        run: bundle exec jekyll build

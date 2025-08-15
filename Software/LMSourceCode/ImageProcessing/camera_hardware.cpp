@@ -1,3 +1,4 @@
+
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (C) 2022-2025, Verdant Consultants, LLC.
@@ -84,11 +85,10 @@ namespace golf_sim {
         std::map<std::string, int> camera_table =
         { { "1", CameraModel::PiCam13 },
             { "2", CameraModel::PiCam2 },
-            { "3", CameraModel::PiHQCam6mmWideLens },
-            { "4", CameraModel::PiGSCam6mmWideLens },
-            { "5", CameraModel::PiGSCam3_6mmLens },
-            { "6", CameraModel::InnoMakerIMX296GS3_6mmM12Lens },
-            { "100", CameraModel::kUnknown },
+            { "3", CameraModel::PiHQ },
+            { "4", CameraModel::PiGS },
+            { "5", CameraModel::InnoMakerIMX296GS_Mono },
+            { "100", CameraModel::kCameraUnknown },
         };
         if (camera_table.count(model_enum_value_string) == 0)
             throw std::runtime_error("Invalid camera model_enum_value_string: " + model_enum_value_string + ".  Expected an integer. Check environment variables.");
@@ -96,6 +96,25 @@ namespace golf_sim {
         CameraHardware::CameraModel camera_model = (CameraHardware::CameraModel)camera_table[model_enum_value_string];
 
         return camera_model;
+    }
+
+    CameraHardware::LensType CameraHardware::string_to_lens_type(const std::string& lens_enum_value_string) {
+
+        std::map<std::string, int> lens_table =
+        { { "1", LensType::Lens_6mm },
+            { "2", LensType::Lens_3_6mm_M12 },
+            { "100", LensType::kLensUnknown },
+        };
+        if (lens_table.count(lens_enum_value_string) == 0)
+            throw std::runtime_error("Invalid camera lens_enum_value_string: " + lens_enum_value_string + ".  Expected an integer. Check environment variables.");
+
+        CameraHardware::LensType lens_type = (CameraHardware::LensType)lens_table[lens_enum_value_string];
+
+        return lens_type;
+    }
+    
+    bool CameraHardware::camera_is_mono() const {
+        return (camera_model_ == CameraModel::InnoMakerIMX296GS_Mono);
     }
 
 
@@ -171,44 +190,35 @@ namespace golf_sim {
 
     // TBD - Need to change signature to accept the desired resolution.  Different resolutions can result in
     // very different calibration matrices.
-    void CameraHardware::init_camera_parameters(const GsCameraNumber camera_number, const CameraModel model, const bool use_default_focal_length) {
+    void CameraHardware::init_camera_parameters(const GsCameraNumber camera_number, const CameraModel model, const LensType lens_type, const bool use_default_focal_length) {
 
-        GS_LOG_TRACE_MSG(trace, "getCameraParameters called with camera number = " + std::to_string(camera_number) + " and model = " + std::to_string(model));
+        GS_LOG_TRACE_MSG(trace, "init_camera_parameters called with camera number = " + std::to_string(camera_number) + " and model = " + std::to_string(model) + ", and lens_type = " + std::to_string(lens_type) );
 
         int sizes[3] = { 3, 3 };
         
         camera_number_ = camera_number;
         camera_model_ = model;
+        lens_type_ = lens_type;
 
-        if (model == PiGSCam6mmWideLens) {
+        if (lens_type == Lens_6mm) {
             focal_length_ = 6.0f;
             horizontalFoV_ = 50.0f;
             verticalFoV_ = 50.0f;
-            is_mono_camera_ = false;
             expected_ball_radius_pixels_at_40cm_ = 87;
         }
 
-        if (model == PiGSCam3_6mmLens) {
+        if (lens_type == Lens_3_6mm_M12) {
             focal_length_ = 3.6f;
             horizontalFoV_ = 70.0f;
             verticalFoV_ = 70.0f;
-            is_mono_camera_ = false;
-            expected_ball_radius_pixels_at_40cm_ = 57;
-        }
-
-        if (model == InnoMakerIMX296GS3_6mmM12Lens) {
-            focal_length_ = 3.6f;
-            horizontalFoV_ = 70.0f;
-            verticalFoV_ = 70.0f;
-            is_mono_camera_ = true;
-            expected_ball_radius_pixels_at_40cm_ = 57;
+            expected_ball_radius_pixels_at_40cm_ = 45;
         }
 
         // This section deals with the common characteristics of some of the cameras
-        if (model == PiGSCam6mmWideLens || 
-            model == InnoMakerIMX296GS3_6mmM12Lens ||
-            model == PiGSCam3_6mmLens) {
+        if (model == PiGS || 
+            model == InnoMakerIMX296GS_Mono) {
 
+        GS_LOG_TRACE_MSG(trace, "Initializing with a PiGS or InnoMakerIMX296GS_Mono camera." );
             // Sensor pixel width is 3.45uM square?  No - 6.33mm diagonal.  It appears that
             // the actual width is the full resolution (1456)  * 3.4uM = 4.95mm,
             // Not simply the diagonal sensor width
@@ -301,7 +311,7 @@ namespace golf_sim {
                 use_calibration_matrix_ = false;
             }
         }
-        else if (model == PiHQCam6mmWideLens) {
+        else if (model == PiHQ) {
 
             // TBD - This camera is no longer supported - REMOVE
             focal_length_ = 6.25f;
@@ -309,8 +319,6 @@ namespace golf_sim {
             verticalFoV_ = 50.0f;
             sensor_width_ = 6.287f;
             sensor_height_ = 4.712f;
-
-            is_mono_camera_ = false;
 
             if (resolution_x_override_ > 0 && resolution_y_override_ > 0) {
                 resolution_x_ = resolution_x_override_;
@@ -360,7 +368,6 @@ namespace golf_sim {
             sensor_width_ = 3.68f;
             sensor_height_ = 2.76f;
 
-            is_mono_camera_ = false;
             // Other possible resolutions for this camera:
             //            resolution_x_ = 1024;
             //            resolution_y_ = 768;

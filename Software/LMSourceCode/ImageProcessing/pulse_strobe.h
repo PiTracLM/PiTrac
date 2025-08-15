@@ -24,6 +24,15 @@ namespace golf_sim {
 
 		static bool gpio_system_initialized_;
 
+		static bool kUsingActiveHighTriggerCamera;
+		static int kPuttingStrobeDelayMs;
+		static long kCam2SetupPeriodMilliseconds;
+		static int kNumberPrimingPulses;
+		static int kPrimingPulseFPS;
+		static long kPauseBeforeReadyForTriggerMicroSeconds;
+		static int kPauseToSetUpInnoMakerExternalTriggerMilliseconds;
+		static int kPauseBeforeReadyForFinalPrimingPulseMs;
+
 		static bool InitGPIOSystem(GsSignalCallback callback_function = nullptr);
 		static bool DeinitGPIOSystem();
 
@@ -101,11 +110,10 @@ namespace golf_sim {
 		static char* tail_repeat_pulse_sequence_;
 		static unsigned long tail_repeat_sequence_length_;
 
-		static int kPuttingStrobeDelayMs;
-
 		static int spiHandle_;
 		static bool spiOpen_;
 		static int lggpio_chip_handle_;
+
 
 		// The number of times the last (usually quite long pulse-off interval)
 		// will be repeated after the earlier part of the pulse pattern

@@ -119,10 +119,11 @@ namespace golf_sim {
         GS_LOG_TRACE_MSG(trace, "WatchForHitAndTrigger");
 
         const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot1CameraType;
+        const CameraHardware::LensType camera_lens_type = GolfSimCamera::kSystemSlot1LensType;
 
         // TBD - refactor this to get rid of the dummy camera necessity
         GolfSimCamera c;
-        c.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera1, camera_model);
+        c.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera1, camera_model, camera_lens_type);
 
         if (!WatchForBallMovement(c, ball, motion_detected)) {
             GS_LOG_MSG(error, "Failed to WatchForBallMovement.");
@@ -149,7 +150,7 @@ namespace golf_sim {
         /*** 
         // We must undistort here, because we are going to immediately send the pre-image and the receiver
         // may not know what camera (and what distortion matrix) is in use.
-        CameraHardware::CameraModel  camera_model = CameraHardware::PiGSCam6mmWideLens;
+        CameraHardware::CameraModel  camera_model = CameraHardware::PiGS;
         cv::Mat return_image = undistort_camera_image(raw_image, GsCameraNumber::kGsCamera2, camera_model);
 
         // Send the image back to the cam1 system
@@ -872,7 +873,7 @@ std::string GetCmdLineForMediaCtlCropping(const GolfSimCamera &camera, cv::Vec2i
     }
 
     // The format will be different for mono cameras amd cp;pr
-    std::string format = (camera.camera_hardware_.is_mono_camera_) ? "Y10_1X10" : "SBGGR10_1X10";
+    std::string format = (camera.camera_hardware_.camera_is_mono()) ? "Y10_1X10" : "SBGGR10_1X10";
 
     s += "#!/bin/sh\n";
     s += "if  media-ctl -d \"/dev/media" + std::to_string(media_number) + "\" --set-v4l2 \"'imx296 " + std::to_string(device_number) + "-001a':0 [fmt:" + format + "/" + std::to_string(croppedHW[0]) + "x" + std::to_string(croppedHW[1]) + " crop:(" + std::to_string(crop_offset_xY[0]) + "," + std::to_string(crop_offset_xY[1]) + ")/" + 
@@ -985,7 +986,7 @@ cv::Mat LibCameraInterface::undistort_camera_image(const cv::Mat& img, const Gol
     cv::Mat unDistortedBall1Img;
     cv::Mat m_undistMap1, m_undistMap2;
 
-    if (camera.camera_hardware_.is_mono_camera_) {
+    if (camera.camera_hardware_.camera_is_mono()) {
         GS_LOG_MSG(trace, "undistort_camera_image using image format CV_8UC1"); 
         cv::initUndistortRectifyMap(cameracalibrationMatrix_, cameraDistortionVector_, cv::Mat(), cameracalibrationMatrix_, cv::Size(img.cols, img.rows), CV_8UC1, m_undistMap1, m_undistMap2);
     }
@@ -1040,7 +1041,7 @@ bool SetLibcameraTuningFileEnvVariable(const GolfSimCamera& camera) {
 
     std::string tuning_file;
 
-    if (camera.camera_hardware_.is_mono_camera_) {
+    if (camera.camera_hardware_.camera_is_mono()) {
         // If this is a mono camera, than we must use the "mono" tuning file, regardless of whether
         // the camera is camera 1 or camera 2
 
@@ -1329,13 +1330,17 @@ bool TakeRawPicture(const GolfSimCamera& camera, cv::Mat& img) {
 
 // TBD - This really seems like it should exist in the gs_camera module?
 bool CheckForBall(GolfBall& ball, cv::Mat& img) {
-    GS_LOG_TRACE_MSG(trace, "CheckForBall called.");
+
+	GsCameraNumber camera_number = GolfSimOptions::GetCommandLineOptions().GetCameraNumber();
+    GS_LOG_TRACE_MSG(trace, "CheckForBall called for camera number " + std::to_string(camera_number));
 
     // Figure out where the ball is
     // TBD - This repeats the camera initialization that we just did
-    const CameraHardware::CameraModel  camera_model = (GolfSimOptions::GetCommandLineOptions().GetCameraNumber()== GsCameraNumber::kGsCamera1) ? GolfSimCamera::kSystemSlot1CameraType : GolfSimCamera::kSystemSlot2CameraType;
+    const CameraHardware::CameraModel  camera_model = (camera_number == GsCameraNumber::kGsCamera1) ? GolfSimCamera::kSystemSlot1CameraType : GolfSimCamera::kSystemSlot2CameraType;
+    const CameraHardware::LensType camera_lens_type = (camera_number == GsCameraNumber::kGsCamera1) ? GolfSimCamera::kSystemSlot1LensType : GolfSimCamera::kSystemSlot2LensType;
+
     GolfSimCamera camera;
-    camera.camera_hardware_.init_camera_parameters(GolfSimOptions::GetCommandLineOptions().GetCameraNumber(), camera_model);
+    camera.camera_hardware_.init_camera_parameters(camera_number, camera_model, camera_lens_type);
     camera.camera_hardware_.firstCannedImageFileName = std::string("/mnt/VerdantShare/dev/GolfSim/LM/Images/") + "FirstWaitingImage";
     camera.camera_hardware_.firstCannedImage = img;
 
@@ -1369,8 +1374,9 @@ bool WaitForCam2Trigger(cv::Mat& return_image) {
 
     // Create a camera just to set the resolution and for un-distort operation
     const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot2CameraType;
+    const CameraHardware::LensType camera_lens_type = GolfSimCamera::kSystemSlot2LensType;
     GolfSimCamera c;
-    c.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera2, camera_model);
+    c.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera2, camera_model, camera_lens_type);
 
     try
     {
@@ -1507,7 +1513,7 @@ bool PerformCameraSystemStartup() {
             else {
                 /****
                 const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot1CameraType;
-                if (camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS3_6mmM12Lens) {
+                if (camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
                     std::string trigger_mode_command = "$PITRAC_ROOT/ImageProcessing/CameraTools/imx296_trigger 6 0";
 
                     GS_LOG_TRACE_MSG(trace, "Camera 1 trigger_mode_command = " + trigger_mode_command);
@@ -1528,6 +1534,7 @@ bool PerformCameraSystemStartup() {
         break;
 
         case SystemMode::kCamera2:
+        case SystemMode::kRunCam2ProcessForPi1Processing:
         case SystemMode::kCamera2TestStandalone: {
 
             if (!GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
@@ -1544,7 +1551,7 @@ bool PerformCameraSystemStartup() {
             else {
                 const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot2CameraType;
 
-                if (camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS3_6mmM12Lens) {
+                if (camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
                     std::string trigger_mode_command = "$PITRAC_ROOT/ImageProcessing/CameraTools/imx296_trigger 4 1";
 
                     GS_LOG_TRACE_MSG(trace, "Camera 2 trigger_mode_command = " + trigger_mode_command);
@@ -1562,7 +1569,7 @@ bool PerformCameraSystemStartup() {
 
             // Create a camera just for purposes of setting the tuning file variable
             GolfSimCamera camera;
-            camera.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera2, GolfSimCamera::kSystemSlot2CameraType);
+            camera.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera2, GolfSimCamera::kSystemSlot2CameraType, GolfSimCamera::kSystemSlot2LensType);
 
             if (!SetLibcameraTuningFileEnvVariable(camera)) {
                 GS_LOG_TRACE_MSG(error, "failed to SetLibcameraTuningFileEnvVariable");

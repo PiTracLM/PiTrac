@@ -184,6 +184,7 @@ namespace golf_sim {
         static int kExternallyStrobedEnvMaximumHoughLineGap;
         static int kExternallyStrobedEnvMinimumHoughLineLength;
 
+
         static bool kPlacedBallUseLargestBall;
 
         static cv::Vec3d kAutoCalibrationBallPositionFromCameraMeters;
@@ -195,6 +196,10 @@ namespace golf_sim {
         // If this instance of the system only has a single camera, there may be no type set for Camera 2.  
         // Instead, another instance, presumably on another Pi, will have the other camera
         static CameraHardware::CameraModel kSystemSlot2CameraType;
+
+        static CameraHardware::LensType kSystemSlot1LensType;
+        static CameraHardware::LensType kSystemSlot2LensType;
+
 
         // Refers to the camera_hardware device object associated with this higher-level camera object
         CameraHardware camera_hardware_;

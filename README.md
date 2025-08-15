@@ -13,7 +13,7 @@ Introducing [PiTrac](https://hackaday.io/project/195042-pitrac-the-diy-golf-laun
 
 PiTrac uses low-cost Raspberry Pi(\*) computers and cameras to determine golf ball launch speed, angles and spin in three dimensions.  PiTrac interfaces with both GSPro and E6/TruGolf simulators, and its output is also accessible on a stand-alone web-based app.  \[We’ve reached out to 2k/TopGolf, but no response yet.\]
 
-PiTrac uses off-the-shelf hardware, and includes a [parts list](https://github.com/jamespilgrim/PiTrac/blob/main/Documentation/PiTrac%20-%20DIY%20LM%20%20Parts%20List.md) with links to potential suppliers.  The only custom part is a small printed circuit board.  The fabrication instructions for that PCB are included in the open-source distribution and it can be manufactured for a few dollars.  The two Pi computers and cameras are the most expensive parts, and cost around $250 in total.
+PiTrac uses off-the-shelf hardware, and includes a [parts list](https://jamespilgrim.github.io/PiTrac/hardware/parts-list.html) with links to potential suppliers.  The only custom part is a small printed circuit board.  The fabrication instructions for that PCB are included in the open-source distribution and it can be manufactured for a few dollars.  The two Pi computers and cameras are the most expensive parts, and cost around $250 in total.
 
 PiTrac is not a commercial product for sale–the full design is being released as open source on GitHub for folks to build themselves.  It’s not easy, but if you’re handy with a soldering iron, can figure out how to 3D print the parts, and are willing to burrow into the Linux operating system to compile and install software, you should be able to create your own PiTrac\!  
 
@@ -26,11 +26,11 @@ Finally, any help at our [support page](https://ko-fi.com/Pitrac) would be appre
 
 (\*) Raspberry Pi is a trademark of Raspberry Pi Ltd.  The PiTrac project is not endorsed, sponsored by or associated with Raspberry Pi or Raspberry Pi products or services.
 
-## [Getting Started](/Documentation/.START_HERE/PiTrac%20–%20START%20HERE.md)
+## [Getting Started](https://jamespilgrim.github.io/PiTrac/getting-started/getting-started.html)
 The process of building your own PiTrac DIY Launch Monitor is described here at a high level. There are several more-detailed instruction documents elsewhere in the PiTrac repository that are referred to below for various sub-assemblies and tasks like compiling the code and preparing the build environment.
 
-## [Setup and Configuration](/Documentation/Raspberry%20Pi%20Setup%20and%20Configuration.md)
+## [Setup and Configuration](https://jamespilgrim.github.io/PiTrac/software/pi-setup.html)
 The instructions which are targeted toward getting setup on a step-by-step basis. These instructions start with a Raspberry Pi with nothing on it, and are meant to describe all the steps to get from that point to a working, compiled version of PiTrac.  PiTrac currently requires two Raspberry Pi’s, so the majority of these instructions will have to be repeated twice.  Because the ‘smaller’ Pi system that connects to Camera 2 is the only Pi that handles the Tomcat/Tomee web-based GUI for the system, there are a few more steps for that system.
 
-## [Join the Discord](https://discord.gg/CP3gVkH7)
-The PiTrac discord is where you can get help or show off your PiTrac build, discuss features and get to know other PiTrac builders. PiTrac is still a new project, so the Discord is a way to clear up any fuzzy parts of the initial ecosystem. Click the link above or copy this invite link in Discord: `https://discord.gg/9nEeVrPX`.
+## [Join the Discord](https://discord.gg/gMQcBBQYHT)
+The PiTrac discord is where you can get help or show off your PiTrac build, discuss features and get to know other PiTrac builders. PiTrac is still a new project, so the Discord is a way to clear up any fuzzy parts of the initial ecosystem. Click the link above or copy this invite link in Discord: `https://discord.gg/gMQcBBQYHT`.

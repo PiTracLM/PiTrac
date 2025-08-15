@@ -1,0 +1,37 @@
+# PiTrac environment configuration defaults
+# These values are used as:
+# - Default suggestions in interactive mode (shown in prompts)
+# - Automatic values in non-interactive mode (--non-interactive flag)
+
+# PiTrac source code directory
+pitrac_root: "/home/pi/Dev/PiTrac/Software/LMSourceCode"
+
+# Image storage directory
+pitrac_image_dir: "/home/pi/LM_Shares/Images"
+
+# Web server directory
+pitrac_web_dir: "/home/pi/LM_Shares/WebShare"
+
+# ActiveMQ broker IP address (use 10.0.0.41 for default network setup)
+pitrac_msg_broker_ip: "10.0.0.41"
+
+# E6/TruGolf host IP (empty to skip)
+pitrac_e6_host: ""
+
+# GSPro host IP (empty to skip)
+pitrac_gspro_host: ""
+
+# Camera slot 1 type (4=Pi Global Shutter 6mm, 6=Innomaker 3.6mm)
+pitrac_slot1_camera: 4
+
+# Camera slot 2 type (4=Pi Global Shutter 6mm, 6=Innomaker 3.6mm)
+pitrac_slot2_camera: 4
+
+# Libcamera config path (auto-detected based on Pi model if empty)
+libcamera_cfg_file: ""
+
+# Add to shell RC file (0=no, 1=yes)
+update_shell_rc: 1
+
+# Force reconfiguration (0=no, 1=yes)
+force: 0

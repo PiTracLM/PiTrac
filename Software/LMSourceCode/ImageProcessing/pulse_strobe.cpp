@@ -38,6 +38,9 @@ namespace golf_sim {
 	std::vector<float>  PulseStrobe::pulse_intervals_slow_ms_;
 	int PulseStrobe::number_bits_for_slow_on_pulse_ = 0;
 
+	// Currently only true if using InnoMaker cameras
+	bool PulseStrobe::kUsingActiveHighTriggerCamera = false;
+
 	// The on-pulses for the tail repeat vector will be the same
 	// as the slow on pulses
 	std::vector<float>  PulseStrobe::pulse_intervals_tail_repeat_ms_;
@@ -57,6 +60,14 @@ namespace golf_sim {
 	bool PulseStrobe::kRecordAllImages = true;
 	bool PulseStrobe::gpio_system_initialized_ = false;
 	int PulseStrobe::kPuttingStrobeDelayMs = 0;
+
+	long PulseStrobe::kCam2SetupPeriodMilliseconds = 2000;
+	int PulseStrobe::kNumberPrimingPulses = 12;
+	int PulseStrobe::kPrimingPulseFPS = 30;
+	long PulseStrobe::kPauseBeforeReadyForTriggerMicroSeconds = 100;
+	int PulseStrobe::kPauseToSetUpInnoMakerExternalTriggerMilliseconds = 1000;
+	int PulseStrobe::kPauseBeforeReadyForFinalPrimingPulseMs = 100;
+
 
 	int PulseStrobe::kLastPulsePutterRepeats = 5;
 	// Will be set when the pulse vector is set
@@ -150,9 +161,10 @@ namespace golf_sim {
 		unsigned long current_byte = 0;
 		int next_pattern_zero_bits_pad = 0;
 
-		if (GolfSimOptions::GetCommandLineOptions().camera_still_mode_ ||
+		// TBD- REMOVE -FOR TESTING ONLY
+		if ((GolfSimOptions::GetCommandLineOptions().camera_still_mode_ ||
 			GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2AutoCalibrate ||
-			GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2BallLocation) {
+			GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2BallLocation)) {
 
 			// Double the basic "on" pulse length, because we are only going to send one pulse
 			number_bits_for_on_pulse *= 2;
@@ -182,9 +194,10 @@ namespace golf_sim {
 				buf[current_byte++] = second_byte_bit_pattern;
 			}
 
-			if (!GolfSimOptions::GetCommandLineOptions().camera_still_mode_ &&
+			// TBD- REMOVE - FOR TESTING ONLY
+			if ( (!GolfSimOptions::GetCommandLineOptions().camera_still_mode_ &&
 				GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kCamera2AutoCalibrate &&
-				GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kCamera2BallLocation) {
+				GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kCamera2BallLocation) ) {
 
 				// Then, turn off the strobe for the specified number of milliseconds.
 
@@ -374,7 +387,17 @@ namespace golf_sim {
 
 		// Open shutter - 
 		// Note - the hardware will invert the signal to the XTR camera trigger
-		lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kON);
+
+		// TBD - Remove for speed
+		// GS_LOG_MSG(trace, "Shutter OPEN");
+
+		// InnoMaker cameras are active high, not low
+		if (kUsingActiveHighTriggerCamera) {
+			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kOFF);
+		}
+		else {
+			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kON);
+		}
 
 		int bytes_sent = lgSpiWrite(spiHandle_, buf, result_length);
 		bool shutter_failure = false;
@@ -384,44 +407,19 @@ namespace golf_sim {
 			shutter_failure = true;
 		}
 
-		// We have a loop here because having the vector have a lot of loooong late
-		// off-durations chews up a ton of memory.  Better to just construct the latter
-		// part of the pulse vector dynamically.  There might be a little timing-shake here
-		// because the pulse sequence is interrupted as the code starts executing again. 
-		// But, that's probably ok, as these are really long pulses anyway.  What's a few
-		// micro-seconds when we're talking about a zero-pulse period of milliseconds?
-		/*** DEPRECATED
-		if (GolfSimClubs::GetCurrentClubType() == GolfSimClubs::GsClubType::kPutter) {
-			for (int i = 0; i < kLastPulsePutterRepeats; i++) {
+		// Close shutter now that all of the strobe pulses should have been sent
 
-				// Each follow-on tail pulse has an on-pulse followed by a (long) zero 
-				// (no-pulse) period.  This means the sequence ends with a long empty
-				// zero-pulse, which would be better if there was one more "on" pulse.  So
-				// we add the on pulse at the end.  Otherwise, we just waste shutter time
-				flag = lgGpioWrite(lggpio_chip_handle_, tail_repeat_pulse_sequence_, tail_repeat_sequence_length_);
-				
-				if (flag != tail_repeat_sequence_length_) {
-					GS_LOG_MSG(error, "First Follow-on lgGpioWrite failed.  Returned " + std::to_string(flag));
-					shutter_failure = true;
-				}
+		// TBD - Remove for speed
+		// GS_LOG_MSG(trace, "Shutter SHUT");
 
-				uint16_t on_pulse{ 0b1000000000000000 };
-
-				flag = lgGpioWrite(lggpio_chip_handle_, (char*)&on_pulse, 2);
-
-				if (flag != 2) {
-					GS_LOG_MSG(error, "Second Follow-on lgGpioWrite failed.  Returned " + std::to_string(flag));
-					shutter_failure = true;
-				}
-			}
+		if (kUsingActiveHighTriggerCamera) {
+			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kON);
 		}
-		*****/
-
-		// Close shutter
-		lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kOFF);
+		else {
+			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kOFF);
+		}
 
 		GS_LOG_TRACE_MSG(trace, "SendCameraStrobeTriggerAndShutter sent pulse sequence of length = " + std::to_string(camera_fast_pulse_sequence_length_) + " bytes.");
-
 
 
 		return !shutter_failure;
@@ -461,7 +459,22 @@ namespace golf_sim {
 			return false;
 		}
 
-		lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kOFF);
+
+		const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot2CameraType;
+
+		// Certain InnoMaker cameras may be active high, not low,  If so, activate the next line
+		// kUsingActiveHighTriggerCamera = (camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS_Mono);
+		kUsingActiveHighTriggerCamera = false;
+
+		// Note that the Connector Board will invert the shutter output
+		if (kUsingActiveHighTriggerCamera) {
+			GS_LOG_MSG(trace, "PulseStrobe::InitGPIOSystem - Will be using an active-HIGH camera");
+			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kON);
+		}
+		else {
+			GS_LOG_MSG(trace, "PulseStrobe::InitGPIOSystem - Will be using an active-LOW camera");
+			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kOFF);
+		}
 
 		if (callback_function != nullptr) {
 			/* TBD
@@ -469,7 +482,7 @@ namespace golf_sim {
 			gpioSetSignalFunc(SIGUSR2, callback_function);
 			gpioSetSignalFunc(SIGINT, callback_function);
 			*/
-	}
+		}
 
 #endif // #ifdef __unix__  // Ignore in Windows environment
 
@@ -509,6 +522,14 @@ namespace golf_sim {
 			return false;
 		}
 
+		GolfSimConfiguration::SetConstant("gs_config.strobing.kCam2SetupPeriodMilliseconds", kCam2SetupPeriodMilliseconds);
+		GolfSimConfiguration::SetConstant("gs_config.strobing.kNumberPrimingPulses", kNumberPrimingPulses);
+		GolfSimConfiguration::SetConstant("gs_config.strobing.kPrimingPulseFPS", kPrimingPulseFPS);
+		GolfSimConfiguration::SetConstant("gs_config.strobing.kPauseBeforeReadyForTriggerMicroSeconds", kPauseBeforeReadyForTriggerMicroSeconds);
+		GolfSimConfiguration::SetConstant("gs_config.strobing.kPauseToSetUpInnoMakerExternalTriggerMilliseconds", kPauseToSetUpInnoMakerExternalTriggerMilliseconds);
+		GolfSimConfiguration::SetConstant("gs_config.strobing.kPauseBeforeReadyForFinalPrimingPulseMs", kPauseBeforeReadyForFinalPrimingPulseMs);
+		
+
 		gpio_system_initialized_ = true;
 		return true;
 	}
@@ -535,9 +556,16 @@ namespace golf_sim {
 
 	void PulseStrobe::SendOnOffPulse(long length_us) {
 #ifdef __unix__  // Ignore in Windows environment
-		lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kON);
-		usleep(length_us);
-		lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kOFF);
+
+		if (!kUsingActiveHighTriggerCamera) {
+			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kON);
+			usleep(length_us);
+			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kOFF);
+		} else {
+			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kOFF);
+			usleep(length_us);
+			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kON);
+		}
 #endif // #ifdef __unix__  // Ignore in Windows environment
 	}
 
@@ -545,7 +573,7 @@ namespace golf_sim {
 
 #ifdef __unix__  // Ignore in Windows environment
 
-		// Re-establish putting delay each time to make it easie to adjust
+		// Re-establish putting delay each time to make it easier to adjust on the fly
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kPuttingStrobeDelayMs", kPuttingStrobeDelayMs);
 
 		// Make sure we are sending pulses at a known speed.  In this case, in the "fast" setting
@@ -561,61 +589,55 @@ namespace golf_sim {
 			return false;
 		}
 
-		long kPauseBeforeCamera2PrimingPulsesMs = 0;
-		GolfSimConfiguration::SetConstant("gs_config.cameras.kPauseBeforeCamera2PrimingPulsesMs", kPauseBeforeCamera2PrimingPulsesMs);
+		// Make sure the camera 2 system has had a chance to receive the IPC "arm" message
+		GolfSimConfiguration::SetConstant("gs_config.strobing.kCam2SetupPeriodMilliseconds", kCam2SetupPeriodMilliseconds);
 
-		long wait_time_in_us = kPauseBeforeCamera2PrimingPulsesMs * 1000;
+		long wait_time_in_ms = kCam2SetupPeriodMilliseconds;
 
-		// Should need almost no time if we are all running on the same pi
-		if (GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
-			wait_time_in_us /= 2;
-		}
+		GS_LOG_TRACE_MSG(trace, "Waiting " + std::to_string(wait_time_in_ms) + " milliseconds for the Camera2 system to prepare its camera.");
+		usleep(wait_time_in_ms * 1000);
+		GS_LOG_TRACE_MSG(trace, "Assuming camera 2 is ready.  Sending PRIMING pulses...");
 
-		GS_LOG_TRACE_MSG(trace, "Waiting " + std::to_string(wait_time_in_us) + " microseconds for the Camera2 system to prepare its camera.");
-		usleep(wait_time_in_us);
-		GS_LOG_TRACE_MSG(trace, "Sending PRIMING pulses.");
-		// SendCameraSpiPrimingPulses();
-
-		// Create a short low pulse (shutter speed) at a
+		// Generate a short low pulse (aka shutter speed) at a
 		// relatively low frame rate as priming pulses
 		const int kShutterSpeed = 100; // microseconds
-		const int kFrameRate = 20; // FPS
 		const int kShutterOffset = 14; // uS
 
-		const int kOnTimeWidth = (int)((1.0 / kFrameRate) * 1000000. - kShutterSpeed);
+		const int kOnTimeWidth = (int)((1.0 / kPrimingPulseFPS) * 1000000. - kShutterSpeed);
 
 		GS_LOG_TRACE_MSG(trace, "Priming Pulse kOffTimeWidth = " + std::to_string(kShutterSpeed));
 		GS_LOG_TRACE_MSG(trace, "Priming Pulse kOnTimeWidth =  " + std::to_string(kOnTimeWidth));
 
-		int kPauseBeforeSendingLastPrimingPulse = 0;
-		GolfSimConfiguration::SetConstant("gs_config.cameras.kPauseBeforeSendingLastPrimingPulse", kPauseBeforeSendingLastPrimingPulse);
-
-		int kNumInitialCamera2PrimingPulses = 0;
-		GolfSimConfiguration::SetConstant("gs_config.cameras.kNumInitialCamera2PrimingPulses", kNumInitialCamera2PrimingPulses);
-
-		// TBD - We are still working on getting the InnoMaker camera to work
-		const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot2CameraType;
-		if (false && camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS3_6mmM12Lens) {
-			kNumInitialCamera2PrimingPulses = 1;
-		}
-
-		for (int i = 0; i < kNumInitialCamera2PrimingPulses; i++) {
+		// Send the priming pulses
+		for (int i = 0; i < kNumberPrimingPulses; i++) {
 			GS_LOG_TRACE_MSG(trace, "Sent priming pulse");
 			SendOnOffPulse(kShutterSpeed - kShutterOffset);
 			usleep(kOnTimeWidth);
+
+			// If we are running an InnoMaker camera, the camera 2 system needs a moment
+			// to (re)setup the external trigger after the first image is received
+			const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot2CameraType;
+
+			// The camera 2 system only needs to set up an InnoMaker camera external trigger once after the camera has started running
+			if (i == 0 && camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+				GS_LOG_TRACE_MSG(trace, "Pausing after first trigger for camera 2 system to setup external triggering for InnoMaker Camera.  Will delay:  " + std::to_string(kPauseToSetUpInnoMakerExternalTriggerMilliseconds) + " mS.");				usleep(kPauseToSetUpInnoMakerExternalTriggerMilliseconds);
+				usleep(kPauseToSetUpInnoMakerExternalTriggerMilliseconds * 1000);
+			}
 		}
 
-		GS_LOG_TRACE_MSG(trace, "Sent " + std::to_string(kNumInitialCamera2PrimingPulses) + " initial pulses.");
+		GS_LOG_TRACE_MSG(trace, "Sent " + std::to_string(kNumberPrimingPulses) + " initial priming pulses.  About to pause for " + 
+				std::to_string(kPauseBeforeReadyForFinalPrimingPulseMs) + " milliSeconds before sending penultimate priming pulse.");
 
-		usleep(kPauseBeforeSendingLastPrimingPulse * 1000);
+		// Wait a little longer to make sure the camera 2 system has ended its period looking for priming pulses --
+		// The next pulses will cause the camera 2 system to ready itself for the REAL shot trigger
+		usleep(kPauseBeforeReadyForFinalPrimingPulseMs * 1000);
 
-		// This next pulse gets the camera2 state machine ready to take an actual image
+		// This next priming pulses gets the camera2 state machine ready to take an actual image
+		SendOnOffPulse(kShutterSpeed - kShutterOffset);
 
-		if (true || camera_model != CameraHardware::CameraModel::InnoMakerIMX296GS3_6mmM12Lens) {
-			GS_LOG_TRACE_MSG(trace, "Not using InnoMaker camera, so sending final priming pulse.");
-			SendOnOffPulse(kShutterSpeed - kShutterOffset);
-		}
+		GS_LOG_TRACE_MSG(trace, "Sent final priming pulse. Camera 2 should be primed at this point.");
 
+		// Deal with a pre-image exposure if we need to (mostly deprecated - didn't work well)
 		GolfSimConfiguration::SetConstant("gs_config.ball_exposure_selection.kUsePreImageSubtraction", 
 												GolfSimCamera::kUsePreImageSubtraction);
 
@@ -623,14 +645,14 @@ namespace golf_sim {
 			GS_LOG_TRACE_MSG(trace, "Sent last priming pulse before pre-image.");
 
 			long kPauseBeforeSendingPreImageTriggerMs = 0;
-			GolfSimConfiguration::SetConstant("gs_config.cameras.kPauseBeforeSendingPreImageTriggerMs", kPauseBeforeSendingPreImageTriggerMs);
+			GolfSimConfiguration::SetConstant("gs_config.strobing.kPauseBeforeSendingPreImageTriggerMs", kPauseBeforeSendingPreImageTriggerMs);
 			usleep(kPauseBeforeSendingPreImageTriggerMs * 1000);
 
 			SendCameraStrobeTriggerAndShutter(lggpio_chip_handle_);
 			GS_LOG_TRACE_MSG(trace, "Sent pre-image trigger.");
 
 			long kPauseBeforeSendingImageFlushMs = 0;
-			GolfSimConfiguration::SetConstant("gs_config.cameras.kPauseBeforeSendingImageFlushMs", kPauseBeforeSendingImageFlushMs);
+			GolfSimConfiguration::SetConstant("gs_config.strobing.kPauseBeforeSendingImageFlushMs", kPauseBeforeSendingImageFlushMs);
 			usleep(kPauseBeforeSendingImageFlushMs * 1000);
 
 			// This acts as a flush, and it forces the actual image to be received and processed
@@ -640,7 +662,7 @@ namespace golf_sim {
 			// It will take the camera2 system a moment to package up the pre-image and send it to the object broker and to the
 			// camera1 system (the one executing this code).  Give it a chance
 			long kPauseAfterSendingPreImageTriggerMs = 0;
-			GolfSimConfiguration::SetConstant("gs_config.cameras.kPauseAfterSendingPreImageTriggerMs", kPauseAfterSendingPreImageTriggerMs);
+			GolfSimConfiguration::SetConstant("gs_config.strobing.kPauseAfterSendingPreImageTriggerMs", kPauseAfterSendingPreImageTriggerMs);
 			usleep(kPauseAfterSendingPreImageTriggerMs * 1000);
 		}
 
@@ -667,20 +689,6 @@ namespace golf_sim {
 		return true;
 	}
 
-	/*
-	uint32_t PulseStrobe::getElapsedTime(uint32_t PulseStrobe::startTimeTicks) {
-		uint32_t currentTimeTicks = gpioTick();
-
-		if (currentTimeTicks >= startTimeTicks) {
-			// This is the usual case - make it fast
-			return (currentTimeTicks - startTimeTicks);
-		}
-		else {
-			return (currentTimeTicks + (kGlobalLastInterruptTick - startTimeTicks));
-		}
-	}
-	*/
-
 	bool PulseStrobe::SendExternalTrigger() {
 
 #ifdef __unix__  // Ignore in Windows environment
@@ -688,12 +696,12 @@ namespace golf_sim {
 		// GS_LOG_TRACE_MSG(trace, "Sent final camera trigger(s) and strobe pulses.");
 		SendCameraStrobeTriggerAndShutter(lggpio_chip_handle_);
 
-			if (golf_sim::GolfSimCamera::kCameraRequiresFlushPulse) {
+		if (golf_sim::GolfSimCamera::kCameraRequiresFlushPulse) {
 
 			GS_LOG_TRACE_MSG(trace, "Waiting a moment to send flush trigger.");
 
 			long kPauseBeforeSendingImageFlushMs = 0;
-			GolfSimConfiguration::SetConstant("gs_config.cameras.kPauseBeforeSendingImageFlushMs", kPauseBeforeSendingImageFlushMs);
+			GolfSimConfiguration::SetConstant("gs_config.strobing.kPauseBeforeSendingImageFlushMs", kPauseBeforeSendingImageFlushMs);
 			usleep(kPauseBeforeSendingImageFlushMs * 1000);
 
 

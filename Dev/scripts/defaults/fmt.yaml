@@ -1,0 +1,7 @@
+fmt-version: 9.1.0
+force: 0
+build-from-source: 0
+build-type: Release
+install-prefix: /usr/local
+build-shared-libs: 1
+build-cores: 0
