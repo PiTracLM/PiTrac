@@ -19,13 +19,15 @@ FORCE="${FORCE:-0}"
 # Check if activemq cpp is installed
 is_activemq_cpp_installed() {
   # Check if libactivemq-cpp is available via ldconfig
-  if ldconfig -p 2>/dev/null | grep -q "libactivemq-cpp"; then
+  if ldconfig -p 2>/dev/null | grep "libactivemq-cpp" >/dev/null 2>&1; then
     return 0
   fi
 
-  # Fallback: check if the header exists
+  # Fallback: check if the header exists (with version in path)
   if [ -f "/usr/local/include/activemq/library/ActiveMQCPP.h" ] || \
-     [ -f "/usr/include/activemq/library/ActiveMQCPP.h" ]; then
+     [ -f "/usr/include/activemq/library/ActiveMQCPP.h" ] || \
+     ls /usr/local/include/activemq-cpp-*/activemq/library/ActiveMQCPP.h >/dev/null 2>&1 || \
+     ls /usr/include/activemq-cpp-*/activemq/library/ActiveMQCPP.h >/dev/null 2>&1; then
     return 0
   fi
 

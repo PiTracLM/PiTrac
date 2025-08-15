@@ -20,6 +20,7 @@ SETUP_GUI="${SETUP_GUI:-1}"
 CONFIGURE_SHELL="${CONFIGURE_SHELL:-0}"
 BUILD_CORES="${BUILD_CORES:-0}"
 CLEAN_BUILD="${CLEAN_BUILD:-0}"
+SKIP_GIT_PULL="${SKIP_GIT_PULL:-0}"
 
 PITRAC_SLOT1_CAMERA_TYPE="${PITRAC_SLOT1_CAMERA_TYPE:-4}"
 PITRAC_SLOT2_CAMERA_TYPE="${PITRAC_SLOT2_CAMERA_TYPE:-4}"
@@ -65,21 +66,36 @@ get_pitrac_source() {
     fi
     
     if check_pitrac_source; then
-        log_info "Updating existing PiTrac repository..."
-        cd "$PITRAC_DIR"
-        
-            if ! git diff --quiet || ! git diff --cached --quiet; then
-            log_warn "Local changes detected, stashing..."
-            git stash push -m "Auto-stash before update $(date +%Y%m%d_%H%M%S)"
+        # Ask user if they want to skip git pull (unless already set)
+        if [ "$SKIP_GIT_PULL" != "1" ] && ! is_non_interactive; then
+            log_info "Repository found at $PITRAC_DIR"
+            read -p "Skip git pull/fetch and use existing code? (y/N): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                SKIP_GIT_PULL=1
+            fi
         fi
         
-        if [ "$PITRAC_PR" != "0" ] && [ -n "$PITRAC_PR" ]; then
-            log_info "Fetching and checking out pull request #$PITRAC_PR..."
-            git fetch origin "pull/$PITRAC_PR/head:pr-$PITRAC_PR"
-            git checkout "pr-$PITRAC_PR"
+        if [ "$SKIP_GIT_PULL" = "1" ]; then
+            log_info "Skipping git pull (using existing code)"
+            cd "$PITRAC_DIR"
         else
-            git fetch origin
-            git pull origin "$PITRAC_BRANCH" || log_warn "Could not update (might have conflicts)"
+            log_info "Updating existing PiTrac repository..."
+            cd "$PITRAC_DIR"
+            
+                if ! git diff --quiet || ! git diff --cached --quiet; then
+                log_warn "Local changes detected, stashing..."
+                git stash push -m "Auto-stash before update $(date +%Y%m%d_%H%M%S)"
+            fi
+            
+            if [ "$PITRAC_PR" != "0" ] && [ -n "$PITRAC_PR" ]; then
+                log_info "Fetching and checking out pull request #$PITRAC_PR..."
+                git fetch origin "pull/$PITRAC_PR/head:pr-$PITRAC_PR"
+                git checkout "pr-$PITRAC_PR"
+            else
+                git fetch origin
+                git pull origin "$PITRAC_BRANCH" || log_warn "Could not update (might have conflicts)"
+            fi
         fi
     else
         log_info "Cloning PiTrac repository..."
