@@ -284,7 +284,7 @@ No hardware connected? Use the test processor - see the [Testing Without Hardwar
 
 PiTrac running? Great! Now:
 1. [Camera Calibration]({% link camera/camera-calibration.md %}) - Get accurate measurements
-2. [Simulator Integration]({% link simulator/simulator-integration.md %}) - Connect to GSPro or E6
-3. [Web Interface]({% link software/web-interface.md %}) - Access the browser UI
+2. [Simulator Integration]({% link integration/integration.md %}) - Connect to GSPro or E6
+3. [Open Interface]({% link integration/open-interface.md %}) - Access the browser UI
 
 Having issues? Check the [Troubleshooting Guide]({% link troubleshooting/troubleshooting.md %}).
