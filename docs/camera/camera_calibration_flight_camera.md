@@ -16,7 +16,7 @@ nav_order: 2.1
     3. Set up a marker point (such as a cross hairs) on a piece of paper attached to an object or stand so that the point is about 15 cm above the ground and roughly centered in the view of the camera with the camera at a slight upward tilt and facing straight out.  The point should be a shape that will be crisp, sharp, and useful for focusing the camera.  
     4. Follow the instructions for Tee Camera (read that first), below, but use the following modifications when recording the various measurements:  
     5. 
-       ![](../assets/images/camera/image6.png)
+       ![]({{ '/assets/images/camera/image6.png' | relative_url }})
     6. Flight Camera Measurements (values are typical/exemplary)  
     7. -X (the negative value of X) is the distance to the left (looking at the monitor) from the point on the floor directly under the center of *Flight camera* (facing the LM as a right-handed golfer) to the marker dot. ***It’s usually 0*** because the point will be centered (horizontally) in the camera’s view. Because this is relative to the OTHER camera, X will usually effectively be `~-3` or `–4` centimeters away from the other camera because the Tee camera is offset because it is twisted.    
         1. This will be made up later when we set the 

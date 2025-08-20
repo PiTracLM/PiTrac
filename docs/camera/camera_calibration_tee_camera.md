@@ -18,13 +18,13 @@ Tee camera distances and angles (also referenced by and relevant for Flight came
    2. Further back (to the right of the LM for right-handed golfers) gives more time for the LM to “see” a fast ball in the Flight camera before it goes too far.  The LM should be able to operate regardless of exactly where the marker point is, but a point close to the typical tee-off makes the calibration in that area more accurate.  
    3. Place a marker (e.g., a sticky-note with a `3mm` dot or crosshair) at the point on the ground where the nominal tee point will be.  If you are calibrating on a hitting mat. A short bit of wire insulation pushed into the hitting mat works well, too.  The point just has to be well enough marked to be able to see it in the center of the preview screen.  
    4. Tee camera Example Setup:  
-      - ![](../assets/images/camera/image7.jpg)
+      - ![]({{ '/assets/images/camera/image7.jpg' | relative_url }})
 5. Loosen and then move the camera mount until the preview screen on the monitor shows the marker dot directly behind the taped-on dot on the monitor.  The idea is to center the marker in the camera view so that the camera is known to be aimed directly at the spot.  Continue to keep the point centered as you tighten the gimbal screws (a small 90-degree M4 hex wrench makes this easier).  
    1. **NOTE** - Sometimes the mount is sticky and only wants to point to a particular point near, but not at the marker.  In that case, let the camera do what it wants to do, and just re-measure where the point is (it might be a few millimeters one way or the other), and then use those measurements, below.  
    2. When tightening the base of the Pi for Tee camera (top floor), you may have to loosen and move the strobe light that is immediately below the camera to get room to use a needle-nose pliers to tighten the bold.   
 6. Measure the following distances from the camera being calibrated to the marker. **NOTE** these values have slightly different definitions for Flight camera. Reference that process elsewhere in this document when calibrating that camera.  
    1. Refer to the following diagram regarding the necessary calibration measurements for Tee camera:  
-   2. ![](../assets/images/camera/image8.png) 
+   2. ![]({{ '/assets/images/camera/image8.png' | relative_url }}) 
    3. X is distance to the right of the LM (facing the LM as a right-handed golfer) to the marker point  
       1. `X = .60` (typical) (distances here are in meters)  
       2. For Flight camera, the X should reflect the effective X-axis difference between the two cameras (because Tee camera is twisted to one side from center). So, even if the Flight camera is centered, it’s X is likely to be 3 or 4 cm.  

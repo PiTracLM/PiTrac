@@ -11,9 +11,9 @@ nav_order: 1.1
    1. For Tee camera, the ball will be immediately above the marker.    
    2. For Flight camera, create a support that will hold the ball so that its center in space is where the marker point existed in space before it was replaced by an actual ball.  Put the   
    3. Example setups:  Flight camera:  
-   4. ![](../assets/images/camera/image9.jpg) 
+   4. ![]({{ '/assets/images/camera/image9.jpg' | relative_url }}) 
    5. Tee camera:  
-   6. ![](../assets/images/camera/image10.png) 
+   6. ![]({{ '/assets/images/camera/image10.png' | relative_url }}) 
 2. Ensure that the area around the ball has good contrast.  For example, put down some black felt around the ball or use a white ball on a green hitting mat.   
 3. For Tee camera, turn the LED strip on the LM base on to make sure there’s sufficient light for good exposures.  
 4. Re-Measure H to ensure it’s correct - it is the distance on a line straight out from the camera lens to the ball center (at or near where the marker point was)  

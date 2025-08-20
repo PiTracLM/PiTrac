@@ -26,12 +26,12 @@ Camera Calibration and Geometry. Basics of camera geometry and how it can be use
 5. To take the pictures, make sure your camera is focused at the distance of where the ball will be.  It’s best to have the Pi console window visible so that you can see when to move the board and avoid blurs.   
 6. Next, we need a bunch of images of the checkerboard at about the distance we expect the golf ball to be imaged by the cameras.  These images should include the board in the middle and nearer the edges of the images, and must each include all of the checkerboard, not just a part of it.  
 7. Sample setup   
-   1. ![](../assets/images/camera/image11.jpg)   
+   1. ![]({{ '/assets/images/camera/image11.jpg' | relative_url }})   
 8. Then, run the `take_calibration_shots.sh` script, specifying, for example, `./images/cam1` as the output directory.  Twenty pictures is usually sufficient.    
    1. → `mkdir images/cam2` for flight camera 
    2. → `take_calibration_shots.sh` ./images/cam2/gs_calibation_20`  
 9. The script will repeatedly pause and take a picture and save it to the output directory.  Each time the script says “READY”, quickly move the checkerboard to a new location.  Each move, try to rotate the board a little bit about the image plane so that it is in a different orientation each time.  Also, try tilting the board a little forward and back randomly.  This should result in a set of images that are named `gs_calibrate_<nn>`, where nn is an increasing number. The images should look like:  
-10. ![](../assets/images/camera/image12.png)![](../assets/images/camera/image13.png)![](../assets/images/camera/image14.png)![](../assets/images/camera/image15.png)
+10. ![]({{ '/assets/images/camera/image12.png' | relative_url }})![]({{ '/assets/images/camera/image13.png' | relative_url }})![]({{ '/assets/images/camera/image14.png' | relative_url }})![]({{ '/assets/images/camera/image15.png' | relative_url }})
 11. Look through the images and delete any where the checkerboard is not fully visible.  Partially-visible board can stall the next step of this process.  
 12. Now that the pictures are ready, run the python processing script on those pictures to come up with the matrices that will be necessary to setup the PiTrac configuration .json file.  To run, do:  
     1. First, edit the python script to point to the images just gathered, for example:  

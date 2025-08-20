@@ -93,15 +93,15 @@ Install LED lighting under the base layer overhang for Camera 1 visibility:
 2. **Position first layer:** Tack down one end on left side, stick below overhang, push ~4 inches into right LED port
 3. **Add second layer:** Stick second layer just below first for double LED rows
 
-![LED Strip Installation](/assets/images/enclosure_assembly/enclosure_light_strip.png)
-![LED Strip Layer 2](/assets/images/enclosure_assembly/enclosure_light_strip_2.png)
+![LED Strip Installation]({{ '/assets/images/enclosure_assembly/enclosure_light_strip.png' | relative_url }})
+![LED Strip Layer 2]({{ '/assets/images/enclosure_assembly/enclosure_light_strip_2.png' | relative_url }})
 
 4. **Route power:** Pull USB power plug through left LED port, either to internal power strip or external power for independent control
 5. **Secure strips:** Use zip-ties through small holes at base layer ends
 
-![LED Strip 3](/assets/images/enclosure_assembly/enclosure_light_strip_3.png)
-![LED Strip 4](/assets/images/enclosure_assembly/enclosure_light_strip_4.png)
-![LED Strip 5](/assets/images/enclosure_assembly/enclosure_light_strip_5.png)
+![LED Strip 3]({{ '/assets/images/enclosure_assembly/enclosure_light_strip_3.png' | relative_url }})
+![LED Strip 4]({{ '/assets/images/enclosure_assembly/enclosure_light_strip_4.png' | relative_url }})
+![LED Strip 5]({{ '/assets/images/enclosure_assembly/enclosure_light_strip_5.png' | relative_url }})
 
 ### 3. Camera 2 Assembly (Flight Camera)
 
@@ -119,7 +119,7 @@ Camera 2 is the bottom camera that captures the ball in flight and requires modi
    - Practice on old surface-mount PCBs first
    - Use quick-connect wires with jumper pins for easier connection/disconnection
 
-![Camera 2 Preparation](/assets/images/enclosure_assembly/enclosure_assembly_cam2_prep.png)
+![Camera 2 Preparation]({{ '/assets/images/enclosure_assembly/enclosure_assembly_cam2_prep.png' | relative_url }})
 
 3. **Strain relief:** Add thick glue drop over wire/solder junction. Run wires down from camera top and pinch between camera and gimbal backplate.
 
@@ -133,7 +133,7 @@ Camera 2 is the bottom camera that captures the ball in flight and requires modi
 
 1. **Filter holder assembly:** Glue two parts together using registration wings for alignment
 
-![Camera Filter](/assets/images/enclosure_assembly/camera_filter.png)
+![Camera Filter]({{ '/assets/images/enclosure_assembly/camera_filter.png' | relative_url }})
 
 2. **Install filter:** Insert visible light-cut filter, attach holder to lens with opening at top
 
@@ -148,14 +148,14 @@ Camera 2 is the bottom camera that captures the ball in flight and requires modi
    - Use black/red wires plus third wire for Camera 2 XTR
    - See wiring diagram reference below
 
-![PCB Wiring Diagram](/assets/images/enclosure_assembly/pcb_wiring_diagram.png)
+![PCB Wiring Diagram]({{ '/assets/images/enclosure_assembly/pcb_wiring_diagram.png' | relative_url }})
 
 {: .note }
 **Quality matters:** Low-quality wiring harnesses can cause random, difficult-to-diagnose problems. Ensure firm connections and make cables slightly longer than necessary.
 
 Recommended: [Pre-crimped ribbon cable kit](https://www.amazon.com/Kidisoii-Dupont-Connector-Pre-Crimped-5P-10CM/dp/B0CCV1HVM9/)
 
-![Pi Base Example](/assets/images/enclosure_assembly/pi_base_example.png)
+![Pi Base Example]({{ '/assets/images/enclosure_assembly/pi_base_example.png' | relative_url }})
 
 ### 5. Joining Base Layer Floor Halves
 
@@ -163,14 +163,14 @@ The two base floor halves join with an overlapping lap joint:
 
 1. **Prepare power-side floor:** Remove printing supports and smooth lap joint area. Belt sanding may help.
 
-![Belt Sanding](/assets/images/enclosure_assembly/belt_sanding.png)
+![Belt Sanding]({{ '/assets/images/enclosure_assembly/belt_sanding.png' | relative_url }})
 
 2. **Pre-place screws:** Insert 6x M3 x 10mm screws a few turns into power-side holes and right-most Pi-side holes
 3. **Join floors:** Slip power-side lap joint between camera base and Pi-side lap joint
 4. **Install assembly:** Place joined floors into base walls, aligning lap joint in middle
 5. **Secure floors:** Use M3 x 10mm screws into wall mounting pads
 
-![Join Two Bottom Layers](/assets/images/enclosure_assembly/join_two_bottom_layers.png)
+![Join Two Bottom Layers]({{ '/assets/images/enclosure_assembly/join_two_bottom_layers.png' | relative_url }})
 
 ### 6. Complete Base Layer
 
@@ -178,8 +178,8 @@ The two base floor halves join with an overlapping lap joint:
 2. **Connect Pi power:** Route from Pi power supply to Pi board
 3. **Connect network cable:** Route one network cable to Pi
 
-![Base Layer One](/assets/images/enclosure_assembly/base_layer_one.png)
-![Base Layer Two](/assets/images/enclosure_assembly/base_layer_two.png)
+![Base Layer One]({{ '/assets/images/enclosure_assembly/base_layer_one.png' | relative_url }})
+![Base Layer Two]({{ '/assets/images/enclosure_assembly/base_layer_two.png' | relative_url }})
 
 ### 7. Prepare for Middle Layer
 
@@ -224,7 +224,7 @@ See [Connector Board instructions](https://github.com/jamespilgrim/PiTrac/tree/m
 
 Mount both Pi-side and power-side lower floors to bottom of lower mounting pads using 4x M3 x 10mm self-tapping screws each.
 
-![Middle Layer](/assets/images/enclosure_assembly/middle_layer.png)
+![Middle Layer]({{ '/assets/images/enclosure_assembly/middle_layer.png' | relative_url }})
 
 Connect 5V micro-USB power to Connector Board from power adapter in left bay.
 
@@ -235,7 +235,7 @@ Camera 1 is similar to Camera 2 but:
 - Uses visible light (no modifications needed)
 - Requires different adapter cable for Pi 5
 
-![Camera Mount Assembly](/assets/images/enclosure_assembly/camera_mount_assembly.png)
+![Camera Mount Assembly]({{ '/assets/images/enclosure_assembly/camera_mount_assembly.png' | relative_url }})
 
 ### 7. Pi-side Middle Layer Upper Floor
 
@@ -258,7 +258,7 @@ Camera 1 is similar to Camera 2 but:
 2. **Guide power components:** Route utility strip and power adapters up left side void
 3. **Thread cables:** Guide base layer cables through right side space as middle layer is positioned
 
-![Two Layers Together](/assets/images/enclosure_assembly/two_layers_together.png)
+![Two Layers Together]({{ '/assets/images/enclosure_assembly/two_layers_together.png' | relative_url }})
 
 4. **Check clearances:** Ensure no wires will be pinched when layers connect
 5. **Connect layers:** Insert middle layer click-tabs into base layer tabs. Set into back first, then pull front of base layer outward to help engagement
@@ -273,8 +273,8 @@ Camera 1 is similar to Camera 2 but:
    {: .danger }
    **CRITICAL:** Double-check polarity! Reversed connection can destroy LED. Use clearly marked wires and keyed connectors when possible.
 
-![MOS Switch Bottom](/assets/images/enclosure_assembly/mos_switch_board_bottom.png)
-![MOS Switch Top](/assets/images/enclosure_assembly/mos_switch_board_top.png)
+![MOS Switch Bottom]({{ '/assets/images/enclosure_assembly/mos_switch_board_bottom.png' | relative_url }})
+![MOS Switch Top]({{ '/assets/images/enclosure_assembly/mos_switch_board_top.png' | relative_url }})
 
 2. **Connector Board to LED Strobe:** Connect "OUT (12V)" terminals to LED strobe
    
@@ -308,7 +308,7 @@ Install 15.5cm x 24cm plexiglass anti-strike window by sliding into mounting slo
 1. **Print components:** Back plate at full size, letters at 99% size for better fit
 2. **Color scheme:** Use preferred colors (see reference image)
 
-![PiTrac Logo](/assets/images/enclosure_assembly/pi_trac_logo.png)
+![PiTrac Logo]({{ '/assets/images/enclosure_assembly/pi_trac_logo.png' | relative_url }})
 
 3. **Assembly:** Use rubber hammer to tap characters into place. Friction holds parts, but cyanoacrylate glue provides permanent bond
 4. **Mounting:** Use 2-sided tape (rough surfaces don't glue well)
