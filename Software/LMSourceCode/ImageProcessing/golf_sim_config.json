@@ -14,6 +14,8 @@
         "ball_identification": {
             "kDetectionMethod": "legacy",
             "DETECTION_METHOD_OPTIONS": "legacy=HoughCircles(stable), experimental=ONNX/YOLO(fast), experimental_sahi=ONNX/YOLO+SAHI(accurate)",
+            "kBallPlacementDetectionMethod": "legacy",
+            "BALL_PLACEMENT_METHOD_OPTIONS": "legacy=GetCalibratedBall/HoughCircles, experimental=YOLO(fast+accurate)",
             "kONNXModelPath": "../../Software/GroundTruthAnnotator/experiments/high_performance_300e2/weights/best.onnx",
             "kONNXConfidenceThreshold": "0.5",
             "kONNXNMSThreshold": "0.4", 

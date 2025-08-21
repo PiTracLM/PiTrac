@@ -42,6 +42,7 @@
 #include <libcamera/logging.h>
 #include "motion_detect.h"
 #include "libcamera_interface.h"
+#include "ball_image_proc.h"
 
 
 namespace golf_sim {
@@ -1328,11 +1329,80 @@ bool TakeRawPicture(const GolfSimCamera& camera, cv::Mat& img) {
     return true;
 }
 
+// Enhanced ball detection using YOLO when configured
+bool CheckForBallEnhanced(GolfBall& ball, cv::Mat& img) {
+    bool use_yolo = (golf_sim::BallImageProc::kBallPlacementDetectionMethod == "experimental");
+    
+    GsCameraNumber camera_number = GolfSimOptions::GetCommandLineOptions().GetCameraNumber();
+    const CameraHardware::CameraModel camera_model = (camera_number == GsCameraNumber::kGsCamera1) ? 
+        GolfSimCamera::kSystemSlot1CameraType : GolfSimCamera::kSystemSlot2CameraType;
+    const CameraHardware::LensType camera_lens_type = (camera_number == GsCameraNumber::kGsCamera1) ? 
+        GolfSimCamera::kSystemSlot1LensType : GolfSimCamera::kSystemSlot2LensType;
+    
+    GolfSimCamera camera;
+    camera.camera_hardware_.init_camera_parameters(camera_number, camera_model, camera_lens_type);
+    
+    if (!TakeRawPicture(camera, img)) {
+        GS_LOG_MSG(error, "Failed to TakeRawPicture.");
+        return false;
+    }
+    
+    cv::Vec2i search_center = camera.GetExpectedBallCenter();
+    
+    if (use_yolo) {
+        GS_LOG_TRACE_MSG(trace, "Using YOLO for ball placement detection");
+        
+        if (!golf_sim::BallImageProc::PreloadYOLOModel()) {
+            GS_LOG_MSG(warning, "YOLO model not available, using legacy detection");
+        } else {
+            std::vector<GsCircle> detected_circles;
+            bool detected = golf_sim::BallImageProc::DetectBallsONNX(img, 
+                                                          golf_sim::BallImageProc::BallSearchMode::kFindPlacedBall,
+                                                          detected_circles);
+            
+            if (detected && !detected_circles.empty()) {
+                GsCircle best_circle;
+                float best_distance = FLT_MAX;
+                
+                for (const auto& circle : detected_circles) {
+                    float dx = circle[0] - search_center[0];
+                    float dy = circle[1] - search_center[1];
+                    float distance = sqrt(dx*dx + dy*dy);
+                    
+                    if (distance < best_distance) {
+                        best_distance = distance;
+                        best_circle = circle;
+                    }
+                }
+                
+                if (best_distance < 200) {
+                    ball.ball_circle_ = best_circle;
+                    ball.measured_radius_pixels_ = best_circle[2];
+                    ball.search_area_center_ = search_center;
+                    ball.search_area_radius_ = 200;
+                    
+                    GS_LOG_TRACE_MSG(trace, "YOLO ball placement detection successful");
+                    return true;
+                }
+            }
+            GS_LOG_TRACE_MSG(trace, "YOLO found no suitable balls near expected position");
+        }
+    }
+    
+    GS_LOG_TRACE_MSG(trace, "Using traditional GetCalibratedBall detection");
+    bool expectBall = false;
+    return camera.GetCalibratedBall(camera, img, ball, search_center, expectBall);
+}
+
 // TBD - This really seems like it should exist in the gs_camera module?
 bool CheckForBall(GolfBall& ball, cv::Mat& img) {
+    return CheckForBallEnhanced(ball, img);
+}
+
+bool CheckForBallLegacy(GolfBall& ball, cv::Mat& img) {
 
 	GsCameraNumber camera_number = GolfSimOptions::GetCommandLineOptions().GetCameraNumber();
-    GS_LOG_TRACE_MSG(trace, "CheckForBall called for camera number " + std::to_string(camera_number));
+    GS_LOG_TRACE_MSG(trace, "CheckForBallLegacy called for camera number " + std::to_string(camera_number));
 
     // Figure out where the ball is
     // TBD - This repeats the camera initialization that we just did

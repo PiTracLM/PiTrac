@@ -184,6 +184,7 @@ public:
 
     // ONNX Detection Configuration
     static std::string kDetectionMethod;
+    static std::string kBallPlacementDetectionMethod;
     static std::string kONNXModelPath;
     static float kONNXConfidenceThreshold;
     static float kONNXNMSThreshold;

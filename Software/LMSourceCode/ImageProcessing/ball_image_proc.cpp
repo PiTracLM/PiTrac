@@ -203,6 +203,7 @@ namespace golf_sim {
     // ONNX Detection Configuration
     // TODO: Fix defaults or remove these entirely
     std::string BallImageProc::kDetectionMethod = "legacy";
+    std::string BallImageProc::kBallPlacementDetectionMethod = "legacy";
     // Default ONNX model path - can be overridden by config file
     #ifdef _WIN32
     std::string BallImageProc::kONNXModelPath = "../../Software/GroundTruthAnnotator/experiments/high_performance_300e2/weights/best.onnx";
@@ -367,6 +368,7 @@ namespace golf_sim {
 
         // ONNX Detection Configuration
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kDetectionMethod", kDetectionMethod);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBallPlacementDetectionMethod", kBallPlacementDetectionMethod);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXModelPath", kONNXModelPath);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXConfidenceThreshold", kONNXConfidenceThreshold);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXNMSThreshold", kONNXNMSThreshold);
@@ -378,9 +380,10 @@ namespace golf_sim {
 
         GolfSimConfiguration::SetConstant("gs_config.logging.kLogIntermediateSpinImagesToFile", kLogIntermediateSpinImagesToFile);
         
-        // Preload YOLO model at startup if using experimental detection
-        if (kDetectionMethod == "experimental" || kDetectionMethod == "experimental_sahi") {
-            GS_LOG_MSG(info, "Detection method is '" + kDetectionMethod + "', preloading YOLO model at startup...");
+        // Preload YOLO model at startup if using experimental detection for either ball placement or flight
+        if (kDetectionMethod == "experimental" || kDetectionMethod == "experimental_sahi" || 
+            kBallPlacementDetectionMethod == "experimental") {
+            GS_LOG_MSG(info, "Detection method is '" + kDetectionMethod + "' / Placement method is '" + kBallPlacementDetectionMethod + "', preloading YOLO model at startup...");
             if (PreloadYOLOModel()) {
                 GS_LOG_MSG(info, "YOLO model preloaded successfully - first detection will be fast!");
             } else {
