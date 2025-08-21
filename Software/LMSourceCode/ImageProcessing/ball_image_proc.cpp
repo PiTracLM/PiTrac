@@ -14,6 +14,7 @@
 #include <ranges>
 #include <algorithm>
 #include <vector>
+#include <chrono>
 #include "gs_format_lib.h"
 
 #include <boost/timer/timer.hpp>
@@ -202,7 +203,12 @@ namespace golf_sim {
     // ONNX Detection Configuration
     // TODO: Fix defaults or remove these entirely
     std::string BallImageProc::kDetectionMethod = "legacy";
+    // Default ONNX model path - can be overridden by config file
+    #ifdef _WIN32
+    std::string BallImageProc::kONNXModelPath = "../../Software/GroundTruthAnnotator/experiments/high_performance_300e2/weights/best.onnx";
+    #else
     std::string BallImageProc::kONNXModelPath = "../GroundTruthAnnotator/experiments/maximum_performance_v3/weights/best.onnx";
+    #endif
     float BallImageProc::kONNXConfidenceThreshold = 0.5f;
     float BallImageProc::kONNXNMSThreshold = 0.4f;
     int BallImageProc::kONNXInputSize = 640;
@@ -210,6 +216,20 @@ namespace golf_sim {
     int BallImageProc::kSAHISliceWidth = 320;
     float BallImageProc::kSAHIOverlapRatio = 0.2f;
     std::string BallImageProc::kONNXDeviceType = "CPU";
+
+    // YOLO model caching - static members
+    cv::dnn::Net BallImageProc::yolo_model_;
+    bool BallImageProc::yolo_model_loaded_ = false;
+    std::mutex BallImageProc::yolo_model_mutex_;
+    
+    // Pre-allocated buffers - static members
+    cv::Mat BallImageProc::yolo_input_buffer_;
+    cv::Mat BallImageProc::yolo_letterbox_buffer_;
+    cv::Mat BallImageProc::yolo_resized_buffer_;
+    cv::Mat BallImageProc::yolo_blob_buffer_;
+    std::vector<cv::Rect> BallImageProc::yolo_detection_boxes_;
+    std::vector<float> BallImageProc::yolo_detection_confidences_;
+    std::vector<cv::Mat> BallImageProc::yolo_outputs_;
 
     BallImageProc::BallImageProc() {
         min_ball_radius_ = -1;
@@ -357,6 +377,16 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXDeviceType", kONNXDeviceType);
 
         GolfSimConfiguration::SetConstant("gs_config.logging.kLogIntermediateSpinImagesToFile", kLogIntermediateSpinImagesToFile);
+        
+        // Preload YOLO model at startup if using experimental detection
+        if (kDetectionMethod == "experimental" || kDetectionMethod == "experimental_sahi") {
+            GS_LOG_MSG(info, "Detection method is '" + kDetectionMethod + "', preloading YOLO model at startup...");
+            if (PreloadYOLOModel()) {
+                GS_LOG_MSG(info, "YOLO model preloaded successfully - first detection will be fast!");
+            } else {
+                GS_LOG_MSG(warning, "Failed to preload YOLO model - will load on first detection");
+            }
+        }
     }
 
     BallImageProc::~BallImageProc() {
@@ -4087,33 +4117,113 @@ namespace golf_sim {
     /**
      * ONNX/YOLO Detection Pipeline
      */
+    bool BallImageProc::PreloadYOLOModel() {
+        GS_LOG_MSG(info, "Preloading YOLO model at startup for detection method: " + kDetectionMethod);
+        
+        if (yolo_model_loaded_) {
+            GS_LOG_MSG(trace, "YOLO model already loaded");
+            return true;
+        }
+        
+        try {
+            std::lock_guard<std::mutex> lock(yolo_model_mutex_);
+            
+            if (yolo_model_loaded_) {
+                return true;
+            }
+            
+            GS_LOG_MSG(info, "Loading YOLO model from: " + kONNXModelPath);
+            auto start_time = std::chrono::high_resolution_clock::now();
+            
+            yolo_model_ = cv::dnn::readNetFromONNX(kONNXModelPath);
+            if (yolo_model_.empty()) {
+                GS_LOG_MSG(error, "Failed to preload ONNX model: " + kONNXModelPath);
+                return false;
+            }
+            
+            if (kONNXDeviceType == "CPU") {
+                yolo_model_.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+                yolo_model_.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+            } else {
+                yolo_model_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+                yolo_model_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+            }
+            
+            yolo_letterbox_buffer_ = cv::Mat(kONNXInputSize, kONNXInputSize, CV_8UC3);
+            yolo_detection_boxes_.reserve(10);  // Max 10 golf balls
+            yolo_detection_confidences_.reserve(10);
+            yolo_outputs_.reserve(3);  // Network typically has 1-3 output layers
+            
+            yolo_model_loaded_ = true;
+            
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+            GS_LOG_MSG(info, "YOLO model preloaded successfully in " + 
+                            std::to_string(duration.count()) + "ms. First detection will be fast!");
+            
+            return true;
+        } catch (const cv::Exception& e) {
+            GS_LOG_MSG(error, "OpenCV exception during YOLO model preload: " + std::string(e.what()));
+            return false;
+        } catch (const std::exception& e) {
+            GS_LOG_MSG(error, "Exception during YOLO model preload: " + std::string(e.what()));
+            return false;
+        } catch (...) {
+            GS_LOG_MSG(error, "Unknown exception during YOLO model preload");
+            return false;
+        }
+    }
+
     bool BallImageProc::DetectBallsONNX(const cv::Mat& preprocessed_img, BallSearchMode search_mode, 
                                        std::vector<GsCircle>& detected_circles) {
         GS_LOG_TRACE_MSG(trace, "BallImageProc::DetectBallsONNX");
         
+        
         try {
-            // Load ONNX model
-            cv::dnn::Net net = cv::dnn::readNetFromONNX(kONNXModelPath);
-            if (net.empty()) {
-                GS_LOG_MSG(error, "Failed to load ONNX model: " + kONNXModelPath);
-                return false;
+            {
+                std::lock_guard<std::mutex> lock(yolo_model_mutex_);
+                if (!yolo_model_loaded_) {
+                    GS_LOG_MSG(info, "Loading YOLO model for the first time (one-time ~500ms operation)...");
+                    auto start_time = std::chrono::high_resolution_clock::now();
+                    
+                    yolo_model_ = cv::dnn::readNetFromONNX(kONNXModelPath);
+                    if (yolo_model_.empty()) {
+                        GS_LOG_MSG(error, "Failed to load ONNX model: " + kONNXModelPath);
+                        return false;
+                    }
+                    
+                    // Set backend and target
+                    if (kONNXDeviceType == "CPU") {
+                        yolo_model_.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+                        yolo_model_.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+                    } else {
+                        yolo_model_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+                        yolo_model_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+                    }
+                    
+                    yolo_letterbox_buffer_ = cv::Mat(kONNXInputSize, kONNXInputSize, CV_8UC3);
+                    yolo_detection_boxes_.reserve(10);  // Max 10 golf balls
+                    yolo_detection_confidences_.reserve(10);
+                    yolo_outputs_.reserve(3);  // Network typically has 1-3 output layers
+                    
+                    yolo_model_loaded_ = true;
+                    
+                    auto end_time = std::chrono::high_resolution_clock::now();
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+                    GS_LOG_MSG(info, "YOLO model loaded and cached successfully in " + 
+                                    std::to_string(duration.count()) + "ms. Buffers pre-allocated. Future detections will be fast!");
+                }
             }
             
-            // Set backend and target
-            if (kONNXDeviceType == "CPU") {
-                net.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
-                net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
-            } else {
-                net.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
-                net.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
-            }
+            cv::dnn::Net& net = yolo_model_;
             
-            // Prepare input image
-            cv::Mat input_image;
             if (preprocessed_img.channels() == 1) {
-                cv::cvtColor(preprocessed_img, input_image, cv::COLOR_GRAY2RGB);
+                cv::cvtColor(preprocessed_img, yolo_input_buffer_, cv::COLOR_GRAY2RGB);
             } else if (preprocessed_img.channels() == 3) {
-                input_image = preprocessed_img.clone();
+                if (yolo_input_buffer_.size() != preprocessed_img.size() || yolo_input_buffer_.type() != preprocessed_img.type()) {
+                    yolo_input_buffer_ = cv::Mat(preprocessed_img.size(), preprocessed_img.type());
+                }
+                preprocessed_img.copyTo(yolo_input_buffer_);
             } else {
                 GS_LOG_MSG(error, "Unsupported number of channels: " + std::to_string(preprocessed_img.channels()));
                 return false;
@@ -4126,26 +4236,26 @@ namespace golf_sim {
             if (use_sahi) {
                 // Create overlapping slices
                 int overlap = static_cast<int>(kSAHISliceWidth * kSAHIOverlapRatio);
-                for (int y = 0; y < input_image.rows; y += kSAHISliceHeight - overlap) {
-                    for (int x = 0; x < input_image.cols; x += kSAHISliceWidth - overlap) {
+                for (int y = 0; y < yolo_input_buffer_.rows; y += kSAHISliceHeight - overlap) {
+                    for (int x = 0; x < yolo_input_buffer_.cols; x += kSAHISliceWidth - overlap) {
                         cv::Rect slice(x, y, 
-                                      std::min(kSAHISliceWidth, input_image.cols - x),
-                                      std::min(kSAHISliceHeight, input_image.rows - y));
+                                      std::min(kSAHISliceWidth, yolo_input_buffer_.cols - x),
+                                      std::min(kSAHISliceHeight, yolo_input_buffer_.rows - y));
                         slices.push_back(slice);
                     }
                 }
                 GS_LOG_TRACE_MSG(trace, "SAHI: Created " + std::to_string(slices.size()) + " slices");
             } else {
                 // Single slice = whole image
-                slices.push_back(cv::Rect(0, 0, input_image.cols, input_image.rows));
+                slices.push_back(cv::Rect(0, 0, yolo_input_buffer_.cols, yolo_input_buffer_.rows));
             }
             
             // Run inference on each slice
-            std::vector<cv::Rect> all_boxes;
-            std::vector<float> all_confidences;
+            yolo_detection_boxes_.clear();  // Clear but keep capacity
+            yolo_detection_confidences_.clear();
             
             for (const auto& slice : slices) {
-                cv::Mat slice_img = input_image(slice);
+                cv::Mat slice_img = yolo_input_buffer_(slice);
                 
                 GS_LOG_TRACE_MSG(trace, "Processing slice: " + std::to_string(slice.x) + "," + 
                                std::to_string(slice.y) + " size=" + std::to_string(slice.width) + "x" + 
@@ -4153,36 +4263,35 @@ namespace golf_sim {
                                std::to_string(slice_img.rows));
                 
                 // Create letterboxed input to match rect=True training format
-                cv::Mat letterboxed_img;
                 float scale = std::min(float(kONNXInputSize) / slice_img.cols, 
                                      float(kONNXInputSize) / slice_img.rows);
                 int new_width = int(slice_img.cols * scale);
                 int new_height = int(slice_img.rows * scale);
                 
                 // Resize maintaining aspect ratio
-                cv::Mat resized_img;
-                cv::resize(slice_img, resized_img, cv::Size(new_width, new_height));
+                if (yolo_resized_buffer_.size() != cv::Size(new_width, new_height) || yolo_resized_buffer_.type() != CV_8UC3) {
+                    yolo_resized_buffer_ = cv::Mat(new_height, new_width, CV_8UC3);
+                }
+                cv::resize(slice_img, yolo_resized_buffer_, cv::Size(new_width, new_height));
                 
-                // Create letterboxed image with gray padding (114, 114, 114) like YOLOv8
-                letterboxed_img = cv::Mat::ones(kONNXInputSize, kONNXInputSize, CV_8UC3) * 114;
+                // Fill letterbox buffer with gray padding (114, 114, 114) like YOLOv8
+                yolo_letterbox_buffer_.setTo(cv::Scalar(114, 114, 114));
                 int x_offset = (kONNXInputSize - new_width) / 2;
                 int y_offset = (kONNXInputSize - new_height) / 2;
-                resized_img.copyTo(letterboxed_img(cv::Rect(x_offset, y_offset, new_width, new_height)));
-                
+                yolo_resized_buffer_.copyTo(yolo_letterbox_buffer_(cv::Rect(x_offset, y_offset, new_width, new_height)));
                 // Create blob from letterboxed image
-                cv::Mat blob;
-                cv::dnn::blobFromImage(letterboxed_img, blob, 1.0/255.0, 
+                cv::dnn::blobFromImage(yolo_letterbox_buffer_, yolo_blob_buffer_, 1.0/255.0, 
                                       cv::Size(kONNXInputSize, kONNXInputSize), 
                                       cv::Scalar(), false, false);  // swapRB=false for YOLOv8 BGR input
                 
-                // Run inference
-                net.setInput(blob);
-                std::vector<cv::Mat> outputs;
-                net.forward(outputs, net.getUnconnectedOutLayersNames());
+                // Run inference - reuse output buffer
+                net.setInput(yolo_blob_buffer_);
+                yolo_outputs_.clear();  // Clear but keep capacity
+                net.forward(yolo_outputs_, net.getUnconnectedOutLayersNames());
                 
                 // Parse YOLOv8 ONNX output format [1, 5, 44436] -> transpose to [44436, 5]
-                if (!outputs.empty()) {
-                    cv::Mat output = outputs[0];
+                if (!yolo_outputs_.empty()) {
+                    cv::Mat output = yolo_outputs_[0];
                     
                     // Reshape and transpose YOLOv8 output to [detections, features] format
                     if (output.dims == 3 && output.size[0] == 1) {
@@ -4233,9 +4342,9 @@ namespace golf_sim {
                             
                             // Bounds checking to ensure valid cv::Rect
                             if (w > 0 && h > 0 && x >= 0 && y >= 0 && 
-                                x + w <= input_image.cols && y + h <= input_image.rows) {
-                                all_boxes.push_back(cv::Rect(x, y, w, h));
-                                all_confidences.push_back(confidence);
+                                x + w <= yolo_input_buffer_.cols && y + h <= yolo_input_buffer_.rows) {
+                                yolo_detection_boxes_.push_back(cv::Rect(x, y, w, h));
+                                yolo_detection_confidences_.push_back(confidence);
                             }
                         }
                     }
@@ -4244,12 +4353,12 @@ namespace golf_sim {
             
             // Apply NMS to remove overlapping detections
             std::vector<int> indices;
-            cv::dnn::NMSBoxes(all_boxes, all_confidences, kONNXConfidenceThreshold, kONNXNMSThreshold, indices);
+            cv::dnn::NMSBoxes(yolo_detection_boxes_, yolo_detection_confidences_, kONNXConfidenceThreshold, kONNXNMSThreshold, indices);
             
             // Convert bounding boxes to circles
             detected_circles.clear();
             for (int idx : indices) {
-                const cv::Rect& box = all_boxes[idx];
+                const cv::Rect& box = yolo_detection_boxes_[idx];
                 GsCircle circle;
                 circle[0] = box.x + box.width / 2;
                 circle[1] = box.y + box.height / 2;

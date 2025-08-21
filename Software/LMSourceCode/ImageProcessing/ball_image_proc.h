@@ -11,6 +11,7 @@
 
 #include <iostream>
 #include <filesystem>
+#include <mutex>
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -323,8 +324,26 @@ public:
     static bool DetectBalls(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
     static bool DetectBallsHoughCircles(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
     static bool DetectBallsONNX(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
+    
+    // Preload YOLO model at startup for faster first detection
+    static bool PreloadYOLOModel();
 
 private:
+    // YOLO model caching - CRITICAL PERFORMANCE FIX
+    // This prevents loading the 50MB ONNX model from disk on every detection
+    static cv::dnn::Net yolo_model_;
+    static bool yolo_model_loaded_;
+    static std::mutex yolo_model_mutex_;  // Thread safety for model loading
+    
+    // PERFORMANCE FIX #2: Pre-allocated buffers for YOLO inference
+    // Prevents allocating ~1.2MB per frame (640x640x3 multiple times)
+    static cv::Mat yolo_input_buffer_;        // Reusable input conversion buffer
+    static cv::Mat yolo_letterbox_buffer_;    // 640x640x3 letterboxed image
+    static cv::Mat yolo_resized_buffer_;      // Resized image before letterboxing
+    static cv::Mat yolo_blob_buffer_;         // Blob for network input
+    static std::vector<cv::Rect> yolo_detection_boxes_;     // Detection results
+    static std::vector<float> yolo_detection_confidences_;  // Detection confidences
+    static std::vector<cv::Mat> yolo_outputs_;              // Network outputs
 
     // When we create a candidate ball list, the elements of that list include not only 
     // the ball, but also the ball identifier(e.g., 1, 2...),
