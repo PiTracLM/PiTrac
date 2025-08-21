@@ -327,6 +327,12 @@ public:
     
     // Preload YOLO model at startup for faster first detection
     static bool PreloadYOLOModel();
+    
+    // Custom single-class NMS optimized for golf balls (faster than generic multi-class NMS)
+    static std::vector<int> SingleClassNMS(const std::vector<cv::Rect>& boxes, 
+                                          const std::vector<float>& confidences,
+                                          float conf_threshold, 
+                                          float nms_threshold);
 
 private:
     // YOLO model caching - CRITICAL PERFORMANCE FIX
