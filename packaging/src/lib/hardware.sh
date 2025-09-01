@@ -2,9 +2,9 @@
 # lib/hardware.sh - Hardware detection and management functions
 
 detect_pi_model() {
-  if grep -q "Raspberry Pi 5" /proc/cpuinfo 2>/dev/null; then
+  if grep -q "Raspberry Pi.*5" /proc/cpuinfo 2>/dev/null; then
     echo "pi5"
-  elif grep -q "Raspberry Pi 4" /proc/cpuinfo 2>/dev/null; then
+  elif grep -q "Raspberry Pi.*4" /proc/cpuinfo 2>/dev/null; then
     echo "pi4"
   elif grep -q "Raspberry Pi" /proc/cpuinfo 2>/dev/null; then
     echo "pi_other"

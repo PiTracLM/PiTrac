@@ -3,9 +3,9 @@ set -e
 
 # Function to detect Pi model
 detect_pi_model() {
-    if grep -q "Raspberry Pi 5" /proc/cpuinfo 2>/dev/null; then
+    if grep -q "Raspberry Pi.*5" /proc/cpuinfo 2>/dev/null; then
         echo "pi5"
-    elif grep -q "Raspberry Pi 4" /proc/cpuinfo 2>/dev/null; then
+    elif grep -q "Raspberry Pi.*4" /proc/cpuinfo 2>/dev/null; then
         echo "pi4"
     else
         echo "unknown"
@@ -15,11 +15,11 @@ detect_pi_model() {
 case "$1" in
     configure)
         echo "Configuring PiTrac..."
-        
+
         # Detect Pi model
         PI_MODEL=$(detect_pi_model)
         echo "Detected Pi model: $PI_MODEL"
-        
+
         # Create tomee user/group
         if ! getent group tomee >/dev/null; then
             groupadd -r tomee
@@ -27,7 +27,7 @@ case "$1" in
         if ! getent passwd tomee >/dev/null; then
             useradd -r -g tomee -d /opt/tomee -s /bin/false tomee
         fi
-        
+
         # Get the actual user who invoked sudo (if any)
         ACTUAL_USER="${SUDO_USER:-}"
         if [ -z "$ACTUAL_USER" ]; then
@@ -35,14 +35,14 @@ case "$1" in
         else
             # Add user to required groups
             usermod -a -G video,gpio,i2c,spi,dialout "$ACTUAL_USER" 2>/dev/null || true
-            
+
             # Create user directories
             USER_HOME=$(getent passwd "$ACTUAL_USER" | cut -d: -f6)
             if [ -n "$USER_HOME" ] && [ -d "$USER_HOME" ]; then
                 mkdir -p "$USER_HOME/.pitrac"/{config,cache,state,calibration}
                 mkdir -p "$USER_HOME/LM_Shares"/{Images,WebShare}
                 chown -R "$ACTUAL_USER:$ACTUAL_USER" "$USER_HOME/.pitrac" "$USER_HOME/LM_Shares"
-                
+
                 # Copy default config to user directory if it doesn't exist
                 if [ ! -f "$USER_HOME/.pitrac/config/pitrac.yaml" ]; then
                     cp /etc/pitrac/pitrac.yaml "$USER_HOME/.pitrac/config/pitrac.yaml"
@@ -50,7 +50,7 @@ case "$1" in
                 fi
             fi
         fi
-        
+
         # System config should be root-owned and world-readable
         chown root:root /etc/pitrac
         chmod 755 /etc/pitrac
@@ -60,17 +60,17 @@ case "$1" in
             chown root:root /etc/pitrac/golf_sim_config.json
             chmod 644 /etc/pitrac/golf_sim_config.json
         fi
-        
+
         # Set TomEE permissions
         chown -R tomee:tomee /opt/tomee
         chmod 755 /opt/tomee/bin/*.sh
-        
+
         # Apply Boost C++20 fix
         if [ -f /usr/include/boost/asio/awaitable.hpp ] && ! grep -q "#include <utility>" /usr/include/boost/asio/awaitable.hpp; then
             echo "Applying Boost 1.74 C++20 compatibility fix..."
             sed -i '/namespace boost {/i #include <utility>' /usr/include/boost/asio/awaitable.hpp
         fi
-        
+
         # Configure boot settings - Bookworm uses /boot/firmware for both Pi 4 and Pi 5
         if [ -f "/boot/firmware/config.txt" ]; then
             CONFIG_FILE="/boot/firmware/config.txt"
@@ -80,49 +80,56 @@ case "$1" in
             # Default to new location
             CONFIG_FILE="/boot/firmware/config.txt"
         fi
-        
+
         if [ -f "$CONFIG_FILE" ]; then
             echo "Configuring boot settings in $CONFIG_FILE..."
-            
+
             # Add settings if not present
             grep -q "camera_auto_detect=1" "$CONFIG_FILE" || echo "camera_auto_detect=1" >> "$CONFIG_FILE"
             grep -q "dtparam=i2c_arm=on" "$CONFIG_FILE" || echo "dtparam=i2c_arm=on" >> "$CONFIG_FILE"
             grep -q "dtparam=spi=on" "$CONFIG_FILE" || echo "dtparam=spi=on" >> "$CONFIG_FILE"
             grep -q "force_turbo=1" "$CONFIG_FILE" || echo "force_turbo=1" >> "$CONFIG_FILE"
-            
+
             if [ "$PI_MODEL" = "pi5" ]; then
                 grep -q "arm_boost=1" "$CONFIG_FILE" || echo "arm_boost=1" >> "$CONFIG_FILE"
             else
                 grep -q "gpu_mem=256" "$CONFIG_FILE" || echo "gpu_mem=256" >> "$CONFIG_FILE"
             fi
         fi
+
+        # Configure libcamera settings
+        echo "Configuring libcamera..."
         
-        # Configure camera timeout
-        if [ "$PI_MODEL" = "pi5" ]; then
-            CAMERA_CONFIG="/usr/share/libcamera/pipeline/rpi/pisp/rpi_apps.yaml"
-        else
-            CAMERA_CONFIG="/usr/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml"
-        fi
-        
-        if [ ! -f "$CAMERA_CONFIG" ]; then
-            # Try to create from example
-            CAMERA_DIR=$(dirname "$CAMERA_CONFIG")
-            if [ -f "$CAMERA_DIR/example.yaml" ]; then
-                cp "$CAMERA_DIR/example.yaml" "$CAMERA_CONFIG"
+        # Use existing example.yaml files as base for configuration
+        # Both Pi 4 (vc4) and Pi 5 (pisp) ship with example.yaml
+        for pipeline in pisp vc4; do
+            CAMERA_DIR="/usr/share/libcamera/pipeline/rpi/${pipeline}"
+            EXAMPLE_FILE="${CAMERA_DIR}/example.yaml"
+            CAMERA_CONFIG="${CAMERA_DIR}/rpi_apps.yaml"
+            
+            # Only proceed if the pipeline directory exists (Pi 4 has vc4, Pi 5 has pisp)
+            if [ -d "$CAMERA_DIR" ]; then
+                # If example exists but rpi_apps doesn't, copy and configure
+                if [ -f "$EXAMPLE_FILE" ] && [ ! -f "$CAMERA_CONFIG" ]; then
+                    echo "Creating ${pipeline} config from example..."
+                    cp "$EXAMPLE_FILE" "$CAMERA_CONFIG"
+                    # Uncomment and set the camera timeout to 1 second (1000000 ms)
+                    sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 1000000/' "$CAMERA_CONFIG"
+                elif [ -f "$CAMERA_CONFIG" ]; then
+                    # Config exists, check if timeout needs updating
+                    if grep -q '# *"camera_timeout_value_ms"' "$CAMERA_CONFIG"; then
+                        echo "Updating ${pipeline} camera timeout..."
+                        sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 1000000/' "$CAMERA_CONFIG"
+                    fi
+                fi
             fi
-        fi
-        
-        if [ -f "$CAMERA_CONFIG" ] && ! grep -q "camera_timeout_value_ms" "$CAMERA_CONFIG"; then
-            echo "Configuring camera timeout..."
-            sed -i '/pipeline:/a\    "camera_timeout_value_ms": 1000000,' "$CAMERA_CONFIG"
-        fi
-        
+        done
         # Update library cache
         ldconfig
-        
+
         # Reload systemd
         systemctl daemon-reload
-        
+
         # Configure ActiveMQ instance
         if [ -d /etc/activemq/instances-available ] && [ ! -e /etc/activemq/instances-enabled/main ]; then
             echo "Enabling ActiveMQ main instance..."
@@ -130,28 +137,41 @@ case "$1" in
             mkdir -p /etc/activemq/instances-enabled
             rm -f /etc/activemq/instances-enabled/*
             ln -sf /etc/activemq/instances-available/main /etc/activemq/instances-enabled/main
-            
-            # Create instance data directory for ActiveMQ
+
+            # Create directories for ActiveMQ
             mkdir -p /var/lib/activemq/main
+            mkdir -p /var/lib/activemq/conf
+            mkdir -p /var/lib/activemq/data
+            mkdir -p /var/lib/activemq/tmp
+
+            # Copy configs to instance directory
             if [ -f /etc/activemq/instances-available/main/activemq.xml ]; then
                 cp /etc/activemq/instances-available/main/activemq.xml /var/lib/activemq/main/ 2>/dev/null || true
             fi
             if [ -f /etc/activemq/instances-available/main/log4j2.properties ]; then
                 cp /etc/activemq/instances-available/main/log4j2.properties /var/lib/activemq/main/ 2>/dev/null || true
             fi
-            
-            # Set proper ownership
-            if getent passwd activemq >/dev/null; then
-                chown -R activemq:activemq /var/lib/activemq/main
+
+            # Also copy to /var/lib/activemq/conf where ActiveMQ actually looks
+            if [ -f /etc/activemq/instances-available/main/activemq.xml ]; then
+                cp /etc/activemq/instances-available/main/activemq.xml /var/lib/activemq/conf/ 2>/dev/null || true
             fi
-            
+            if [ -f /etc/activemq/instances-available/main/log4j2.properties ]; then
+                cp /etc/activemq/instances-available/main/log4j2.properties /var/lib/activemq/conf/ 2>/dev/null || true
+            fi
+
+            # Set proper ownership for ALL ActiveMQ directories
+            if getent passwd activemq >/dev/null; then
+                chown -R activemq:activemq /var/lib/activemq/
+            fi
+
             # Don't start it here - let the user or pitrac CLI handle it
         fi
-        
+
         # Enable services (but don't start)
         systemctl enable pitrac.service || true
         systemctl enable tomee.service || true
-        
+
         echo ""
         echo "======================================"
         echo " PiTrac installed!"
@@ -166,16 +186,16 @@ case "$1" in
         echo ""
         echo "Need help? Try 'pitrac help' or 'pitrac status'"
         echo ""
-        
+
         # Suggest reboot if Pi model detected
         if [ "$PI_MODEL" != "unknown" ]; then
             echo "Note: A reboot is recommended to apply boot configuration changes."
         fi
         ;;
-    
+
     abort-upgrade|abort-remove|abort-deconfigure)
         ;;
-    
+
     *)
         echo "postinst called with unknown argument: $1" >&2
         exit 1

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # lib/process.sh - Process management functions
 
-readonly PITRAC_PID_DIR="/var/run/pitrac"
-readonly PITRAC_PID_FILE="${PITRAC_PID_DIR}/pitrac.pid"
-readonly PITRAC_LOCK_FILE="${PITRAC_PID_DIR}/pitrac.lock"
-readonly PITRAC_LOG_FILE="/var/log/pitrac/pitrac.log"
+PITRAC_PID_DIR="/var/run/pitrac"
+PITRAC_PID_FILE="${PITRAC_PID_DIR}/pitrac.pid"
+PITRAC_LOCK_FILE="${PITRAC_PID_DIR}/pitrac.lock"
+PITRAC_LOG_FILE="/var/log/pitrac/pitrac.log"
 
 ensure_pid_directory() {
   if [[ ! -d "$PITRAC_PID_DIR" ]]; then
