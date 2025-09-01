@@ -126,9 +126,25 @@ case "$1" in
         # Configure ActiveMQ instance
         if [ -d /etc/activemq/instances-available ] && [ ! -e /etc/activemq/instances-enabled/main ]; then
             echo "Enabling ActiveMQ main instance..."
-            # Clean up any existing instances first
+            # Ensure directory exists and clean up any existing instances
+            mkdir -p /etc/activemq/instances-enabled
             rm -f /etc/activemq/instances-enabled/*
             ln -sf /etc/activemq/instances-available/main /etc/activemq/instances-enabled/main
+            
+            # Create instance data directory for ActiveMQ
+            mkdir -p /var/lib/activemq/main
+            if [ -f /etc/activemq/instances-available/main/activemq.xml ]; then
+                cp /etc/activemq/instances-available/main/activemq.xml /var/lib/activemq/main/ 2>/dev/null || true
+            fi
+            if [ -f /etc/activemq/instances-available/main/log4j2.properties ]; then
+                cp /etc/activemq/instances-available/main/log4j2.properties /var/lib/activemq/main/ 2>/dev/null || true
+            fi
+            
+            # Set proper ownership
+            if getent passwd activemq >/dev/null; then
+                chown -R activemq:activemq /var/lib/activemq/main
+            fi
+            
             # Don't start it here - let the user or pitrac CLI handle it
         fi
         

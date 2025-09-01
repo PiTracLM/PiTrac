@@ -517,6 +517,65 @@ EOF
         log_info "  golf_sim_config.json already exists, skipping"
     fi
     
+    # Configure ActiveMQ if installed
+    if command -v activemq &>/dev/null; then
+        log_info "Configuring ActiveMQ..."
+        
+        # Create instances directories if needed
+        mkdir -p /etc/activemq/instances-available/main
+        mkdir -p /etc/activemq/instances-enabled
+        
+        # Create basic ActiveMQ config if it doesn't exist
+        if [[ ! -f /etc/activemq/instances-available/main/activemq.xml ]]; then
+            cat > /etc/activemq/instances-available/main/activemq.xml <<'EOF'
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core.xsd">
+    
+    <broker xmlns="http://activemq.apache.org/schema/core" 
+            brokerName="localhost" 
+            dataDirectory="${activemq.data}">
+        
+        <transportConnectors>
+            <transportConnector name="openwire" uri="tcp://127.0.0.1:61616"/>
+        </transportConnectors>
+        
+    </broker>
+</beans>
+EOF
+        fi
+        
+        if [[ ! -f /etc/activemq/instances-available/main/log4j2.properties ]]; then
+            cat > /etc/activemq/instances-available/main/log4j2.properties <<'EOF'
+appender.console.type = Console
+appender.console.name = console
+appender.console.layout.type = PatternLayout
+appender.console.layout.pattern = %d{ISO8601} | %-5p | %m%n
+
+rootLogger.level = INFO
+rootLogger.appenderRef.console.ref = console
+EOF
+        fi
+        
+        if [[ ! -e /etc/activemq/instances-enabled/main ]]; then
+            ln -sf /etc/activemq/instances-available/main /etc/activemq/instances-enabled/main
+        fi
+        
+        # Create instance data directory
+        mkdir -p /var/lib/activemq/main
+        cp /etc/activemq/instances-available/main/activemq.xml /var/lib/activemq/main/ 2>/dev/null || true
+        cp /etc/activemq/instances-available/main/log4j2.properties /var/lib/activemq/main/ 2>/dev/null || true
+        
+        # Set ownership if activemq user exists
+        if getent passwd activemq >/dev/null; then
+            chown -R activemq:activemq /var/lib/activemq/main
+        fi
+        
+        log_success "ActiveMQ configured"
+    else
+        log_warn "ActiveMQ not installed - install with: sudo apt install activemq"
+    fi
+    
     # Install systemd services (optional)
     log_info "Installing systemd services..."
     cp "$SCRIPT_DIR/templates/pitrac.service" /etc/systemd/system/pitrac.service
