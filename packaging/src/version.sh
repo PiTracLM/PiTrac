@@ -1,4 +1,7 @@
 
+initialize_global_flags
+
+
 show_build="${args[--build]:-}"
 
 echo "PiTrac Launch Monitor"

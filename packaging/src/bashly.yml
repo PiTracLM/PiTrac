@@ -19,9 +19,16 @@ flags:
     help: Use alternate configuration file
   - long: --verbose
     short: -v
-    help: Enable verbose output
+    help: Enable verbose output (info level)
+  - long: --info
+    short: -i
+    help: Enable info level output
   - long: --debug
-    help: Enable debug mode
+    short: -d
+    help: Enable debug level output
+  - long: --trace
+    short: -t
+    help: Enable trace level output (most verbose)
 
 commands:
   # Main operational commands

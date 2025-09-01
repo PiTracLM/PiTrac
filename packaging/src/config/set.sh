@@ -1,4 +1,8 @@
 
+# Initialize global flags and logging (libraries are embedded by bashly)
+initialize_global_flags
+
+
 key="${args[key]}"
 value="${args[value]}"
 use_global="${args[--global]:-}"
@@ -13,5 +17,5 @@ else
   config_file="${USER_CONFIG:-$DEFAULT_CONFIG}"
 fi
 
-warn "Manual edit required. Use 'pitrac config edit' to set:"
+log_warn "Manual edit required. Use 'pitrac config edit' to set:"
 echo "$key: $value"

@@ -1,3 +1,5 @@
+initialize_global_flags
+
 
 pi_model="${args[--pi-model]:-auto}"
 skip_reboot="${args[--skip-reboot]:-}"
@@ -15,7 +17,7 @@ fi
 echo ""
 echo "Creating directory structure..."
 ensure_directories
-success "Directories created"
+log_info "Directories created"
 
 user_config_dir="${HOME}/.pitrac/config"
 user_config_file="${user_config_dir}/pitrac.yaml"
@@ -23,7 +25,7 @@ user_config_file="${user_config_dir}/pitrac.yaml"
 if [[ ! -f "$user_config_file" ]] && [[ -f "/etc/pitrac/pitrac.yaml" ]]; then
   echo "Creating user configuration..."
   cp "/etc/pitrac/pitrac.yaml" "$user_config_file"
-  success "User configuration created"
+  log_info "User configuration created"
 fi
 
 echo ""

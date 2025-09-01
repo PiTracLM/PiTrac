@@ -19,9 +19,16 @@ flags:
     help: Use alternate configuration file
   - long: --verbose
     short: -v
-    help: Enable verbose output
+    help: Enable verbose output (info level)
+  - long: --info
+    short: -i
+    help: Enable info level output
   - long: --debug
-    help: Enable debug mode
+    short: -d
+    help: Enable debug level output
+  - long: --trace
+    short: -t
+    help: Enable trace level output (most verbose)
 
 commands:
   # Main operational commands
@@ -109,7 +116,15 @@ commands:
 
       - name: edit
         help: Edit configuration file
+        examples:
+          - pitrac config edit
+          - pitrac config edit --profile advanced
         flags:
+          - long: --profile
+            arg: profile
+            help: Configuration profile to edit
+            allowed: [basic, advanced]
+            default: basic
           - long: --editor
             arg: editor
             help: Use specific editor
@@ -146,6 +161,53 @@ commands:
         flags:
           - long: --backup
             help: Create backup before reset
+      
+      - name: preset
+        help: Apply a configuration preset
+        examples:
+          - pitrac config preset indoor
+          - pitrac config preset putting
+        args:
+          - name: preset_name
+            help: Preset to apply
+            required: true
+            allowed: [indoor, outdoor, putting, driver, debug]
+      
+      - name: diff
+        help: Show configuration differences from defaults
+        flags:
+          - long: --json
+            help: Output in JSON format
+      
+      - name: backup
+        help: Create configuration backup
+        flags:
+          - long: --name
+            arg: name
+            help: Backup name (default is timestamp)
+      
+      - name: restore
+        help: Restore configuration from backup
+        args:
+          - name: backup_name
+            help: Backup to restore (use 'list' to see available)
+            required: true
+        flags:
+          - long: --force
+            help: Force restore even if config exists
+      
+      - name: migrate
+        help: Migrate from old JSON configuration
+        flags:
+          - long: --dry-run
+            help: Show what would be migrated without changing files
+      
+      - name: source
+        help: Show where a configuration value comes from
+        args:
+          - name: key
+            help: Configuration key to check
+            required: true
 
   # Camera management
   - name: camera
@@ -290,8 +352,20 @@ commands:
       - pitrac service enable
 
   # External service management
+  - name: web
+    help: Manage PiTrac web server
+    args:
+      - name: action
+        help: Action to perform
+        required: true
+        allowed: [start, stop, restart, status, logs, url]
+    flags:
+      - long: --follow
+        short: -f
+        help: Follow logs (with 'logs' action)
+
   - name: tomee
-    help: Manage TomEE web server
+    help: "[DEPRECATED] Use 'pitrac web' instead"
     args:
       - name: action
         help: Action to perform

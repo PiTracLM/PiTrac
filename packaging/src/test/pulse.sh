@@ -1,3 +1,5 @@
+initialize_global_flags
+
 
 duration="${args[--duration]:-0}"
 

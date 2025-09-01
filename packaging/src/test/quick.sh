@@ -1,3 +1,5 @@
+initialize_global_flags
+
 
 echo "=== Quick Image Processing Test ==="
 echo "Testing image processing algorithms (no camera required)"

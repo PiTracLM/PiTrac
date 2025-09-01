@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# Initialize global flags and logging (libraries are embedded by bashly)
+initialize_global_flags
+
 # config/backup.sh - Backup PiTrac configuration files
 
 backup_name="${args[--name]:-}"
@@ -27,7 +31,7 @@ if [[ -f "$backup_path" ]]; then
     exit 1
 fi
 
-info "Creating backup: $backup_name"
+log_info "Creating backup: $backup_name"
 
 # Create temporary directory for staging
 tmp_dir=$(mktemp -d)

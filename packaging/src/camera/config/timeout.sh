@@ -1,4 +1,11 @@
 
+# Source libraries
+source "${BASH_SOURCE%/*}/../../lib/logging.sh"
+source "${BASH_SOURCE%/*}/../../lib/global_flags.sh"
+
+# Initialize global flags and logging
+initialize_global_flags
+
 timeout_ms="${args[milliseconds]}"
 
 config_file=$(get_libcamera_config_path)

@@ -1,4 +1,8 @@
 
+# Initialize global flags and logging (libraries are embedded by bashly)
+initialize_global_flags
+
+
 editor="${args[--editor]:-${EDITOR:-nano}}"
 config_file="${USER_CONFIG:-$DEFAULT_CONFIG}"
 
@@ -8,4 +12,4 @@ if [[ ! -f "$config_file" ]]; then
 fi
 
 "$editor" "$config_file"
-info "Configuration saved. Run 'pitrac config validate' to check for errors"
+log_info "Configuration saved. Run 'pitrac config validate' to check for errors"

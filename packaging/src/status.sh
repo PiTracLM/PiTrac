@@ -1,3 +1,5 @@
+initialize_global_flags
+
 
 show_json="${args[--json]:-}"
 show_services="${args[--services]:-}"

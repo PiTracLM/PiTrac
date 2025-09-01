@@ -1,3 +1,5 @@
+initialize_global_flags
+
 
 follow="${args[--follow]:-}"
 tail_lines="${args[--tail]:-50}"

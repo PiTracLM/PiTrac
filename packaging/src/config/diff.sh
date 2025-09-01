@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# Initialize global flags and logging (libraries are embedded by bashly)
+initialize_global_flags
+
 # config/diff.sh - Show configuration differences from defaults
 
 user_config="${HOME}/.pitrac/config/pitrac.yaml"

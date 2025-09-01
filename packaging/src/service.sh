@@ -1,3 +1,5 @@
+initialize_global_flags
+
 
 action="${args[action]}"
 

@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# Initialize global flags and logging (libraries are embedded by bashly)
+initialize_global_flags
+
 # config/restore.sh - Restore PiTrac configuration from backup
 
 backup_name="${args[backup_name]}"
@@ -41,7 +45,7 @@ if [[ ! -f "$backup_path" ]]; then
     exit 1
 fi
 
-info "Restoring from backup: $backup_name"
+log_info "Restoring from backup: $backup_name"
 
 # Create temporary directory for extraction
 tmp_dir=$(mktemp -d)
@@ -152,7 +156,7 @@ else
 fi
 
 # Validate the restored configuration
-info "Validating restored configuration..."
+log_info "Validating restored configuration..."
 if pitrac config validate 2>/dev/null; then
     success "Configuration is valid"
 else

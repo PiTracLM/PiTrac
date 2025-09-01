@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# Initialize global flags and logging (libraries are embedded by bashly)
+initialize_global_flags
+
 # config/source.sh - Show where a configuration value comes from
 
 key="${args[key]}"
@@ -16,7 +20,7 @@ if [[ -z "$key" ]]; then
     exit 1
 fi
 
-info "Searching for configuration key: $key"
+log_info "Searching for configuration key: $key"
 echo ""
 
 # Check in priority order and track where found

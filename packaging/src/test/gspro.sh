@@ -1,3 +1,5 @@
+initialize_global_flags
+
 
 host="${args[--host]:-}"
 

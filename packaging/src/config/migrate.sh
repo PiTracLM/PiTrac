@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# Initialize global flags and logging (libraries are embedded by bashly)
+initialize_global_flags
+
 # config/migrate.sh - Migrate from old JSON configuration to new YAML system
 
 dry_run="${args[--dry-run]:-}"
@@ -12,7 +16,7 @@ if [[ ! -f "$json_file" ]]; then
     exit 1
 fi
 
-info "Analyzing existing configuration..."
+log_info "Analyzing existing configuration..."
 
 # Create temporary Python script for migration
 python_script='

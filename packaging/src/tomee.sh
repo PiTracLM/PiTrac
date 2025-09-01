@@ -1,3 +1,8 @@
+initialize_global_flags
+
+
+log_warn "The 'tomee' command is deprecated. Please use 'pitrac web' instead."
+echo ""
 
 action="${args[action]}"
 follow="${args[--follow]:-}"

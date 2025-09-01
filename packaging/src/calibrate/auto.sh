@@ -1,4 +1,8 @@
 
+# Initialize global flags and logging (libraries are embedded by bashly)
+initialize_global_flags
+
+
 slot="${args[slot]}"
 
 echo "=== Automatic Calibration - Camera $slot ==="

@@ -1,16 +1,20 @@
+initialize_global_flags
 
-system_mode="${args[mode]:-camera1}"
+system_mode="${args[--system-mode]:-camera1}"
 foreground="${args[--foreground]:-}"
-verbose="${args[--verbose]:-}"
-config_file="${args[--config]:-}"
+msg_broker_address="${args[--msg-broker-address]:-}"
+base_image_logging_dir="${args[--base-image-logging-dir]:-}"
+web_server_share_dir="${args[--web-server-share-dir]:-}"
+e6_host_address="${args[--e6-host-address]:-}"
+gspro_host_address="${args[--gspro-host-address]:-}"
 
 if ! validate_system_mode "$system_mode"; then
-  error "Invalid system mode: $system_mode"
+  log_error "Invalid system mode: $system_mode"
   exit 1
 fi
 
 if is_pitrac_running; then
-  error "PiTrac is already running (PID: $(cat "$PITRAC_PID_FILE"))"
+  log_error "PiTrac is already running (PID: $(cat "$PITRAC_PID_FILE"))"
   exit 1
 fi
 
@@ -22,23 +26,21 @@ setup_pitrac_environment
 
 cmd_args=("--system_mode=$system_mode")
 
-if [[ "$verbose" == "1" ]]; then
-  cmd_args+=("--logging_level=debug")
-else
-  cmd_args+=("--logging_level=info")
-fi
+build_pitrac_logging_args cmd_args
 
-if [[ -n "$config_file" ]] && [[ -f "$config_file" ]]; then
-  cmd_args+=("--config=$config_file")
-fi
+[[ -n "$msg_broker_address" ]] && cmd_args+=("--msg_broker_address=$msg_broker_address")
+[[ -n "$base_image_logging_dir" ]] && cmd_args+=("--base_image_logging_dir=$base_image_logging_dir")
+[[ -n "$web_server_share_dir" ]] && cmd_args+=("--web_server_share_dir=$web_server_share_dir")
+[[ -n "$e6_host_address" ]] && cmd_args+=("--e6_host_address=$e6_host_address")
+[[ -n "$gspro_host_address" ]] && cmd_args+=("--gspro_host_address=$gspro_host_address")
 
 if [[ "$foreground" == "1" ]]; then
-  info "Starting PiTrac launch monitor (foreground)..."
-  info "Press Ctrl+C to stop"
+  log_info "Starting PiTrac launch monitor (foreground)..."
+  log_info "Press Ctrl+C to stop"
   exec "$PITRAC_BINARY" "${cmd_args[@]}"
 else
-  info "Starting PiTrac launch monitor (background)..."
-  info "Use 'pitrac status' to check status, 'pitrac logs' to view output"
+  log_info "Starting PiTrac launch monitor (background)..."
+  log_info "Use 'pitrac status' to check status, 'pitrac logs' to view output"
   
   ensure_pid_directory
   ensure_log_directory
@@ -49,9 +51,9 @@ else
   
   sleep 2
   if kill -0 $pid 2>/dev/null; then
-    success "PiTrac started successfully (PID: $pid)"
+    log_info "PiTrac started successfully (PID: $pid)"
   else
-    error "Failed to start PiTrac. Check logs with 'pitrac logs'"
+    log_error "Failed to start PiTrac. Check logs with 'pitrac logs'"
     rm -f "$PITRAC_PID_FILE"
     exit 1
   fi

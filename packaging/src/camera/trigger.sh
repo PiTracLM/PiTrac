@@ -1,4 +1,8 @@
 
+# Initialize global flags and logging (libraries are embedded by bashly)
+initialize_global_flags
+
+
 mode="${args[mode]}"
 camera_slot="${args[--camera]:-}"
 

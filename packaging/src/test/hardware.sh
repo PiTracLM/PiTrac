@@ -1,3 +1,5 @@
+initialize_global_flags
+
 
 skip_camera="${args[--skip-camera]:-}"
 skip_gpio="${args[--skip-gpio]:-}"

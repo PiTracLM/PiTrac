@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# Initialize global flags and logging (libraries are embedded by bashly)
+initialize_global_flags
+
 # config/validate.sh - Validate PiTrac configuration
 
 user_config="${HOME}/.pitrac/config/pitrac.yaml"
@@ -12,7 +16,7 @@ if [[ ! -f "$user_config" ]]; then
 fi
 
 # First check YAML syntax
-info "Checking YAML syntax..."
+log_info "Checking YAML syntax..."
 if command -v python3 >/dev/null 2>&1; then
     if python3 -c "import yaml; yaml.safe_load(open('$user_config'))" 2>/dev/null; then
         success "YAML syntax is valid"
@@ -34,7 +38,7 @@ else
 fi
 
 # Validate values against schema
-info "Validating configuration values..."
+log_info "Validating configuration values..."
 
 if [[ -f "$mappings_file" ]] && command -v python3 >/dev/null 2>&1; then
     python3 << 'EOF'

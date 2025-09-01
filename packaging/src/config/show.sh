@@ -1,4 +1,8 @@
 
+# Initialize global flags and logging (libraries are embedded by bashly)
+initialize_global_flags
+
+
 show_effective="${args[--effective]:-}"
 
 if [[ "$show_effective" == "1" ]]; then

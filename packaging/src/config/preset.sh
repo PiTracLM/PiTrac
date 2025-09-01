@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# Initialize global flags and logging (libraries are embedded by bashly)
+initialize_global_flags
+
 # config/preset.sh - Apply configuration presets
 
 preset_name="${args[preset_name]}"
@@ -109,4 +113,4 @@ else
     esac
 fi
 
-info "Run 'pitrac config validate' to check configuration"
+log_info "Run 'pitrac config validate' to check configuration"

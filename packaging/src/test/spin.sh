@@ -1,3 +1,5 @@
+initialize_global_flags
+
 
 echo "=== Spin Detection Test ==="
 echo "Testing spin algorithms (no camera required)"
