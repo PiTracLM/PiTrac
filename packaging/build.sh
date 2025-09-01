@@ -368,12 +368,12 @@ build_dev() {
 
     # Configure libcamera using existing example.yaml files
     log_info "Setting up libcamera configuration..."
-    
+
     for pipeline in pisp vc4; do
         config_dir="/usr/share/libcamera/pipeline/rpi/${pipeline}"
         example_file="${config_dir}/example.yaml"
         config_file="${config_dir}/rpi_apps.yaml"
-        
+
         if [[ -d "$config_dir" ]] && [[ -f "$example_file" ]] && [[ ! -f "$config_file" ]]; then
             log_info "Creating ${pipeline} config from example..."
             # Copy example and uncomment/set the camera timeout
@@ -608,7 +608,18 @@ EOF
             chown -R activemq:activemq /var/lib/activemq/
         fi
 
-        log_success "ActiveMQ configured"
+        # Restart ActiveMQ to pick up the new configuration
+        log_info "Restarting ActiveMQ to apply configuration..."
+        systemctl restart activemq
+        systemctl enable activemq
+
+        # Verify ActiveMQ is running properly
+        sleep 2
+        if systemctl is-active --quiet activemq; then
+            log_success "ActiveMQ configured and running"
+        else
+            log_warn "ActiveMQ configured but may need manual restart"
+        fi
     else
         log_error "ActiveMQ installation failed! This is a critical component."
         log_info "Try manually installing with: sudo apt install activemq"
@@ -716,3 +727,4 @@ fi
 mkdir -p "$ARTIFACT_DIR"
 
 # Run main
+main

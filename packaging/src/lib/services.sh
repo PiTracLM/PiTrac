@@ -3,13 +3,13 @@
 
 is_service_running() {
   local service="$1"
-  
+
   if command -v systemctl >/dev/null 2>&1; then
     if systemctl is-active --quiet "$service" 2>/dev/null; then
       return 0
     fi
   fi
-  
+
   case "$service" in
     activemq)
       pgrep -f "activemq" >/dev/null 2>&1
@@ -29,7 +29,7 @@ is_service_running() {
 start_service() {
   local service="$1"
   local use_sudo="${2:-auto}"
-  
+
   if [[ "$use_sudo" == "auto" ]]; then
     if [[ $EUID -eq 0 ]]; then
       use_sudo="no"
@@ -39,25 +39,29 @@ start_service() {
       use_sudo="yes"
     fi
   fi
-  
+
   if command -v systemctl >/dev/null 2>&1; then
     if [[ "$use_sudo" == "yes" ]]; then
       if command -v sudo >/dev/null 2>&1; then
-        sudo systemctl start "$service" 2>/dev/null
+        if ! sudo systemctl start "$service" 2>&1; then
+          log_warn "Failed to start $service - it may already be running or misconfigured"
+        fi
       else
         log_error "sudo required to start $service but not available"
         return 1
       fi
     else
-      systemctl start "$service" 2>/dev/null
+      if ! systemctl start "$service" 2>&1; then
+        log_warn "Failed to start $service - it may already be running or misconfigured"
+      fi
     fi
   else
     log_error "systemctl not available, cannot start $service"
     return 1
   fi
-  
+
   sleep 1
-  
+
   if is_service_running "$service"; then
     return 0
   else
@@ -68,7 +72,7 @@ start_service() {
 stop_service() {
   local service="$1"
   local use_sudo="${2:-auto}"
-  
+
   if [[ "$use_sudo" == "auto" ]]; then
     if [[ $EUID -eq 0 ]]; then
       use_sudo="no"
@@ -78,7 +82,7 @@ stop_service() {
       use_sudo="yes"
     fi
   fi
-  
+
   if command -v systemctl >/dev/null 2>&1; then
     if [[ "$use_sudo" == "yes" ]]; then
       if command -v sudo >/dev/null 2>&1; then
@@ -94,9 +98,9 @@ stop_service() {
     log_error "systemctl not available, cannot stop $service"
     return 1
   fi
-  
+
   sleep 1
-  
+
   if ! is_service_running "$service"; then
     return 0
   else
@@ -107,7 +111,7 @@ stop_service() {
 restart_service() {
   local service="$1"
   local use_sudo="${2:-auto}"
-  
+
   stop_service "$service" "$use_sudo"
   sleep 1
   start_service "$service" "$use_sudo"
@@ -116,7 +120,7 @@ restart_service() {
 enable_service() {
   local service="$1"
   local use_sudo="${2:-auto}"
-  
+
   if [[ "$use_sudo" == "auto" ]]; then
     if [[ $EUID -eq 0 ]]; then
       use_sudo="no"
@@ -124,7 +128,7 @@ enable_service() {
       use_sudo="yes"
     fi
   fi
-  
+
   if command -v systemctl >/dev/null 2>&1; then
     if [[ "$use_sudo" == "yes" ]]; then
       if command -v sudo >/dev/null 2>&1; then
@@ -145,7 +149,7 @@ enable_service() {
 disable_service() {
   local service="$1"
   local use_sudo="${2:-auto}"
-  
+
   if [[ "$use_sudo" == "auto" ]]; then
     if [[ $EUID -eq 0 ]]; then
       use_sudo="no"
@@ -153,7 +157,7 @@ disable_service() {
       use_sudo="yes"
     fi
   fi
-  
+
   if command -v systemctl >/dev/null 2>&1; then
     if [[ "$use_sudo" == "yes" ]]; then
       if command -v sudo >/dev/null 2>&1; then
@@ -173,7 +177,7 @@ disable_service() {
 
 get_service_status() {
   local service="$1"
-  
+
   if command -v systemctl >/dev/null 2>&1; then
     systemctl status "$service" --no-pager 2>/dev/null || true
   else
@@ -188,7 +192,7 @@ get_service_status() {
 check_activemq_broker() {
   local address="${1:-localhost}"
   local port="${2:-61616}"
-  
+
   if command -v ss >/dev/null 2>&1; then
     ss -tln | grep -q ":${port}" 2>/dev/null
   elif command -v netstat >/dev/null 2>&1; then
@@ -201,7 +205,7 @@ check_activemq_broker() {
 check_tomee_server() {
   local address="${1:-localhost}"
   local port="${2:-8080}"
-  
+
   if command -v ss >/dev/null 2>&1; then
     ss -tln | grep -q ":${port}" 2>/dev/null
   elif command -v netstat >/dev/null 2>&1; then
@@ -214,19 +218,19 @@ check_tomee_server() {
 deploy_webapp_if_needed() {
   local webapp_source="/usr/share/pitrac/webapp/golfsim.war"
   local webapp_dest="/opt/tomee/webapps/golfsim.war"
-  
+
   if [[ -f "$webapp_dest" ]]; then
     log_debug "Web application already deployed"
     return 0
   fi
-  
+
   if [[ ! -f "$webapp_source" ]]; then
     log_warn "Web application source not found: $webapp_source"
     return 1
   fi
-  
+
   log_info "Deploying PiTrac web application..."
-  
+
   if [[ -w "$(dirname "$webapp_dest")" ]]; then
     cp "$webapp_source" "$webapp_dest"
   elif command -v sudo >/dev/null 2>&1; then
@@ -235,7 +239,7 @@ deploy_webapp_if_needed() {
     log_error "Cannot deploy webapp - no write permission and sudo not available"
     return 1
   fi
-  
+
   log_info "Web application deployed successfully"
   return 0
 }
@@ -244,7 +248,7 @@ get_service_logs() {
   local service="$1"
   local follow="${2:-false}"
   local lines="${3:-50}"
-  
+
   if command -v journalctl >/dev/null 2>&1; then
     if [[ "$follow" == "true" ]]; then
       journalctl -u "$service" -f
@@ -273,7 +277,7 @@ get_service_logs() {
         return 1
         ;;
     esac
-    
+
     if [[ -f "$log_file" ]]; then
       if [[ "$follow" == "true" ]]; then
         tail -f "$log_file"
@@ -289,9 +293,9 @@ get_service_logs() {
 
 check_required_services() {
   local all_good=true
-  
+
   log_info "Checking required services..."
-  
+
   if is_service_running "activemq"; then
     log_debug "✓ ActiveMQ is running"
     if check_activemq_broker; then
@@ -304,7 +308,7 @@ check_required_services() {
     log_warn "✗ ActiveMQ is not running"
     all_good=false
   fi
-  
+
   if is_service_running "tomee"; then
     log_debug "✓ TomEE is running"
     if check_tomee_server; then
@@ -317,7 +321,7 @@ check_required_services() {
     log_warn "✗ TomEE is not running"
     all_good=false
   fi
-  
+
   if [[ "$all_good" == "true" ]]; then
     return 0
   else

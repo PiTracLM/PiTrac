@@ -5,7 +5,16 @@ follow="${args[--follow]:-}"
 case "$action" in
   start)
     info "Starting ActiveMQ broker..."
-    start_service "activemq"
+    if systemctl is-active --quiet activemq 2>/dev/null; then
+      if ! check_activemq_broker; then
+        info "ActiveMQ service is active but broker not responding, restarting..."
+        restart_service "activemq"
+      else
+        info "ActiveMQ is already running and responsive"
+      fi
+    else
+      start_service "activemq"
+    fi
     ;;
   stop)
     info "Stopping ActiveMQ broker..."
