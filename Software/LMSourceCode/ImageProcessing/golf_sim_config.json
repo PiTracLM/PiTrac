@@ -6,7 +6,7 @@
             "kLogWebserverImagesToFile": "1",
             "kLogDiagnosticImagesToUniqueFiles": "1",
             "kLinuxBaseImageLoggingDir": ".\/",
-            "kPCBaseImageLoggingDir": "c:\/Users\/conno\/source\/repos\/connorgallopo\/PiTrac\/Software\/LMSourceCode\/Images\/"
+            "kPCBaseImageLoggingDir": "./Images/"
         },
         "modes": {
             "kStartInPuttingMode": "0"
@@ -503,7 +503,7 @@
             "kCroppedImagePixelOffsetUp": "-3"
         },
         "testing": {
-            "kBaseTestImageDir": "c:\/Users\/conno\/source\/repos\/connorgallopo\/PiTrac\/Software\/LMSourceCode\/Images\/",
+            "kBaseTestImageDir": "./Images/",
             "kTwoImageTestTeedBallImage": "gs_log_img__log_ball_final_found_ball_img.png",
             "kTwoImageTestStrobedImage": "gs_log_img__log_cam2_last_strobed_img_Shot_2_2025-Aug-05_09.40.44.png",
             "OLD_kTwoImageTestTeedBallImage": "log_ball_final_found_ball_img.png",
