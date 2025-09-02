@@ -118,13 +118,8 @@ commands:
         help: Edit configuration file
         examples:
           - pitrac config edit
-          - pitrac config edit --profile advanced
+          - pitrac config edit --editor vim
         flags:
-          - long: --profile
-            arg: profile
-            help: Configuration profile to edit
-            allowed: [basic, advanced]
-            default: basic
           - long: --editor
             arg: editor
             help: Use specific editor
