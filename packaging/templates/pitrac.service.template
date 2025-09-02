@@ -2,6 +2,8 @@
 Description=PiTrac Launch Monitor
 After=network.target activemq.service tomee.service
 Wants=activemq.service tomee.service
+StartLimitBurst=3
+StartLimitIntervalSec=30
 
 [Service]
 Type=simple
@@ -23,8 +25,6 @@ ExecStart=/usr/bin/pitrac run --foreground --system_mode=camera1
 
 Restart=on-failure
 RestartSec=5
-StartLimitBurst=3
-StartLimitIntervalSec=30
 
 StandardOutput=journal
 StandardError=journal

@@ -59,7 +59,8 @@ install_pitrac_service() {
         return 1
     }
     
-    trap 'rm -f "$temp_service"' EXIT
+    # Use a function-local trap that properly handles the variable scope
+    trap 'rm -f '"$temp_service"'' RETURN INT TERM
     
     local escaped_user
     local escaped_group
