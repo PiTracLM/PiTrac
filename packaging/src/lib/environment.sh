@@ -16,7 +16,11 @@ setup_pitrac_environment() {
     elif [[ -n "${SUDO_USER:-}" ]]; then
       export HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
     else
-      export HOME="/home/pi"
+      local current_user=$(whoami)
+      export HOME=$(getent passwd "$current_user" | cut -d: -f6)
+      if [[ -z "${HOME:-}" ]]; then
+        export HOME="/home/$current_user"
+      fi
     fi
   fi
   
@@ -121,7 +125,11 @@ setup_systemd_environment() {
   export PITRAC_SERVICE_MODE="1"
   
   if [[ -z "${HOME:-}" ]]; then
-    export HOME="/home/pi"
+    local current_user=$(whoami)
+    export HOME=$(getent passwd "$current_user" | cut -d: -f6)
+    if [[ -z "${HOME:-}" ]]; then
+      export HOME="/home/$current_user"
+    fi
   fi
   
   export PATH="/usr/local/bin:/usr/bin:/bin"

@@ -1,0 +1,34 @@
+[Unit]
+Description=PiTrac Launch Monitor
+After=network.target activemq.service tomee.service
+Wants=activemq.service tomee.service
+
+[Service]
+Type=simple
+User=@PITRAC_USER@
+Group=@PITRAC_GROUP@
+WorkingDirectory=@PITRAC_HOME@
+Environment="HOME=@PITRAC_HOME@"
+Environment="USER=@PITRAC_USER@"
+Environment="LD_LIBRARY_PATH=/usr/lib/pitrac"
+Environment="PITRAC_BASE_IMAGE_LOGGING_DIR=@PITRAC_HOME@/LM_Shares/Images/"
+Environment="PITRAC_WEBSERVER_SHARE_DIR=@PITRAC_HOME@/LM_Shares/WebShare/"
+Environment="PITRAC_MSG_BROKER_FULL_ADDRESS=tcp://localhost:61616"
+
+ExecStartPre=/bin/mkdir -p @PITRAC_HOME@/LM_Shares/Images
+ExecStartPre=/bin/mkdir -p @PITRAC_HOME@/LM_Shares/WebShare
+ExecStartPre=/bin/sleep 10
+
+ExecStart=/usr/bin/pitrac run --foreground --system_mode=camera1
+
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=3
+StartLimitIntervalSec=30
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pitrac
+
+[Install]
+WantedBy=multi-user.target

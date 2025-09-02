@@ -6,6 +6,7 @@
  */
 
 #include "tf_stage.hpp"
+#include <cstdlib>
 
 struct ObjectClassifyTfConfig : public TfConfig
 {
@@ -58,7 +59,9 @@ void ObjectClassifyTfStage::readExtras(boost::property_tree::ptree const &params
 	config()->threshold_low = params.get<float>("threshold_low", 0.1f);
 	config()->display_labels = params.get<int>("display_labels", 1);
 
-	std::string labels_file = params.get<std::string>("labels_file", "/home/pi/models/labels.txt");
+	const char* home = std::getenv("HOME");
+	std::string default_path = home ? std::string(home) + "/models/labels.txt" : "/usr/share/pitrac/models/labels.txt";
+	std::string labels_file = params.get<std::string>("labels_file", default_path);
 	readLabelsFile(labels_file);
 
 	// Check the tensor outputs and label classes match up.

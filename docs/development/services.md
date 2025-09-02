@@ -25,14 +25,14 @@ Wants=activemq.service tomee.service
 
 [Service]
 Type=simple
-User=pi
-Group=pi
-WorkingDirectory=/home/pi
-Environment="HOME=/home/pi"
-Environment="USER=pi"
+User=@PITRAC_USER@  # Set during installation
+Group=@PITRAC_GROUP@  # Set during installation
+WorkingDirectory=@PITRAC_HOME@  # User's home directory
+Environment="HOME=@PITRAC_HOME@"
+Environment="USER=@PITRAC_USER@"
 Environment="LD_LIBRARY_PATH=/usr/lib/pitrac"
-Environment="PITRAC_BASE_IMAGE_LOGGING_DIR=/home/pi/LM_Shares/Images/"
-Environment="PITRAC_WEBSERVER_SHARE_DIR=/home/pi/LM_Shares/WebShare/"
+Environment="PITRAC_BASE_IMAGE_LOGGING_DIR=@PITRAC_HOME@/LM_Shares/Images/"
+Environment="PITRAC_WEBSERVER_SHARE_DIR=@PITRAC_HOME@/LM_Shares/WebShare/"
 Environment="PITRAC_MSG_BROKER_FULL_ADDRESS=tcp://localhost:61616"
 ExecStartPre=/bin/sleep 10
 ExecStart=/usr/bin/pitrac run --foreground --system_mode=camera1
@@ -110,6 +110,8 @@ case "$1" in
         ;;
 esac
 ```
+
+**Note**: The service file uses placeholder values (@PITRAC_USER@, @PITRAC_HOME@, etc.) that are replaced during installation with the actual user's information. This allows the service to work with any username.
 
 ## Service Management
 

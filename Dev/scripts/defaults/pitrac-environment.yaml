@@ -4,13 +4,13 @@
 # - Automatic values in non-interactive mode (--non-interactive flag)
 
 # PiTrac source code directory
-pitrac_root: "/home/pi/Dev/PiTrac/Software/LMSourceCode"
+pitrac_root: "~/Dev/PiTrac/Software/LMSourceCode"
 
 # Image storage directory
-pitrac_image_dir: "/home/pi/LM_Shares/Images"
+pitrac_image_dir: "~/LM_Shares/Images"
 
 # Web server directory
-pitrac_web_dir: "/home/pi/LM_Shares/WebShare"
+pitrac_web_dir: "~/LM_Shares/WebShare"
 
 # ActiveMQ broker IP address (use 10.0.0.41 for default network setup)
 pitrac_msg_broker_ip: "10.0.0.41"

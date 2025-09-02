@@ -637,11 +637,11 @@ detect_directory() {
 detect_pitrac_root() {
   detect_directory \
     "Software/LMSourceCode" \
-    "/home/$(whoami)/Dev/PiTrac/Software/LMSourceCode" \
+    "$HOME/Dev/PiTrac/Software/LMSourceCode" \
     "/work" \
     "$HOME/dev/personal/PiTrac" \
     "$HOME/Dev/PiTrac" \
-    "/home/pi/Dev/PiTrac"
+    "/home/$(whoami)/Dev/PiTrac"
 }
 
 detect_lm_shares_dir() {
@@ -661,10 +661,10 @@ detect_lm_shares_dir() {
   
   detect_directory \
     "LM_Shares/$subdir" \
-    "/home/$(whoami)/LM_Shares/$subdir" \
+    "$HOME/LM_Shares/$subdir" \
     "/work" \
     "$HOME" \
-    "/home/pi"
+    "/home/$(whoami)"
 }
 
 # Detect Raspberry Pi model

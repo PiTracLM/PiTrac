@@ -168,8 +168,15 @@ case "$1" in
             # Don't start it here - let the user or pitrac CLI handle it
         fi
 
-        # Enable services (but don't start)
-        systemctl enable pitrac.service || true
+        if [ -x /usr/lib/pitrac/service-install.sh ]; then
+            if [ -n "$ACTUAL_USER" ]; then
+                echo "Installing PiTrac service for user: $ACTUAL_USER"
+                /usr/lib/pitrac/service-install.sh install "$ACTUAL_USER" || true
+            else
+                echo "Note: PiTrac service not installed. Run '/usr/lib/pitrac/service-install.sh install <username>' to install for a specific user"
+            fi
+        fi
+        
         systemctl enable tomee.service || true
 
         echo ""

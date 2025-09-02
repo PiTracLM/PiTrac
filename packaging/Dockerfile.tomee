@@ -41,7 +41,7 @@ RUN sed -i '/<Valve className="org.apache.catalina.valves.AccessLogValve"/,/\/>/
 # Add context for PiTrac WebShare (will be configured per-user in postinst)
 RUN sed -i '/<\/Host>/i \
         <!-- PiTrac WebShare context - path will be updated during installation -->\n\
-        <Context docBase="/home/pi/LM_Shares/WebShare" path="/golfsim/WebShare" />' \
+        <Context docBase="@PITRAC_HOME@/LM_Shares/WebShare" path="/golfsim/WebShare" />' \
     conf/server.xml
 
 # Set permissions for webapps deployment

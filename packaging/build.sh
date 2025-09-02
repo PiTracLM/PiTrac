@@ -628,7 +628,16 @@ EOF
 
     # Install systemd services (optional)
     log_info "Installing systemd services..."
-    cp "$SCRIPT_DIR/templates/pitrac.service" /etc/systemd/system/pitrac.service
+    
+    mkdir -p /usr/share/pitrac/templates
+    cp "$SCRIPT_DIR/templates/pitrac.service.template" /usr/share/pitrac/templates/
+    cp "$SCRIPT_DIR/src/lib/service-install.sh" /usr/lib/pitrac/
+    chmod 755 /usr/lib/pitrac/service-install.sh
+    
+    INSTALL_USER="${SUDO_USER:-$(whoami)}"
+    log_info "Installing PiTrac service for user: $INSTALL_USER"
+    /usr/lib/pitrac/service-install.sh install "$INSTALL_USER"
+    
     cp "$SCRIPT_DIR/templates/tomee.service" /etc/systemd/system/tomee.service
     cp "$SCRIPT_DIR/templates/tomee-wrapper.sh" /usr/lib/pitrac/tomee-wrapper.sh
     chmod 755 /usr/lib/pitrac/tomee-wrapper.sh

@@ -33,7 +33,7 @@ enable_samba: 0
 samba_share_name: "PiTrac"
 
 # Samba share path
-samba_share_path: "/home/pi/LM_Shares"
+samba_share_path: "~/LM_Shares"
 
 # Samba user (empty to use current user)
 samba_user: ""
