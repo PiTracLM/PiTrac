@@ -10,5 +10,8 @@ echo ""
 ensure_golf_config
 setup_pitrac_environment
 
-"$PITRAC_BINARY" --system_mode=automated_testing --logging_level=info "$@"
+pitrac_args=()
+build_pitrac_logging_args pitrac_args
+
+"$PITRAC_BINARY" --system_mode=automated_testing "${pitrac_args[@]}" "$@"
 echo "Test suite complete."

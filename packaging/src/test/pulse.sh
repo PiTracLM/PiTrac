@@ -16,4 +16,7 @@ fi
 
 setup_pitrac_environment
 
-"$PITRAC_BINARY" --pulse_test --system_mode=camera1 --logging_level=info
+pitrac_args=()
+build_pitrac_logging_args pitrac_args
+
+"$PITRAC_BINARY" --pulse_test --system_mode=camera1 "${pitrac_args[@]}"
