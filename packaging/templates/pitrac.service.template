@@ -21,7 +21,7 @@ ExecStartPre=/bin/mkdir -p @PITRAC_HOME@/LM_Shares/Images
 ExecStartPre=/bin/mkdir -p @PITRAC_HOME@/LM_Shares/WebShare
 ExecStartPre=/bin/sleep 10
 
-ExecStart=/usr/bin/pitrac run --foreground --system_mode=camera1
+ExecStart=/usr/bin/pitrac run --foreground
 
 Restart=on-failure
 RestartSec=5
