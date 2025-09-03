@@ -1,0 +1,424 @@
+name: pitrac
+help: PiTrac Golf Launch Monitor CLI
+version: 1.0.0
+
+# Global environment variables
+environment_variables:
+  - name: PITRAC_CONFIG
+    help: Path to PiTrac configuration file
+    default: /etc/pitrac/pitrac.yaml
+  - name: PITRAC_HOME
+    help: PiTrac home directory
+    default: ${HOME}/.pitrac
+
+# Global flags available to all commands
+flags:
+  - long: --config
+    short: -c
+    arg: path
+    help: Use alternate configuration file
+  - long: --verbose
+    short: -v
+    help: Enable verbose output (info level)
+  - long: --info
+    short: -i
+    help: Enable info level output
+  - long: --debug
+    short: -d
+    help: Enable debug level output
+  - long: --trace
+    short: -t
+    help: Enable trace level output (most verbose)
+
+commands:
+  # Main operational commands
+  - name: run
+    help: Start PiTrac launch monitor
+    examples:
+      - pitrac run
+      - pitrac run --foreground
+      - pitrac run --system-mode camera2
+    flags:
+      - long: --foreground
+        short: -f
+        help: Run in foreground (don't daemonize)
+      - long: --system-mode
+        arg: mode
+        help: Override system mode from config
+        allowed: [camera1, camera2]
+      - long: --msg-broker-address
+        arg: address
+        help: "Override message broker address (e.g., tcp://10.0.0.41:61616)"
+      - long: --base-image-logging-dir
+        arg: dir
+        help: Override image logging directory
+      - long: --web-server-share-dir
+        arg: dir
+        help: Override web share directory
+      - long: --e6-host-address
+        arg: host
+        help: E6 simulator host address
+      - long: --gspro-host-address
+        arg: host
+        help: GSPro simulator host address
+
+  - name: stop
+    help: Stop PiTrac launch monitor
+    examples:
+      - pitrac stop
+      - pitrac stop --force
+    flags:
+      - long: --force
+        short: -f
+        help: Force stop (SIGKILL instead of SIGTERM)
+      - long: --timeout
+        arg: seconds
+        help: Timeout before force stopping
+        default: "5"
+
+  - name: status
+    help: Show PiTrac system status
+    examples:
+      - pitrac status
+      - pitrac status --json
+    flags:
+      - long: --json
+        help: Output in JSON format
+      - long: --services
+        help: Include service status
+
+  - name: setup
+    help: Run initial setup wizard
+    examples:
+      - pitrac setup
+      - pitrac setup --pi-model pi5
+    flags:
+      - long: --pi-model
+        arg: model
+        help: Specify Pi model
+        allowed: [pi4, pi5, auto]
+        default: auto
+      - long: --skip-reboot
+        help: Don't prompt for reboot after setup
+
+  # Configuration management
+  - name: config
+    alias: cfg
+    help: Manage PiTrac configuration
+    commands:
+      - name: show
+        help: Display current configuration
+        flags:
+          - long: --effective
+            help: Show effective configuration (with overrides)
+          - long: --yaml
+            help: Output in YAML format
+
+      - name: edit
+        help: Edit configuration file
+        examples:
+          - pitrac config edit
+          - pitrac config edit --profile advanced
+        flags:
+          - long: --profile
+            arg: profile
+            help: Configuration profile to edit
+            allowed: [basic, advanced]
+            default: basic
+          - long: --editor
+            arg: editor
+            help: Use specific editor
+            default: ${EDITOR:-nano}
+
+      - name: get
+        help: Get specific configuration value
+        args:
+          - name: key
+            help: Configuration key (e.g., system.mode)
+            required: true
+
+      - name: set
+        help: Set configuration value
+        args:
+          - name: key
+            help: Configuration key
+            required: true
+          - name: value
+            help: New value
+            required: true
+        flags:
+          - long: --global
+            help: Set in global config (requires sudo)
+
+      - name: validate
+        help: Validate configuration file
+        flags:
+          - long: --fix
+            help: Attempt to fix issues
+
+      - name: reset
+        help: Reset to default configuration
+        flags:
+          - long: --backup
+            help: Create backup before reset
+      
+      - name: preset
+        help: Apply a configuration preset
+        examples:
+          - pitrac config preset indoor
+          - pitrac config preset putting
+        args:
+          - name: preset_name
+            help: Preset to apply
+            required: true
+            allowed: [indoor, outdoor, putting, driver, debug]
+      
+      - name: diff
+        help: Show configuration differences from defaults
+        flags:
+          - long: --json
+            help: Output in JSON format
+      
+      - name: backup
+        help: Create configuration backup
+        flags:
+          - long: --name
+            arg: name
+            help: Backup name (default is timestamp)
+      
+      - name: restore
+        help: Restore configuration from backup
+        args:
+          - name: backup_name
+            help: Backup to restore (use 'list' to see available)
+            required: true
+        flags:
+          - long: --force
+            help: Force restore even if config exists
+      
+      - name: migrate
+        help: Migrate from old JSON configuration
+        flags:
+          - long: --dry-run
+            help: Show what would be migrated without changing files
+      
+      - name: source
+        help: Show where a configuration value comes from
+        args:
+          - name: key
+            help: Configuration key to check
+            required: true
+
+  # Camera management
+  - name: camera
+    alias: cam
+    help: Camera operations
+    commands:
+      - name: list
+        help: List available cameras
+        flags:
+          - long: --detailed
+            help: Show detailed information
+
+      - name: test
+        help: Test camera capture
+        args:
+          - name: duration
+            help: Test duration in seconds
+            default: "5"
+        flags:
+          - long: --camera
+            arg: slot
+            help: Camera slot (1 or 2)
+            allowed: ["1", "2"]
+
+      - name: trigger
+        help: Set camera trigger mode
+        args:
+          - name: mode
+            help: Trigger mode
+            required: true
+            allowed: [internal, external]
+        flags:
+          - long: --camera
+            arg: slot
+            help: Camera slot (1 or 2)
+            allowed: ["1", "2"]
+
+      - name: config
+        help: Camera configuration
+        commands:
+          - name: timeout
+            help: Set camera timeout
+            args:
+              - name: milliseconds
+                help: Timeout in milliseconds
+                required: true
+
+  # Testing commands
+  - name: test
+    help: Run tests
+    examples:
+      - pitrac test hardware
+      - pitrac test quick
+      - pitrac test camera --slot 1
+    commands:
+      - name: hardware
+        help: Test hardware components
+        flags:
+          - long: --skip-camera
+            help: Skip camera tests
+          - long: --skip-gpio
+            help: Skip GPIO tests
+
+      - name: pulse
+        help: Test strobe pulses (Ctrl+C to stop)
+        flags:
+          - long: --duration
+            arg: seconds
+            help: Test duration (0 for continuous)
+            default: "0"
+
+      - name: quick
+        help: Quick image processing test (no camera)
+
+      - name: spin
+        help: Test spin detection algorithms
+
+      - name: gspro
+        help: Test GSPro server connection
+        flags:
+          - long: --host
+            arg: address
+            help: GSPro host address
+
+      - name: automated
+        help: Run automated test suite
+        flags:
+          - long: --suite
+            arg: name
+            help: Test suite to run
+            allowed: [basic, full, performance]
+
+      - name: camera
+        help: Test specific camera
+        args:
+          - name: slot
+            help: Camera slot number
+            required: true
+            allowed: ["1", "2"]
+
+  # Calibration commands
+  - name: calibrate
+    alias: cal
+    help: Camera calibration
+    examples:
+      - pitrac calibrate camera --slot 1
+      - pitrac calibrate auto --slot 2
+    commands:
+      - name: camera
+        help: Manual camera calibration
+        args:
+          - name: slot
+            help: Camera slot (1 or 2)
+            required: true
+            allowed: ["1", "2"]
+        flags:
+          - long: --interactive
+            help: Interactive calibration mode
+
+      - name: auto
+        help: Automatic calibration
+        args:
+          - name: slot
+            help: Camera slot (1 or 2)
+            required: true
+            allowed: ["1", "2"]
+
+      - name: wizard
+        help: Calibration wizard
+
+  # Service management
+  - name: service
+    alias: svc
+    help: Manage PiTrac service
+    args:
+      - name: action
+        help: Service action
+        required: true
+        allowed: [start, stop, restart, status, enable, disable]
+    examples:
+      - pitrac service start
+      - pitrac service enable
+
+  # External service management
+  - name: tomee
+    help: Manage TomEE web server
+    args:
+      - name: action
+        help: Action to perform
+        required: true
+        allowed: [start, stop, restart, status, deploy, logs]
+    flags:
+      - long: --follow
+        short: -f
+        help: Follow logs (with 'logs' action)
+
+  - name: activemq
+    alias: amq
+    help: Manage ActiveMQ broker
+    args:
+      - name: action
+        help: Action to perform
+        required: true
+        allowed: [start, stop, restart, status, logs, console, port]
+    flags:
+      - long: --follow
+        short: -f
+        help: Follow logs (with 'logs' action)
+
+  # Log viewing
+  - name: logs
+    help: View PiTrac logs
+    examples:
+      - pitrac logs
+      - pitrac logs --follow
+      - pitrac logs --tail 100
+    flags:
+      - long: --follow
+        short: -f
+        help: Follow log output
+      - long: --tail
+        short: -n
+        arg: lines
+        help: Number of lines to show
+        default: "50"
+      - long: --service
+        help: Show service logs instead
+      - long: --all
+        help: Show all available logs
+
+  # Boot configuration
+  - name: boot
+    help: Boot configuration helper
+    commands:
+      - name: config
+        help: Show boot configuration requirements
+        args:
+          - name: model
+            help: Pi model
+            default: auto
+            allowed: [pi4, pi5, auto]
+
+  # Help and version (built-in, but customizable)
+  - name: version
+    help: Show version information
+    flags:
+      - long: --build
+        help: Include build information
+
+# Dependencies check - these are checked at runtime
+dependencies:
+  - bash
+  - grep
+  - sed
