@@ -146,3 +146,17 @@ get_camera_slots() {
     done
   fi
 }
+
+
+# Determines if running on a single pi by determining how many cameras are attached
+# Returns 0 if this is a single-pi setup (with 2 cameras on the same pi) or 1 if not
+is_single_pi() {
+
+    LINE_COUNT=$(rpicam-hello --list 2>/dev/null | grep -E "^\s*[0-9]+ :" | wc -l )
+
+    if [[ $LINE_COUNT == "2" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}

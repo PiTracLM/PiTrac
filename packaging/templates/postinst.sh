@@ -12,6 +12,22 @@ detect_pi_model() {
     fi
 }
 
+
+# Determines if running on a single pi by determining how many cameras are attached
+# Returns 0 if this is a single-pi setup (with 2 cameras on the same pi) or 1 if not
+is_single_pi() {
+
+    LINE_COUNT=$(rpicam-hello --list 2>/dev/null | grep -E "^\s*[0-9]+ :" | wc -l )
+
+    if [[ $LINE_COUNT == "2" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+
+
 case "$1" in
     configure)
         echo "Configuring PiTrac..."
@@ -95,6 +111,18 @@ case "$1" in
             else
                 grep -q "gpu_mem=256" "$CONFIG_FILE" || echo "gpu_mem=256" >> "$CONFIG_FILE"
             fi
+
+
+            # If running in single-pi mode, both Pi and Innomaker cameras need a kernel dtoverlay setting
+            # in order to have one camera triggered internally and the other externally
+
+            if is_single_pi ; then
+                echo "Running in single-pi mode, so setting up triggering in config.txt"
+                grep -q "dtoverlay=imx296,sync-sink" "$CONFIG_FILE" || echo -e "# Setup camera triggering (slot 0 internal, slot 1 external\ndtoverlay=imx296,sync-sink=1\ndtoverlay=imx296,cam0" >> "$CONFIG_FILE"
+            else
+                grep -q "Not running in single pi mode" "$CONFIG_FILE" || echo "# Not running in single pi mode, so no dtoverlays required." >> "$CONFIG_FILE"
+            fi
+
         fi
 
         # Configure libcamera settings
