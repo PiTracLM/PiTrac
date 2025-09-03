@@ -205,38 +205,4 @@ verify_service_health() {
     return 0
 }
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    case "${1:-}" in
-        install)
-            install_pitrac_service "${2:-$(whoami)}"
-            ;;
-        update)
-            update_service_user "${2:-$(whoami)}"
-            ;;
-        uninstall)
-            uninstall_pitrac_service
-            ;;
-        status)
-            if is_service_installed; then
-                echo "PiTrac service is installed"
-                user=$(get_service_user)
-                if [[ -n "$user" ]]; then
-                    echo "Running as user: $user"
-                fi
-                systemctl status pitrac --no-pager || true
-            else
-                echo "PiTrac service is not installed"
-            fi
-            ;;
-        *)
-            echo "Usage: $0 {install|update|uninstall|status} [username]"
-            echo ""
-            echo "Commands:"
-            echo "  install [user]  - Install service for specified user (default: current user)"
-            echo "  update [user]   - Update service to run as different user"
-            echo "  uninstall       - Remove service completely"
-            echo "  status          - Check service installation status"
-            exit 1
-            ;;
-    esac
-fi
+# Direct execution block removed - these functions are now called via bashly commands
