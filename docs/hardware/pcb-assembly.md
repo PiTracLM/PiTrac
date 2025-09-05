@@ -22,7 +22,7 @@ The Connector Board is the only custom electronic component in PiTrac. It:
 ### Design Files
 
 The PCB design files are available in the main PiTrac repository under:
-- `Hardware/Connector Board/` directory
+- `Hardware/Dual Pi5 Connector Board` directory
 
 ### Fabrication
 

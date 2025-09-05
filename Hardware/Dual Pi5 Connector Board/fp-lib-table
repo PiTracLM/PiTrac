@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "Pi Connector Parts")(type "KiCad")(uri "${KIPRJMOD}/Pi Connector Parts.pretty")(options "")(descr ""))
+)
