@@ -191,8 +191,6 @@ class PiTracProcessManager:
             system_config = config.get("system") or {}
             is_single_pi = system_config.get("mode", "single") == "single"
 
-            cmd = self._build_command("camera1")
-
             env = os.environ.copy()
             env["LD_LIBRARY_PATH"] = "/usr/lib/pitrac"
             env["PITRAC_ROOT"] = (
@@ -221,6 +219,49 @@ class PiTracProcessManager:
             Path(f"{home_dir}/LM_Shares/Images").mkdir(parents=True, exist_ok=True)
             Path(f"{home_dir}/LM_Shares/WebShare").mkdir(parents=True, exist_ok=True)
 
+            if is_single_pi:
+                logger.info(
+                    "Starting camera2 process FIRST for single-Pi dual camera mode..."
+                )
+
+                cmd2 = self._build_command("camera2")
+
+                with open(self.camera2_log_file, "a") as log2:
+                    self.camera2_process = subprocess.Popen(
+                        cmd2,
+                        stdout=log2,
+                        stderr=subprocess.STDOUT,
+                        env=env,
+                        cwd=str(Path.home()),
+                        preexec_fn=os.setsid,
+                    )
+
+                    with open(self.camera2_pid_file, "w") as f:
+                        f.write(str(self.camera2_process.pid))
+
+                    await asyncio.sleep(2)
+
+                    if self.camera2_process.poll() is None:
+                        logger.info(
+                            f"PiTrac camera2 started successfully with PID {self.camera2_process.pid}"
+                        )
+                        
+                        logger.info("Waiting for camera2 to be ready before starting camera1...")
+                        await asyncio.sleep(1)
+                    else:
+                        logger.error("Camera2 process exited immediately")
+                        if self.camera2_pid_file.exists():
+                            self.camera2_pid_file.unlink()
+                        self.camera2_process = None
+                        return {
+                            "status": "failed",
+                            "message": "Camera2 failed to start - check logs",
+                            "log_file": str(self.camera2_log_file),
+                        }
+
+            logger.info("Starting camera1 process...")
+            cmd = self._build_command("camera1")
+
             with open(self.log_file, "a") as log:
                 self.process = subprocess.Popen(
                     cmd,
@@ -242,56 +283,33 @@ class PiTracProcessManager:
                     )
 
                     if is_single_pi:
-                        logger.info(
-                            "Starting camera2 process for single-Pi dual camera mode..."
-                        )
-
-                        cmd2 = self._build_command("camera2")
-
-                        with open(self.camera2_log_file, "a") as log2:
-                            self.camera2_process = subprocess.Popen(
-                                cmd2,
-                                stdout=log2,
-                                stderr=subprocess.STDOUT,
-                                env=env,
-                                cwd=str(Path.home()),
-                                preexec_fn=os.setsid,
-                            )
-
-                            with open(self.camera2_pid_file, "w") as f:
-                                f.write(str(self.camera2_process.pid))
-
-                            await asyncio.sleep(3)
-
-                            if self.camera2_process.poll() is None:
-                                logger.info(
-                                    f"PiTrac camera2 started successfully with PID {self.camera2_process.pid}"
-                                )
-                                return {
-                                    "status": "started",
-                                    "message": "PiTrac started successfully (both cameras)",
-                                    "camera1_pid": self.process.pid,
-                                    "camera2_pid": self.camera2_process.pid,
-                                }
-                            else:
-                                logger.error("Camera2 process exited immediately")
-                                if self.camera2_pid_file.exists():
-                                    self.camera2_pid_file.unlink()
-                                self.camera2_process = None
-
-                                try:
-                                    os.kill(self.process.pid, signal.SIGTERM)
-                                except ProcessLookupError:
-                                    pass
-                                if self.pid_file.exists():
-                                    self.pid_file.unlink()
-                                self.process = None
-
-                                return {
-                                    "status": "failed",
-                                    "message": "Camera2 failed to start - check logs",
-                                    "log_file": str(self.camera2_log_file),
-                                }
+                        if self.camera2_process and self.camera2_process.poll() is None:
+                            return {
+                                "status": "started",
+                                "message": "PiTrac started successfully (both cameras)",
+                                "camera1_pid": self.process.pid,
+                                "camera2_pid": self.camera2_process.pid,
+                            }
+                        else:
+                            logger.error("Camera2 process died during camera1 startup")
+                            
+                            try:
+                                os.kill(self.process.pid, signal.SIGTERM)
+                            except ProcessLookupError:
+                                pass
+                            if self.pid_file.exists():
+                                self.pid_file.unlink()
+                            self.process = None
+                            
+                            if self.camera2_pid_file.exists():
+                                self.camera2_pid_file.unlink()
+                            self.camera2_process = None
+                            
+                            return {
+                                "status": "failed",
+                                "message": "Camera2 died during startup - check logs",
+                                "log_file": str(self.camera2_log_file),
+                            }
                     else:
                         return {
                             "status": "started",
@@ -299,13 +317,24 @@ class PiTracProcessManager:
                             "pid": self.process.pid,
                         }
                 else:
-                    logger.error("PiTrac process exited immediately")
+                    logger.error("PiTrac camera1 process exited immediately")
+                    
                     if self.pid_file.exists():
                         self.pid_file.unlink()
                     self.process = None
+                    
+                    if is_single_pi and self.camera2_process:
+                        try:
+                            os.kill(self.camera2_process.pid, signal.SIGTERM)
+                        except ProcessLookupError:
+                            pass
+                        if self.camera2_pid_file.exists():
+                            self.camera2_pid_file.unlink()
+                        self.camera2_process = None
+                    
                     return {
                         "status": "failed",
-                        "message": "PiTrac failed to start - check logs",
+                        "message": "PiTrac camera1 failed to start - check logs",
                         "log_file": str(self.log_file),
                     }
 
@@ -314,7 +343,7 @@ class PiTracProcessManager:
             return {"status": "error", "message": f"Failed to start PiTrac: {str(e)}"}
 
     async def stop(self) -> Dict[str, Any]:
-        """Stop the PiTrac process(es) gracefully"""
+        """Stop the PiTrac process(es) gracefully - stop camera1 first, then camera2"""
         if not self.is_running():
             return {"status": "not_running", "message": "PiTrac is not running"}
 
@@ -329,13 +358,18 @@ class PiTracProcessManager:
                 max_wait = 5
                 for _ in range(max_wait * 10):
                     await asyncio.sleep(0.1)
-                    if not self.is_running():
+                    try:
+                        os.kill(pid, 0)
+                    except ProcessLookupError:
                         break
 
-                if self.is_running():
+                try:
+                    os.kill(pid, 0)
                     logger.warning("PiTrac camera1 didn't stop gracefully, forcing...")
                     os.kill(pid, signal.SIGKILL)
                     await asyncio.sleep(0.5)
+                except ProcessLookupError:
+                    pass
 
                 if self.pid_file.exists():
                     self.pid_file.unlink()
@@ -357,6 +391,8 @@ class PiTracProcessManager:
                         break
 
                 try:
+                    os.kill(camera2_pid, 0)
+                    logger.warning("PiTrac camera2 didn't stop gracefully, forcing...")
                     os.kill(camera2_pid, signal.SIGKILL)
                     await asyncio.sleep(0.5)
                 except ProcessLookupError:
