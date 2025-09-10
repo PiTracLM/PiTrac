@@ -297,7 +297,9 @@ class ConfigurationManager:
             
             if setting_type == "select" and "options" in setting_info:
                 valid_options = list(setting_info["options"].keys())
-                if value not in valid_options:
+                # Convert value to string for comparison (handles both string and numeric inputs)
+                str_value = str(value)
+                if str_value not in valid_options:
                     return False, f"Must be one of: {', '.join(valid_options)}"
             
             elif setting_type == "boolean":
@@ -309,6 +311,8 @@ class ConfigurationManager:
                     float(value)
                 except (TypeError, ValueError):
                     return False, "Must be a number"
+            
+            return True, ""
         
         if "Gain" in key:
             try:
