@@ -26,6 +26,7 @@ from managers import ConnectionManager, ShotDataStore
 from parsers import ShotDataParser
 from config_manager import ConfigurationManager
 from pitrac_manager import PiTracProcessManager
+from camera_detector import CameraDetector
 
 logger = logging.getLogger(__name__)
 
@@ -308,6 +309,34 @@ class PiTracServer:
         async def pitrac_status() -> Dict[str, Any]:
             """Get the status of the PiTrac launch monitor process"""
             return self.pitrac_manager.get_status()
+        
+        @self.app.get("/api/cameras/detect")
+        async def detect_cameras() -> Dict[str, Any]:
+            """Auto-detect connected cameras"""
+            try:
+                detector = CameraDetector()
+                result = detector.detect()
+                return result
+            except Exception as e:
+                logger.error(f"Camera detection failed: {e}")
+                return {
+                    "success": False,
+                    "message": f"Detection failed: {str(e)}",
+                    "cameras": [],
+                    "configuration": {
+                        "slot1": {"type": 4, "lens": 1},
+                        "slot2": {"type": 4, "lens": 1}
+                    }
+                }
+        
+        @self.app.get("/api/cameras/types")
+        async def get_camera_types() -> Dict[str, Any]:
+            """Get available camera types and their descriptions"""
+            detector = CameraDetector()
+            return {
+                "camera_types": detector.get_camera_types(),
+                "lens_types": detector.get_lens_types()
+            }
         
         @self.app.get("/logs", response_class=HTMLResponse)
         async def logs_page(request: Request) -> Response:

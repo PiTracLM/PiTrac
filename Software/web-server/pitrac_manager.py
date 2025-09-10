@@ -66,6 +66,14 @@ class PiTracProcessManager:
             "cameras": {
                 "camera1_gain": config.get("gs_config.cameras.kCamera1Gain", 1.0),
                 "camera2_gain": config.get("gs_config.cameras.kCamera2Gain", 4.0),
+                "slot1": {
+                    "type": config.get("cameras.slot1.type", 4),
+                    "lens": config.get("cameras.slot1.lens", 1),
+                },
+                "slot2": {
+                    "type": config.get("cameras.slot2.type", 4),
+                    "lens": config.get("cameras.slot2.lens", 1),
+                },
             },
         }
 
@@ -203,18 +211,32 @@ class PiTracProcessManager:
 
             config = self._load_pitrac_config()
             cameras_config = config.get("cameras") or {}
-
+            
             slot1 = cameras_config.get("slot1") or {}
+            slot2 = cameras_config.get("slot2") or {}
+            
             if "type" in slot1:
                 env["PITRAC_SLOT1_CAMERA_TYPE"] = str(slot1["type"])
+            elif is_single_pi:
+                env["PITRAC_SLOT1_CAMERA_TYPE"] = "4"
+                
             if "lens" in slot1:
-                env["PITRAC_SLOT1_LENS_TYPE"] = str(slot1["lens"])
+                env["PITRAC_SLOT1_LENS_TYPE"] = str(slot1.get("lens", 1))
+            else:
+                env["PITRAC_SLOT1_LENS_TYPE"] = "1"
 
-            slot2 = cameras_config.get("slot2") or {}
             if "type" in slot2:
                 env["PITRAC_SLOT2_CAMERA_TYPE"] = str(slot2["type"])
+            elif is_single_pi:
+                env["PITRAC_SLOT2_CAMERA_TYPE"] = "4"
+                
             if "lens" in slot2:
-                env["PITRAC_SLOT2_LENS_TYPE"] = str(slot2["lens"])
+                env["PITRAC_SLOT2_LENS_TYPE"] = str(slot2.get("lens", 1))
+            else:
+                env["PITRAC_SLOT2_LENS_TYPE"] = "1"
+            
+            logger.info(f"Camera configuration - Slot1: Type={env.get('PITRAC_SLOT1_CAMERA_TYPE')}, Lens={env.get('PITRAC_SLOT1_LENS_TYPE')}")
+            logger.info(f"Camera configuration - Slot2: Type={env.get('PITRAC_SLOT2_CAMERA_TYPE')}, Lens={env.get('PITRAC_SLOT2_LENS_TYPE')}")
 
             Path(f"{home_dir}/LM_Shares/Images").mkdir(parents=True, exist_ok=True)
             Path(f"{home_dir}/LM_Shares/WebShare").mkdir(parents=True, exist_ok=True)

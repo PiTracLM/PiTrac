@@ -298,6 +298,8 @@ function createConfigItem(key, value, defaultValue, isModified) {
 
     // Input
     const inputContainer = document.createElement('div');
+    inputContainer.className = 'input-container';
+    
     const input = createInput(key, value);
     input.className = 'config-input';
     input.dataset.key = key;
@@ -308,6 +310,18 @@ function createConfigItem(key, value, defaultValue, isModified) {
         input.oninput = () => handleValueChange(key, input.value, input.dataset.original);
     }
     inputContainer.appendChild(input);
+    
+    if (key === 'cameras.slot1.type' || key === 'cameras.slot2.type') {
+        const detectBtn = document.createElement('button');
+        detectBtn.className = 'btn btn-primary btn-small';
+        detectBtn.textContent = 'Detect';
+        detectBtn.style.marginLeft = '10px';
+        detectBtn.onclick = async () => {
+            await detectAndSetCameras(key);
+        };
+        inputContainer.appendChild(detectBtn);
+    }
+    
     item.appendChild(inputContainer);
 
     // Actions
@@ -692,3 +706,62 @@ function showConfirm(title, message, onConfirm) {
 function closeModal() {
     document.getElementById('confirmModal').classList.remove('active');
 }
+
+async function detectAndSetCameras(targetKey = null) {
+    try {
+        updateStatus('Detecting cameras...', 'info');
+        
+        const response = await fetch('/api/cameras/detect');
+        const result = await response.json();
+        
+        if (result.success) {
+            const config = result.configuration;
+            
+            if (targetKey === 'cameras.slot1.type') {
+                const input = document.querySelector(`[data-key="cameras.slot1.type"]`);
+                if (input) {
+                    input.value = config.slot1.type;
+                    handleValueChange('cameras.slot1.type', config.slot1.type, input.dataset.original);
+                }
+                updateStatus(`Camera 1 detected: Type ${config.slot1.type}`, 'success');
+            } else if (targetKey === 'cameras.slot2.type') {
+                const input = document.querySelector(`[data-key="cameras.slot2.type"]`);
+                if (input) {
+                    input.value = config.slot2.type;
+                    handleValueChange('cameras.slot2.type', config.slot2.type, input.dataset.original);
+                }
+                updateStatus(`Camera 2 detected: Type ${config.slot2.type}`, 'success');
+            } else {
+                const input1 = document.querySelector(`[data-key="cameras.slot1.type"]`);
+                const input2 = document.querySelector(`[data-key="cameras.slot2.type"]`);
+                
+                if (input1) {
+                    input1.value = config.slot1.type;
+                    handleValueChange('cameras.slot1.type', config.slot1.type, input1.dataset.original);
+                }
+                if (input2) {
+                    input2.value = config.slot2.type;
+                    handleValueChange('cameras.slot2.type', config.slot2.type, input2.dataset.original);
+                }
+                
+                updateStatus(`Detected cameras - Slot 1: Type ${config.slot1.type}, Slot 2: Type ${config.slot2.type}`, 'success');
+            }
+            
+            if (result.cameras && result.cameras.length > 0) {
+                let details = 'Detected: ';
+                result.cameras.forEach((cam, idx) => {
+                    details += `${cam.model} (${cam.sensor}) on ${cam.port}`;
+                    if (idx < result.cameras.length - 1) details += ', ';
+                });
+                console.log(details);
+            }
+            
+        } else {
+            updateStatus(`Camera detection failed: ${result.message}`, 'error');
+        }
+    } catch (error) {
+        console.error('Camera detection error:', error);
+        updateStatus('Failed to detect cameras', 'error');
+    }
+}
+
