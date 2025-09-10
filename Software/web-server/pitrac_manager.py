@@ -133,10 +133,6 @@ class PiTracProcessManager:
             cmd.append(f"--config_file={self.config_file}")
 
         cameras_config = config.get("cameras") or {}
-        if camera == "camera1" and "camera1_gain" in cameras_config:
-            cmd.append(f"--camera_gain={cameras_config['camera1_gain']}")
-        elif camera == "camera2" and "camera2_gain" in cameras_config:
-            cmd.append(f"--camera_gain={cameras_config['camera2_gain']}")
 
         slot1_config = cameras_config.get("slot1") or {}
         slot2_config = cameras_config.get("slot2") or {}
