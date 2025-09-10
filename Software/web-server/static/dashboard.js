@@ -310,9 +310,9 @@ async function checkPiTracStatus() {
         const response = await fetch('/api/pitrac/status');
         const status = await response.json();
 
-        updatePiTracButtons(status.running);
+        updatePiTracButtons(status.is_running);
 
-        if (!status.running) {
+        if (!status.is_running) {
             updateBallStatus(null, null, false);
         }
 
