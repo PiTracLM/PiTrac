@@ -288,6 +288,28 @@ class ConfigurationManager:
         Returns:
             Tuple of (is_valid, error_message)
         """
+        metadata = self.load_configurations_metadata()
+        settings_metadata = metadata.get("settings", {})
+        
+        if key in settings_metadata:
+            setting_info = settings_metadata[key]
+            setting_type = setting_info.get("type", "")
+            
+            if setting_type == "select" and "options" in setting_info:
+                valid_options = list(setting_info["options"].keys())
+                if value not in valid_options:
+                    return False, f"Must be one of: {', '.join(valid_options)}"
+            
+            elif setting_type == "boolean":
+                if not isinstance(value, bool) and value not in [True, False, "true", "false"]:
+                    return False, "Must be true or false"
+            
+            elif setting_type == "number":
+                try:
+                    float(value)
+                except (TypeError, ValueError):
+                    return False, "Must be a number"
+        
         if "Gain" in key:
             try:
                 float_val = float(value)
