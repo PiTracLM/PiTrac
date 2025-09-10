@@ -206,9 +206,9 @@ class CameraDetector:
         """Parse camera information from libcamera output"""
         cameras = []
 
-        camera_pattern = r"(\d+)\s*:\s*(\w+)\s*\[([^\]]+)\](?:\s*\(([^)]+)\))?"
+        camera_pattern = r"^(\d+)\s*:\s*(\w+)\s*\[([^\]]+)\](?:\s*\(([^)]+)\))?"
 
-        for match in re.finditer(camera_pattern, output):
+        for match in re.finditer(camera_pattern, output, re.MULTILINE):
             idx = int(match.group(1))
             sensor = match.group(2).lower()
             resolution = match.group(3)

@@ -71,6 +71,7 @@ async function loadConfiguration() {
         renderConfiguration();
         updateModifiedCount();
 
+        updateConditionalVisibility();
         setTimeout(updateConditionalVisibility, 100);
 
         updateStatus('Configuration loaded', 'success');
