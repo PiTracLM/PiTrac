@@ -9,7 +9,6 @@ import signal
 import subprocess
 from pathlib import Path
 from typing import Optional, Dict, Any
-import json
 from config_manager import ConfigurationManager
 
 logger = logging.getLogger(__name__)
@@ -20,9 +19,7 @@ class PiTracProcessManager:
 
     def __init__(self, config_manager: Optional[ConfigurationManager] = None):
         self.process: Optional[subprocess.Popen] = None
-        self.camera2_process: Optional[subprocess.Popen] = (
-            None
-        )
+        self.camera2_process: Optional[subprocess.Popen] = None
         self.pitrac_binary = "/usr/lib/pitrac/pitrac_lm"
         self.config_file = "/etc/pitrac/golf_sim_config.json"
         self.log_file = Path.home() / ".pitrac" / "logs" / "pitrac.log"
@@ -201,9 +198,7 @@ class PiTracProcessManager:
 
             env = os.environ.copy()
             env["LD_LIBRARY_PATH"] = "/usr/lib/pitrac"
-            env["PITRAC_ROOT"] = (
-                "/usr/lib/pitrac"
-            )
+            env["PITRAC_ROOT"] = "/usr/lib/pitrac"
             home_dir = str(Path.home())
             env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = f"{home_dir}/LM_Shares/Images/"
             env["PITRAC_WEBSERVER_SHARE_DIR"] = f"{home_dir}/LM_Shares/WebShare/"
@@ -211,15 +206,15 @@ class PiTracProcessManager:
 
             config = self._load_pitrac_config()
             cameras_config = config.get("cameras") or {}
-            
+
             slot1 = cameras_config.get("slot1") or {}
             slot2 = cameras_config.get("slot2") or {}
-            
+
             if "type" in slot1:
                 env["PITRAC_SLOT1_CAMERA_TYPE"] = str(slot1["type"])
             elif is_single_pi:
                 env["PITRAC_SLOT1_CAMERA_TYPE"] = "4"
-                
+
             if "lens" in slot1:
                 env["PITRAC_SLOT1_LENS_TYPE"] = str(slot1.get("lens", 1))
             else:
@@ -229,14 +224,18 @@ class PiTracProcessManager:
                 env["PITRAC_SLOT2_CAMERA_TYPE"] = str(slot2["type"])
             elif is_single_pi:
                 env["PITRAC_SLOT2_CAMERA_TYPE"] = "4"
-                
+
             if "lens" in slot2:
                 env["PITRAC_SLOT2_LENS_TYPE"] = str(slot2.get("lens", 1))
             else:
                 env["PITRAC_SLOT2_LENS_TYPE"] = "1"
-            
-            logger.info(f"Camera configuration - Slot1: Type={env.get('PITRAC_SLOT1_CAMERA_TYPE')}, Lens={env.get('PITRAC_SLOT1_LENS_TYPE')}")
-            logger.info(f"Camera configuration - Slot2: Type={env.get('PITRAC_SLOT2_CAMERA_TYPE')}, Lens={env.get('PITRAC_SLOT2_LENS_TYPE')}")
+
+            logger.info(
+                f"Camera configuration - Slot1: Type={env.get('PITRAC_SLOT1_CAMERA_TYPE')}, Lens={env.get('PITRAC_SLOT1_LENS_TYPE')}"
+            )
+            logger.info(
+                f"Camera configuration - Slot2: Type={env.get('PITRAC_SLOT2_CAMERA_TYPE')}, Lens={env.get('PITRAC_SLOT2_LENS_TYPE')}"
+            )
 
             Path(f"{home_dir}/LM_Shares/Images").mkdir(parents=True, exist_ok=True)
             Path(f"{home_dir}/LM_Shares/WebShare").mkdir(parents=True, exist_ok=True)
@@ -267,8 +266,10 @@ class PiTracProcessManager:
                         logger.info(
                             f"PiTrac camera2 started successfully with PID {self.camera2_process.pid}"
                         )
-                        
-                        logger.info("Waiting for camera2 to be ready before starting camera1...")
+
+                        logger.info(
+                            "Waiting for camera2 to be ready before starting camera1..."
+                        )
                         await asyncio.sleep(1)
                     else:
                         logger.error("Camera2 process exited immediately")
@@ -314,7 +315,7 @@ class PiTracProcessManager:
                             }
                         else:
                             logger.error("Camera2 process died during camera1 startup")
-                            
+
                             try:
                                 os.kill(self.process.pid, signal.SIGTERM)
                             except ProcessLookupError:
@@ -322,11 +323,11 @@ class PiTracProcessManager:
                             if self.pid_file.exists():
                                 self.pid_file.unlink()
                             self.process = None
-                            
+
                             if self.camera2_pid_file.exists():
                                 self.camera2_pid_file.unlink()
                             self.camera2_process = None
-                            
+
                             return {
                                 "status": "failed",
                                 "message": "Camera2 died during startup - check logs",
@@ -340,11 +341,11 @@ class PiTracProcessManager:
                         }
                 else:
                     logger.error("PiTrac camera1 process exited immediately")
-                    
+
                     if self.pid_file.exists():
                         self.pid_file.unlink()
                     self.process = None
-                    
+
                     if is_single_pi and self.camera2_process:
                         try:
                             os.kill(self.camera2_process.pid, signal.SIGTERM)
@@ -353,7 +354,7 @@ class PiTracProcessManager:
                         if self.camera2_pid_file.exists():
                             self.camera2_pid_file.unlink()
                         self.camera2_process = None
-                    
+
                     return {
                         "status": "failed",
                         "message": "PiTrac camera1 failed to start - check logs",
@@ -507,7 +508,7 @@ class PiTracProcessManager:
         """Get detailed status of PiTrac process(es)"""
         camera1_pid = self.get_pid()
         camera2_pid = self.get_camera2_pid()
-        
+
         config = self._load_pitrac_config()
         system_config = config.get("system") or {}
         is_single_pi = system_config.get("mode", "single") == "single"
@@ -524,7 +525,7 @@ class PiTracProcessManager:
             "camera2_log_file": str(self.camera2_log_file),
             "config_file": self.config_file,
             "binary": self.pitrac_binary,
-            "mode": system_config.get("mode", "single")
+            "mode": system_config.get("mode", "single"),
         }
 
         if self.log_file.exists():
