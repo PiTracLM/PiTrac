@@ -449,7 +449,8 @@ class PiTracServer:
         """Stream logs for a specific service via WebSocket"""
         try:
             if service == "pitrac":
-                await self._stream_systemd_logs(websocket, "pitrac")
+                log_file = self.pitrac_manager.log_file
+                await self._stream_file_logs(websocket, log_file)
             elif service == "pitrac_camera2":
                 log_file = self.pitrac_manager.camera2_log_file
                 await self._stream_file_logs(websocket, log_file)
