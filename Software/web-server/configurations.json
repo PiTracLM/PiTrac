@@ -51,8 +51,8 @@
         "1": "Pi Camera v1.3 - OV5647 sensor (DEPRECATED)",
         "2": "Pi Camera v2 - IMX219 sensor (DEPRECATED)",
         "3": "Pi HQ Camera - IMX477 sensor (DEPRECATED)",
-        "4": "Pi Global Shutter - IMX296 Color (RECOMMENDED)",
-        "5": "InnoMaker IMX296 - Mono sensor"
+        "4": "Pi Global Shutter - IMX296 Color",
+        "5": "InnoMaker IMX296 - Mono sensor (RECOMMENDED)"
       },
       "default": "4",
       "requiresRestart": true,

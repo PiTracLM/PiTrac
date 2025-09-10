@@ -131,54 +131,78 @@ class CameraDetector:
             logger.error("No camera detection tool found")
             return None
         
-        try:
-            cmd_name = os.path.basename(self.camera_cmd)
-            
-            if cmd_name in ["rpicam-hello", "libcamera-hello", "rpicam-still", "libcamera-still"]:
-                cmd = [self.camera_cmd, "--list-cameras"]
-                logger.debug(f"Running command: {' '.join(cmd)}")
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                    check=False
-                )
-                if result.returncode == 0:
-                    logger.debug(f"Command successful, output length: {len(result.stdout)} bytes")
-                    return result.stdout
-                else:
-                    logger.warning(f"Command failed with return code {result.returncode}")
-                    if result.stderr:
-                        logger.debug(f"stderr: {result.stderr[:200]}")
-                    return None
-            elif cmd_name == "raspistill":
-                vcgencmd_result = subprocess.run(
-                    ["which", "vcgencmd"],
-                    capture_output=True
-                )
-                if vcgencmd_result.returncode == 0:
-                    supported = subprocess.run(
-                        ["vcgencmd", "get_camera"],
-                        capture_output=True,
-                        text=True
-                    )
-                    if "supported=1" in supported.stdout:
-                        return "0 : Legacy camera detected (check with libcamera tools for details)"
-                    else:
-                        return "No cameras available"
-                else:
-                    return "No cameras available"
-            
-            logger.error(f"Camera detection failed")
-            return None
+        commands_to_try = []
+        
+        if self.camera_cmd:
+            commands_to_try.append(self.camera_cmd)
+        
+        if self.pi_model == "pi5" and self.camera_cmd != "rpicam-hello":
+            commands_to_try.append("rpicam-hello")
+        if self.camera_cmd != "libcamera-hello":
+            commands_to_try.append("libcamera-hello")
+        
+        for i, cmd_path in enumerate(commands_to_try):
+            try:
+                cmd_name = os.path.basename(cmd_path)
                 
-        except subprocess.TimeoutExpired:
-            logger.error("Camera detection timed out")
-            return None
-        except Exception as e:
-            logger.error(f"Camera detection error: {e}")
-            return None
+                if cmd_name in ["rpicam-hello", "libcamera-hello", "rpicam-still", "libcamera-still"]:
+                    cmd = [cmd_path, "--list-cameras"]
+                    if i == 0:
+                        logger.info(f"Running camera detection with {cmd_name}")
+                    else:
+                        logger.info(f"Trying fallback detection with {cmd_name}")
+                    logger.debug(f"Full command: {' '.join(cmd)}")
+                    result = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                        check=False
+                    )
+                    if result.returncode == 0 and result.stdout:
+                        logger.info(f"Camera detection successful with {cmd_name}")
+                        logger.debug(f"Output length: {len(result.stdout)} bytes")
+                        self.camera_cmd = cmd_path
+                        return result.stdout
+                    else:
+                        if i == 0:
+                            logger.info(f"Primary detection with {cmd_name} failed (return code: {result.returncode})")
+                        else:
+                            logger.debug(f"{cmd_path} failed with return code {result.returncode}")
+                        if result.stderr and "ERROR" in result.stderr:
+                            logger.warning(f"Camera detection error: {result.stderr[:200]}")
+                        elif result.stderr:
+                            logger.debug(f"stderr: {result.stderr[:200]}")
+                elif cmd_name == "raspistill":
+                    vcgencmd_result = subprocess.run(
+                        ["which", "vcgencmd"],
+                        capture_output=True
+                    )
+                    if vcgencmd_result.returncode == 0:
+                        supported = subprocess.run(
+                            ["vcgencmd", "get_camera"],
+                            capture_output=True,
+                            text=True
+                        )
+                        if "supported=1" in supported.stdout:
+                            return "0 : Legacy camera detected (check with libcamera tools for details)"
+                        else:
+                            logger.debug("raspistill reports no cameras available")
+                    else:
+                        logger.debug("vcgencmd not found for raspistill check")
+                        
+            except subprocess.TimeoutExpired:
+                logger.warning(f"Command {cmd_path} timed out")
+                continue
+            except FileNotFoundError:
+                logger.debug(f"Command {cmd_path} not found")
+                continue
+            except Exception as e:
+                logger.warning(f"Error running {cmd_path}: {e}")
+                continue
+        
+        logger.warning("All camera detection methods failed")
+        return None
     
     def _parse_camera_info(self, output: str) -> List[Dict]:
         """Parse camera information from libcamera output"""
