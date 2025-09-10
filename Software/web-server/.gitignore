@@ -66,3 +66,6 @@ temp/
 # Static file builds (if any)
 static/build/
 static/dist/
+
+## JavaScript
+node_modules/

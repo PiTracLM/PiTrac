@@ -71,6 +71,8 @@ async function loadConfiguration() {
         renderConfiguration();
         updateModifiedCount();
 
+        setTimeout(updateConditionalVisibility, 100);
+
         updateStatus('Configuration loaded', 'success');
     } catch (error) {
         console.error('Failed to load configuration:', error);
@@ -269,12 +271,16 @@ function createConfigItem(key, value, defaultValue, isModified) {
     }
     item.dataset.key = key;
 
+    const metadata = configMetadata[key] || {};
+
+    if (metadata.visibleWhen && !checkVisibilityCondition(metadata.visibleWhen)) {
+        item.style.display = 'none';
+        item.dataset.hiddenByCondition = 'true';
+    }
+
     // Label
     const label = document.createElement('div');
     label.className = 'config-label';
-
-    // Get metadata for this setting
-    const metadata = configMetadata[key] || {};
 
     // Use display name from metadata or extract readable name from key
     const displayName = metadata.displayName || (() => {
@@ -299,7 +305,7 @@ function createConfigItem(key, value, defaultValue, isModified) {
     // Input
     const inputContainer = document.createElement('div');
     inputContainer.className = 'input-container';
-    
+
     const input = createInput(key, value);
     input.className = 'config-input';
     input.dataset.key = key;
@@ -310,13 +316,13 @@ function createConfigItem(key, value, defaultValue, isModified) {
         input.oninput = () => handleValueChange(key, input.value, input.dataset.original);
     }
     inputContainer.appendChild(input);
-    
-    if (key === 'cameras.slot1.type' || key === 'cameras.slot2.type' || 
+
+    if (key === 'cameras.slot1.type' || key === 'cameras.slot2.type' ||
         key === 'cameras.slot1_type' || key === 'cameras.slot2_type') {
         inputContainer.style.display = 'flex';
         inputContainer.style.alignItems = 'center';
         inputContainer.style.gap = '0.75rem';
-        
+
         const detectBtn = document.createElement('button');
         detectBtn.className = 'btn btn-secondary btn-small';
         detectBtn.textContent = 'Detect';
@@ -335,7 +341,7 @@ function createConfigItem(key, value, defaultValue, isModified) {
         };
         inputContainer.appendChild(detectBtn);
     }
-    
+
     item.appendChild(inputContainer);
 
     // Actions
@@ -358,7 +364,7 @@ function createConfigItem(key, value, defaultValue, isModified) {
 // Create appropriate input based on value type
 function createInput(key, value) {
     const metadata = configMetadata[key] || {};
-    
+
     if (metadata.type === 'select' && metadata.options) {
         const select = document.createElement('select');
         Object.entries(metadata.options).forEach(([optValue, optDisplay]) => {
@@ -372,7 +378,7 @@ function createInput(key, value) {
         });
         return select;
     }
-    
+
     // Handle arrays and complex objects
     if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
         const textarea = document.createElement('textarea');
@@ -428,6 +434,12 @@ async function handleValueChange(key, currentValue, originalValue) {
         else if (!isNaN(original) && original !== '') original = Number(original);
 
         const isModified = current !== original;
+
+        setNestedValue(currentConfig, key, current);
+
+        if (key === 'system.mode') {
+            updateConditionalVisibility();
+        }
 
         const item = document.querySelector(`[data-key="${key}"]`);
         if (item) {
@@ -688,6 +700,19 @@ function getNestedValue(obj, path) {
     return path.split('.').reduce((current, key) => current?.[key], obj);
 }
 
+function setNestedValue(obj, path, value) {
+    const parts = path.split('.');
+    let current = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+        const part = parts[i];
+        if (!(part in current) || typeof current[part] !== 'object') {
+            current[part] = {};
+        }
+        current = current[part];
+    }
+    current[parts[parts.length - 1]] = value;
+}
+
 function updateStatus(message, type = '') {
     const statusEl = document.getElementById('statusMessage');
     statusEl.textContent = message;
@@ -724,31 +749,31 @@ function closeModal() {
 async function detectAndSetCameras(targetKey = null) {
     try {
         updateStatus('Detecting cameras...', 'info');
-        
+
         const response = await fetch('/api/cameras/detect');
         const result = await response.json();
-        
+
         if (result.success && result.cameras && result.cameras.length > 0) {
             const config = result.configuration;
-            
+
             if (targetKey === 'cameras.slot1.type') {
-                const input = document.querySelector(`[data-key="cameras.slot1.type"]`);
+                const input = document.querySelector('[data-key="cameras.slot1.type"]');
                 if (input) {
                     input.value = config.slot1.type;
                     handleValueChange('cameras.slot1.type', config.slot1.type, input.dataset.original);
                 }
                 updateStatus(`Camera 1 detected: Type ${config.slot1.type}`, 'success');
             } else if (targetKey === 'cameras.slot2.type') {
-                const input = document.querySelector(`[data-key="cameras.slot2.type"]`);
+                const input = document.querySelector('[data-key="cameras.slot2.type"]');
                 if (input) {
                     input.value = config.slot2.type;
                     handleValueChange('cameras.slot2.type', config.slot2.type, input.dataset.original);
                 }
                 updateStatus(`Camera 2 detected: Type ${config.slot2.type}`, 'success');
             } else {
-                const input1 = document.querySelector(`[data-key="cameras.slot1.type"]`);
-                const input2 = document.querySelector(`[data-key="cameras.slot2.type"]`);
-                
+                const input1 = document.querySelector('[data-key="cameras.slot1.type"]');
+                const input2 = document.querySelector('[data-key="cameras.slot2.type"]');
+
                 if (input1) {
                     input1.value = config.slot1.type;
                     handleValueChange('cameras.slot1.type', config.slot1.type, input1.dataset.original);
@@ -757,44 +782,71 @@ async function detectAndSetCameras(targetKey = null) {
                     input2.value = config.slot2.type;
                     handleValueChange('cameras.slot2.type', config.slot2.type, input2.dataset.original);
                 }
-                
+
                 updateStatus(`Detected cameras - Slot 1: Type ${config.slot1.type}, Slot 2: Type ${config.slot2.type}`, 'success');
             }
-         
+
         } else {
             const errorMsg = result.message || 'No cameras detected';
             updateStatus(`Camera detection failed: ${errorMsg}`, 'error');
-            
+
             if (result.warnings && result.warnings.length > 0) {
-                showModal('Camera Detection Failed', 
+                showModal('Camera Detection Failed',
                     `<p><strong>${errorMsg}</strong></p>` +
-                    `<p>Warnings:</p>` +
-                    `<ul style="text-align: left; margin: 10px 20px;">` +
+                    '<p>Warnings:</p>' +
+                    '<ul style="text-align: left; margin: 10px 20px;">' +
                     result.warnings.map(w => `<li>${w}</li>`).join('') +
-                    `</ul>` +
-                    `<p style="margin-top: 15px;">Troubleshooting:</p>` +
-                    `<ul style="text-align: left; margin: 10px 20px;">` +
-                    `<li>Check ribbon cable connections and orientation</li>` +
-                    `<li>Verify camera_auto_detect=1 in /boot/firmware/config.txt</li>` +
-                    `<li>Power cycle the Raspberry Pi</li>` +
-                    `<li>Ensure cameras are compatible (IMX296 recommended)</li>` +
-                    `</ul>`
+                    '</ul>' +
+                    '<p style="margin-top: 15px;">Troubleshooting:</p>' +
+                    '<ul style="text-align: left; margin: 10px 20px;">' +
+                    '<li>Check ribbon cable connections and orientation</li>' +
+                    '<li>Verify camera_auto_detect=1 in /boot/firmware/config.txt</li>' +
+                    '<li>Power cycle the Raspberry Pi</li>' +
+                    '<li>Ensure cameras are compatible (IMX296 recommended)</li>' +
+                    '</ul>'
                 );
             }
         }
     } catch (error) {
         console.error('Camera detection error:', error);
         updateStatus('Failed to detect cameras - check connection', 'error');
-        showModal('Connection Error', 
-            `<p>Failed to connect to camera detection service.</p>` +
+        showModal('Connection Error',
+            '<p>Failed to connect to camera detection service.</p>' +
             `<p>Error: ${error.message}</p>` +
-            `<p style="margin-top: 15px;">Please ensure:</p>` +
-            `<ul style="text-align: left; margin: 10px 20px;">` +
-            `<li>The PiTrac web service is running</li>` +
-            `<li>You have a stable network connection</li>` +
-            `<li>Try refreshing the page</li>` +
-            `</ul>`
+            '<p style="margin-top: 15px;">Please ensure:</p>' +
+            '<ul style="text-align: left; margin: 10px 20px;">' +
+            '<li>The PiTrac web service is running</li>' +
+            '<li>You have a stable network connection</li>' +
+            '<li>Try refreshing the page</li>' +
+            '</ul>'
         );
     }
 }
 
+function checkVisibilityCondition(condition) {
+    for (const [condKey, condValue] of Object.entries(condition)) {
+        const actualValue = getNestedValue(currentConfig, condKey);
+        if (actualValue !== condValue) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function updateConditionalVisibility() {
+    document.querySelectorAll('.config-item').forEach(item => {
+        const key = item.dataset.key;
+        const metadata = configMetadata[key];
+
+        if (metadata && metadata.visibleWhen) {
+            const shouldBeVisible = checkVisibilityCondition(metadata.visibleWhen);
+            if (shouldBeVisible) {
+                item.style.display = '';
+                delete item.dataset.hiddenByCondition;
+            } else {
+                item.style.display = 'none';
+                item.dataset.hiddenByCondition = 'true';
+            }
+        }
+    });
+}

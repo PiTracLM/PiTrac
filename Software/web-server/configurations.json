@@ -2,6 +2,35 @@
   "version": "1.0",
   "description": "PiTrac configuration metadata and schema",
   "settings": {
+    "system.mode": {
+      "category": "System",
+      "showInBasic": true,
+      "basicSubcategory": "System",
+      "displayName": "Pi Configuration Mode",
+      "description": "Single Pi with dual cameras (most common) or Dual Pi setup (one camera per Pi)",
+      "type": "select",
+      "options": {
+        "single": "Single Pi (2 cameras on 1 Pi)",
+        "dual": "Dual Pi (1 camera per Pi)"
+      },
+      "default": "single",
+      "requiresRestart": true,
+      "affectsSettings": ["cameras.slot2.type", "cameras.slot2.lens", "gs_config.cameras.kCamera2Gain"]
+    },
+    "system.camera_role": {
+      "category": "System",
+      "showInBasic": false,
+      "displayName": "Camera Role (Dual Pi Mode)",
+      "description": "Which camera this Pi controls in dual Pi mode",
+      "type": "select",
+      "options": {
+        "camera1": "Camera 1 (Primary)",
+        "camera2": "Camera 2 (Secondary)"
+      },
+      "default": "camera1",
+      "requiresRestart": true,
+      "visibleWhen": {"system.mode": "dual"}
+    },
     "gs_config.modes.kStartInPuttingMode": {
       "category": "System",
       "showInBasic": true,
@@ -79,7 +108,8 @@
       "showInBasic": true,
       "basicSubcategory": "Hardware",
       "displayName": "Camera 2 Type",
-      "description": "Type of camera connected to slot 2 (CAM1 port) - Required for single Pi mode",
+      "description": "Type of camera connected to slot 2 (CAM1 port) - Only used in single Pi mode",
+      "visibleWhen": {"system.mode": "single"},
       "type": "select",
       "options": {
         "1": "Pi Camera v1.3 - OV5647 sensor (DEPRECATED)",
@@ -97,7 +127,8 @@
       "category": "Cameras",
       "showInBasic": false,
       "displayName": "Camera 2 Lens",
-      "description": "Lens type for camera 2",
+      "description": "Lens type for camera 2 - Only used in single Pi mode",
+      "visibleWhen": {"system.mode": "single"},
       "type": "select",
       "options": {
         "1": "6mm - Standard lens",
@@ -224,7 +255,8 @@
       "showInBasic": true,
       "basicSubcategory": "Cameras",
       "displayName": "Camera 2 Gain",
-      "description": "Brightness/gain setting for Camera 2",
+      "description": "Brightness/gain setting for Camera 2 - Only used in single Pi mode",
+      "visibleWhen": {"system.mode": "single"},
       "type": "number",
       "min": 0.5,
       "max": 16.0,
