@@ -15,5 +15,4 @@ This section covers debugging, troubleshooting, and development guides for PiTra
 - **[Testing Without Hardware]({% link troubleshooting/testing-without-hardware.md %})** - Test image processing without cameras
 
 For immediate help during setup, also refer to:
-- [Running PiTrac]({% link software/running-pitrac.md %}) - Runtime issues and process management
 - [Startup Guide]({% link software/startup-guide.md %}) - Hardware testing procedures

@@ -387,7 +387,6 @@ TestImages/
 Testing works? Great! Now:
 1. Try different test images to verify robustness
 2. Create custom images for your use cases
-3. Move to [hardware testing]({% link software/running-pitrac.md %})
-4. Start [camera calibration]({% link camera/camera-calibration.md %})
+3. Start [camera calibration]({% link camera/camera-calibration.md %})
 
 For more debugging tools, see the [Debugging Guide]({% link troubleshooting/debugging-guide.md %}).
