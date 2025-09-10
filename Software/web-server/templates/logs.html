@@ -3,316 +3,179 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PiTrac - Logs Viewer</title>
-    <link rel="stylesheet" href="/static/styles.css">
-    <style>
-        .logs-container {
-            display: flex;
-            flex-direction: column;
-            height: calc(100vh - 120px);
-            padding: 20px;
-        }
-        
-        .logs-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding: 15px;
-            background: var(--card-bg);
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .service-selector {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        
-        .service-selector select {
-            padding: 8px 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            background: white;
-            font-size: 14px;
-            min-width: 200px;
-        }
-        
-        .service-status {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-        
-        .service-status.running {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .service-status.stopped {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        
-        .logs-controls {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .logs-controls button {
-            padding: 6px 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            background: white;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        
-        .logs-controls button:hover {
-            background: #f5f5f5;
-        }
-        
-        .logs-controls button.active {
-            background: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
-        }
-        
-        .log-viewer {
-            flex: 1;
-            background: #1e1e1e;
-            color: #d4d4d4;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 13px;
-            padding: 15px;
-            border-radius: 8px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .log-line {
-            margin: 2px 0;
-            padding: 2px 0;
-            border-left: 3px solid transparent;
-            padding-left: 10px;
-        }
-        
-        .log-line.historical {
-            opacity: 0.7;
-        }
-        
-        .log-line.error {
-            color: #f48771;
-            border-left-color: #f48771;
-            background: rgba(244, 135, 113, 0.1);
-        }
-        
-        .log-line.warning {
-            color: #dcdcaa;
-            border-left-color: #dcdcaa;
-            background: rgba(220, 220, 170, 0.1);
-        }
-        
-        .log-line.info {
-            color: #9cdcfe;
-            border-left-color: #9cdcfe;
-        }
-        
-        .log-line.debug {
-            color: #858585;
-            border-left-color: #858585;
-        }
-        
-        .log-line.trace {
-            color: #666666;
-            border-left-color: #666666;
-        }
-        
-        .status-indicator {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-right: 8px;
-            animation: pulse 2s infinite;
-        }
-        
-        .status-indicator.connected {
-            background: #28a745;
-        }
-        
-        .status-indicator.disconnected {
-            background: #dc3545;
-            animation: none;
-        }
-        
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-        
-        .connection-status {
-            display: flex;
-            align-items: center;
-            font-size: 14px;
-        }
-        
-        .log-stats {
-            display: flex;
-            gap: 20px;
-            font-size: 12px;
-            color: #666;
-            margin-top: 10px;
-        }
-        
-        #clearButton {
-            background: #ff4444;
-            color: white;
-            border: none;
-        }
-        
-        #clearButton:hover {
-            background: #cc0000;
-        }
-        
-        .navbar {
-            background: var(--primary-color);
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .navbar h1 {
-            color: white;
-            margin: 0;
-            font-size: 24px;
-        }
-
-        .nav-menu {
-            position: relative;
-        }
-
-        .menu-button {
-            background: white;
-            color: var(--primary-color);
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .dropdown-menu {
-            position: absolute;
-            right: 0;
-            top: 100%;
-            margin-top: 8px;
-            background: white;
-            border-radius: 4px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            min-width: 150px;
-            display: none;
-            z-index: 1000;
-        }
-
-        .dropdown-menu.show {
-            display: block;
-        }
-
-        .dropdown-menu a {
-            display: block;
-            padding: 10px 16px;
-            color: #333;
-            text-decoration: none;
-            transition: background 0.2s;
-        }
-
-        .dropdown-menu a:hover {
-            background: #f5f5f5;
-        }
-
-        :root {
-            --primary-color: #4CAF50;
-            --card-bg: #ffffff;
-            --border-color: #ddd;
-        }
-    </style>
+    <title>PiTrac - Logs</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="stylesheet" href="/static/dashboard.css">
+    <link rel="stylesheet" href="/static/logs.css">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
 </head>
 <body>
-    <nav class="navbar">
-        <h1>PiTrac Logs</h1>
-        <div class="nav-menu">
-            <button class="menu-button" onclick="toggleMenu()">Menu ▼</button>
-            <div class="dropdown-menu" id="dropdownMenu">
-                <a href="/">Dashboard</a>
-                <a href="/config">Configuration</a>
-                <a href="/logs" class="active">Logs</a>
+    <div class="container">
+        <!-- Header matching dashboard -->
+        <div class="header">
+            <div class="header-content">
+                <a href="/" style="display: flex; align-items: center; gap: 0.75rem; text-decoration: none; color: inherit;">
+                    <img src="/static/logos/PiTrac.svg" alt="PiTrac Logo" class="header-logo">
+                    <h1>Logs</h1>
+                </a>
+            </div>
+            <div class="header-right">
+                <div class="dropdown">
+                    <button class="dropdown-toggle" aria-label="Menu">
+                        <svg fill="currentColor" viewBox="0 0 20 20" width="24" height="24">
+                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+                        </svg>
+                    </button>
+                    <div class="dropdown-menu">
+                        <a href="/" class="dropdown-item">
+                            <svg fill="currentColor" viewBox="0 0 20 20" width="20" height="20">
+                                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
+                            </svg>
+                            Dashboard
+                        </a>
+                        <a href="/config" class="dropdown-item">
+                            <svg fill="currentColor" viewBox="0 0 20 20" width="20" height="20">
+                                <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+                            </svg>
+                            Configuration
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <div class="theme-selector">
+                            <span class="dropdown-label">Theme</span>
+                            <div class="theme-options">
+                                <button class="theme-btn" data-theme="light" title="Light mode" onclick="setTheme('light')">
+                                    <svg fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>
+                                    </svg>
+                                </button>
+                                <button class="theme-btn" data-theme="dark" title="Dark mode" onclick="setTheme('dark')">
+                                    <svg fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </nav>
-    
-    <div class="logs-container">
-        <div class="logs-header">
-            <div class="service-selector">
-                <label for="serviceSelect">Service:</label>
-                <select id="serviceSelect" onchange="changeService()">
-                    <option value="">Loading services...</option>
-                </select>
-                <span id="serviceStatus" class="service-status"></span>
-                <div class="connection-status">
-                    <span class="status-indicator" id="connectionIndicator"></span>
-                    <span id="connectionText">Disconnected</span>
+        
+        <!-- Logs Content -->
+        <div class="logs-container">
+            <div class="logs-header">
+                <div class="logs-controls-row">
+                    <div class="service-selector">
+                        <label for="serviceSelect">Service:</label>
+                        <select id="serviceSelect" onchange="changeService()">
+                            <option value="">Loading services...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="service-info">
+                        <span id="serviceStatus" class="service-status" style="display: none;"></span>
+                        <div class="connection-status">
+                            <span class="status-indicator disconnected" id="connectionIndicator"></span>
+                            <span id="connectionText">Disconnected</span>
+                        </div>
+                    </div>
+                    
+                    <div class="logs-actions">
+                        <button id="pauseButton" class="action-btn" onclick="togglePause()">
+                            <svg fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M6 3.5a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5zm4 0a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5z"/>
+                            </svg>
+                            <span class="btn-text">Pause</span>
+                        </button>
+                        <button id="clearButton" class="action-btn danger" onclick="clearLogs()">
+                            <svg fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                            </svg>
+                            <span class="btn-text">Clear</span>
+                        </button>
+                        <button class="action-btn" onclick="downloadLogs()">
+                            <svg fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                            </svg>
+                            <span class="btn-text">Download</span>
+                        </button>
+                    </div>
                 </div>
             </div>
             
-            <div class="logs-controls">
-                <button id="pauseButton" onclick="togglePause()">Pause</button>
-                <button id="clearButton" onclick="clearLogs()">Clear</button>
-                <button onclick="downloadLogs()">Download</button>
+            <div class="log-viewer-wrapper">
+                <div class="log-viewer empty" id="logViewer"></div>
+                
+                <div class="log-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Lines:</span>
+                        <span class="stat-value" id="lineCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Errors:</span>
+                        <span class="stat-value" id="errorCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Warnings:</span>
+                        <span class="stat-value" id="warningCount">0</span>
+                    </div>
+                </div>
             </div>
-        </div>
-        
-        <div class="log-viewer" id="logViewer">
-            <div style="color: #858585;">Select a service to view logs...</div>
-        </div>
-        
-        <div class="log-stats">
-            <span>Lines: <span id="lineCount">0</span></span>
-            <span>Errors: <span id="errorCount">0</span></span>
-            <span>Warnings: <span id="warningCount">0</span></span>
         </div>
     </div>
     
     <script>
+        // Theme management (from dashboard)
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            updateThemeButtons();
+        }
+        
+        function updateThemeButtons() {
+            const theme = localStorage.getItem('theme') || 'light';
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                if (btn.dataset.theme === theme) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+        
+        // Dropdown menu functionality
+        document.addEventListener('DOMContentLoaded', () => {
+            const dropdown = document.querySelector('.dropdown');
+            const toggle = document.querySelector('.dropdown-toggle');
+            
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dropdown.classList.toggle('active');
+            });
+            
+            document.addEventListener('click', () => {
+                dropdown.classList.remove('active');
+            });
+            
+            document.querySelector('.dropdown-menu').addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+            
+            // Initialize theme
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            setTheme(savedTheme);
+        });
+        
+        // Logs viewer functionality
         let ws = null;
         let isPaused = false;
         let currentService = null;
         let logBuffer = [];
         let maxLogLines = 1000;
         let stats = { lines: 0, errors: 0, warnings: 0 };
-        
-        function toggleMenu() {
-            document.getElementById('dropdownMenu').classList.toggle('show');
-        }
-        
-        // Close dropdown when clicking outside
-        window.onclick = function(event) {
-            if (!event.target.matches('.menu-button')) {
-                var dropdown = document.getElementById('dropdownMenu');
-                if (dropdown.classList.contains('show')) {
-                    dropdown.classList.remove('show');
-                }
-            }
-        }
         
         async function loadServices() {
             try {
@@ -338,6 +201,8 @@
                 }
             } catch (error) {
                 console.error('Failed to load services:', error);
+                const select = document.getElementById('serviceSelect');
+                select.innerHTML = '<option value="">Error loading services</option>';
             }
         }
         
@@ -347,6 +212,8 @@
             
             if (!select.value) {
                 disconnectWebSocket();
+                document.getElementById('serviceStatus').style.display = 'none';
+                document.getElementById('logViewer').className = 'log-viewer empty';
                 return;
             }
             
@@ -357,9 +224,11 @@
             const statusEl = document.getElementById('serviceStatus');
             statusEl.textContent = status.charAt(0).toUpperCase() + status.slice(1);
             statusEl.className = 'service-status ' + status;
+            statusEl.style.display = 'inline-flex';
             
             // Clear logs and reset stats
             clearLogs();
+            document.getElementById('logViewer').className = 'log-viewer loading';
             
             // Connect WebSocket
             connectWebSocket(currentService);
@@ -379,6 +248,10 @@
                 
                 // Send service selection
                 ws.send(JSON.stringify({ service: service }));
+                
+                // Remove loading state
+                const viewer = document.getElementById('logViewer');
+                viewer.classList.remove('loading', 'empty');
             };
             
             ws.onmessage = (event) => {
@@ -435,12 +308,11 @@
             const line = document.createElement('div');
             line.className = 'log-line';
             
-            // Parse log level from message or priority
+            // Parse log level
             let level = 'info';
             const message = data.message || '';
             
             if (data.level) {
-                // Systemd priority levels: 0-2 error, 3 warning, 4-5 notice, 6 info, 7 debug
                 const priority = parseInt(data.level);
                 if (priority <= 2) level = 'error';
                 else if (priority === 3) level = 'warning';
@@ -503,8 +375,25 @@
         function togglePause() {
             isPaused = !isPaused;
             const button = document.getElementById('pauseButton');
-            button.textContent = isPaused ? 'Resume' : 'Pause';
-            button.classList.toggle('active', isPaused);
+            
+            if (isPaused) {
+                button.classList.add('active');
+                button.innerHTML = `
+                    <svg fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
+                        <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/>
+                    </svg>
+                    <span class="btn-text">Resume</span>
+                `;
+            } else {
+                button.classList.remove('active');
+                button.innerHTML = `
+                    <svg fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M6 3.5a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5zm4 0a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5z"/>
+                    </svg>
+                    <span class="btn-text">Pause</span>
+                `;
+            }
         }
         
         function clearLogs() {
@@ -513,15 +402,24 @@
             logBuffer = [];
             stats = { lines: 0, errors: 0, warnings: 0 };
             updateStats();
+            
+            if (!currentService) {
+                viewer.className = 'log-viewer empty';
+            }
         }
         
         function downloadLogs() {
+            if (logBuffer.length === 0) {
+                alert('No logs to download');
+                return;
+            }
+            
             const content = logBuffer.map(el => el.textContent).join('\n');
             const blob = new Blob([content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `pitrac-logs-${currentService}-${new Date().toISOString()}.txt`;
+            a.download = `pitrac-logs-${currentService || 'all'}-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
             a.click();
             URL.revokeObjectURL(url);
         }

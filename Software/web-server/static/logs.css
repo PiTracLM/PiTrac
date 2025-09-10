@@ -1,0 +1,332 @@
+/* Logs Page Specific Styles */
+
+.logs-container {
+    height: calc(100vh - 60px);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-primary);
+    gap: 1.5rem;
+}
+
+.logs-header {
+    background: var(--bg-secondary);
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    margin: 0 1.5rem;
+}
+
+.logs-controls-row {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.service-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 250px;
+}
+
+.service-selector label {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.service-selector select {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.service-info {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex: 1;
+}
+
+.service-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.service-status.running {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+}
+
+.service-status.stopped {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.connected {
+    background: #22c55e;
+}
+
+.status-indicator.disconnected {
+    background: #ef4444;
+    animation: none;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.logs-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--btn-primary-bg);
+    color: var(--btn-primary-text);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.action-btn:hover {
+    background: var(--btn-primary-hover);
+}
+
+.action-btn.danger {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.2);
+}
+
+.action-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.action-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.log-viewer-wrapper {
+    flex: 1;
+    margin: 0 1.5rem 1.5rem;
+    background: var(--bg-secondary);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.log-viewer {
+    flex: 1;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-y: auto;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    min-height: 200px;
+}
+
+:root[data-theme="dark"] .log-viewer {
+    background: #0d1117;
+    border: 1px solid var(--border-color);
+}
+
+.log-line {
+    margin: 0;
+    padding: 0.25rem 0.5rem;
+    border-left: 3px solid transparent;
+    transition: background 0.1s ease;
+}
+
+.log-line:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.log-line.historical {
+    opacity: 0.7;
+}
+
+.log-line.error {
+    color: #f48771;
+    border-left-color: #f48771;
+    background: rgba(244, 135, 113, 0.05);
+}
+
+.log-line.warning {
+    color: #dcdcaa;
+    border-left-color: #dcdcaa;
+    background: rgba(220, 220, 170, 0.05);
+}
+
+.log-line.info {
+    color: #9cdcfe;
+    border-left-color: #9cdcfe;
+}
+
+.log-line.debug {
+    color: #858585;
+    border-left-color: #858585;
+}
+
+.log-line.trace {
+    color: #666666;
+    border-left-color: #666666;
+    font-size: 0.75rem;
+}
+
+.log-stats {
+    display: flex;
+    gap: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.stat-label {
+    font-weight: 600;
+}
+
+.stat-value {
+    color: var(--text-primary);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .logs-container {
+        height: calc(100vh - 100px);
+        gap: 1rem;
+    }
+    
+    .logs-header {
+        padding: 1rem;
+    }
+    
+    .logs-controls-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .service-selector {
+        min-width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .service-selector label {
+        margin-bottom: 0.5rem;
+    }
+    
+    .service-info {
+        margin-top: 1rem;
+        justify-content: space-between;
+    }
+    
+    .logs-actions {
+        margin-top: 1rem;
+        justify-content: stretch;
+    }
+    
+    .action-btn {
+        flex: 1;
+        justify-content: center;
+    }
+    
+    .btn-text {
+        display: none;
+    }
+    
+    .log-viewer-wrapper {
+        padding: 1rem;
+    }
+    
+    .log-viewer {
+        font-size: 0.75rem;
+        padding: 0.75rem;
+    }
+    
+    .log-stats {
+        flex-direction: column;
+        gap: 0.5rem;
+        padding-top: 0.75rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .logs-header {
+        padding: 0.75rem;
+    }
+    
+    .action-btn {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.75rem;
+    }
+    
+    .log-viewer {
+        font-size: 0.7rem;
+        padding: 0.5rem;
+    }
+}
+
+/* Loading state */
+.log-viewer.loading::before {
+    content: "Loading logs...";
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* Empty state */
+.log-viewer.empty::before {
+    content: "No logs available. Select a service to view logs.";
+    color: var(--text-muted);
+    font-style: italic;
+}
