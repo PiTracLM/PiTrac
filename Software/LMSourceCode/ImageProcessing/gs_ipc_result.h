@@ -61,6 +61,7 @@ namespace golf_sim {
         GsIPCResultType result_type_ = GsIPCResultType::kUnknown;
         std::string message_{ "" };
         std::vector<std::string> log_messages_;
+        std::vector<std::string> image_file_paths_;  // Paths to shot images
 
         MSGPACK_DEFINE( carry_meters_,
                         speed_mpers_,
@@ -72,7 +73,8 @@ namespace golf_sim {
                         club_type_,
                         result_type_,
                         message_,
-                        log_messages_);
+                        log_messages_,
+                        image_file_paths_);
 
     };
 

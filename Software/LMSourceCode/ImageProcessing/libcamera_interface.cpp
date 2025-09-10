@@ -16,7 +16,7 @@
 
 #include <chrono>
 
-#include <fstream>
+
 #include <opencv2/calib3d/calib3d.hpp>
 
 // TBD - May need to be before ball_watcher, as there is a mman.h conflict
@@ -533,26 +533,26 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
         return false;
     }
 
-    const std::string kOutputFileName = pitrac_root + "/pi_cam_location.txt";
+    const std::string kOutputFileName = "/tmp/pi_cam_location.txt";
 
     std::string s;
 
     s += "#!/bin/bash\n";
-    s += "rm -f discover_media.txt discover_device.txt discover_result.txt " + kOutputFileName + "\n";
+    s += "rm -f /tmp/discover_media.txt /tmp/discover_device.txt /tmp/discover_result.txt " + kOutputFileName + "\n";
     s += "for ((m = 0; m <= 5; ++m))\n";
     s += "    do\n";
-    s += "        rm -f discover_result.txt\n";
-    s += "        media-ctl -d \"/dev/media$m\" --print-dot | grep imx > discover_media.txt\n";
-    s += "        awk -F\"imx296 \" '{print $2}' < discover_media.txt | cut -d- -f1 > discover_device.txt\n";
-    s += "        echo -n -e \"$m \" > discover_result.txt\n";
-    s += "        cat discover_device.txt >> discover_result.txt\n";
+    s += "        rm -f /tmp/discover_result.txt\n";
+    s += "        media-ctl -d \"/dev/media$m\" --print-dot | grep imx > /tmp/discover_media.txt\n";
+    s += "        awk -F\"imx296 \" '{print $2}' < /tmp/discover_media.txt | cut -d- -f1 > /tmp/discover_device.txt\n";
+    s += "        echo -n -e \"$m \" > /tmp/discover_result.txt\n";
+    s += "        cat /tmp/discover_device.txt >> /tmp/discover_result.txt\n";
 
-    s += "       if  grep imx discover_media.txt > /dev/null;  then  cat discover_result.txt >> " + kOutputFileName + ";  fi\n";
+    s += "       if  grep imx /tmp/discover_media.txt > /dev/null;  then  cat /tmp/discover_result.txt >> " + kOutputFileName + ";  fi\n";
     s += "            done\n";
 
-    s += "            rm -f discover_media.txt discover_device.txt discover_result.txt\n";
+    s += "            rm -f /tmp/discover_media.txt /tmp/discover_device.txt /tmp/discover_result.txt\n";
 
-    const std::string script_name = pitrac_root + "/pi_cam_location.sh";
+    const std::string script_name = "/tmp/pi_cam_location.sh";
 
     GS_LOG_TRACE_MSG(trace, "DiscoverCameraLocation script string is:\n" + s);
 
@@ -1077,14 +1077,6 @@ bool SetLibcameraTuningFileEnvVariable(const GolfSimCamera& camera) {
             GS_LOG_TRACE_MSG(trace, "Detected PiModel::kRPi4 and color camera 2.");
             tuning_file = "/usr/share/libcamera/ipa/rpi/vc4/imx296_noir.json";
         }
-    }
-
-    // Make sure the environment actually has the file available
-    std::ifstream file(tuning_file);
-    if (!file.good()) {
-        GS_LOG_MSG(error, "SetLibcameraTuningFileEnvVariable failed to open file: " + tuning_file);
-        GS_LOG_MSG(error, "If necessary, find the example file (e.g., imx296_noir.json.PI_5_FOR_PISP_DIRECTORY), and copy it to the expected file name.");
-        return false;
     }
 
     setenv("LIBCAMERA_RPI_TUNING_FILE", tuning_file.c_str(), 1);

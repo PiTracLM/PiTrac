@@ -39,14 +39,6 @@ if needs_gpu_memory_setting "$pi_model"; then
   echo "  gpu_mem=$(get_recommended_gpu_memory)"
 fi
 
-if is_single_pi ; then
-  echo "  # Setup camera on slot 0 to be internally triggered, and on slot 1 to be externally triggered"
-  echo "  dtoverlay=imx296,sync-sink=1 "
-  echo "  dtoverlay=imx296,cam0"
-else
-  echo "<no other camera-related parameters need to be set in config.sys>"
-fi
-
 echo ""
 echo "=== Current Status ==="
 

@@ -368,52 +368,19 @@ build_pitrac() {
     fi
 }
 
-# Setup GUI if TomEE is installed
+# Setup GUI (Python web server is now used instead of TomEE)
 setup_gui() {
     if [ "$SETUP_GUI" != "1" ]; then
         log_info "Skipping GUI setup (SETUP_GUI=0)"
         return 0
     fi
     
-    if ! [ -d "/opt/tomee" ]; then
-        log_info "TomEE not installed, skipping GUI setup"
-        return 0
-    fi
+    log_info "Python web server is now used for the GUI (available in packaging/build.sh dev mode)"
+    log_info "The web interface has been migrated from Java/TomEE to Python Flask"
     
-    log_info "Setting up PiTrac GUI..."
-    
-    local webapp_dir="$HOME/Dev/WebAppDev"
-    mkdir -p "$webapp_dir"
-    cd "$webapp_dir"
-    
-    if [ -f "${PITRAC_ROOT}/ImageProcessing/golfsim_tomee_webapp/refresh_from_dev.sh" ]; then
-        cp "${PITRAC_ROOT}/ImageProcessing/golfsim_tomee_webapp/refresh_from_dev.sh" .
-        chmod +x refresh_from_dev.sh
-        
-        log_info "Running refresh script..."
-        ./refresh_from_dev.sh
-        
-        if need_cmd mvn; then
-            log_info "Building web application with Maven..."
-            mvn package
-            
-            if [ -f "target/golfsim.war" ]; then
-                $SUDO cp target/golfsim.war /opt/tomee/webapps/
-                log_success "GUI deployed to TomEE"
-                
-                local ip_addr
-                ip_addr=$(hostname -I | awk '{print $1}')
-                log_info "Access the GUI at: http://${ip_addr}:8080/golfsim/monitor"
-            else
-                log_error "WAR file not created"
-            fi
-        else
-            log_warn "Maven not installed, skipping GUI build"
-            log_info "Install Maven with: sudo apt-get install maven"
-        fi
-    else
-        log_warn "Refresh script not found in repository"
-    fi
+    local ip_addr
+    ip_addr=$(hostname -I | awk '{print $1}')
+    log_info "After installation, access the GUI at: http://${ip_addr}:8080"
 }
 
 is_pitrac_built() {
@@ -459,6 +426,7 @@ main() {
         return 1
     fi
     
+    # GUI setup is now handled by Python web server
     setup_gui
     
     log_success "=== PiTrac Build Complete ==="

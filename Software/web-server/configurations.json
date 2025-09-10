@@ -1,0 +1,536 @@
+{
+  "version": "1.0",
+  "description": "PiTrac configuration metadata and schema",
+  "settings": {
+    "gs_config.modes.kStartInPuttingMode": {
+      "category": "System",
+      "showInBasic": true,
+      "basicSubcategory": "System",
+      "displayName": "Start in Putting Mode",
+      "description": "Start the system in putting mode for short game practice",
+      "type": "boolean",
+      "default": false,
+      "requiresRestart": false
+    },
+    "gs_config.player.kGolferOrientation": {
+      "category": "System",
+      "showInBasic": true,
+      "basicSubcategory": "System",
+      "displayName": "Golfer Orientation",
+      "description": "Golfer handedness - affects ball detection and swing analysis (CLI parameter)",
+      "type": "select",
+      "options": {
+        "right_handed": "Right Handed",
+        "left_handed": "Left Handed"
+      },
+      "default": "right_handed",
+      "requiresRestart": true,
+      "passedVia": "cli",
+      "cliArgument": "--golfer_orientation"
+    },
+    "gs_config.player.kUsePracticeBalls": {
+      "category": "System",
+      "showInBasic": true,
+      "basicSubcategory": "System",
+      "displayName": "Practice Ball Mode",
+      "description": "Enable for lightweight practice/foam balls - adjusts detection parameters (CLI parameter)",
+      "type": "boolean",
+      "default": false,
+      "requiresRestart": true,
+      "passedVia": "cli",
+      "cliArgument": "--practice_ball"
+    },
+    "gs_config.logging.kArtifactSaveLevel": {
+      "category": "Logging",
+      "showInBasic": true,
+      "basicSubcategory": "Storage",
+      "displayName": "Diagnostic Image Level",
+      "description": "Control how many diagnostic images are saved (CLI parameter)",
+      "type": "select",
+      "options": {
+        "none": "None - No images saved",
+        "final_results_only": "Final Results Only - Save key images",
+        "all": "All - Save all intermediate images (may slow system)"
+      },
+      "default": "final_results_only",
+      "requiresRestart": true,
+      "passedVia": "cli",
+      "cliArgument": "--artifact_save_level"
+    },
+    "gs_config.debug.kShowDebugImages": {
+      "category": "Advanced",
+      "showInBasic": false,
+      "displayName": "Show Debug Images",
+      "description": "Display debug/trace images on screen for troubleshooting (CLI parameter)",
+      "type": "boolean",
+      "default": false,
+      "requiresRestart": true,
+      "passedVia": "cli",
+      "cliArgument": "--show_images"
+    },
+    "gs_config.debug.kWaitForKeyOnImages": {
+      "category": "Advanced",
+      "showInBasic": false,
+      "displayName": "Pause on Debug Images",
+      "description": "Wait for keypress after showing debug images (CLI parameter)",
+      "type": "boolean",
+      "default": false,
+      "requiresRestart": true,
+      "passedVia": "cli",
+      "cliArgument": "--wait_keys"
+    },
+    "gs_config.ball_identification.kDetectionMethod": {
+      "category": "Ball Detection",
+      "showInBasic": true,
+      "basicSubcategory": "Detection Methods",
+      "displayName": "Ball Detection Method",
+      "description": "Algorithm for detecting balls in flight",
+      "type": "select",
+      "options": {
+        "legacy": "HoughCircles (Most Stable)",
+        "experimental": "YOLO Neural Network (Fast)",
+        "experimental_sahi": "YOLO + SAHI Slicing (Most Accurate)"
+      },
+      "default": "legacy",
+      "requiresRestart": true
+    },
+    "gs_config.ball_identification.kBallPlacementDetectionMethod": {
+      "category": "Ball Detection",
+      "showInBasic": true,
+      "basicSubcategory": "Detection Methods",
+      "displayName": "Ball Placement Detection Method",
+      "description": "Algorithm for detecting ball placement on tee",
+      "type": "select",
+      "options": {
+        "legacy": "GetCalibratedBall/HoughCircles",
+        "experimental": "YOLO (Fast & Accurate)"
+      },
+      "default": "legacy",
+      "requiresRestart": true
+    },
+    "gs_config.ball_identification.kONNXModelPath": {
+      "category": "AI Detection",
+      "showInBasic": true,
+      "basicSubcategory": "Detection Methods",
+      "displayName": "AI Model",
+      "description": "Select YOLO model for AI-based ball detection",
+      "type": "select",
+      "options": {},
+      "default": "~/LM_Shares/models/high_performance_300e2/best.onnx",
+      "requiresRestart": true
+    },
+    "gs_config.cameras.kCamera1Gain": {
+      "category": "Cameras",
+      "showInBasic": true,
+      "basicSubcategory": "Cameras",
+      "displayName": "Camera 1 Gain",
+      "description": "Brightness/gain setting for Camera 1",
+      "type": "number",
+      "min": 0.5,
+      "max": 16.0,
+      "step": 0.1,
+      "default": 1.0,
+      "requiresRestart": true
+    },
+    "gs_config.cameras.kCamera2Gain": {
+      "category": "Cameras",
+      "showInBasic": true,
+      "basicSubcategory": "Cameras",
+      "displayName": "Camera 2 Gain",
+      "description": "Brightness/gain setting for Camera 2",
+      "type": "number",
+      "min": 0.5,
+      "max": 16.0,
+      "step": 0.1,
+      "default": 4.0,
+      "requiresRestart": true
+    },
+    "gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress": {
+      "category": "Simulators",
+      "showInBasic": true,
+      "basicSubcategory": "Simulators",
+      "displayName": "E6 Connect Address",
+      "description": "IP address of E6 Connect simulator",
+      "type": "text",
+      "default": "",
+      "requiresRestart": false
+    },
+    "gs_config.golf_simulator_interfaces.E6.kE6ConnectPort": {
+      "category": "Simulators",
+      "showInBasic": true,
+      "basicSubcategory": "Simulators",
+      "displayName": "E6 Connect Port",
+      "description": "Port number for E6 Connect simulator",
+      "type": "number",
+      "min": 1,
+      "max": 65535,
+      "default": 2483,
+      "requiresRestart": true
+    },
+    "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress": {
+      "category": "Simulators",
+      "showInBasic": true,
+      "basicSubcategory": "Simulators",
+      "displayName": "GSPro Address",
+      "description": "IP address of GSPro simulator",
+      "type": "text",
+      "default": "",
+      "requiresRestart": false
+    },
+    "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectPort": {
+      "category": "Simulators",
+      "showInBasic": true,
+      "basicSubcategory": "Simulators",
+      "displayName": "GSPro Port",
+      "description": "Port number for GSPro simulator",
+      "type": "number",
+      "min": 1,
+      "max": 65535,
+      "default": 921,
+      "requiresRestart": true
+    },
+    "gs_config.ball_identification.kUseCLAHEProcessing": {
+      "category": "Ball Detection",
+      "showInBasic": true,
+      "basicSubcategory": "Ball Detection",
+      "displayName": "Use CLAHE Processing",
+      "description": "Enable Contrast Limited Adaptive Histogram Equalization for better ball detection",
+      "type": "boolean",
+      "default": true,
+      "requiresRestart": false
+    },
+    "gs_config.ball_identification.kCLAHEClipLimit": {
+      "category": "Ball Detection",
+      "showInBasic": true,
+      "basicSubcategory": "Ball Detection",
+      "displayName": "CLAHE Clip Limit",
+      "description": "Contrast enhancement strength (1-40)",
+      "type": "number",
+      "min": 1,
+      "max": 40,
+      "default": 8,
+      "requiresRestart": false
+    },
+    "gs_config.ball_position.kExpectedBallRadiusPixelsAt40cm": {
+      "category": "Ball Detection",
+      "showInBasic": true,
+      "basicSubcategory": "Ball Detection",
+      "displayName": "Expected Ball Radius (pixels)",
+      "description": "Expected ball size at 40cm distance - critical for distance calculations",
+      "type": "number",
+      "min": 10,
+      "max": 200,
+      "default": 87,
+      "requiresRestart": false
+    },
+    "gs_config.strobing.kStandardBallSpeedSlowdownPercentage": {
+      "category": "Strobing",
+      "showInBasic": true,
+      "basicSubcategory": "Strobing",
+      "displayName": "Standard Ball Speed Adjustment",
+      "description": "Speed adjustment for standard golf balls (%)",
+      "type": "number",
+      "min": 0,
+      "max": 10,
+      "step": 0.1,
+      "default": 0.1,
+      "requiresRestart": false
+    },
+    "gs_config.strobing.kPracticeBallSpeedSlowdownPercentage": {
+      "category": "Strobing",
+      "showInBasic": true,
+      "basicSubcategory": "Strobing",
+      "displayName": "Practice Ball Speed Adjustment",
+      "description": "Speed adjustment for practice/foam balls (%)",
+      "type": "number",
+      "min": 0,
+      "max": 20,
+      "step": 0.1,
+      "default": 4.0,
+      "requiresRestart": false
+    },
+    "gs_config.strobing.kPuttingBallSpeedSlowdownPercentage": {
+      "category": "Strobing",
+      "showInBasic": true,
+      "basicSubcategory": "Strobing",
+      "displayName": "Putting Speed Adjustment",
+      "description": "Speed adjustment in putting mode (%)",
+      "type": "number",
+      "min": 0,
+      "max": 20,
+      "step": 0.1,
+      "default": 5.2,
+      "requiresRestart": false
+    },
+    "gs_config.logging.kLogIntermediateExposureImagesToFile": {
+      "category": "Logging",
+      "showInBasic": true,
+      "basicSubcategory": "Storage",
+      "displayName": "Log Exposure Images",
+      "description": "Save intermediate exposure images for debugging",
+      "type": "boolean",
+      "default": false,
+      "requiresRestart": false
+    },
+    "gs_config.logging.kLogIntermediateSpinImagesToFile": {
+      "category": "Logging",
+      "showInBasic": true,
+      "basicSubcategory": "Storage",
+      "displayName": "Log Spin Images",
+      "description": "Save spin analysis images",
+      "type": "boolean",
+      "default": false,
+      "requiresRestart": false
+    },
+    "gs_config.logging.kLogWebserverImagesToFile": {
+      "category": "Logging",
+      "showInBasic": true,
+      "basicSubcategory": "Storage",
+      "displayName": "Log Web Server Images",
+      "description": "Save images for web server display",
+      "type": "boolean",
+      "default": true,
+      "requiresRestart": false
+    },
+    "gs_config.logging.kLogDiagnosticImagesToUniqueFiles": {
+      "category": "Logging",
+      "showInBasic": true,
+      "basicSubcategory": "Storage",
+      "displayName": "Use Unique Filenames",
+      "description": "Save diagnostic images with unique names (vs overwriting)",
+      "type": "boolean",
+      "default": true,
+      "requiresRestart": false
+    },
+    "gs_config.logging.kLinuxBaseImageLoggingDir": {
+      "category": "Storage",
+      "showInBasic": true,
+      "basicSubcategory": "Storage",
+      "displayName": "Image Directory",
+      "description": "Base directory for saving images",
+      "type": "path",
+      "default": "~/LM_Shares/Images/",
+      "requiresRestart": false
+    },
+    "gs_config.ipc_interface.kWebServerShareDirectory": {
+      "category": "Network",
+      "showInBasic": true,
+      "basicSubcategory": "Storage",
+      "displayName": "Web Share Directory",
+      "description": "Directory for web server shared files",
+      "type": "path",
+      "default": "~/LM_Shares/Images/",
+      "requiresRestart": false
+    },
+    "gs_config.ipc_interface.kWebServerTomcatShareDirectory": {
+      "category": "Network",
+      "showInBasic": true,
+      "basicSubcategory": "Storage",
+      "displayName": "Tomcat Share Directory",
+      "description": "Directory for Tomcat web server files",
+      "type": "path",
+      "default": "~/LM_Shares/WebShare",
+      "requiresRestart": false
+    },
+    "gs_config.ipc_interface.kWebActiveMQHostAddress": {
+      "category": "Network",
+      "showInBasic": true,
+      "basicSubcategory": "Network",
+      "displayName": "ActiveMQ Broker Address",
+      "description": "ActiveMQ message broker address for dual camera mode",
+      "type": "text",
+      "default": "tcp://127.0.0.1:61616",
+      "requiresRestart": true
+    },
+    "gs_config.ipc_interface.kRefreshTimeSeconds": {
+      "category": "Network",
+      "showInBasic": true,
+      "basicSubcategory": "Network",
+      "displayName": "Web Refresh Interval",
+      "description": "Web interface refresh interval in seconds",
+      "type": "number",
+      "min": 1,
+      "max": 60,
+      "default": 3,
+      "requiresRestart": false
+    },
+    "gs_config.golf_simulator_interfaces.kSkipSpinCalculation": {
+      "category": "Spin Analysis",
+      "showInBasic": true,
+      "basicSubcategory": "Spin",
+      "displayName": "Skip Spin Calculation",
+      "description": "Disable spin calculation (for putting-only or debugging)",
+      "type": "boolean",
+      "default": false,
+      "requiresRestart": false
+    },
+    "gs_config.golf_simulator_interfaces.kWriteSpinAnalysisCsvFiles": {
+      "category": "Spin Analysis",
+      "showInBasic": true,
+      "basicSubcategory": "Spin",
+      "displayName": "Write Spin CSV Files",
+      "description": "Save spin analysis data to CSV files",
+      "type": "boolean",
+      "default": true,
+      "requiresRestart": false
+    },
+    "gs_config.ball_identification.kONNXConfidenceThreshold": {
+      "category": "AI Detection",
+      "showInBasic": false,
+      "displayName": "ONNX Confidence Threshold",
+      "description": "Minimum confidence for AI ball detection",
+      "type": "number",
+      "min": 0.1,
+      "max": 1.0,
+      "step": 0.05,
+      "default": 0.5,
+      "requiresRestart": false
+    },
+    "gs_config.ball_identification.kONNXNMSThreshold": {
+      "category": "AI Detection",
+      "showInBasic": false,
+      "displayName": "ONNX NMS Threshold",
+      "description": "Non-Maximum Suppression threshold for overlapping detections",
+      "type": "number",
+      "min": 0.1,
+      "max": 1.0,
+      "step": 0.05,
+      "default": 0.4,
+      "requiresRestart": false
+    },
+    "gs_config.ball_identification.kONNXInputSize": {
+      "category": "AI Detection",
+      "showInBasic": false,
+      "displayName": "ONNX Input Size",
+      "description": "Neural network input image size",
+      "type": "number",
+      "min": 320,
+      "max": 2048,
+      "step": 32,
+      "default": 1472,
+      "requiresRestart": false
+    },
+    "gs_config.ball_identification.kStrobedBallsCannyLower": {
+      "category": "Ball Detection",
+      "showInBasic": false,
+      "displayName": "Canny Lower Threshold",
+      "description": "Lower threshold for Canny edge detection",
+      "type": "number",
+      "min": 0,
+      "max": 255,
+      "default": 33,
+      "requiresRestart": false
+    },
+    "gs_config.ball_identification.kStrobedBallsCannyUpper": {
+      "category": "Ball Detection",
+      "showInBasic": false,
+      "displayName": "Canny Upper Threshold",
+      "description": "Upper threshold for Canny edge detection",
+      "type": "number",
+      "min": 0,
+      "max": 255,
+      "default": 90,
+      "requiresRestart": false
+    }
+  },
+  "categories": {
+    "System": {
+      "displayName": "System Settings",
+      "description": "Core system configuration",
+      "icon": "settings"
+    },
+    "Ball Detection": {
+      "displayName": "Ball Detection",
+      "description": "Ball detection algorithms and parameters",
+      "icon": "target"
+    },
+    "AI Detection": {
+      "displayName": "AI Detection",
+      "description": "Neural network detection settings",
+      "icon": "brain"
+    },
+    "Cameras": {
+      "displayName": "Cameras",
+      "description": "Camera hardware and settings",
+      "icon": "camera"
+    },
+    "Simulators": {
+      "displayName": "Simulator Interfaces",
+      "description": "Golf simulator connections",
+      "icon": "game"
+    },
+    "Strobing": {
+      "displayName": "LED Strobing",
+      "description": "LED timing and speed adjustments",
+      "icon": "flash"
+    },
+    "Storage": {
+      "displayName": "Storage",
+      "description": "File paths and directories",
+      "icon": "folder"
+    },
+    "Logging": {
+      "displayName": "Logging",
+      "description": "Image and data logging options",
+      "icon": "file"
+    },
+    "Network": {
+      "displayName": "Network",
+      "description": "Network and communication settings",
+      "icon": "network"
+    },
+    "Spin Analysis": {
+      "displayName": "Spin Analysis",
+      "description": "Spin calculation settings",
+      "icon": "rotate"
+    },
+    "Calibration": {
+      "displayName": "Calibration",
+      "description": "Camera calibration parameters",
+      "icon": "adjust"
+    },
+    "Advanced": {
+      "displayName": "Advanced",
+      "description": "Advanced configuration options",
+      "icon": "expert"
+    }
+  },
+  "basicSubcategories": {
+    "System": {
+      "displayName": "System",
+      "order": 1
+    },
+    "Detection Methods": {
+      "displayName": "Detection Methods",
+      "order": 2
+    },
+    "Cameras": {
+      "displayName": "Cameras",
+      "order": 3
+    },
+    "Simulators": {
+      "displayName": "Simulators",
+      "order": 4
+    },
+    "Ball Detection": {
+      "displayName": "Ball Detection",
+      "order": 5
+    },
+    "Strobing": {
+      "displayName": "Strobing",
+      "order": 6
+    },
+    "Storage": {
+      "displayName": "Storage",
+      "order": 7
+    },
+    "Network": {
+      "displayName": "Network",
+      "order": 8
+    },
+    "Spin": {
+      "displayName": "Spin",
+      "order": 9
+    }
+  }
+}

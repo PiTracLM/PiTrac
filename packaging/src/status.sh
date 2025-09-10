@@ -13,7 +13,7 @@ if [[ "$show_json" == "1" ]]; then
     "pid": $(is_pitrac_running && cat "$PITRAC_PID_FILE" 2>/dev/null || echo "null")
   },
   "services": {
-    "tomee": $(is_service_running "tomee" && echo "true" || echo "false"),
+    "pitrac-web": $(is_service_running "pitrac-web" && echo "true" || echo "false"),
     "activemq": $(is_service_running "activemq" && echo "true" || echo "false")
   },
   "hardware": {
@@ -39,10 +39,10 @@ else
   if [[ "$show_services" == "1" ]] || [[ "$show_services" != "1" ]]; then
     echo ""
     echo "Services:"
-    if is_service_running "tomee"; then
-      success "  TomEE web server is running"
+    if is_service_running "pitrac-web"; then
+      success "  PiTrac web server is running"
     else
-      warn "  TomEE web server is not running"
+      warn "  PiTrac web server is not running"
     fi
     
     if is_service_running "activemq"; then

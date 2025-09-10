@@ -5,9 +5,9 @@ case "$1" in
     remove|upgrade|deconfigure)
         # Stop services
         systemctl stop pitrac 2>/dev/null || true
-        systemctl stop tomee 2>/dev/null || true
+        systemctl stop pitrac-web 2>/dev/null || true
         systemctl disable pitrac 2>/dev/null || true
-        systemctl disable tomee 2>/dev/null || true
+        systemctl disable pitrac-web 2>/dev/null || true
         ;;
     
     failed-upgrade)

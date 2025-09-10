@@ -12,22 +12,6 @@ detect_pi_model() {
     fi
 }
 
-
-# Determines if running on a single pi by determining how many cameras are attached
-# Returns 0 if this is a single-pi setup (with 2 cameras on the same pi) or 1 if not
-is_single_pi() {
-
-    LINE_COUNT=$(rpicam-hello --list 2>/dev/null | grep -E "^\s*[0-9]+ :" | wc -l )
-
-    if [[ $LINE_COUNT == "2" ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-
-
 case "$1" in
     configure)
         echo "Configuring PiTrac..."
@@ -36,13 +20,6 @@ case "$1" in
         PI_MODEL=$(detect_pi_model)
         echo "Detected Pi model: $PI_MODEL"
 
-        # Create tomee user/group
-        if ! getent group tomee >/dev/null; then
-            groupadd -r tomee
-        fi
-        if ! getent passwd tomee >/dev/null; then
-            useradd -r -g tomee -d /opt/tomee -s /bin/false tomee
-        fi
 
         # Get the actual user who invoked sudo (if any)
         ACTUAL_USER="${SUDO_USER:-}"
@@ -51,6 +28,17 @@ case "$1" in
         else
             # Add user to required groups
             usermod -a -G video,gpio,i2c,spi,dialout "$ACTUAL_USER" 2>/dev/null || true
+            
+            if [ -f /usr/lib/pitrac/pitrac-common-functions.sh ]; then
+                . /usr/lib/pitrac/pitrac-common-functions.sh
+                if [ -d /usr/share/pitrac/models ]; then
+                    USER_MODELS_DIR="/home/$ACTUAL_USER/LM_Shares/models"
+                    mkdir -p "$USER_MODELS_DIR"
+                    cp -r /usr/share/pitrac/models/* "$USER_MODELS_DIR/" 2>/dev/null || true
+                    chown -R "$ACTUAL_USER:$ACTUAL_USER" "/home/$ACTUAL_USER/LM_Shares"
+                    echo "Installed ONNX models to $USER_MODELS_DIR"
+                fi
+            fi
 
             # Create user directories
             USER_HOME=$(getent passwd "$ACTUAL_USER" | cut -d: -f6)
@@ -67,19 +55,52 @@ case "$1" in
             fi
         fi
 
-        # System config should be root-owned and world-readable
-        chown root:root /etc/pitrac
-        chmod 755 /etc/pitrac
-        chown root:root /etc/pitrac/pitrac.yaml
-        chmod 644 /etc/pitrac/pitrac.yaml
-        if [ -f /etc/pitrac/golf_sim_config.json ]; then
-            chown root:root /etc/pitrac/golf_sim_config.json
-            chmod 644 /etc/pitrac/golf_sim_config.json
+        if type -t set_config_permissions &>/dev/null; then
+            chown root:root /etc/pitrac
+            chmod 755 /etc/pitrac
+            set_config_permissions "/etc/pitrac/pitrac.yaml"
+            set_config_permissions "/etc/pitrac/golf_sim_config.json"
+            
+            if [ -d /etc/pitrac/config ]; then
+                chown -R root:root /etc/pitrac/config
+                chmod 755 /etc/pitrac/config
+                find /etc/pitrac/config -type f -exec chmod 644 {} \;
+            fi
+        else
+            chown root:root /etc/pitrac
+            chmod 755 /etc/pitrac
+            chown root:root /etc/pitrac/pitrac.yaml
+            chmod 644 /etc/pitrac/pitrac.yaml
+            if [ -f /etc/pitrac/golf_sim_config.json ]; then
+                chown root:root /etc/pitrac/golf_sim_config.json
+                chmod 644 /etc/pitrac/golf_sim_config.json
+            fi
+            
+            if [ -d /etc/pitrac/config ]; then
+                chown -R root:root /etc/pitrac/config
+                chmod 755 /etc/pitrac/config
+                find /etc/pitrac/config -type f -exec chmod 644 {} \;
+            fi
         fi
 
-        # Set TomEE permissions
-        chown -R tomee:tomee /opt/tomee
-        chmod 755 /opt/tomee/bin/*.sh
+
+        if [ -d /usr/lib/pitrac/web-server ]; then
+            if [ -f /usr/lib/pitrac/pitrac-common-functions.sh ]; then
+                . /usr/lib/pitrac/pitrac-common-functions.sh
+                install_python_dependencies "/usr/lib/pitrac/web-server"
+            else
+                echo "Installing Python web server dependencies..."
+                pip3 install -r /usr/lib/pitrac/web-server/requirements.txt --break-system-packages 2>/dev/null || \
+                pip3 install -r /usr/lib/pitrac/web-server/requirements.txt || true
+            fi
+            
+            if [ -x /usr/lib/pitrac/web-service-install.sh ] && [ -n "$ACTUAL_USER" ]; then
+                echo "Installing PiTrac web service for user: $ACTUAL_USER"
+                /usr/lib/pitrac/web-service-install.sh install "$ACTUAL_USER" || true
+            elif [ -x /usr/lib/pitrac/web-service-install.sh ]; then
+                echo "Note: Web service not installed. Run '/usr/lib/pitrac/web-service-install.sh install <username>' as a regular user"
+            fi
+        fi
 
         # Apply Boost C++20 fix
         if [ -f /usr/include/boost/asio/awaitable.hpp ] && ! grep -q "#include <utility>" /usr/include/boost/asio/awaitable.hpp; then
@@ -111,30 +132,18 @@ case "$1" in
             else
                 grep -q "gpu_mem=256" "$CONFIG_FILE" || echo "gpu_mem=256" >> "$CONFIG_FILE"
             fi
-
-
-            # If running in single-pi mode, both Pi and Innomaker cameras need a kernel dtoverlay setting
-            # in order to have one camera triggered internally and the other externally
-
-            if is_single_pi ; then
-                echo "Running in single-pi mode, so setting up triggering in config.txt"
-                grep -q "dtoverlay=imx296,sync-sink" "$CONFIG_FILE" || echo -e "# Setup camera triggering (slot 0 internal, slot 1 external\ndtoverlay=imx296,sync-sink=1\ndtoverlay=imx296,cam0" >> "$CONFIG_FILE"
-            else
-                grep -q "Not running in single pi mode" "$CONFIG_FILE" || echo "# Not running in single pi mode, so no dtoverlays required." >> "$CONFIG_FILE"
-            fi
-
         fi
 
         # Configure libcamera settings
         echo "Configuring libcamera..."
-        
+
         # Use existing example.yaml files as base for configuration
         # Both Pi 4 (vc4) and Pi 5 (pisp) ship with example.yaml
         for pipeline in pisp vc4; do
             CAMERA_DIR="/usr/share/libcamera/pipeline/rpi/${pipeline}"
             EXAMPLE_FILE="${CAMERA_DIR}/example.yaml"
             CAMERA_CONFIG="${CAMERA_DIR}/rpi_apps.yaml"
-            
+
             # Only proceed if the pipeline directory exists (Pi 4 has vc4, Pi 5 has pisp)
             if [ -d "$CAMERA_DIR" ]; then
                 # If example exists but rpi_apps doesn't, copy and configure
@@ -152,60 +161,63 @@ case "$1" in
                 fi
             fi
         done
+        
+        if type -t create_pkgconfig_files &>/dev/null; then
+            create_pkgconfig_files
+        fi
+        
         # Update library cache
         ldconfig
 
         # Reload systemd
         systemctl daemon-reload
 
-        # Configure ActiveMQ instance
-        if [ -d /etc/activemq/instances-available ] && [ ! -e /etc/activemq/instances-enabled/main ]; then
-            echo "Enabling ActiveMQ main instance..."
-            # Ensure directory exists and clean up any existing instances
-            mkdir -p /etc/activemq/instances-enabled
-            rm -f /etc/activemq/instances-enabled/*
-            ln -sf /etc/activemq/instances-available/main /etc/activemq/instances-enabled/main
-
-            # Create directories for ActiveMQ
-            mkdir -p /var/lib/activemq/main
-            mkdir -p /var/lib/activemq/conf
-            mkdir -p /var/lib/activemq/data
-            mkdir -p /var/lib/activemq/tmp
-
-            # Copy configs to instance directory
-            if [ -f /etc/activemq/instances-available/main/activemq.xml ]; then
-                cp /etc/activemq/instances-available/main/activemq.xml /var/lib/activemq/main/ 2>/dev/null || true
+        # Configure ActiveMQ
+        if command -v activemq &>/dev/null || [ -f /usr/share/activemq/bin/activemq ]; then
+            echo "Configuring ActiveMQ for PiTrac..."
+            
+            if [ -x /usr/lib/pitrac/activemq-service-install.sh ]; then
+                echo "Installing ActiveMQ configuration from templates..."
+                export ACTIVEMQ_BROKER_NAME="localhost"
+                export ACTIVEMQ_BIND_ADDRESS="0.0.0.0"
+                export ACTIVEMQ_PORT="61616"
+                export ACTIVEMQ_LOG_LEVEL="INFO"
+                export PITRAC_TEMPLATE_DIR="/usr/share/pitrac/templates"
+                
+                if /usr/lib/pitrac/activemq-service-install.sh install activemq; then
+                    echo "ActiveMQ configuration installed successfully"
+                else
+                    echo "Warning: ActiveMQ configuration failed, falling back to basic setup"
+                    mkdir -p /etc/activemq/instances-available/main
+                    mkdir -p /etc/activemq/instances-enabled
+                    if [ ! -e /etc/activemq/instances-enabled/main ]; then
+                        ln -sf /etc/activemq/instances-available/main /etc/activemq/instances-enabled/main
+                    fi
+                fi
+            else
+                echo "Warning: ActiveMQ configuration script not found, using basic setup"
+                if [ -d /etc/activemq/instances-available ] && [ ! -e /etc/activemq/instances-enabled/main ]; then
+                    mkdir -p /etc/activemq/instances-enabled
+                    ln -sf /etc/activemq/instances-available/main /etc/activemq/instances-enabled/main
+                fi
             fi
-            if [ -f /etc/activemq/instances-available/main/log4j2.properties ]; then
-                cp /etc/activemq/instances-available/main/log4j2.properties /var/lib/activemq/main/ 2>/dev/null || true
-            fi
-
-            # Also copy to /var/lib/activemq/conf where ActiveMQ actually looks
-            if [ -f /etc/activemq/instances-available/main/activemq.xml ]; then
-                cp /etc/activemq/instances-available/main/activemq.xml /var/lib/activemq/conf/ 2>/dev/null || true
-            fi
-            if [ -f /etc/activemq/instances-available/main/log4j2.properties ]; then
-                cp /etc/activemq/instances-available/main/log4j2.properties /var/lib/activemq/conf/ 2>/dev/null || true
-            fi
-
-            # Set proper ownership for ALL ActiveMQ directories
+            
             if getent passwd activemq >/dev/null; then
-                chown -R activemq:activemq /var/lib/activemq/
+                chown -R activemq:activemq /var/lib/activemq/ 2>/dev/null || true
             fi
-
+            
             # Don't start it here - let the user or pitrac CLI handle it
         fi
 
-        if [ -x /usr/lib/pitrac/service-install.sh ]; then
+        if [ -x /usr/lib/pitrac/pitrac-service-install.sh ]; then
             if [ -n "$ACTUAL_USER" ]; then
                 echo "Installing PiTrac service for user: $ACTUAL_USER"
-                /usr/lib/pitrac/service-install.sh install "$ACTUAL_USER" || true
+                /usr/lib/pitrac/pitrac-service-install.sh install "$ACTUAL_USER" || true
             else
-                echo "Note: PiTrac service not installed. Run '/usr/lib/pitrac/service-install.sh install <username>' to install for a specific user"
+                echo "Note: PiTrac service not installed. Run '/usr/lib/pitrac/pitrac-service-install.sh install <username>' to install for a specific user"
             fi
         fi
-        
-        systemctl enable tomee.service || true
+
 
         echo ""
         echo "======================================"

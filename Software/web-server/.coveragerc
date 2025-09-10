@@ -1,0 +1,30 @@
+[run]
+source = .
+omit = 
+    */tests/*
+    */test_*.py
+    */conftest.py
+    setup.py
+    run_tests.py
+    main_refactored.py
+    */venv/*
+    */.venv/*
+    */site-packages/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if self.debug:
+    if settings.DEBUG
+    raise AssertionError
+    raise NotImplementedError
+    if 0:
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    class .*\bProtocol\):
+    @(abc\.)?abstractmethod
+    
+precision = 2
+show_missing = True
+skip_covered = False

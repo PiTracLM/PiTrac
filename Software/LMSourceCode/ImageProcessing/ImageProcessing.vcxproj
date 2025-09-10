@@ -497,10 +497,6 @@
     <None Include="core\version.cpp.in" />
     <None Include="create_closed_source_objects.sh" />
     <None Include="encoder\meson.build" />
-    <None Include="golfsim_tomee_webapp\src\main\java\com\verdanttechs\jakarta\ee9\HelloServlet.java" />
-    <None Include="golfsim_tomee_webapp\src\main\java\com\verdanttechs\jakarta\ee9\MonitorServlet.java" />
-    <None Include="golfsim_tomee_webapp\src\main\webapp\index.html" />
-    <None Include="golfsim_tomee_webapp\src\main\webapp\WEB-INF\gs_dashboard.jsp" />
     <None Include="golf_sim_config.json" />
     <None Include="image\meson.build" />
     <None Include="imx296_noir.json">
@@ -529,9 +525,6 @@
     <None Include="RunScripts\runTestResults.sh" />
     <None Include="RunScripts\runTestSpin.sh" />
     <None Include="RunScripts\shutdown_gs.sh" />
-  </ItemGroup>
-  <ItemGroup>
-    <Xml Include="golfsim_tomee_webapp\pom.xml" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="core\CMakeLists.txt" />

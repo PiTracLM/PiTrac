@@ -18,11 +18,11 @@ fi
 # First check YAML syntax
 log_info "Checking YAML syntax..."
 if command -v python3 >/dev/null 2>&1; then
-    if python3 -c "import yaml; yaml.safe_load(open('$user_config'))" 2>/dev/null; then
+    if python3 -c "import yaml; yaml.safe_load(open('${user_config}'))" 2>/dev/null; then
         success "YAML syntax is valid"
     else
         error "YAML syntax errors found!"
-        python3 -c "import yaml; yaml.safe_load(open('$user_config'))" 2>&1
+        python3 -c "import yaml; yaml.safe_load(open('${user_config}'))" 2>&1
         exit 1
     fi
 elif command -v yq >/dev/null 2>&1; then
@@ -41,7 +41,7 @@ fi
 log_info "Validating configuration values..."
 
 if [[ -f "$mappings_file" ]] && command -v python3 >/dev/null 2>&1; then
-    python3 << 'EOF'
+    python3 << EOF
 import yaml
 import sys
 import re
@@ -52,11 +52,11 @@ fixed = []
 
 try:
     # Load user config
-    with open("$user_config", "r") as f:
+    with open("${user_config}", "r") as f:
         user_config = yaml.safe_load(f) or {}
     
     # Load mappings with validation rules
-    with open("$mappings_file", "r") as f:
+    with open("${mappings_file}", "r") as f:
         mappings_data = yaml.safe_load(f)
     
     if "mappings" not in mappings_data:
@@ -90,7 +90,7 @@ try:
             if "enum" in validation:
                 if str(value) not in [str(v) for v in validation["enum"]]:
                     errors.append(f"{key}: '{value}' not in allowed values {validation['enum']}")
-                    if "$fix_issues" == "1":
+                    if "${fix_issues}" == "1":
                         # Set to first allowed value
                         fixed.append(f"{key}: '{value}' -> '{validation['enum'][0]}'")
             
@@ -100,11 +100,11 @@ try:
                     num_val = float(value)
                     if "min" in validation and num_val < validation["min"]:
                         errors.append(f"{key}: {value} below minimum {validation['min']}")
-                        if "$fix_issues" == "1":
+                        if "${fix_issues}" == "1":
                             fixed.append(f"{key}: {value} -> {validation['min']}")
                     if "max" in validation and num_val > validation["max"]:
                         errors.append(f"{key}: {value} above maximum {validation['max']}")
-                        if "$fix_issues" == "1":
+                        if "${fix_issues}" == "1":
                             fixed.append(f"{key}: {value} -> {validation['max']}")
                 except (ValueError, TypeError):
                     errors.append(f"{key}: '{value}' is not numeric")

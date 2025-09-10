@@ -412,7 +412,7 @@ void EDColor::testSegment(int i, int index1, int index2)
 
 	// First find the min. gradient along the segment
 	int minGrad = 1 << 30;
-	int minGradIndex = 0;
+	int minGradIndex;
 	for (int k = index1; k <= index2; k++) {
 		int r = segments[i][k].y;
 		int c = segments[i][k].x;

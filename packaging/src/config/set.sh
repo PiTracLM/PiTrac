@@ -1,21 +1,27 @@
 
+#!/usr/bin/env bash
+# config set - Set configuration value using JSON
+
 # Initialize global flags and logging (libraries are embedded by bashly)
 initialize_global_flags
 
+# Source JSON config library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../lib/config_json.sh"
 
 key="${args[key]}"
 value="${args[value]}"
-use_global="${args[--global]:-}"
 
-if [[ "$use_global" == "1" ]]; then
-  config_file="/etc/pitrac/pitrac.yaml"
-  if [[ $EUID -ne 0 ]]; then
-    error "Setting global config requires sudo"
+# Validate the value if possible
+if ! validate_config_value "$key" "$value"; then
     exit 1
-  fi
-else
-  config_file="${USER_CONFIG:-$DEFAULT_CONFIG}"
 fi
 
-log_warn "Manual edit required. Use 'pitrac config edit' to set:"
-echo "$key: $value"
+# Set the configuration value
+if set_config_value "$key" "$value"; then
+    log_success "Configuration updated"
+    log_info "Restart PiTrac for changes to take effect: pitrac stop && pitrac run"
+else
+    error "Failed to update configuration"
+    exit 1
+fi

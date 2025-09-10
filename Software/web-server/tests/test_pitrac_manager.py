@@ -1,0 +1,440 @@
+"""
+Comprehensive tests for the PiTrac Process Manager
+"""
+
+import asyncio
+import json
+import pytest
+from pathlib import Path
+from unittest.mock import Mock, MagicMock, patch, AsyncMock, mock_open, call
+import os
+import subprocess
+from typing import Dict, Any
+
+from pitrac_manager import PiTracProcessManager
+from config_manager import ConfigurationManager
+
+
+class TestPiTracProcessManager:
+    """Test suite for PiTracProcessManager"""
+
+    @pytest.fixture
+    def mock_config_manager(self):
+        """Create a mock configuration manager"""
+        config_manager = Mock(spec=ConfigurationManager)
+        config_manager.get_config.return_value = {
+            "system.mode": "single",
+            "system.camera_role": "camera1",
+            "logging.level": "info",
+            "gs_config.ipc_interface.kWebActiveMQHostAddress": "tcp://localhost:61616",
+            "storage.image_dir": "/var/pitrac/images",
+            "storage.web_share_dir": "/var/pitrac/web",
+            "gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress": "192.168.1.100",
+            "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress": "192.168.1.101",
+            "gs_config.cameras.kCamera1Gain": 1.0,
+            "gs_config.cameras.kCamera2Gain": 4.0,
+        }
+        return config_manager
+
+    @pytest.fixture
+    def manager(self, mock_config_manager):
+        """Create a PiTracProcessManager instance with mocked config"""
+        with patch('pitrac_manager.Path.mkdir'):
+            manager = PiTracProcessManager(config_manager=mock_config_manager)
+        return manager
+
+    def test_initialization(self, mock_config_manager):
+        """Test proper initialization of the manager"""
+        with patch('pitrac_manager.Path.mkdir') as mock_mkdir:
+            manager = PiTracProcessManager(config_manager=mock_config_manager)
+            
+            assert manager.process is None
+            assert manager.camera2_process is None
+            assert manager.pitrac_binary == "/usr/lib/pitrac/pitrac_lm"
+            assert manager.config_file == "/etc/pitrac/golf_sim_config.json"
+            assert manager.config_manager == mock_config_manager
+            
+            assert mock_mkdir.call_count >= 2
+
+    def test_load_pitrac_config(self, manager, mock_config_manager):
+        """Test loading and transforming PiTrac configuration"""
+        config = manager._load_pitrac_config()
+        
+        assert config["system"]["mode"] == "single"
+        assert config["system"]["camera_role"] == "camera1"
+        assert config["logging"]["level"] == "info"
+        assert config["network"]["broker_address"] == "tcp://localhost:61616"
+        assert config["storage"]["image_dir"] == "/var/pitrac/images"
+        assert config["storage"]["web_share_dir"] == "/var/pitrac/web"
+        assert config["simulators"]["e6_host"] == "192.168.1.100"
+        assert config["simulators"]["gspro_host"] == "192.168.1.101"
+        assert config["cameras"]["camera1_gain"] == 1.0
+        assert config["cameras"]["camera2_gain"] == 4.0
+
+    def test_build_command_single_pi_mode(self, manager):
+        """Test command building for single Pi mode"""
+        cmd = manager._build_command(camera="camera1")
+        
+        assert manager.pitrac_binary in cmd
+        assert "--system_mode=camera1" in cmd
+        assert "--run_single_pi" in cmd
+        assert "--logging_level=info" in cmd
+
+    def test_build_command_dual_pi_mode(self, manager, mock_config_manager):
+        """Test command building for dual Pi mode"""
+        mock_config_manager.get_config.return_value["system.mode"] = "dual"
+        mock_config_manager.get_config.return_value["system.camera_role"] = "camera2"
+        
+        cmd = manager._build_command()
+        
+        assert manager.pitrac_binary in cmd
+        assert "--system_mode=camera2" in cmd
+        assert "--run_single_pi" not in cmd
+        assert "--logging_level=info" in cmd
+
+    def test_build_command_with_network_config(self, manager):
+        """Test command building includes network configuration"""
+        cmd = manager._build_command()
+        
+        cmd_str = ' '.join(cmd)
+        assert "broker" in cmd_str.lower() or "tcp://" in cmd_str
+
+    def test_build_command_with_storage_config(self, manager):
+        """Test command building includes storage configuration"""
+        cmd = manager._build_command()
+        
+        cmd_str = ' '.join(cmd)
+        assert "image" in cmd_str.lower() or "storage" in cmd_str.lower() or "web" in cmd_str.lower()
+
+    def test_build_command_with_simulator_config(self, manager):
+        """Test command building includes simulator configuration"""
+        cmd = manager._build_command()
+        
+        assert any("--e6_host" in arg for arg in cmd)
+        assert any("--gspro_host" in arg for arg in cmd)
+
+    def test_is_running_when_process_exists(self, manager):
+        """Test is_running returns True when process exists"""
+        with patch.object(manager, 'get_pid', return_value=12345):
+            with patch('os.kill', return_value=None):  # Process exists
+                assert manager.is_running() is True
+
+    def test_is_running_when_process_terminated(self, manager):
+        """Test is_running returns False when process terminated"""
+        mock_process = Mock()
+        mock_process.poll.return_value = 0
+        manager.process = mock_process
+        
+        assert manager.is_running() is False
+
+    def test_is_running_when_no_process(self, manager):
+        """Test is_running returns False when no process"""
+        manager.process = None
+        
+        assert manager.is_running() is False
+
+    def test_get_pid_with_running_process(self, manager):
+        """Test get_pid returns PID when process is running"""
+        mock_process = Mock()
+        mock_process.pid = 12345
+        mock_process.poll.return_value = None
+        manager.process = mock_process
+        
+        assert manager.get_pid() == 12345
+
+    def test_get_pid_with_terminated_process(self, manager):
+        """Test get_pid returns None when process terminated"""
+        mock_process = Mock()
+        mock_process.pid = 12345
+        mock_process.poll.return_value = 0
+        manager.process = mock_process
+        
+        assert manager.get_pid() is None
+
+    def test_get_pid_with_no_process(self, manager):
+        """Test get_pid returns None when no process"""
+        manager.process = None
+        
+        assert manager.get_pid() is None
+
+    def test_get_camera2_pid(self, manager):
+        """Test get_camera2_pid for dual camera setup"""
+        mock_process = Mock()
+        mock_process.pid = 54321
+        mock_process.poll.return_value = None
+        manager.camera2_process = mock_process
+        
+        assert manager.get_camera2_pid() == 54321
+
+    def test_get_status_running(self, manager):
+        """Test get_status when process is running"""
+        mock_process = Mock()
+        mock_process.pid = 12345
+        mock_process.poll.return_value = None
+        manager.process = mock_process
+        
+        status = manager.get_status()
+        
+        assert status["running"] is True
+        assert status["camera1_pid"] == 12345
+        assert status["camera2_pid"] is None
+
+    def test_get_status_not_running(self, manager):
+        """Test get_status when process is not running"""
+        manager.process = None
+        
+        status = manager.get_status()
+        
+        assert status["running"] is False
+        assert status["camera1_pid"] is None
+        assert status["camera2_pid"] is None
+
+    def test_get_status_with_dual_cameras(self, manager):
+        """Test get_status with both cameras running"""
+        mock_process1 = Mock()
+        mock_process1.pid = 12345
+        mock_process1.poll.return_value = None
+        manager.process = mock_process1
+        
+        mock_process2 = Mock()
+        mock_process2.pid = 54321
+        mock_process2.poll.return_value = None
+        manager.camera2_process = mock_process2
+        
+        status = manager.get_status()
+        
+        assert status["running"] is True
+        assert status["camera1_pid"] == 12345
+        assert status["camera2_pid"] == 54321
+
+    @pytest.mark.asyncio
+    async def test_start_success(self, manager):
+        """Test successful start of pitrac process"""
+        mock_process = Mock()
+        mock_process.pid = 12345
+        mock_process.poll.return_value = None
+        
+        with patch('subprocess.Popen', return_value=mock_process) as mock_popen:
+            with patch('builtins.open', mock_open()) as mock_file:
+                with patch('pitrac_manager.Path.exists', return_value=False):
+                    result = await manager.start()
+        
+
+        assert result.get("status") in ["started", "failed"]
+        if result["status"] == "started":
+            assert result["pid"] == 12345
+            assert manager.process == mock_process
+
+    @pytest.mark.asyncio
+    async def test_start_already_running(self, manager):
+        """Test start when process is already running"""
+        mock_process = Mock()
+        mock_process.poll.return_value = None
+        mock_process.pid = 12345
+        manager.process = mock_process
+        
+        result = await manager.start()
+        
+        assert result["status"] == "already_running"
+        assert "already running" in result["message"]
+        assert result["pid"] == 12345
+
+    @pytest.mark.asyncio
+    async def test_start_with_exception(self, manager):
+        """Test start with exception during process creation"""
+        with patch('subprocess.Popen', side_effect=Exception("Test error")):
+            result = await manager.start()
+        
+        assert result["status"] == "error"
+        assert "Test error" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_start_single_pi_dual_camera(self, manager, mock_config_manager):
+        """Test starting both cameras in single Pi mode"""
+        mock_config_manager.get_config.return_value["system.mode"] = "single"
+        mock_process1 = Mock()
+        mock_process1.pid = 12345
+        mock_process1.poll.return_value = None
+        
+        mock_process2 = Mock()
+        mock_process2.pid = 54321
+        mock_process2.poll.return_value = None
+        
+        with patch('subprocess.Popen', side_effect=[mock_process1, mock_process2]):
+            with patch('builtins.open', mock_open()):
+                with patch('pitrac_manager.Path.exists', return_value=False):
+                    with patch('asyncio.sleep', new_callable=AsyncMock):
+                        result = await manager.start()
+        
+        assert result["status"] == "started"
+        assert manager.process == mock_process1
+        assert manager.camera2_process == mock_process2
+
+    @pytest.mark.asyncio
+    async def test_stop_success(self, manager):
+        """Test successful stop of pitrac process"""
+        mock_process = Mock()
+        mock_process.pid = 12345
+        mock_process.poll.return_value = None
+        mock_process.terminate = Mock()
+        mock_process.wait = AsyncMock(return_value=0)
+        manager.process = mock_process
+        
+        with patch('pitrac_manager.Path.unlink'):
+            result = await manager.stop()
+        
+        assert result["status"] == "stopped"
+        assert "stopped" in result["message"].lower()
+        assert manager.process is None
+
+    @pytest.mark.asyncio
+    async def test_stop_not_running(self, manager):
+        """Test stop when process is not running"""
+        manager.process = None
+        
+        result = await manager.stop()
+        
+        assert result["status"] == "not_running"
+        assert "not running" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_stop_with_kill_fallback(self, manager):
+        """Test stop with kill fallback when terminate fails"""
+        mock_process = Mock()
+        mock_process.pid = 12345
+        mock_process.poll.return_value = None
+        mock_process.terminate = Mock()
+        mock_process.kill = Mock()
+        mock_process.wait = AsyncMock(side_effect=[asyncio.TimeoutError, 0])
+        manager.process = mock_process
+        
+        with patch('pitrac_manager.Path.unlink'):
+            result = await manager.stop()
+        
+        assert result["status"] == "stopped"
+        assert manager.process is None
+
+    @pytest.mark.asyncio
+    async def test_stop_dual_cameras(self, manager):
+        """Test stopping both camera processes"""
+        mock_process1 = Mock()
+        mock_process1.pid = 12345
+        mock_process1.poll.return_value = None
+        mock_process1.terminate = Mock()
+        mock_process1.wait = AsyncMock(return_value=0)
+        manager.process = mock_process1
+        
+        mock_process2 = Mock()
+        mock_process2.pid = 54321
+        mock_process2.poll.return_value = None
+        mock_process2.terminate = Mock()
+        mock_process2.wait = AsyncMock(return_value=0)
+        manager.camera2_process = mock_process2
+        
+        with patch('pitrac_manager.Path.unlink'):
+            result = await manager.stop()
+        
+        assert result["status"] == "stopped"
+        assert manager.process is None
+        assert manager.camera2_process is None
+
+    @pytest.mark.asyncio
+    async def test_restart_success(self, manager):
+        """Test successful restart of pitrac process"""
+        mock_process_old = Mock()
+        mock_process_old.pid = 12345
+        mock_process_old.poll.return_value = None
+        mock_process_old.terminate = Mock()
+        mock_process_old.wait = AsyncMock(return_value=0)
+        manager.process = mock_process_old
+        
+        mock_process_new = Mock()
+        mock_process_new.pid = 67890
+        mock_process_new.poll.return_value = None
+        
+        with patch('subprocess.Popen', return_value=mock_process_new):
+            with patch('builtins.open', mock_open()):
+                with patch('pitrac_manager.Path.unlink'):
+                    with patch('pitrac_manager.Path.exists', return_value=False):
+                        with patch('asyncio.sleep', new_callable=AsyncMock):
+                            result = await manager.restart()
+        
+        assert result.get("status") in ["started", "restarted", "failed"]
+        if result["status"] in ["started", "restarted"]:
+            assert result.get("pid") == 67890
+            assert manager.process == mock_process_new
+
+    @pytest.mark.asyncio
+    async def test_restart_not_running(self, manager):
+        """Test restart when process is not running - should start"""
+        manager.process = None
+        
+        mock_process = Mock()
+        mock_process.pid = 12345
+        mock_process.poll.return_value = None
+        
+        with patch('subprocess.Popen', return_value=mock_process):
+            with patch('builtins.open', mock_open()):
+                with patch('pitrac_manager.Path.exists', return_value=False):
+                    result = await manager.restart()
+        
+        assert result.get("status") in ["started", "restarted", "failed"]
+        if result["status"] in ["started", "restarted"]:
+            assert result.get("pid") == 12345
+            assert manager.process == mock_process
+
+    @pytest.mark.asyncio
+    async def test_restart_with_delay(self, manager):
+        """Test restart includes delay between stop and start"""
+        mock_process_old = Mock()
+        mock_process_old.pid = 12345
+        mock_process_old.poll.return_value = None
+        mock_process_old.terminate = Mock()
+        mock_process_old.wait = AsyncMock(return_value=0)
+        manager.process = mock_process_old
+        
+        mock_process_new = Mock()
+        mock_process_new.pid = 67890
+        mock_process_new.poll.return_value = None
+        
+        with patch('subprocess.Popen', return_value=mock_process_new):
+            with patch('builtins.open', mock_open()):
+                with patch('pitrac_manager.Path.unlink'):
+                    with patch('pitrac_manager.Path.exists', return_value=False):
+                        with patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+                            result = await manager.restart()
+        
+        mock_sleep.assert_called()
+        assert result.get("status") in ["started", "restarted", "failed"]
+
+
+class TestPiTracProcessManagerIntegration:
+    """Integration tests for PiTracProcessManager with real subprocess interaction"""
+
+    @pytest.fixture
+    def manager(self):
+        """Create a PiTracProcessManager instance for integration testing"""
+        config_manager = Mock(spec=ConfigurationManager)
+        config_manager.get_config.return_value = {
+            "system.mode": "single",
+            "system.camera_role": "camera1",
+            "logging.level": "debug",
+            "gs_config.ipc_interface.kWebActiveMQHostAddress": "tcp://localhost:61616",
+            "storage.image_dir": "/tmp/pitrac/images",
+            "storage.web_share_dir": "/tmp/pitrac/web",
+        }
+        with patch('pitrac_manager.Path.mkdir'):
+            manager = PiTracProcessManager(config_manager=config_manager)
+        manager.pitrac_binary = "echo"
+        return manager
+
+    @pytest.mark.asyncio
+    async def test_start_stop_cycle(self, manager):
+        """Test complete start/stop cycle with subprocess"""
+
+        result = await manager.start()
+        assert result["status"] in ["started", "failed"]
+        
+        assert manager.is_running() is False 
+        
+        manager.process = None

@@ -8,8 +8,8 @@
 # Top Level Software Ownership
 /Software/ @jamespilgrim
 
-# Java Ownership files 
-/Software/LMSourceCode/ImageProcessing/golfsim_tomee_webapp/ @jeshernandez 
+# Python Web Server
+/Software/web-server/ @connorgallopo 
 
 # Yolo Model + Tooling
 /Software/GroundTruthAnnotator/ @connorgallopo

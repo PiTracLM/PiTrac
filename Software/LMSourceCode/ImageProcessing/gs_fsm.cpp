@@ -906,7 +906,6 @@ namespace golf_sim {
         GolfSimIpcSystem::ShutdownIPCSystem();
 
         if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1 ||
-               GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kRunCam2ProcessForPi1Processing ||
                GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1TestStandalone) {
             PulseStrobe::DeinitGPIOSystem();
         }

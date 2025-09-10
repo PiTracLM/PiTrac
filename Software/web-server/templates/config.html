@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PiTrac Configuration</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="stylesheet" href="/static/dashboard.css">
+    <link rel="stylesheet" href="/static/config.css">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-content">
+                <a href="/" style="display: flex; align-items: center; gap: 0.75rem; text-decoration: none; color: inherit;">
+                    <img src="/static/logos/PiTrac.svg" alt="PiTrac Logo" class="header-logo">
+                    <h1>Configuration</h1>
+                </a>
+            </div>
+            <div class="header-right">
+                <div class="dropdown">
+                    <button class="dropdown-toggle" aria-label="Menu">
+                        <svg fill="currentColor" viewBox="0 0 20 20" width="24" height="24">
+                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+                        </svg>
+                    </button>
+                    <div class="dropdown-menu">
+                        <a href="/" class="dropdown-item">
+                            <svg fill="currentColor" viewBox="0 0 20 20" width="20" height="20">
+                                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
+                            </svg>
+                            Dashboard
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <div class="theme-selector">
+                            <span class="dropdown-label">Theme</span>
+                            <div class="theme-options">
+                                <button class="theme-btn" data-theme="light" title="Light mode" onclick="setTheme('light')">
+                                    <svg fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>
+                                    </svg>
+                                </button>
+                                <button class="theme-btn" data-theme="dark" title="Dark mode" onclick="setTheme('dark')">
+                                    <svg fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+                                    </svg>
+                                </button>
+                                <button class="theme-btn" data-theme="system" title="System theme" onclick="setTheme('system')">
+                                    <svg fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div id="statusMessage" class="status-message"></div>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="saveChanges()">
+                    Save All Changes (<span id="modifiedCount">0</span>)
+                </button>
+                <button class="btn btn-secondary" onclick="reloadConfig()">
+                    Reload
+                </button>
+                <button class="btn btn-danger" onclick="resetAll()">
+                    Reset to Defaults
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="config-container">
+            <!-- Category Sidebar -->
+            <div class="category-sidebar">
+                <h3>Categories</h3>
+                <ul id="categoryList" class="category-list">
+                    <!-- Categories will be loaded here -->
+                </ul>
+            </div>
+
+            <!-- Configuration Panel -->
+            <div class="config-panel">
+                <!-- Search Bar -->
+                <div class="search-container">
+                    <input type="text" id="searchInput" placeholder="Search settings..." class="search-input" oninput="searchConfig()">
+                    <button onclick="clearSearch()" class="clear-search">Clear</button>
+                </div>
+
+                <!-- Configuration Content -->
+                <div id="configContent" class="config-content">
+                    <!-- Configuration items will be dynamically loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Loading configuration...</p>
+        </div>
+        
+        <!-- Confirmation Modal -->
+        <div id="confirmModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modalTitle">Confirm</h2>
+                    <button class="modal-close" onclick="closeModal()">&times;</button>
+                </div>
+                <div class="modal-body" id="modalBody">
+                    <!-- Modal content goes here -->
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-primary" id="modalConfirmBtn">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Theme Script (same as dashboard) -->
+    <script>
+        // Theme management
+        function getSystemTheme() {
+            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+
+        function applyTheme(theme) {
+            if (theme === 'system') {
+                theme = getSystemTheme();
+            }
+            document.documentElement.setAttribute('data-theme', theme);
+            
+            // Update active button
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            const activeBtn = document.querySelector(`.theme-btn[data-theme="${localStorage.getItem('pitrac-theme') || 'system'}"]`);
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+            }
+        }
+
+        function setTheme(theme) {
+            localStorage.setItem('pitrac-theme', theme);
+            applyTheme(theme);
+        }
+
+        // Initialize theme
+        const savedTheme = localStorage.getItem('pitrac-theme') || 'system';
+        applyTheme(savedTheme);
+
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+            if (localStorage.getItem('pitrac-theme') === 'system') {
+                applyTheme('system');
+            }
+        });
+
+        // Dropdown menu toggle
+        document.addEventListener('DOMContentLoaded', () => {
+            const dropdown = document.querySelector('.dropdown');
+            const toggle = document.querySelector('.dropdown-toggle');
+            
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dropdown.classList.toggle('active');
+            });
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', () => {
+                dropdown.classList.remove('active');
+            });
+            
+            // Prevent dropdown from closing when clicking inside
+            document.querySelector('.dropdown-menu').addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        });
+    </script>
+
+    <!-- Configuration Scripts -->
+    <script src="/static/js/config.js"></script>
+</body>
+</html>

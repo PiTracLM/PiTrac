@@ -1,0 +1,499 @@
+"""Configuration Manager for PiTrac Web Server
+
+Handles reading and writing JSON configuration files with a two-tier system:
+1. System defaults: /etc/pitrac/golf_sim_config.json (read-only)
+2. User overrides: ~/.pitrac/config/user_settings.json (read-write, sparse)
+"""
+
+import json
+import logging
+import os
+import shutil
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
+
+
+class ConfigurationManager:
+    """Manages PiTrac configuration with JSON-based system"""
+
+    def __init__(self):
+        self.system_config_path = Path("/etc/pitrac/golf_sim_config.json")
+        self.user_settings_path = (
+            Path.home() / ".pitrac" / "config" / "user_settings.json"
+        )
+        self.backup_dir = Path.home() / ".pitrac" / "backups"
+
+        self.system_config: Dict[str, Any] = {}
+        self.user_settings: Dict[str, Any] = {}
+        self.merged_config: Dict[str, Any] = {}
+
+        self.restart_required_params = self._load_restart_required_params()
+
+        self.reload()
+
+    def _load_restart_required_params(self) -> set:
+        """Load parameters that require restart from configurations.json metadata"""
+        metadata = self.load_configurations_metadata()
+        settings_metadata = metadata.get("settings", {})
+
+        restart_params = set()
+        for key, setting_info in settings_metadata.items():
+            if setting_info.get("requiresRestart", False):
+                restart_params.add(key)
+
+        logger.info(f"Loaded {len(restart_params)} parameters that require restart")
+        return restart_params
+
+    def reload(self) -> None:
+        """Reload all configuration files"""
+        self.system_config = self._load_json(self.system_config_path)
+        self.user_settings = self._load_json(self.user_settings_path)
+        self.merged_config = self._merge_configs()
+        self.restart_required_params = self._load_restart_required_params()
+        logger.info(f"Loaded configuration: {len(self.user_settings)} user overrides")
+
+    def _load_json(self, path: Path) -> Dict[str, Any]:
+        """Load JSON file safely"""
+        if not path.exists():
+            return {}
+
+        try:
+            with open(path, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError) as e:
+            logger.error(f"Failed to load {path}: {e}")
+            return {}
+
+    def _save_json(self, path: Path, data: Dict[str, Any]) -> bool:
+        """Save JSON file with proper formatting"""
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+            temp_path = path.with_suffix(".tmp")
+            with open(temp_path, "w") as f:
+                json.dump(data, f, indent=2, sort_keys=True)
+
+            temp_path.replace(path)
+            logger.info(f"Saved configuration to {path}")
+            return True
+
+        except (IOError, OSError) as e:
+            logger.error(f"Failed to save {path}: {e}")
+            return False
+
+    def _merge_configs(self) -> Dict[str, Any]:
+        """Merge system defaults with user overrides"""
+
+        def deep_merge(base: Dict, override: Dict) -> Dict:
+            """Recursively merge override into base"""
+            result = base.copy()
+            for key, value in override.items():
+                if (
+                    key in result
+                    and isinstance(result[key], dict)
+                    and isinstance(value, dict)
+                ):
+                    result[key] = deep_merge(result[key], value)
+                else:
+                    result[key] = value
+            return result
+
+        return deep_merge(self.system_config, self.user_settings)
+
+    def get_config(self, key: Optional[str] = None) -> Any:
+        """Get configuration value or entire config
+
+        Args:
+            key: Dot-notation path (e.g., 'gs_config.cameras.kCamera1Gain')
+                 If None, returns entire merged config
+
+        Returns:
+            Configuration value or None if not found
+        """
+        if key is None:
+            return self.merged_config
+
+        value = self.merged_config
+        for part in key.split("."):
+            if isinstance(value, dict) and part in value:
+                value = value[part]
+            else:
+                return None
+
+        return value
+
+    def get_default(self, key: Optional[str] = None) -> Any:
+        """Get default system configuration value"""
+        if key is None:
+            return self.system_config
+
+        value = self.system_config
+        for part in key.split("."):
+            if isinstance(value, dict) and part in value:
+                value = value[part]
+            else:
+                return None
+
+        return value
+
+    def get_user_settings(self) -> Dict[str, Any]:
+        """Get only user overrides"""
+        return self.user_settings.copy()
+
+    def set_config(self, key: str, value: Any) -> Tuple[bool, str, bool]:
+        """Set configuration value
+
+        Args:
+            key: Dot-notation path
+            value: New value
+
+        Returns:
+            Tuple of (success, message, requires_restart)
+        """
+        default_value = self.get_default(key)
+
+        if value == default_value:
+            if self._delete_from_dict(self.user_settings, key):
+                self._save_json(self.user_settings_path, self.user_settings)
+                self.reload()
+                return (
+                    True,
+                    f"Reset {key} to default value",
+                    key in self.restart_required_params,
+                )
+            return True, "Value already at default", False
+
+        if self._set_in_dict(self.user_settings, key, value):
+            self._backup_config()
+
+            if self._save_json(self.user_settings_path, self.user_settings):
+                self.reload()
+                requires_restart = key in self.restart_required_params
+                return True, f"Set {key} = {value}", requires_restart
+
+            return False, "Failed to save configuration", False
+
+        return False, "Failed to set value", False
+
+    def _set_in_dict(self, d: Dict[str, Any], key: str, value: Any) -> bool:
+        """Set value in nested dictionary using dot notation"""
+        parts = key.split(".")
+        current = d
+
+        for part in parts[:-1]:
+            if part not in current:
+                current[part] = {}
+            elif not isinstance(current[part], dict):
+                return False 
+            current = current[part]
+
+        current[parts[-1]] = value
+        return True
+
+    def _delete_from_dict(self, d: Dict[str, Any], key: str) -> bool:
+        """Delete value from nested dictionary using dot notation"""
+        parts = key.split(".")
+        current = d
+
+        for part in parts[:-1]:
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+            else:
+                return False  # Key doesn't exist
+
+        if isinstance(current, dict) and parts[-1] in current:
+            del current[parts[-1]]
+
+            self._cleanup_empty_dicts(d)
+            return True
+
+        return False
+
+    def _cleanup_empty_dicts(self, d: Dict[str, Any]) -> None:
+        """Remove empty nested dictionaries"""
+        keys_to_delete = []
+
+        for key, value in d.items():
+            if isinstance(value, dict):
+                self._cleanup_empty_dicts(value)
+                if not value:  # Empty dict
+                    keys_to_delete.append(key)
+
+        for key in keys_to_delete:
+            del d[key]
+
+    def reset_all(self) -> Tuple[bool, str]:
+        """Reset all user settings to defaults"""
+        self._backup_config()
+
+        self.user_settings = {}
+
+        if self._save_json(self.user_settings_path, self.user_settings):
+            self.reload()
+            return True, "Reset all settings to defaults"
+
+        return False, "Failed to reset configuration"
+
+    def _backup_config(self) -> Optional[Path]:
+        """Create backup of current user settings"""
+        if not self.user_settings:
+            return None
+
+        try:
+            self.backup_dir.mkdir(parents=True, exist_ok=True)
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = self.backup_dir / f"user_settings_{timestamp}.json"
+
+            shutil.copy2(self.user_settings_path, backup_path)
+            logger.info(f"Created backup: {backup_path}")
+            return backup_path
+
+        except (IOError, OSError) as e:
+            logger.error(f"Failed to create backup: {e}")
+            return None
+
+    def get_diff(self) -> Dict[str, Any]:
+        """Get differences between user settings and defaults
+
+        Returns:
+            Dictionary showing what's different from defaults
+        """
+        diff = {}
+
+        def compare_nested(user: Dict, default: Dict, path: str = "") -> None:
+            for key, value in user.items():
+                current_path = f"{path}.{key}" if path else key
+
+                if key not in default:
+                    diff[current_path] = {"user": value, "default": None}
+                elif isinstance(value, dict) and isinstance(default.get(key), dict):
+                    compare_nested(value, default[key], current_path)
+                elif value != default.get(key):
+                    diff[current_path] = {"user": value, "default": default[key]}
+
+        compare_nested(self.user_settings, self.system_config)
+        return diff
+
+    def validate_config(self, key: str, value: Any) -> Tuple[bool, str]:
+        """Validate configuration value
+
+        Args:
+            key: Configuration key
+            value: Value to validate
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        if "Gain" in key:
+            try:
+                float_val = float(value)
+                if not 0.5 <= float_val <= 16.0:
+                    return False, "Gain must be between 0.5 and 16.0"
+            except (TypeError, ValueError):
+                return False, "Gain must be a number"
+
+        elif "Port" in key:
+            try:
+                port = int(value)
+                if not 1 <= port <= 65535:
+                    return False, "Port must be between 1 and 65535"
+            except (TypeError, ValueError):
+                return False, "Port must be an integer"
+
+        elif any(x in key for x in ["Address", "Host"]):
+            if value and not isinstance(value, str):
+                return False, "Address must be a string"
+
+        return True, ""
+
+    def get_available_models(self) -> Dict[str, str]:
+        """
+        Discover available YOLO models from the models directory.
+        Returns a dict of {display_name: path} for dropdown options.
+        """
+        models = {}
+
+        model_dirs = [
+            Path.home() / "LM_Shares" / "models",
+            Path("/opt/pitrac/models"),
+            Path.home()
+            / "dev"
+            / "PiTrac"
+            / "Software"
+            / "GroundTruthAnnotator"
+            / "experiments",
+        ]
+
+        for base_dir in model_dirs:
+            if not base_dir.exists():
+                continue
+
+            for model_dir in base_dir.iterdir():
+                if model_dir.is_dir():
+                    onnx_paths = [
+                        model_dir / "best.onnx",
+                        model_dir / "weights" / "best.onnx",
+                    ]
+
+                    for onnx_path in onnx_paths:
+                        if onnx_path.exists():
+                            display_name = model_dir.name
+                            try:
+                                relative_path = onnx_path.relative_to(Path.home())
+                                path_str = f"~/{relative_path}"
+                            except ValueError:
+                                path_str = str(onnx_path)
+
+                            models[display_name] = path_str
+                            break
+
+        return dict(sorted(models.items()))
+
+    def load_configurations_metadata(self):
+        """
+        Load configuration metadata from configurations.json
+        """
+        try:
+            config_path = os.path.join(os.path.dirname(__file__), "configurations.json")
+            with open(config_path, "r") as f:
+                metadata = json.load(f)
+
+            model_options = self.get_available_models()
+            if model_options and "settings" in metadata:
+                model_key = "gs_config.ball_identification.kONNXModelPath"
+                if model_key in metadata["settings"]:
+                    metadata["settings"][model_key]["options"] = model_options
+
+            return metadata
+        except Exception as e:
+            print(f"Error loading configurations.json: {e}")
+            return {"settings": {}}
+
+    def flatten_config(
+        self, config: Dict[str, Any], prefix: str = ""
+    ) -> Dict[str, Any]:
+        """Flatten nested config dict into dot-notation keys."""
+        result = {}
+        for key, value in config.items():
+            full_key = f"{prefix}.{key}" if prefix else key
+            if isinstance(value, dict):
+                result.update(self.flatten_config(value, full_key))
+            else:
+                result[full_key] = value
+        return result
+
+    def get_categories(self) -> Dict[str, List[str]]:
+        """Get configuration organized by categories based on configurations.json
+
+        Returns:
+            Dictionary with category names and their parameters
+        """
+        metadata = self.load_configurations_metadata()
+        settings_metadata = metadata.get("settings", {})
+
+        categories = {
+            "Basic": [],
+            "Cameras": [],
+            "Simulators": [],
+            "Ball Detection": [],
+            "AI Detection": [],
+            "Storage": [],
+            "Network": [],
+            "Logging": [],
+            "Strobing": [],
+            "Spin Analysis": [],
+            "Calibration": [],
+            "Advanced": [],
+        }
+
+        processed_keys = set()
+
+        for key, setting_info in settings_metadata.items():
+            processed_keys.add(key)
+            if setting_info.get("showInBasic", False):
+                categories["Basic"].append(key)
+            category = setting_info.get("category", "Advanced")
+            if category in categories:
+                categories[category].append(key)
+
+        for key in self.flatten_config(self.merged_config).keys():
+            if key not in processed_keys:
+                category = self.auto_categorize_key(key)
+                categories[category].append(key)
+
+        categories = {k: v for k, v in categories.items() if v}
+
+        return categories
+
+    def auto_categorize_key(self, key: str) -> str:
+        """Auto-categorize keys that aren't in the metadata file."""
+        if "camera" in key.lower():
+            return "Cameras"
+        elif any(x in key for x in ["GSPro", "E6", "golf_simulator"]):
+            return "Simulators"
+        elif any(
+            x in key.lower() for x in ["onnx", "yolo", "sahi", "nms", "confidence"]
+        ):
+            return "AI Detection"
+        elif "strob" in key.lower():
+            return "Strobing"
+        elif "ball" in key.lower() or "hough" in key.lower():
+            return "Ball Detection"
+        elif (
+            any(x in key.lower() for x in ["log", "dir", "path", "file"])
+            and "logging" not in key.lower()
+        ):
+            return "Storage"
+        elif any(x in key.lower() for x in ["network", "broker", "port", "address"]):
+            return "Network"
+        elif "logging" in key.lower():
+            return "Logging"
+        elif "spin" in key.lower():
+            return "Spin Analysis"
+        elif "calibrat" in key.lower():
+            return "Calibration"
+        else:
+            return "Advanced"
+
+    def get_basic_subcategories(self):
+        """Get subcategories for Basic settings."""
+        metadata = self.load_configurations_metadata()
+        settings_metadata = metadata.get("settings", {})
+
+        subcategories = {}
+        for key, setting_info in settings_metadata.items():
+            if setting_info.get("showInBasic", False):
+                subcat = setting_info.get("basicSubcategory", "Other")
+                if subcat not in subcategories:
+                    subcategories[subcat] = []
+                subcategories[subcat].append(key)
+
+        return subcategories
+
+    def export_config(self) -> Dict[str, Any]:
+        """Export current configuration for backup/sharing"""
+        return {
+            "version": "1.0",
+            "exported_at": datetime.now().isoformat(),
+            "user_settings": self.user_settings,
+            "system_version": self.system_config.get("version", "unknown"),
+        }
+
+    def import_config(self, config_data: Dict[str, Any]) -> Tuple[bool, str]:
+        """Import configuration from exported data"""
+        if "user_settings" not in config_data:
+            return False, "Invalid configuration format"
+
+        self._backup_config()
+
+        self.user_settings = config_data["user_settings"]
+
+        if self._save_json(self.user_settings_path, self.user_settings):
+            self.reload()
+            return True, "Configuration imported successfully"
+
+        return False, "Failed to import configuration"

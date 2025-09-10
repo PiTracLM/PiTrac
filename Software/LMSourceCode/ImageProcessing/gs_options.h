@@ -45,7 +45,7 @@ namespace golf_sim {
 	};
 
 	enum ArtifactSaveLevel {
-		kNoArtifacts = 0,		
+		kNoArtifacts = 0,
 		kFinalResultsOnly = 1,	// produces images, but only at a few higher-level points in the processing
 		kAll = 2				// May slow the system to a crawl, with over a dozen large intermediate files being written
 	};
@@ -90,6 +90,8 @@ namespace golf_sim {
 					"Configure for operating in another infrared-based LM environment")
 				("send_test_results", value<bool>(&send_test_results_)->default_value(false)->implicit_value(true),
 					"Send a single IPC results message (e.g., for testing) and exit")
+				("skip_wait_armed", value<bool>(&skip_wait_armed_)->default_value(false)->implicit_value(true),
+					"Skip waiting for simulator armed state (for hardware-less testing)")
 				("output_filename", value<std::string>(&output_filename_)->default_value("out.png"),
 					"Write any still picture to the specified filename")
 				("pulse_test", value<bool>(&perform_pulse_test_)->default_value(false)->implicit_value(true),
@@ -103,7 +105,7 @@ namespace golf_sim {
 				("show_images", value<bool>(&show_images_)->default_value(false)->implicit_value(true),
 					"0 = Don't show any debug/trace images in windows on the screen, 1 = Do")
 				("use_non_IR_camera", value<bool>(&use_non_IR_camera_)->default_value(false)->implicit_value(true),
-					"1 = The camera in use by this system is not an IR camera (and will likely need less gain)")						
+					"1 = The camera in use by this system is not an IR camera (and will likely need less gain)")
 				("search_center_x", value<unsigned int>(&search_center_x_)->default_value(0),
 					"Set the x coordinate of the center of the ball-search circle")
 				("search_center_y", value<unsigned int>(&search_center_y_)->default_value(0),
@@ -146,6 +148,7 @@ namespace golf_sim {
 		bool camera_still_mode_;
 		bool lm_comparison_mode_;
 		bool send_test_results_;
+		bool skip_wait_armed_;
 		bool practice_ball_;
 		bool perform_pulse_test_;
 		bool use_non_IR_camera_;

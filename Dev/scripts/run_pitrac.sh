@@ -72,7 +72,7 @@ load_environment() {
         # Set critical environment variables if not set
         export PITRAC_BASE_IMAGE_LOGGING_DIR="${PITRAC_BASE_IMAGE_LOGGING_DIR:-$HOME/LM_Shares/Images/}"
         export PITRAC_WEBSERVER_SHARE_DIR="${PITRAC_WEBSERVER_SHARE_DIR:-$HOME/LM_Shares/WebShare/}"
-        export PITRAC_MSG_BROKER_FULL_ADDRESS="${PITRAC_MSG_BROKER_FULL_ADDRESS:-tcp://localhost:61616}"
+        export PITRAC_MSG_BROKER_FULL_ADDRESS="${PITRAC_MSG_BROKER_FULL_ADDRESS:-tcp://127.0.0.1:61616}"
     fi
 }
 
@@ -89,11 +89,11 @@ check_runtime_dependencies() {
         fi
     fi
     
-    # Check if TomEE is running for web interface
+    # Check if web server is running for web interface
     if [ "$ENABLE_WEB_SERVER" = "1" ]; then
-        if ! systemctl is-active --quiet tomee 2>/dev/null && \
-           ! pgrep -f tomee >/dev/null 2>&1; then
-            warnings="${warnings}  - TomEE web server not running\n"
+        if ! systemctl is-active --quiet pitrac-web 2>/dev/null && \
+           ! pgrep -f "python.*main.py" >/dev/null 2>&1; then
+            warnings="${warnings}  - PiTrac web server not running\n"
         fi
     fi
     

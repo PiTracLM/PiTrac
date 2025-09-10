@@ -17,6 +17,6 @@ echo "================================"
 pitrac_args=()
 build_pitrac_logging_args pitrac_args
 
-"$PITRAC_BINARY" --system_mode=test "${pitrac_args[@]}" "$@"
+"$PITRAC_BINARY" --system_mode=test --send_test_results=1 --skip_wait_armed=1 "${pitrac_args[@]}" "$@"
 echo "================================"
 echo "Test complete. Check output for ball detection results."

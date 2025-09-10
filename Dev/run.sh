@@ -217,7 +217,7 @@ declare -A PACKAGES=(
     ["libcamera"]="Libcamera & RpiCam Apps"
     ["java"]="Java 17 OpenJDK"
     ["maven"]="Apache Maven"
-    ["tomee"]="Apache TomEE 10.1.0"
+    # Python web server is now used instead of TomEE
     ["pitrac-deps"]="PiTrac Dependencies"
 )
 
@@ -422,7 +422,7 @@ install_all_dependencies() {
     # Define the complete dependency chain
     local all_packages=(
         "java" "maven" "boost" "activemq-broker" "activemq-cpp" 
-        "msgpack" "lgpio" "opencv" "libcamera" "tomee" "pitrac-deps"
+        "msgpack" "lgpio" "opencv" "libcamera" "pitrac-deps"
     )
     
     for package in "${all_packages[@]}"; do

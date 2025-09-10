@@ -7,7 +7,7 @@ initialize_global_flags
 
 user_config="${HOME}/.pitrac/config/pitrac.yaml"
 system_config="/etc/pitrac/pitrac.yaml"
-default_config="/etc/pitrac/config/settings-basic.yaml"
+default_config="/etc/pitrac/pitrac.yaml"
 json_output="${args[--json]:-}"
 
 # Determine which configs to compare
@@ -24,8 +24,8 @@ else
 fi
 
 # Check if default template exists
-if [[ ! -f "$default_config" ]] && [[ -f "/usr/share/pitrac/config/settings-basic.yaml" ]]; then
-    default_config="/usr/share/pitrac/config/settings-basic.yaml"
+if [[ ! -f "$default_config" ]] && [[ -f "/usr/share/pitrac/config.yaml.default" ]]; then
+    default_config="/usr/share/pitrac/config.yaml.default"
 fi
 
 if [[ ! -f "$default_config" ]]; then

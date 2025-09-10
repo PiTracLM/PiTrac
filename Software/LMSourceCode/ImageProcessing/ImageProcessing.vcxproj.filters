@@ -505,19 +505,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="golfsim_tomee_webapp\src\main\java\com\verdanttechs\jakarta\ee9\HelloServlet.java">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="golfsim_tomee_webapp\src\main\java\com\verdanttechs\jakarta\ee9\MonitorServlet.java">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="golfsim_tomee_webapp\src\main\webapp\WEB-INF\gs_dashboard.jsp">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="golf_sim_config.json">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="golfsim_tomee_webapp\src\main\webapp\index.html">
       <Filter>Resource Files</Filter>
     </None>
     <None Include="meson.build">
@@ -589,11 +577,6 @@
     <None Include="RunScripts\runTestSpin.sh" />
     <None Include="RunScripts\shutdown_gs.sh" />
     <None Include="create_closed_source_objects.sh" />
-  </ItemGroup>
-  <ItemGroup>
-    <Xml Include="golfsim_tomee_webapp\pom.xml">
-      <Filter>Resource Files</Filter>
-    </Xml>
   </ItemGroup>
   <ItemGroup>
     <Text Include="core\CMakeLists.txt">

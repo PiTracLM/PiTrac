@@ -26,6 +26,50 @@ using namespace std;
 
 namespace golf_sim {
 
+    static std::string base64_encode(unsigned char const* bytes_to_encode, unsigned int in_len) {
+        static const std::string base64_chars =
+                     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                     "abcdefghijklmnopqrstuvwxyz"
+                     "0123456789+/";
+
+        std::string ret;
+        int i = 0;
+        int j = 0;
+        unsigned char char_array_3[3];
+        unsigned char char_array_4[4];
+
+        while (in_len--) {
+            char_array_3[i++] = *(bytes_to_encode++);
+            if (i == 3) {
+                char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+                char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+                char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+                char_array_4[3] = char_array_3[2] & 0x3f;
+
+                for(i = 0; (i <4) ; i++)
+                    ret += base64_chars[char_array_4[i]];
+                i = 0;
+            }
+        }
+
+        if (i) {
+            for(j = i; j < 3; j++)
+                char_array_3[j] = '\0';
+
+            char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+            char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+            char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+
+            for (j = 0; (j < i + 1); j++)
+                ret += base64_chars[char_array_4[j]];
+
+            while((i++ < 3))
+                ret += '=';
+        }
+
+        return ret;
+    }
+
     std::string GolfSimIpcSystem::kWebActiveMQHostAddress = "";
 
     const std::string GolfSimIpcSystem::kGolfSimMessageTypeTag = "Message Type";
@@ -106,10 +150,10 @@ namespace golf_sim {
             //        "?transport.commandTracingEnabled=true"
             //        "&transport.tcpTracingEnabled=true"
             //        "&wireFormat.tightEncodingEnabled=true"
-        
+
         GS_LOG_TRACE_MSG(trace, "Active-MQ broker_URI is: " + broker_URI);
 
-        // Initialization order probably doesn't matter, but we will initialize the consumer first to 
+        // Initialization order probably doesn't matter, but we will initialize the consumer first to
         // clear out any messages before the producer starts.
         consumer_ = GolfSimMessageConsumer::Initialize(broker_URI);
 
@@ -211,7 +255,7 @@ namespace golf_sim {
             }
             default:
             {
-                GS_LOG_MSG(error, "Could not dispatch unknown IPC message of type " + 
+                GS_LOG_MSG(error, "Could not dispatch unknown IPC message of type " +
                                             std::to_string((int)ipc_message->GetMessageType()));
                 break;
             }
@@ -257,7 +301,7 @@ namespace golf_sim {
 
         GolfSimEventElement controlMessageReceived{ new GolfSimEvent::ControlMessage{ message.GetControlMessage().control_type_} };
         GolfSimEventQueue::QueueEvent(controlMessageReceived);
-        
+
         return true;
     }
 
@@ -307,7 +351,7 @@ namespace golf_sim {
         // This message is telling the camera 2 system to get ready to take a picture, whereas
         // the camera will be externally triggered from the camera 1 system once the ball appears
         // to have been hit.
-        
+
         switch (GolfSimOptions::GetCommandLineOptions().system_mode_) {
 
             case SystemMode::kCamera1:
@@ -373,7 +417,7 @@ namespace golf_sim {
         switch (GolfSimOptions::GetCommandLineOptions().system_mode_) {
 
             case SystemMode::kCamera2:
-            case SystemMode::kCamera2TestStandalone: 
+            case SystemMode::kCamera2TestStandalone:
             {
 
                 // This message is only for the camera 1 system.  Ignore it for camera 2
@@ -461,7 +505,7 @@ namespace golf_sim {
             }
 
             // We appear to have a valid GolfSimIpcMessage
-            GS_LOG_TRACE_MSG(trace, "BuildIpcMessageFromBytesMessage converting Active-MQ message of type " + main_message_type + 
+            GS_LOG_TRACE_MSG(trace, "BuildIpcMessageFromBytesMessage converting Active-MQ message of type " + main_message_type +
                                         " and message-type " + std::to_string((int)ipc_message_type) + " to GolfSimIpcMessage");
             ipc_message = new GolfSimIPCMessage(ipc_message_type);
 
@@ -469,7 +513,7 @@ namespace golf_sim {
                 return nullptr;
             }
 
-            if (ipc_message->GetMessageType() == GolfSimIPCMessage::IPCMessageType::kCamera2Image || 
+            if (ipc_message->GetMessageType() == GolfSimIPCMessage::IPCMessageType::kCamera2Image ||
                 ipc_message->GetMessageType() == GolfSimIPCMessage::IPCMessageType::kCamera2ReturnPreImage) {
 
                 GS_LOG_TRACE_MSG(trace, "BuildIpcMessageFromBytesMessage about to UnpackMatData.");
@@ -552,7 +596,7 @@ namespace golf_sim {
 
         GS_LOG_TRACE_MSG(trace, "BuildBytesMessageObjectFromIpcMessage called with IPC message type =" + std::to_string((int)ipc_message.GetMessageType()));
 
-        // Need to ask the producer's session to create the new message for us 
+        // Need to ask the producer's session to create the new message for us
         // (in order to setup some of the messages's internal values correctly).
         std::unique_ptr<cms::BytesMessage> active_mq_message = producer_->getNewBytesMessage();
 
@@ -581,10 +625,14 @@ namespace golf_sim {
             msgpack::pack(&serialized_result, ipc_message.GetResults());
 
             GS_LOG_TRACE_MSG(trace, "Sending a result of: " + ipc_message.GetResults().Format());
-            GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem::BuildBytesMessageObjectFromIpcMessage setting body data for GsIPCResults of length = " + 
+            GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem::BuildBytesMessageObjectFromIpcMessage setting body data for GsIPCResults of length = " +
                             std::to_string(serialized_result.size()));
 
-            active_mq_message->setBodyBytes((unsigned char*)serialized_result.data(), serialized_result.size());
+            // For STOMP compatibility, we'll send as a text message with base64 encoding
+            // This avoids binary corruption when crossing the OpenWire-to-STOMP bridge
+            std::string base64_data = base64_encode((unsigned char*)serialized_result.data(), serialized_result.size());
+            active_mq_message->setStringProperty("encoding", "base64");
+            active_mq_message->setBodyBytes((unsigned char*)base64_data.c_str(), base64_data.length());
         }
 
         return active_mq_message;

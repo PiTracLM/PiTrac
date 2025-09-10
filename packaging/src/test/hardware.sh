@@ -47,8 +47,8 @@ else
   warn "ActiveMQ not running"
 fi
 
-if is_service_running "tomee"; then
-  success "TomEE running"
+if is_service_running "pitrac-web"; then
+  success "PiTrac web server running"
 else
-  warn "TomEE not running"
+  warn "PiTrac web server not running"
 fi

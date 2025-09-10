@@ -1,22 +1,42 @@
 
+#!/usr/bin/env bash
+# config get - Get configuration value using JSON
+
 # Initialize global flags and logging (libraries are embedded by bashly)
 initialize_global_flags
 
+# Source JSON config library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../lib/config_json.sh"
 
-key="${args[key]}"
-load_configuration
+key="${args[key]:-}"
+show_all="${args[--all]:-}"
+show_user="${args[--user-only]:-}"
 
-case "$key" in
-  system.mode) echo "${config[system_mode]}" ;;
-  system.camera_role) echo "${config[system_camera_role]}" ;;
-  hardware.gpio_chip) echo "${config[hardware_gpio_chip]}" ;;
-  network.broker_address) echo "${config[network_broker_address]}" ;;
-  network.broker_port) echo "${config[network_broker_port]}" ;;
-  storage.image_logging_dir) echo "${config[storage_image_logging_dir]}" ;;
-  storage.web_share_dir) echo "${config[storage_web_share_dir]}" ;;
-  cameras.slot1.type) echo "${config[camera_slot1_type]}" ;;
-  cameras.slot2.type) echo "${config[camera_slot2_type]}" ;;
-  simulators.e6_host) echo "${config[simulators_e6_host]}" ;;
-  simulators.gspro_host) echo "${config[simulators_gspro_host]}" ;;
-  *) error "Unknown configuration key: $key"; exit 1 ;;
-esac
+if [[ -z "$key" && "$show_all" != "1" && "$show_user" != "1" ]]; then
+    error "Specify a configuration key or use --all to show all settings"
+    echo ""
+    echo "Examples:"
+    echo "  pitrac config get gs_config.cameras.kCamera1Gain"
+    echo "  pitrac config get --all"
+    echo "  pitrac config get --user-only"
+    exit 1
+fi
+
+if [[ "$show_all" == "1" ]]; then
+    log_info "Showing all configuration (merged system + user):"
+    list_config_values
+elif [[ "$show_user" == "1" ]]; then
+    log_info "Showing user overrides only:"
+    show_user_overrides
+else
+    # Get specific value
+    value=$(get_config_value "$key")
+    
+    if [[ -n "$value" ]]; then
+        echo "$value"
+    else
+        warn "Configuration key '$key' not found"
+        exit 1
+    fi
+fi

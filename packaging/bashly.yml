@@ -109,10 +109,8 @@ commands:
       - name: show
         help: Display current configuration
         flags:
-          - long: --effective
-            help: Show effective configuration (with overrides)
           - long: --yaml
-            help: Output in YAML format
+            help: Show raw YAML file instead of runtime configuration
 
       - name: edit
         help: Edit configuration file
@@ -359,17 +357,6 @@ commands:
         short: -f
         help: Follow logs (with 'logs' action)
 
-  - name: tomee
-    help: "[DEPRECATED] Use 'pitrac web' instead"
-    args:
-      - name: action
-        help: Action to perform
-        required: true
-        allowed: [start, stop, restart, status, deploy, logs]
-    flags:
-      - long: --follow
-        short: -f
-        help: Follow logs (with 'logs' action)
 
   - name: activemq
     alias: amq

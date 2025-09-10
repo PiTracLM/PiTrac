@@ -39,7 +39,7 @@ else
   DETECTED_WEB_DIR="$(detect_lm_shares_dir "WebShare")"
   DEFAULT_WEB_DIR="${PITRAC_WEB_DIR:-$DETECTED_WEB_DIR}"
 fi
-DEFAULT_MSG_BROKER_IP="${PITRAC_MSG_BROKER_IP:-localhost}"
+DEFAULT_MSG_BROKER_IP="${PITRAC_MSG_BROKER_IP:-127.0.0.1}"
 DEFAULT_E6_HOST="${PITRAC_E6_HOST:-}"
 DEFAULT_GSPRO_HOST="${PITRAC_GSPRO_HOST:-}"
 DEFAULT_SLOT1_CAMERA="${PITRAC_SLOT1_CAMERA:-4}"
@@ -90,10 +90,10 @@ prompt_network_config() {
   
   # ActiveMQ Broker Address
   # Default to localhost for single-machine setups
-  local default_broker="localhost"
+  local default_broker="127.0.0.1"
   
   echo ""
-  echo "For single-machine setup (most common): use 'localhost' or '127.0.0.1'"
+  echo "For single-machine setup (most common): use '127.0.0.1'"
   echo "For multi-machine setup: use the broker machine's IP address"
   
   PITRAC_MSG_BROKER_IP=$(prompt_with_default "ActiveMQ Broker IP address" "$default_broker")
@@ -333,7 +333,7 @@ setup_default_environment() {
   PITRAC_ROOT="$DEFAULT_PITRAC_ROOT"
   PITRAC_IMAGE_DIR="$DEFAULT_IMAGE_DIR"
   PITRAC_WEB_DIR="$DEFAULT_WEB_DIR"
-  PITRAC_MSG_BROKER_IP="localhost"
+  PITRAC_MSG_BROKER_IP="127.0.0.1"
   PITRAC_E6_HOST=""
   PITRAC_GSPRO_HOST=""
   PITRAC_SLOT1_CAMERA="4"

@@ -8,8 +8,7 @@ initialize_global_flags
 key="${args[key]}"
 user_config="${HOME}/.pitrac/config/pitrac.yaml"
 system_config="/etc/pitrac/pitrac.yaml" 
-default_config="/etc/pitrac/config/settings-basic.yaml"
-advanced_config="/etc/pitrac/config/settings-advanced.yaml"
+default_config="/etc/pitrac/pitrac.yaml"
 mappings_file="/etc/pitrac/config/parameter-mappings.yaml"
 json_config="/etc/pitrac/golf_sim_config.json"
 
@@ -141,9 +140,6 @@ if [[ -z "$found_in" ]]; then
     check_yaml_file "$default_config" "basic defaults"
 fi
 
-if [[ -z "$found_in" ]]; then
-    check_yaml_file "$advanced_config" "advanced defaults"
-fi
 
 # Check parameter mappings for JSON mapping
 if [[ -f "$mappings_file" ]] && command -v python3 >/dev/null 2>&1; then
@@ -225,8 +221,8 @@ else
     warn "Configuration key '$key' not found in any configuration source"
     echo ""
     echo "Available configuration keys can be found in:"
-    echo "  - /etc/pitrac/config/settings-basic.yaml"
-    echo "  - /etc/pitrac/config/settings-advanced.yaml"
+    echo "  - /etc/pitrac/pitrac.yaml"
+    echo "  - /etc/pitrac/config/parameter-mappings.yaml"
     echo ""
     echo "Use 'pitrac config show' to see current configuration"
     exit 1

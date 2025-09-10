@@ -10,8 +10,28 @@
 #include <regex>
 #include <cstdlib>
 
-// Helper function to convert YAML to boost property tree
+// Helper function to merge property trees (user overrides defaults)
 namespace {
+    void merge_ptree(const boost::property_tree::ptree& from, boost::property_tree::ptree& to) {
+        for (const auto& [key, value] : from) {
+            if (value.empty()) {
+                // Leaf node - copy value
+                to.put(key, value.data());
+            } else {
+                // Non-leaf node - recursive merge
+                auto child = to.get_child_optional(key);
+                if (child) {
+                    boost::property_tree::ptree merged = *child;
+                    merge_ptree(value, merged);
+                    to.put_child(key, merged);
+                } else {
+                    to.put_child(key, value);
+                }
+            }
+        }
+    }
+    
+    // Helper function to convert YAML to property tree
     void yaml_to_ptree(const YAML::Node& node, boost::property_tree::ptree& pt, const std::string& key = "") {
         if (node.IsScalar()) {
             pt.put(key, node.as<std::string>());
@@ -20,22 +40,20 @@ namespace {
                 yaml_to_ptree(node[i], pt, key + "." + std::to_string(i));
             }
         } else if (node.IsMap()) {
-            for (auto it = node.begin(); it != node.end(); ++it) {
-                std::string child_key = it->first.as<std::string>();
-                if (!key.empty()) {
-                    child_key = key + "." + child_key;
-                }
-                yaml_to_ptree(it->second, pt, child_key);
+            for (const auto& it : node) {
+                std::string child_key = key.empty() ? it.first.as<std::string>() : key + "." + it.first.as<std::string>();
+                yaml_to_ptree(it.second, pt, child_key);
             }
         }
     }
     
+    // Helper function to load YAML file to property tree
     void load_yaml_to_ptree(const std::string& filename, boost::property_tree::ptree& pt) {
-        YAML::Node root = YAML::LoadFile(filename);
-        if (root.IsMap()) {
-            for (auto it = root.begin(); it != root.end(); ++it) {
-                yaml_to_ptree(it->second, pt, it->first.as<std::string>());
-            }
+        try {
+            YAML::Node yaml_node = YAML::LoadFile(filename);
+            yaml_to_ptree(yaml_node, pt);
+        } catch (const YAML::Exception& e) {
+            throw std::runtime_error("Failed to load YAML file: " + std::string(e.what()));
         }
     }
 }
@@ -50,63 +68,58 @@ bool ConfigurationManager::Initialize(
     GS_LOG_TRACE_MSG(trace, "Initializing ConfigurationManager");
     
     json_config_file_ = json_config_file;
-    yaml_config_file_ = yaml_config_file;
     
-    // Load JSON configuration (golf_sim_config.json)
+    // Load system defaults from golf_sim_config.json
     if (std::filesystem::exists(json_config_file)) {
         try {
             boost::property_tree::read_json(json_config_file, json_config_);
-            GS_LOG_MSG(info, "Loaded JSON configuration from: " + json_config_file);
+            GS_LOG_MSG(info, "Loaded system defaults from: " + json_config_file);
         } catch (const boost::property_tree::json_parser_error& e) {
-            GS_LOG_MSG(error, "Failed to parse JSON config: " + std::string(e.what()));
+            GS_LOG_MSG(error, "Failed to parse system config: " + std::string(e.what()));
             return false;
         }
     } else {
-        GS_LOG_MSG(warning, "JSON configuration file not found: " + json_config_file);
+        GS_LOG_MSG(warning, "System configuration file not found: " + json_config_file);
     }
     
-    // Load parameter mappings
-    std::string mappings_file = "/etc/pitrac/config/parameter-mappings.yaml";
-    if (!std::filesystem::exists(mappings_file)) {
-        // Try local template for development
-        mappings_file = "packaging/templates/config/parameter-mappings.yaml";
-    }
+    // Load user settings from user_settings.json (new JSON-only approach)
+    std::string user_settings_file = std::string(std::getenv("HOME") ? std::getenv("HOME") : "") + "/.pitrac/config/user_settings.json";
     
-    if (std::filesystem::exists(mappings_file)) {
-        if (!LoadMappings(mappings_file)) {
-            GS_LOG_MSG(warning, "Failed to load parameter mappings");
-        }
-    }
-    
-    // Load YAML configuration (pitrac.yaml) if specified
-    std::string yaml_file = yaml_config_file;
-    if (yaml_file.empty()) {
-        // Check default locations
-        const std::vector<std::string> yaml_locations = {
-            std::string(std::getenv("HOME") ? std::getenv("HOME") : "") + "/.pitrac/config/pitrac.yaml",
-            "/etc/pitrac/config/pitrac.yaml",
-            "./pitrac.yaml"
-        };
-        
-        for (const auto& location : yaml_locations) {
-            if (std::filesystem::exists(location)) {
-                yaml_file = location;
-                break;
-            }
-        }
-    }
-    
-    if (!yaml_file.empty() && std::filesystem::exists(yaml_file)) {
+    if (std::filesystem::exists(user_settings_file)) {
         try {
-            load_yaml_to_ptree(yaml_file, yaml_config_);
-            yaml_config_file_ = yaml_file;
-            GS_LOG_MSG(info, "Loaded YAML configuration from: " + yaml_file);
-        } catch (const YAML::Exception& e) {
-            GS_LOG_MSG(error, "Failed to parse YAML config: " + std::string(e.what()));
-            return false;
-        } catch (const std::exception& e) {
-            GS_LOG_MSG(error, "Failed to load YAML config: " + std::string(e.what()));
-            return false;
+            boost::property_tree::ptree user_settings;
+            boost::property_tree::read_json(user_settings_file, user_settings);
+            
+            // Merge user settings into json_config (user overrides defaults)
+            merge_ptree(user_settings, json_config_);
+            
+            GS_LOG_MSG(info, "Loaded user settings from: " + user_settings_file);
+        } catch (const boost::property_tree::json_parser_error& e) {
+            GS_LOG_MSG(error, "Failed to parse user settings: " + std::string(e.what()));
+            // Continue with defaults if user settings are corrupt
+        }
+    } else {
+        GS_LOG_MSG(debug, "No user settings found at: " + user_settings_file);
+    }
+    
+    // DEPRECATED: Support legacy YAML for migration period only
+    // This will be removed in future versions
+    if (!yaml_config_file.empty() && yaml_config_file != "none") {
+        std::string yaml_file = yaml_config_file;
+        if (yaml_file.empty()) {
+            // Check for legacy YAML in old locations
+            const std::vector<std::string> yaml_locations = {
+                std::string(std::getenv("HOME") ? std::getenv("HOME") : "") + "/.pitrac/config/pitrac.yaml",
+                "/etc/pitrac/pitrac.yaml"
+            };
+            
+            for (const auto& location : yaml_locations) {
+                if (std::filesystem::exists(location)) {
+                    GS_LOG_MSG(warning, "Found legacy YAML config at: " + location);
+                    GS_LOG_MSG(warning, "Please run 'pitrac config migrate-to-json' to convert to new format");
+                    break;
+                }
+            }
         }
     }
     

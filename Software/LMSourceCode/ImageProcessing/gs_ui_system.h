@@ -3,7 +3,7 @@
  * Copyright (C) 2022-2025, Verdant Consultants, LLC.
  */
 
-// Main class for communicating with the system's web-based (Tomee) GUI.
+// Main class for communicating with the system's web-based GUI.
 
 #pragma once
 

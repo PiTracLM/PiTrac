@@ -34,27 +34,27 @@ load_configuration() {
 parse_yaml_with_yq() {
   local config_file="$1"
   
-  config[system_mode]=$(yq eval '.system.mode // "camera1"' "$config_file")
-  config[system_camera_role]=$(yq eval '.system.camera_role // "camera1"' "$config_file")
-  config[system_golfer_orientation]=$(yq eval '.system.golfer_orientation // "right_handed"' "$config_file")
-  config[hardware_gpio_chip]=$(yq eval '.hardware.gpio_chip // "auto"' "$config_file")
+  config[system_mode]=$(yq -r '.system.mode // "single"' "$config_file" 2>/dev/null || echo "single")
+  config[system_camera_role]=$(yq -r '.system.camera_role // "camera1"' "$config_file" 2>/dev/null || echo "camera1")
+  config[system_golfer_orientation]=$(yq -r '.system.golfer_orientation // "right_handed"' "$config_file" 2>/dev/null || echo "right_handed")
+  config[hardware_gpio_chip]=$(yq -r '.hardware.gpio_chip // "auto"' "$config_file" 2>/dev/null || echo "auto")
   
-  config[network_broker_address]=$(yq eval '.network.broker_address // ""' "$config_file")
-  config[network_broker_port]=$(yq eval '.network.broker_port // "61616"' "$config_file")
-  config[network_web_port]=$(yq eval '.network.web_port // "8080"' "$config_file")
+  config[network_broker_address]=$(yq -r '.network.broker_address // ""' "$config_file" 2>/dev/null || echo "")
+  config[network_broker_port]=$(yq -r '.network.broker_port // "61616"' "$config_file" 2>/dev/null || echo "61616")
+  config[network_web_port]=$(yq -r '.network.web_port // "8080"' "$config_file" 2>/dev/null || echo "8080")
   
-  config[storage_image_logging_dir]=$(yq eval '.storage.image_logging_dir // "~/LM_Shares/Images/"' "$config_file")
-  config[storage_web_share_dir]=$(yq eval '.storage.web_share_dir // "~/LM_Shares/WebShare/"' "$config_file")
-  config[storage_calibration_dir]=$(yq eval '.storage.calibration_dir // "~/.pitrac/calibration/"' "$config_file")
+  config[storage_image_logging_dir]=$(yq -r '.storage.image_logging_dir // "~/LM_Shares/Images/"' "$config_file" 2>/dev/null || echo "~/LM_Shares/Images/")
+  config[storage_web_share_dir]=$(yq -r '.storage.web_share_dir // "~/LM_Shares/WebShare/"' "$config_file" 2>/dev/null || echo "~/LM_Shares/WebShare/")
+  config[storage_calibration_dir]=$(yq -r '.storage.calibration_dir // "~/.pitrac/calibration/"' "$config_file" 2>/dev/null || echo "~/.pitrac/calibration/")
   
-  config[camera_slot1_type]=$(yq eval '.cameras.slot1.type // "4"' "$config_file")
-  config[camera_slot1_lens]=$(yq eval '.cameras.slot1.lens // "1"' "$config_file")
-  config[camera_slot2_type]=$(yq eval '.cameras.slot2.type // "4"' "$config_file")
-  config[camera_slot2_lens]=$(yq eval '.cameras.slot2.lens // "1"' "$config_file")
+  config[camera_slot1_type]=$(yq -r '.cameras.slot1.type // "4"' "$config_file" 2>/dev/null || echo "4")
+  config[camera_slot1_lens]=$(yq -r '.cameras.slot1.lens // "1"' "$config_file" 2>/dev/null || echo "1")
+  config[camera_slot2_type]=$(yq -r '.cameras.slot2.type // "4"' "$config_file" 2>/dev/null || echo "4")
+  config[camera_slot2_lens]=$(yq -r '.cameras.slot2.lens // "1"' "$config_file" 2>/dev/null || echo "1")
   
-  config[simulators_e6_host]=$(yq eval '.simulators.e6_host // ""' "$config_file")
-  config[simulators_gspro_host]=$(yq eval '.simulators.gspro_host // ""' "$config_file")
-  config[simulators_trugolf_host]=$(yq eval '.simulators.trugolf_host // ""' "$config_file")
+  config[simulators_e6_host]=$(yq -r '.simulators.e6_host // ""' "$config_file" 2>/dev/null || echo "")
+  config[simulators_gspro_host]=$(yq -r '.simulators.gspro_host // ""' "$config_file" 2>/dev/null || echo "")
+  config[simulators_trugolf_host]=$(yq -r '.simulators.trugolf_host // ""' "$config_file" 2>/dev/null || echo "")
   
   expand_config_paths
 }
@@ -82,6 +82,7 @@ def get_value(data, path, default=""):
 paths = {
     "system_mode": "system.mode",
     "system_camera_role": "system.camera_role",
+    "system_golfer_orientation": "system.golfer_orientation",
     "hardware_gpio_chip": "hardware.gpio_chip",
     "network_broker_address": "network.broker_address",
     "network_broker_port": "network.broker_port",
@@ -99,9 +100,11 @@ paths = {
 }
 
 defaults = {
-    "system_mode": "camera1",
+    "system_mode": "single",
     "system_camera_role": "camera1",
+    "system_golfer_orientation": "right_handed",
     "hardware_gpio_chip": "auto",
+    "network_broker_address": "",
     "network_broker_port": "61616",
     "network_web_port": "8080",
     "storage_image_logging_dir": "~/LM_Shares/Images/",
@@ -153,7 +156,7 @@ parse_yaml_basic() {
     echo "${value:-$default}"
   }
   
-  config[system_mode]=$(parse_yaml_value "system" "mode" "camera1")
+  config[system_mode]=$(parse_yaml_value "system" "mode" "single")
   config[system_camera_role]=$(parse_yaml_value "system" "camera_role" "camera1")
   config[system_golfer_orientation]=$(parse_yaml_value "system" "golfer_orientation" "right_handed")
   config[hardware_gpio_chip]=$(parse_yaml_value "hardware" "gpio_chip" "auto")
@@ -161,10 +164,15 @@ parse_yaml_basic() {
   config[network_broker_port]=$(parse_yaml_value "network" "broker_port" "61616")
   config[storage_image_logging_dir]=$(parse_yaml_value "storage" "image_logging_dir" "~/LM_Shares/Images/")
   config[storage_web_share_dir]=$(parse_yaml_value "storage" "web_share_dir" "~/LM_Shares/WebShare/")
+  config[storage_calibration_dir]=$(parse_yaml_value "storage" "calibration_dir" "~/.pitrac/calibration/")
+  config[network_web_port]=$(parse_yaml_value "network" "web_port" "8080")
   config[camera_slot1_type]=$(parse_yaml_value "cameras" "type" "4" 3)
+  config[camera_slot1_lens]=$(parse_yaml_value "cameras" "lens" "1" 3)
   config[camera_slot2_type]=$(parse_yaml_value "cameras" "type" "4" 6)
+  config[camera_slot2_lens]=$(parse_yaml_value "cameras" "lens" "1" 6)
   config[simulators_e6_host]=$(parse_yaml_value "simulators" "e6_host" "")
   config[simulators_gspro_host]=$(parse_yaml_value "simulators" "gspro_host" "")
+  config[simulators_trugolf_host]=$(parse_yaml_value "simulators" "trugolf_host" "")
   
   expand_config_paths
 }
@@ -193,7 +201,7 @@ set_config() {
 }
 
 get_system_mode() {
-  local mode="${config[system_mode]:-camera1}"
+  local mode="${config[system_mode]:-single}"
   local role="${config[system_camera_role]:-camera1}"
   
   if [[ "$mode" == "dual" && "$role" == "camera2" ]]; then
@@ -228,6 +236,8 @@ build_pitrac_arguments() {
     args_ref+=("--e6_host_address=${config[simulators_e6_host]}")
   [[ -n "${config[simulators_gspro_host]}" ]] && \
     args_ref+=("--gspro_host_address=${config[simulators_gspro_host]}")
+  
+  return 0
 }
 
 ensure_golf_config() {

@@ -1,0 +1,27 @@
+[Unit]
+Description=PiTrac Web Server
+After=network.target activemq.service multi-user.target
+Wants=activemq.service
+
+[Service]
+Type=simple
+Nice=10
+CPUWeight=50
+MemoryMax=512M
+User=@PITRAC_USER@
+Group=@PITRAC_GROUP@
+DynamicUser=no
+WorkingDirectory=/usr/lib/pitrac/web-server
+Environment="HOME=@PITRAC_HOME@"
+Environment="USER=@PITRAC_USER@"
+Environment="PATH=/usr/bin:/usr/local/bin"
+Environment="PYTHONPATH=/usr/lib/pitrac/web-server"
+ExecStart=/usr/bin/python3 /usr/lib/pitrac/web-server/main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pitrac-web
+
+[Install]
+WantedBy=multi-user.target

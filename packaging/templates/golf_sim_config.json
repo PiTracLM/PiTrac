@@ -11,6 +11,16 @@
             "kStartInPuttingMode": "0"
         },
         "ball_identification": {
+            "kDetectionMethod": "legacy",
+            "kBallPlacementDetectionMethod": "legacy",
+            "kONNXModelPath": "~/LM_Shares/models/high_performance_300e2/best.onnx",
+            "kONNXConfidenceThreshold": "0.5",
+            "kONNXNMSThreshold": "0.4",
+            "kONNXInputSize": "1472",
+            "kONNXDeviceType": "CPU",
+            "kSAHISliceHeight": "320",
+            "kSAHISliceWidth": "320",
+            "kSAHIOverlapRatio": "0.2",
             "kStrobedBallsCannyLower": "33",
             "kStrobedBallsCannyUpper": "90",
             "kStrobedBallsMinHoughReturnCircles": "6",

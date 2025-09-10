@@ -87,6 +87,8 @@ build_pitrac_logging_args() {
         # Default to info for the binary (it has its own defaults)
         cmd_args_ref+=("--logging_level=info")
     fi
+    
+    return 0
 }
 
 initialize_global_flags() {

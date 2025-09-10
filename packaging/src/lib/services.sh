@@ -14,9 +14,6 @@ is_service_running() {
     activemq)
       pgrep -f "activemq" >/dev/null 2>&1
       ;;
-    tomee)
-      pgrep -f "tomee|catalina" >/dev/null 2>&1
-      ;;
     pitrac)
       pgrep -x "pitrac_lm" >/dev/null 2>&1
       ;;
@@ -202,47 +199,7 @@ check_activemq_broker() {
   fi
 }
 
-check_tomee_server() {
-  local address="${1:-localhost}"
-  local port="${2:-8080}"
 
-  if command -v ss >/dev/null 2>&1; then
-    ss -tln | grep -q ":${port}" 2>/dev/null
-  elif command -v netstat >/dev/null 2>&1; then
-    netstat -tln | grep -q ":${port}" 2>/dev/null
-  else
-    timeout 2 bash -c "echo >/dev/tcp/${address}/${port}" 2>/dev/null
-  fi
-}
-
-deploy_webapp_if_needed() {
-  local webapp_source="/usr/share/pitrac/webapp/golfsim.war"
-  local webapp_dest="/opt/tomee/webapps/golfsim.war"
-
-  if [[ -f "$webapp_dest" ]]; then
-    log_debug "Web application already deployed"
-    return 0
-  fi
-
-  if [[ ! -f "$webapp_source" ]]; then
-    log_warn "Web application source not found: $webapp_source"
-    return 1
-  fi
-
-  log_info "Deploying PiTrac web application..."
-
-  if [[ -w "$(dirname "$webapp_dest")" ]]; then
-    cp "$webapp_source" "$webapp_dest"
-  elif command -v sudo >/dev/null 2>&1; then
-    sudo cp "$webapp_source" "$webapp_dest"
-  else
-    log_error "Cannot deploy webapp - no write permission and sudo not available"
-    return 1
-  fi
-
-  log_info "Web application deployed successfully"
-  return 0
-}
 
 get_service_logs() {
   local service="$1"
@@ -268,9 +225,6 @@ get_service_logs() {
         ;;
       activemq)
         local log_file="/var/log/activemq/activemq.log"
-        ;;
-      tomee)
-        local log_file="/opt/tomee/logs/catalina.out"
         ;;
       *)
         log_error "Unknown service: $service"
@@ -309,18 +263,6 @@ check_required_services() {
     all_good=false
   fi
 
-  if is_service_running "tomee"; then
-    log_debug "✓ TomEE is running"
-    if check_tomee_server; then
-      log_debug "  Web server accessible on port 8080"
-    else
-      log_warn "  Web server not accessible on port 8080"
-      all_good=false
-    fi
-  else
-    log_warn "✗ TomEE is not running"
-    all_good=false
-  fi
 
   if [[ "$all_good" == "true" ]]; then
     return 0

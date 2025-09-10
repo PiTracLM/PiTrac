@@ -8,32 +8,35 @@ ARCH="${PITRAC_ARCH:-arm64}"
 MAINTAINER="PiTrac Team <team@pitrac.io>"
 DESCRIPTION="Open-source DIY golf launch monitor for Raspberry Pi"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
-log_success() { echo -e "${GREEN}[✓]${NC} $*"; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -f "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh" ]]; then
+    source "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh"
+else
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m'
+
+    log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
+    log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
+    log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
+    log_success() { echo -e "${GREEN}[✓]${NC} $*"; }
+fi
+
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 POC_DIR="$SCRIPT_DIR"
 BUILD_DIR="$POC_DIR/build/package"
 DEB_DIR="$BUILD_DIR/debian"
 PACKAGE_NAME="pitrac_${VERSION}_${ARCH}"
 
-# Check prerequisites
 check_prerequisites() {
     log_info "Checking prerequisites..."
     
     local missing=0
     for artifact in opencv-4.11.0-arm64.tar.gz activemq-cpp-3.9.5-arm64.tar.gz \
-                    lgpio-0.2.2-arm64.tar.gz msgpack-cxx-6.1.1-arm64.tar.gz \
-                    tomee-10.1.0-plume-arm64.tar.gz; do
+                    lgpio-0.2.2-arm64.tar.gz msgpack-cxx-6.1.1-arm64.tar.gz; do
         if [[ ! -f "$POC_DIR/deps-artifacts/$artifact" ]]; then
             log_error "Missing artifact: $artifact"
             missing=1
@@ -60,7 +63,6 @@ check_prerequisites() {
     log_success "All prerequisites found"
 }
 
-# Install pre-built webapp if available
 install_webapp() {
     local webapp_artifact="$POC_DIR/deps-artifacts/golfsim-1.0.0-noarch.war"
     
@@ -76,11 +78,9 @@ install_webapp() {
     fi
 }
 
-# Extract PiTrac binary from Docker container
 extract_pitrac_binary() {
     log_info "Extracting PiTrac binary from Docker build..."
     
-    # Check if we already have the built binary from a previous run
     if [[ -f "$REPO_ROOT/Software/LMSourceCode/ImageProcessing/build/pitrac_lm" ]]; then
         log_info "Using existing built binary"
         cp "$REPO_ROOT/Software/LMSourceCode/ImageProcessing/build/pitrac_lm" "$BUILD_DIR/pitrac_lm.tmp"
@@ -88,7 +88,6 @@ extract_pitrac_binary() {
     else
         log_info "Binary not found, extracting from Docker container..."
         
-        # Create a container from the built image to extract the binary
         local container_id=$(docker create pitrac-poc:arm64 2>/dev/null)
         
         if [[ -z "$container_id" ]]; then
@@ -96,7 +95,6 @@ extract_pitrac_binary() {
             exit 1
         fi
         
-        # Extract the binary
         docker cp "$container_id:/build/Software/LMSourceCode/ImageProcessing/build/pitrac_lm" "$BUILD_DIR/pitrac_lm.tmp"
         docker rm "$container_id" > /dev/null
         
@@ -112,7 +110,6 @@ extract_pitrac_binary() {
 create_cli_wrapper() {
     log_info "Creating CLI wrapper..."
     
-    # First, generate the Bashly script if it doesn't exist
     if [[ ! -f "$SCRIPT_DIR/pitrac" ]]; then
         log_info "Generating Bashly CLI script..."
         if [[ -f "$SCRIPT_DIR/generate.sh" ]]; then
@@ -136,47 +133,49 @@ create_cli_wrapper() {
     log_success "CLI wrapper created"
 }
 
-# Prepare build environment
 prepare_build_env() {
     log_info "Preparing build environment..."
     rm -rf "$BUILD_DIR"
-    mkdir -p "$DEB_DIR"/{DEBIAN,usr/{bin,lib/pitrac,share/{pitrac,doc/pitrac}},etc/pitrac,opt/{tomee,pitrac},var/lib/pitrac}
+    mkdir -p "$DEB_DIR"/{DEBIAN,usr/{bin,lib/pitrac,share/{pitrac,doc/pitrac}},etc/pitrac,opt/pitrac,var/lib/pitrac}
     mkdir -p "$DEB_DIR/etc/systemd/system"
     mkdir -p "$DEB_DIR/usr/share/pitrac"/{webapp,test-images,calibration,templates}
     mkdir -p "$DEB_DIR/etc/pitrac/config"
     log_success "Build directories created"
 }
 
-# Install binaries
 install_binaries() {
     log_info "Installing binaries..."
     
-    # Install main binary
     install -m 755 "$BUILD_DIR/pitrac_lm.tmp" "$DEB_DIR/usr/lib/pitrac/pitrac_lm"
     
-    # Install CLI tool (Bashly-generated script is self-contained)
     install -m 755 "$BUILD_DIR/pitrac-cli" "$DEB_DIR/usr/bin/pitrac"
     
     log_success "Binaries installed"
 }
 
-# Install test images and calibration tools
 install_test_resources() {
     log_info "Installing test images and calibration tools..."
     
-    local test_images_dir="$REPO_ROOT/Software/LMSourceCode/Images"
-    if [[ -d "$test_images_dir" ]]; then
-        if [[ -f "$test_images_dir/gs_log_img__log_ball_final_found_ball_img.png" ]]; then
-            cp "$test_images_dir/gs_log_img__log_ball_final_found_ball_img.png" \
-               "$DEB_DIR/usr/share/pitrac/test-images/teed-ball.png"
+    install_test_images "$DEB_DIR/usr/share/pitrac/test-images" "$REPO_ROOT"
+    install_camera_tools "$DEB_DIR/usr/lib/pitrac" "$REPO_ROOT"
+    
+    log_info "Staging ONNX models..."
+    local models_dir="$REPO_ROOT/Software/GroundTruthAnnotator/experiments"
+    if [[ -d "$models_dir" ]]; then
+        mkdir -p "$DEB_DIR/usr/share/pitrac/models"
+        local models_found=0
+        for experiment in "$models_dir"/*/weights/best.onnx; do
+            if [[ -f "$experiment" ]]; then
+                local experiment_name=$(basename "$(dirname "$(dirname "$experiment")")")
+                mkdir -p "$DEB_DIR/usr/share/pitrac/models/$experiment_name"
+                cp "$experiment" "$DEB_DIR/usr/share/pitrac/models/$experiment_name/best.onnx"
+                log_info "  Staged model: $experiment_name/best.onnx"
+                ((models_found++))
+            fi
+        done
+        if [[ $models_found -gt 0 ]]; then
+            log_success "Staged $models_found ONNX model(s)"
         fi
-        if [[ -f "$test_images_dir/log_cam2_last_strobed_img.png" ]]; then
-            cp "$test_images_dir/log_cam2_last_strobed_img.png" \
-               "$DEB_DIR/usr/share/pitrac/test-images/strobed.png"
-        fi
-        log_success "Test images installed"
-    else
-        log_warn "Test images directory not found"
     fi
     
     local calib_dir="$REPO_ROOT/Software/CalibrateCameraDistortions"
@@ -186,22 +185,6 @@ install_test_resources() {
         log_success "Calibration tools installed"
     else
         log_warn "Calibration tools not found"
-    fi
-    
-    log_info "Installing camera tools..."
-    local camera_tools_dir="$REPO_ROOT/Software/LMSourceCode/ImageProcessing/CameraTools"
-    if [[ -d "$camera_tools_dir" ]]; then
-        mkdir -p "$DEB_DIR/usr/lib/pitrac/ImageProcessing/CameraTools"
-        cp -r "$camera_tools_dir"/* "$DEB_DIR/usr/lib/pitrac/ImageProcessing/CameraTools/"
-        
-        find "$DEB_DIR/usr/lib/pitrac/ImageProcessing/CameraTools" -name "*.sh" -type f -exec chmod 755 {} \;
-        if [[ -f "$DEB_DIR/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_trigger" ]]; then
-            chmod 755 "$DEB_DIR/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_trigger"
-        fi
-        
-        log_success "Camera tools installed"
-    else
-        log_warn "Camera tools not found"
     fi
     
     cat > "$DEB_DIR/usr/lib/pitrac/calibration-wizard" << 'EOF'
@@ -222,30 +205,18 @@ bundle_dependencies() {
     
     local lib_dir="$DEB_DIR/usr/lib/pitrac"
     
-    log_info "  OpenCV 4.11.0..."
-    tar xzf "$POC_DIR/deps-artifacts/opencv-4.11.0-arm64.tar.gz" -C /tmp/
-    cp -r /tmp/opencv/lib/*.so* "$lib_dir/" 2>/dev/null || true
-    rm -rf /tmp/opencv
+    extract_all_dependencies "$POC_DIR/deps-artifacts" "$lib_dir"
     
-    log_info "  ActiveMQ-CPP 3.9.5..."
-    tar xzf "$POC_DIR/deps-artifacts/activemq-cpp-3.9.5-arm64.tar.gz" -C /tmp/
-    cp -r /tmp/activemq-cpp/lib/*.so* "$lib_dir/" 2>/dev/null || true
-    rm -rf /tmp/activemq-cpp
-    
-    log_info "  lgpio 0.2.2..."
-    tar xzf "$POC_DIR/deps-artifacts/lgpio-0.2.2-arm64.tar.gz" -C /tmp/
-    cp -r /tmp/lgpio/lib/*.so* "$lib_dir/" 2>/dev/null || true
-    rm -rf /tmp/lgpio
-    
-    log_info "  msgpack-cxx 6.1.1..."
-    tar xzf "$POC_DIR/deps-artifacts/msgpack-cxx-6.1.1-arm64.tar.gz" -C /tmp/
-    if [[ -d /tmp/msgpack/lib ]]; then
-        cp -r /tmp/msgpack/lib/*.so* "$lib_dir/" 2>/dev/null || true
+    log_info "  PiTrac Web Server..."
+    WEB_SERVER_DIR="$REPO_ROOT/Software/web-server"
+    if [[ -d "$WEB_SERVER_DIR" ]]; then
+        mkdir -p "$DEB_DIR/usr/lib/pitrac/web-server"
+        cp -r "$WEB_SERVER_DIR"/* "$DEB_DIR/usr/lib/pitrac/web-server/"
+        log_info "    Web server files copied"
+    else
+        log_error "  Web server not found at $WEB_SERVER_DIR"
+        exit 1
     fi
-    rm -rf /tmp/msgpack
-    
-    log_info "  TomEE 10.1.0 Plume..."
-    tar xzf "$POC_DIR/deps-artifacts/tomee-10.1.0-plume-arm64.tar.gz" -C "$DEB_DIR/opt/"
     
     strip --strip-unneeded "$lib_dir"/*.so* 2>/dev/null || true
     
@@ -261,26 +232,45 @@ create_configs() {
     cp "$SCRIPT_DIR/templates/golf_sim_config.json" "$DEB_DIR/etc/pitrac/golf_sim_config.json"
     cp "$SCRIPT_DIR/templates/golf_sim_config.json" "$DEB_DIR/usr/share/pitrac/golf_sim_config.json.default"
     
-    # Install configuration templates (required by generated pitrac CLI)
     if [[ -d "$SCRIPT_DIR/templates/config" ]]; then
-        cp "$SCRIPT_DIR/templates/config/settings-basic.yaml" "$DEB_DIR/etc/pitrac/config/"
-        cp "$SCRIPT_DIR/templates/config/settings-advanced.yaml" "$DEB_DIR/etc/pitrac/config/"
         cp "$SCRIPT_DIR/templates/config/parameter-mappings.yaml" "$DEB_DIR/etc/pitrac/config/"
-        cp "$SCRIPT_DIR/templates/config/README.md" "$DEB_DIR/etc/pitrac/config/"
-        log_info "Configuration templates installed"
+        log_info "Parameter mappings installed"
     else
         log_warn "Configuration templates not found in $SCRIPT_DIR/templates/config/"
     fi
 
     cp "$SCRIPT_DIR/templates/pitrac.service.template" "$DEB_DIR/usr/share/pitrac/templates/pitrac.service.template"
-    cp "$SCRIPT_DIR/templates/tomee.service" "$DEB_DIR/etc/systemd/system/tomee.service"
+    cp "$SCRIPT_DIR/templates/pitrac-web.service.template" "$DEB_DIR/usr/share/pitrac/templates/pitrac-web.service.template"
     
-    cp "$SCRIPT_DIR/src/lib/service-install.sh" "$DEB_DIR/usr/lib/pitrac/service-install.sh"
-    chmod 755 "$DEB_DIR/usr/lib/pitrac/service-install.sh"
+    if [[ -f "$SCRIPT_DIR/templates/activemq.xml.template" ]]; then
+        cp "$SCRIPT_DIR/templates/activemq.xml.template" "$DEB_DIR/usr/share/pitrac/templates/activemq.xml.template"
+        cp "$SCRIPT_DIR/templates/log4j2.properties.template" "$DEB_DIR/usr/share/pitrac/templates/log4j2.properties.template"
+        cp "$SCRIPT_DIR/templates/activemq-options.template" "$DEB_DIR/usr/share/pitrac/templates/activemq-options.template"
+        log_info "ActiveMQ templates installed"
+    else
+        log_warn "ActiveMQ templates not found"
+    fi
     
-    # Install tomee wrapper script
-    cp "$SCRIPT_DIR/templates/tomee-wrapper.sh" "$DEB_DIR/usr/lib/pitrac/tomee-wrapper.sh"
-    chmod 755 "$DEB_DIR/usr/lib/pitrac/tomee-wrapper.sh"
+    cp "$SCRIPT_DIR/src/lib/pitrac-service-install.sh" "$DEB_DIR/usr/lib/pitrac/pitrac-service-install.sh"
+    chmod 755 "$DEB_DIR/usr/lib/pitrac/pitrac-service-install.sh"
+    
+    if [[ -f "$SCRIPT_DIR/src/lib/web-service-install.sh" ]]; then
+        cp "$SCRIPT_DIR/src/lib/web-service-install.sh" "$DEB_DIR/usr/lib/pitrac/web-service-install.sh"
+        chmod 755 "$DEB_DIR/usr/lib/pitrac/web-service-install.sh"
+    fi
+    
+    if [[ -f "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh" ]]; then
+        cp "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh" "$DEB_DIR/usr/lib/pitrac/pitrac-common-functions.sh"
+        chmod 644 "$DEB_DIR/usr/lib/pitrac/pitrac-common-functions.sh"
+    fi
+    
+    if [[ -f "$SCRIPT_DIR/src/lib/activemq-service-install.sh" ]]; then
+        cp "$SCRIPT_DIR/src/lib/activemq-service-install.sh" "$DEB_DIR/usr/lib/pitrac/activemq-service-install.sh"
+        chmod 755 "$DEB_DIR/usr/lib/pitrac/activemq-service-install.sh"
+        log_info "ActiveMQ configuration installer installed"
+    else
+        log_warn "ActiveMQ configuration installer not found"
+    fi
 
     log_success "Configs created"
 }
@@ -288,25 +278,23 @@ create_configs() {
 create_debian_control() {
     log_info "Creating Debian control files..."
     
-    # Calculate installed size
     local size=$(du -sk "$DEB_DIR" | cut -f1)
     
-    # Control file
     cat > "$DEB_DIR/DEBIAN/control" << EOF
 Package: pitrac
 Version: $VERSION
 Architecture: $ARCH
 Maintainer: $MAINTAINER
 Installed-Size: $size
-Depends: libc6 (>= 2.36), libstdc++6 (>= 12), libgcc-s1 (>= 12), libcamera0.0.3, libcamera-dev, libcamera-tools, rpicam-apps, libboost-system1.74.0, libboost-thread1.74.0, libboost-program-options1.74.0, libboost-filesystem1.74.0, libboost-log1.74.0, libboost-regex1.74.0, libboost-timer1.74.0, libfmt9, libssl3, libtbb12, libgstreamer1.0-0, libgstreamer-plugins-base1.0-0, libgtk-3-0, libavcodec59, libavformat59, libswscale6, libopenexr-3-1-30, libavutil57, libavdevice59, libexif12, libjpeg62-turbo, libtiff6, libpng16-16, libdrm2, libx11-6, libepoxy0, libqt5core5a, libqt5widgets5, libqt5gui5, libapr1, libaprutil1, libuuid1, activemq, default-jre-headless | openjdk-17-jre-headless, gpiod, net-tools, python3, python3-opencv, python3-numpy, python3-yaml
-Recommends: maven, yq
+Depends: libc6 (>= 2.36), libstdc++6 (>= 12), libgcc-s1 (>= 12), libcamera0.0.3, libcamera-dev, libcamera-tools, rpicam-apps, libboost-system1.74.0, libboost-thread1.74.0, libboost-program-options1.74.0, libboost-filesystem1.74.0, libboost-log1.74.0, libboost-regex1.74.0, libboost-timer1.74.0, libfmt9, libssl3, libtbb12, libgstreamer1.0-0, libgstreamer-plugins-base1.0-0, libgtk-3-0, libavcodec59, libavformat59, libswscale6, libopenexr-3-1-30, libavutil57, libavdevice59, libexif12, libjpeg62-turbo, libtiff6, libpng16-16, libdrm2, libx11-6, libepoxy0, libqt5core5a, libqt5widgets5, libqt5gui5, libapr1, libaprutil1, libuuid1, activemq, default-jre-headless | openjdk-17-jre-headless, gpiod, net-tools, python3, python3-opencv, python3-numpy, python3-yaml, yq
+Recommends: maven
 Section: misc
 Priority: optional
 Homepage: https://github.com/jamespilgrim/PiTrac
 Description: $DESCRIPTION
  PiTrac uses Raspberry Pi cameras to track golf ball
  launch parameters. Includes pre-built binaries with
- OpenCV 4.11.0, ActiveMQ-CPP, and TomEE web server.
+ OpenCV 4.11.0, ActiveMQ-CPP, and Python web server.
 EOF
 
     cp "$SCRIPT_DIR/templates/postinst.sh" "$DEB_DIR/DEBIAN/postinst"
@@ -334,7 +322,6 @@ build_package() {
     chmod 755 debian/usr/bin/pitrac
     chmod 755 debian/usr/lib/pitrac/pitrac_lm
     chmod 755 debian/usr/lib/pitrac/calibration-wizard
-    chmod -R 755 debian/opt/tomee/bin
     
     dpkg-deb --root-owner-group --build debian "$PACKAGE_NAME.deb"
     

@@ -153,7 +153,7 @@ Camera types:
 export PITRAC_ROOT=/path/to/pitrac
 export PITRAC_BASE_IMAGE_LOGGING_DIR=$HOME/LM_Shares/Images/
 export PITRAC_WEBSERVER_SHARE_DIR=$HOME/LM_Shares/WebShare/
-export PITRAC_MSG_BROKER_FULL_ADDRESS=tcp://localhost:61616
+export PITRAC_MSG_BROKER_FULL_ADDRESS=tcp://127.0.0.1:61616
 ```
 
 ## CLI Integration
