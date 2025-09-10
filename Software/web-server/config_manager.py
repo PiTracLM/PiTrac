@@ -187,7 +187,7 @@ class ConfigurationManager:
             if part not in current:
                 current[part] = {}
             elif not isinstance(current[part], dict):
-                return False 
+                return False
             current = current[part]
 
         current[parts[-1]] = value

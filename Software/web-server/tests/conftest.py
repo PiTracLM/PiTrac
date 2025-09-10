@@ -1,9 +1,8 @@
 import asyncio
-import json
 import os
 import sys
 from pathlib import Path
-from typing import AsyncGenerator, Generator
+from typing import AsyncGenerator
 from unittest.mock import MagicMock, patch, AsyncMock
 
 import pytest
@@ -24,7 +23,7 @@ from server import PiTracServer
 @pytest.fixture
 def mock_activemq():
     """Mock ActiveMQ connection"""
-    with patch('server.stomp.Connection') as mock_conn:
+    with patch("server.stomp.Connection") as mock_conn:
         mock_instance = MagicMock()
         mock_conn.return_value = mock_instance
         mock_instance.is_connected.return_value = True
@@ -71,7 +70,7 @@ def sample_shot_data():
         "side_spin": -320,
         "result_type": 7,  # HIT
         "message": "Great shot!",
-        "image_paths": ["shot_001.jpg", "shot_002.jpg"]
+        "image_paths": ["shot_001.jpg", "shot_002.jpg"],
     }
 
 
@@ -88,7 +87,7 @@ def shot_data_instance():
         result_type="Hit",
         message="Great shot!",
         timestamp="2024-01-01T12:00:00",
-        images=["shot_001.jpg", "shot_002.jpg"]
+        images=["shot_001.jpg", "shot_002.jpg"],
     )
 
 
@@ -97,29 +96,30 @@ def mock_home_dir(tmp_path):
     """Mock home directory for testing"""
     home = tmp_path / "home"
     home.mkdir()
-    
+
     (home / ".pitrac" / "config").mkdir(parents=True)
     (home / "LM_Shares" / "Images").mkdir(parents=True)
-    
+
     # Create a test config file
     config = {
         "network": {
             "broker_address": "tcp://localhost:61616",
             "username": "test_user",
-            "password": "test_pass"
+            "password": "test_pass",
         }
     }
-    
+
     config_file = home / ".pitrac" / "config" / "pitrac.yaml"
     import yaml
-    with open(config_file, 'w') as f:
+
+    with open(config_file, "w") as f:
         yaml.dump(config, f)
-    
-    with patch('constants.Path.home', return_value=home):
-        with patch('constants.HOME_DIR', home):
-            with patch('constants.PITRAC_DIR', home / ".pitrac"):
-                with patch('constants.IMAGES_DIR', home / "LM_Shares" / "Images"):
-                    with patch('constants.CONFIG_FILE', config_file):
+
+    with patch("constants.Path.home", return_value=home):
+        with patch("constants.HOME_DIR", home):
+            with patch("constants.PITRAC_DIR", home / ".pitrac"):
+                with patch("constants.IMAGES_DIR", home / "LM_Shares" / "Images"):
+                    with patch("constants.CONFIG_FILE", config_file):
                         yield home
 
 
@@ -155,6 +155,7 @@ def parser():
 @pytest.fixture
 def shot_simulator():
     """Factory for simulating golf shots"""
+
     class ShotSimulator:
         @staticmethod
         def generate_shot(
@@ -163,11 +164,11 @@ def shot_simulator():
             launch_range=(8, 20),
             side_range=(-5, 5),
             backspin_range=(1500, 4000),
-            sidespin_range=(-1000, 1000)
+            sidespin_range=(-1000, 1000),
         ):
             """Generate random realistic shot data"""
             import random
-            
+
             return {
                 "speed": round(random.uniform(*speed_range), 1),
                 "carry": round(random.uniform(*carry_range), 1),
@@ -176,24 +177,22 @@ def shot_simulator():
                 "back_spin": random.randint(*backspin_range),
                 "side_spin": random.randint(*sidespin_range),
                 "result_type": 7,  # HIT
-                "message": random.choice([
-                    "Great shot!",
-                    "Nice swing!",
-                    "Perfect contact!",
-                    "Solid strike!"
-                ]),
-                "image_paths": [f"shot_{random.randint(1000, 9999)}.jpg"]
+                "message": random.choice(
+                    ["Great shot!", "Nice swing!", "Perfect contact!", "Solid strike!"]
+                ),
+                "image_paths": [f"shot_{random.randint(1000, 9999)}.jpg"],
             }
-        
+
         @staticmethod
         def generate_sequence(count=10):
             """Generate a sequence of shots"""
             return [ShotSimulator.generate_shot() for _ in range(count)]
-        
+
         @staticmethod
         def generate_array_format():
             """Generate shot data in array format (C++ MessagePack format)"""
             import random
+
             return [
                 round(random.uniform(150, 350), 1),  # carry_meters
                 round(random.uniform(44.7, 80.5), 1),  # speed_mpers (100-180 mph)
@@ -205,9 +204,9 @@ def shot_simulator():
                 1,  # club_type
                 7,  # result_type (HIT)
                 "Great shot!",  # message
-                []  # log_messages
+                [],  # log_messages
             ]
-    
+
     return ShotSimulator()
 
 
@@ -217,12 +216,12 @@ def reset_singleton_state(server_instance):
     # Reset shot store
     server_instance.shot_store.reset()
     server_instance.shot_store.clear_history()
-    
+
     # Clear websocket connections
     server_instance.connection_manager._connections.clear()
-    
+
     yield
-    
+
     # Cleanup after test
     server_instance.shot_store.reset()
     server_instance.shot_store.clear_history()

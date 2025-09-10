@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -29,10 +28,10 @@ class ShotData:
     message: str = ""
     timestamp: Optional[str] = None
     images: List[str] = field(default_factory=list)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ShotData":
         return cls(**data)

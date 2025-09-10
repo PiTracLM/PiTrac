@@ -6,7 +6,6 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, mock_open
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -70,7 +69,6 @@ def test_config_manager():
         assert len(diff) > 0, "Should have differences"
 
 
-
 def test_cli_commands():
     """Test CLI configuration commands"""
     print("\nTesting CLI Commands...")
@@ -85,7 +83,6 @@ def test_cli_commands():
         with open(user_settings_path, "w") as f:
             json.dump({}, f)
 
-
         test_config = {"gs_config": {"cameras": {"kCamera1Gain": "5.0"}}}
 
         with open(user_settings_path, "w") as f:
@@ -96,30 +93,28 @@ def test_cli_commands():
             assert loaded["gs_config"]["cameras"]["kCamera1Gain"] == "5.0"
 
 
-
 def test_migration_logic():
     """Test YAML to JSON migration logic"""
     print("\nTesting Migration Logic...")
-
-    yaml_style_config = {
-        "system": {"putting_mode": True},
-        "cameras": {"camera1_gain": 2.5, "camera2_gain": 6.0},
-        "simulators": {"gspro_host": "192.168.1.100", "gspro_port": 921},
-    }
-
-    expected_json = {
-        "gs_config": {
-            "modes": {"kStartInPuttingMode": "1"},
-            "cameras": {"kCamera1Gain": "2.5", "kCamera2Gain": "6.0"},
-            "golf_simulator_interfaces": {
-                "GSPro": {
-                    "kGSProConnectAddress": "192.168.1.100",
-                    "kGSProConnectPort": "921",
-                }
-            },
-        }
-    }
-
+    # TODO: Implement migration logic test
+    # yaml_style_config = {
+    #     "system": {"putting_mode": True},
+    #     "cameras": {"camera1_gain": 2.5, "camera2_gain": 6.0},
+    #     "simulators": {"gspro_host": "192.168.1.100", "gspro_port": 921},
+    # }
+    #
+    # expected_json = {
+    #     "gs_config": {
+    #         "modes": {"kStartInPuttingMode": "1"},
+    #         "cameras": {"kCamera1Gain": "2.5", "kCamera2Gain": "6.0"},
+    #         "golf_simulator_interfaces": {
+    #             "GSPro": {
+    #                 "kGSProConnectAddress": "192.168.1.100",
+    #                 "kGSProConnectPort": "921",
+    #             }
+    #         },
+    #     }
+    # }
 
 
 def test_config_edge_cases():
@@ -176,7 +171,6 @@ def test_config_edge_cases():
         assert valid, "Should accept valid port"
 
 
-
 def test_config_export_import():
     """Test configuration export and import functionality"""
     print("\nTesting Export/Import...")
@@ -203,17 +197,25 @@ def test_config_export_import():
 
         exported = config_manager.export_config()
         assert exported is not None
-        assert "gs_config.cameras.kCamera1Gain" in exported
-        assert exported["gs_config.cameras.kCamera1Gain"] == "5.0"
+        assert "user_settings" in exported
+        assert "gs_config" in exported["user_settings"]
+        assert exported["user_settings"]["gs_config"]["cameras"]["kCamera1Gain"] == "5.0"
 
         config_manager.reset_all()
         assert config_manager.get_config("gs_config.cameras.kCamera1Gain") == "1.0"
 
-        import_data = {"gs_config.cameras.kCamera1Gain": "7.0"}
+        import_data = {
+            "user_settings": {
+                "gs_config": {
+                    "cameras": {
+                        "kCamera1Gain": "7.0"
+                    }
+                }
+            }
+        }
         success, message = config_manager.import_config(import_data)
         assert success, f"Import failed: {message}"
         assert config_manager.get_config("gs_config.cameras.kCamera1Gain") == "7.0"
-
 
 
 def main():
