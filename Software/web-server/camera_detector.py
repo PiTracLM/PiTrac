@@ -136,6 +136,7 @@ class CameraDetector:
             
             if cmd_name in ["rpicam-hello", "libcamera-hello", "rpicam-still", "libcamera-still"]:
                 cmd = [self.camera_cmd, "--list-cameras"]
+                logger.debug(f"Running command: {' '.join(cmd)}")
                 result = subprocess.run(
                     cmd,
                     capture_output=True,
@@ -144,7 +145,13 @@ class CameraDetector:
                     check=False
                 )
                 if result.returncode == 0:
+                    logger.debug(f"Command successful, output length: {len(result.stdout)} bytes")
                     return result.stdout
+                else:
+                    logger.warning(f"Command failed with return code {result.returncode}")
+                    if result.stderr:
+                        logger.debug(f"stderr: {result.stderr[:200]}")
+                    return None
             elif cmd_name == "raspistill":
                 vcgencmd_result = subprocess.run(
                     ["which", "vcgencmd"],
@@ -401,6 +408,8 @@ class CameraDetector:
     
     def detect(self) -> Dict:
         """Main detection function - returns camera configuration"""
+        logger.info(f"Starting camera detection on {self.pi_model} using {self.camera_cmd}")
+        
         result = {
             "success": False,
             "pi_model": self.pi_model,
@@ -415,16 +424,21 @@ class CameraDetector:
         }
         
         if not self._check_camera_tools():
+            logger.warning("Camera detection tools not fully installed")
             result["warnings"].append("Camera detection tools not fully installed")
         
+        logger.debug("Running camera detection command...")
         output = self._run_camera_detection()
         if not output:
+            logger.warning("No output from camera detection tool")
             result["message"] = "No camera detection tool available or no cameras found"
             result["warnings"].append("Make sure libcamera is installed: sudo apt install libcamera-apps")
             return result
         
+        logger.debug(f"Parsing camera info from output ({len(output)} bytes)")
         cameras = self._parse_camera_info(output)
         if not cameras:
+            logger.info("No cameras detected by parsing tool output")
             result["message"] = "No cameras detected"
             result["warnings"].append("Check ribbon cable connections and camera_auto_detect=1 in config.txt")
             return result
@@ -432,24 +446,35 @@ class CameraDetector:
         result["cameras"] = cameras
         result["success"] = True
         
+        logger.info(f"Found {len(cameras)} camera(s)")
+        for cam in cameras:
+            logger.debug(f"Camera {cam['index']}: {cam['sensor']} - {cam['model']} on {cam['port']}, Status: {cam['status']}")
+        
         if len(cameras) >= 1:
             result["configuration"]["slot1"]["type"] = cameras[0]["pitrac_type"]
+            logger.debug(f"Setting slot1 configuration to type {cameras[0]['pitrac_type']}")
             
         if len(cameras) >= 2:
             result["configuration"]["slot2"]["type"] = cameras[1]["pitrac_type"]
+            logger.debug(f"Setting slot2 configuration to type {cameras[1]['pitrac_type']}")
         elif len(cameras) == 1:
+            logger.warning("Only 1 camera detected. Single-Pi mode requires 2 cameras.")
             result["warnings"].append("Only 1 camera detected. Single-Pi mode requires 2 cameras.")
         
         supported_count = sum(1 for c in cameras if c["status"] == "SUPPORTED")
         if supported_count == len(cameras):
             result["message"] = f"Detected {len(cameras)} supported camera(s)"
+            logger.info(f"All {len(cameras)} detected cameras are supported")
         elif supported_count > 0:
             result["message"] = f"Detected {len(cameras)} camera(s), {supported_count} supported"
             deprecated = [c for c in cameras if c["status"] == "DEPRECATED"]
             if deprecated:
-                result["warnings"].append(f"Deprecated cameras detected: {', '.join(c['model'] for c in deprecated)}")
+                dep_list = ', '.join(c['model'] for c in deprecated)
+                logger.warning(f"Deprecated cameras detected: {dep_list}")
+                result["warnings"].append(f"Deprecated cameras detected: {dep_list}")
         else:
             result["message"] = f"Detected {len(cameras)} camera(s), but none are fully supported"
+            logger.warning("No fully supported cameras detected - PiTrac requires IMX296-based cameras")
             result["warnings"].append("PiTrac requires IMX296-based Global Shutter cameras for best results")
         
         return result

@@ -760,22 +760,12 @@ async function detectAndSetCameras(targetKey = null) {
                 
                 updateStatus(`Detected cameras - Slot 1: Type ${config.slot1.type}, Slot 2: Type ${config.slot2.type}`, 'success');
             }
-            
-            if (result.cameras && result.cameras.length > 0) {
-                let details = 'Detected: ';
-                result.cameras.forEach((cam, idx) => {
-                    details += `${cam.model} (${cam.sensor}) on ${cam.port}`;
-                    if (idx < result.cameras.length - 1) details += ', ';
-                });
-                console.log(details);
-            }
-            
+         
         } else {
             const errorMsg = result.message || 'No cameras detected';
             updateStatus(`Camera detection failed: ${errorMsg}`, 'error');
             
             if (result.warnings && result.warnings.length > 0) {
-                const warningsList = result.warnings.join('\n• ');
                 showModal('Camera Detection Failed', 
                     `<p><strong>${errorMsg}</strong></p>` +
                     `<p>Warnings:</p>` +

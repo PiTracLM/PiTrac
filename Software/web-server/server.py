@@ -313,12 +313,31 @@ class PiTracServer:
         @self.app.get("/api/cameras/detect")
         async def detect_cameras() -> Dict[str, Any]:
             """Auto-detect connected cameras"""
+            logger.info("Camera auto-detection initiated")
             try:
                 detector = CameraDetector()
+                logger.info(f"Using detection tool: {detector.camera_cmd}, Pi model: {detector.pi_model}")
+                
                 result = detector.detect()
+                
+                if result.get("success"):
+                    camera_count = len(result.get("cameras", []))
+                    logger.info(f"Camera detection successful: {camera_count} camera(s) found")
+                    if camera_count > 0:
+                        for cam in result["cameras"]:
+                            logger.info(f"  - Camera {cam['index']}: {cam['model']} ({cam['sensor']}) on {cam['port']}, Type: {cam['pitrac_type']}")
+                    
+                    config = result.get("configuration", {})
+                    logger.info(f"Recommended configuration - Slot1: Type {config.get('slot1', {}).get('type', 'N/A')}, Slot2: Type {config.get('slot2', {}).get('type', 'N/A')}")
+                else:
+                    logger.warning(f"Camera detection completed with no cameras found: {result.get('message', 'Unknown error')}")
+                    if result.get("warnings"):
+                        for warning in result["warnings"]:
+                            logger.warning(f"  Warning: {warning}")
+                
                 return result
             except Exception as e:
-                logger.error(f"Camera detection failed: {e}")
+                logger.error(f"Camera detection failed with exception: {e}", exc_info=True)
                 return {
                     "success": False,
                     "message": f"Detection failed: {str(e)}",
