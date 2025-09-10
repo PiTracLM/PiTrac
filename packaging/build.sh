@@ -261,13 +261,23 @@ build_dev() {
     done
 
     # Core libraries
-    for pkg in libcamera0.0.3 libcamera-dev libfmt-dev libssl-dev libssl3 \
+    for pkg in libcamera0.0.3 libcamera-dev libcamera-tools libfmt-dev libssl-dev libssl3 \
                liblgpio-dev liblgpio1 libmsgpack-cxx-dev \
                libapr1 libaprutil1 libapr1-dev libaprutil1-dev; do
         if ! dpkg -l | grep -q "^ii  $pkg"; then
             missing_deps+=("$pkg")
         fi
     done
+    
+    if ! command -v rpicam-hello &> /dev/null && ! command -v libcamera-hello &> /dev/null; then
+        if apt-cache show rpicam-apps &> /dev/null; then
+            missing_deps+=("rpicam-apps")
+        elif apt-cache show libcamera-apps &> /dev/null; then
+            missing_deps+=("libcamera-apps")
+        else
+            log_warning "Neither rpicam-apps nor libcamera-apps available in repositories"
+        fi
+    fi
 
     # OpenCV runtime dependencies
     for pkg in libgtk-3-0 libavcodec59 libavformat59 libswscale6 libtbb12 \

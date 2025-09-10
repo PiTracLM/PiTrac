@@ -82,11 +82,11 @@ class CameraDetector:
             except Exception as e:
                 logger.debug(f"Could not read /proc/cpuinfo: {e}")
         
-        if "Raspberry Pi 5" in model:
+        if "Raspberry Pi 5" in model or "Raspberry Pi Compute Module 5" in model:
             return "pi5"
-        elif "Raspberry Pi 4" in model:
+        elif "Raspberry Pi 4" in model or "Raspberry Pi Compute Module 4" in model:
             return "pi4"
-        elif "Raspberry Pi 3" in model:
+        elif "Raspberry Pi 3" in model or "Raspberry Pi Compute Module 3" in model:
             return "pi3"
         elif "Raspberry Pi 2" in model:
             return "pi2"
