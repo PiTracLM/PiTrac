@@ -372,7 +372,7 @@ function createInput(key, value) {
             const option = document.createElement('option');
             option.value = optValue;
             option.textContent = optDisplay;
-            if (value === optValue) {
+            if (String(value) === String(optValue)) {
                 option.selected = true;
             }
             select.appendChild(option);
@@ -760,15 +760,17 @@ async function detectAndSetCameras(targetKey = null) {
             if (targetKey === 'cameras.slot1.type') {
                 const input = document.querySelector('[data-key="cameras.slot1.type"]');
                 if (input) {
-                    input.value = config.slot1.type;
-                    handleValueChange('cameras.slot1.type', config.slot1.type, input.dataset.original);
+                    const typeValue = String(config.slot1.type);
+                    input.value = typeValue;
+                    handleValueChange('cameras.slot1.type', typeValue, input.dataset.original);
                 }
                 updateStatus(`Camera 1 detected: Type ${config.slot1.type}`, 'success');
             } else if (targetKey === 'cameras.slot2.type') {
                 const input = document.querySelector('[data-key="cameras.slot2.type"]');
                 if (input) {
-                    input.value = config.slot2.type;
-                    handleValueChange('cameras.slot2.type', config.slot2.type, input.dataset.original);
+                    const typeValue = String(config.slot2.type);
+                    input.value = typeValue;
+                    handleValueChange('cameras.slot2.type', typeValue, input.dataset.original);
                 }
                 updateStatus(`Camera 2 detected: Type ${config.slot2.type}`, 'success');
             } else {
@@ -776,12 +778,14 @@ async function detectAndSetCameras(targetKey = null) {
                 const input2 = document.querySelector('[data-key="cameras.slot2.type"]');
 
                 if (input1) {
-                    input1.value = config.slot1.type;
-                    handleValueChange('cameras.slot1.type', config.slot1.type, input1.dataset.original);
+                    const typeValue = String(config.slot1.type);
+                    input1.value = typeValue;
+                    handleValueChange('cameras.slot1.type', typeValue, input1.dataset.original);
                 }
                 if (input2) {
-                    input2.value = config.slot2.type;
-                    handleValueChange('cameras.slot2.type', config.slot2.type, input2.dataset.original);
+                    const typeValue = String(config.slot2.type);
+                    input2.value = typeValue;
+                    handleValueChange('cameras.slot2.type', typeValue, input2.dataset.original);
                 }
 
                 updateStatus(`Detected cameras - Slot 1: Type ${config.slot1.type}, Slot 2: Type ${config.slot2.type}`, 'success');
