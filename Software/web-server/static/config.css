@@ -1,12 +1,73 @@
 /* Configuration Page Specific Styles */
 /* Inherits base styles from dashboard.css */
 
+/* Status Message */
+.status-message {
+    padding: 0.75rem 1rem;
+    margin: 0.5rem 0;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    text-align: center;
+    min-height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.status-message:empty {
+    display: none;
+}
+
+.status-message.success {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.status-message.error {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.status-message.warning {
+    background: rgba(251, 191, 36, 0.1);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.status-message.info {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
 /* Config Container Layout */
 .config-container {
     display: grid;
     grid-template-columns: 250px 1fr;
     gap: 1.5rem;
     margin-top: 1.5rem;
+}
+
+/* Input Container for special fields */
+.input-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.input-container select,
+.input-container input {
+    flex: 1;
+    min-width: 0;
+}
+
+.input-container .btn-small {
+    padding: 0.375rem 0.875rem;
+    font-size: 0.875rem;
+    white-space: nowrap;
 }
 
 /* Category Sidebar */

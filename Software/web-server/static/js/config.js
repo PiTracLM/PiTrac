@@ -311,13 +311,27 @@ function createConfigItem(key, value, defaultValue, isModified) {
     }
     inputContainer.appendChild(input);
     
-    if (key === 'cameras.slot1.type' || key === 'cameras.slot2.type') {
+    if (key === 'cameras.slot1.type' || key === 'cameras.slot2.type' || 
+        key === 'cameras.slot1_type' || key === 'cameras.slot2_type') {
+        inputContainer.style.display = 'flex';
+        inputContainer.style.alignItems = 'center';
+        inputContainer.style.gap = '0.75rem';
+        
         const detectBtn = document.createElement('button');
-        detectBtn.className = 'btn btn-primary btn-small';
+        detectBtn.className = 'btn btn-secondary btn-small';
         detectBtn.textContent = 'Detect';
-        detectBtn.style.marginLeft = '10px';
+        detectBtn.style.flexShrink = '0';
+        detectBtn.title = 'Auto-detect connected camera';
         detectBtn.onclick = async () => {
-            await detectAndSetCameras(key);
+            detectBtn.disabled = true;
+            const originalText = detectBtn.textContent;
+            detectBtn.textContent = 'Detecting...';
+            try {
+                await detectAndSetCameras(key);
+            } finally {
+                detectBtn.disabled = false;
+                detectBtn.textContent = originalText;
+            }
         };
         inputContainer.appendChild(detectBtn);
     }
@@ -714,7 +728,7 @@ async function detectAndSetCameras(targetKey = null) {
         const response = await fetch('/api/cameras/detect');
         const result = await response.json();
         
-        if (result.success) {
+        if (result.success && result.cameras && result.cameras.length > 0) {
             const config = result.configuration;
             
             if (targetKey === 'cameras.slot1.type') {
@@ -757,11 +771,40 @@ async function detectAndSetCameras(targetKey = null) {
             }
             
         } else {
-            updateStatus(`Camera detection failed: ${result.message}`, 'error');
+            const errorMsg = result.message || 'No cameras detected';
+            updateStatus(`Camera detection failed: ${errorMsg}`, 'error');
+            
+            if (result.warnings && result.warnings.length > 0) {
+                const warningsList = result.warnings.join('\n• ');
+                showModal('Camera Detection Failed', 
+                    `<p><strong>${errorMsg}</strong></p>` +
+                    `<p>Warnings:</p>` +
+                    `<ul style="text-align: left; margin: 10px 20px;">` +
+                    result.warnings.map(w => `<li>${w}</li>`).join('') +
+                    `</ul>` +
+                    `<p style="margin-top: 15px;">Troubleshooting:</p>` +
+                    `<ul style="text-align: left; margin: 10px 20px;">` +
+                    `<li>Check ribbon cable connections and orientation</li>` +
+                    `<li>Verify camera_auto_detect=1 in /boot/firmware/config.txt</li>` +
+                    `<li>Power cycle the Raspberry Pi</li>` +
+                    `<li>Ensure cameras are compatible (IMX296 recommended)</li>` +
+                    `</ul>`
+                );
+            }
         }
     } catch (error) {
         console.error('Camera detection error:', error);
-        updateStatus('Failed to detect cameras', 'error');
+        updateStatus('Failed to detect cameras - check connection', 'error');
+        showModal('Connection Error', 
+            `<p>Failed to connect to camera detection service.</p>` +
+            `<p>Error: ${error.message}</p>` +
+            `<p style="margin-top: 15px;">Please ensure:</p>` +
+            `<ul style="text-align: left; margin: 10px 20px;">` +
+            `<li>The PiTrac web service is running</li>` +
+            `<li>You have a stable network connection</li>` +
+            `<li>Try refreshing the page</li>` +
+            `</ul>`
+        );
     }
 }
 
