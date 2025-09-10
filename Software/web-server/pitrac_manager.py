@@ -66,10 +66,12 @@ class PiTracProcessManager:
                 "slot1": {
                     "type": config.get("cameras.slot1.type", 4),
                     "lens": config.get("cameras.slot1.lens", 1),
+                    "index": config.get("cameras.slot1.index", 0),
                 },
                 "slot2": {
                     "type": config.get("cameras.slot2.type", 4),
                     "lens": config.get("cameras.slot2.lens", 1),
+                    "index": config.get("cameras.slot2.index", 1),
                 },
             },
         }
