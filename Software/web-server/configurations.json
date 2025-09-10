@@ -139,6 +139,43 @@
       "passedVia": "environment",
       "envVariable": "PITRAC_SLOT2_LENS_TYPE"
     },
+    "cameras.slot1.index": {
+      "category": "Cameras",
+      "showInBasic": true,
+      "basicSubcategory": "Hardware",
+      "displayName": "Camera 1 Hardware Index",
+      "description": "Hardware camera index for Camera 1 (0-based, use 'rpicam-hello --list-cameras' to see available cameras)",
+      "type": "select",
+      "options": {
+        "0": "Camera 0",
+        "1": "Camera 1", 
+        "2": "Camera 2",
+        "3": "Camera 3"
+      },
+      "default": "0",
+      "requiresRestart": true,
+      "passedVia": "environment",
+      "envVariable": "PITRAC_SLOT1_CAMERA_INDEX"
+    },
+    "cameras.slot2.index": {
+      "category": "Cameras", 
+      "showInBasic": true,
+      "basicSubcategory": "Hardware",
+      "displayName": "Camera 2 Hardware Index",
+      "description": "Hardware camera index for Camera 2 (0-based, use 'rpicam-hello --list-cameras' to see available cameras) - Only used in single Pi mode",
+      "visibleWhen": {"system.mode": "single"},
+      "type": "select",
+      "options": {
+        "0": "Camera 0",
+        "1": "Camera 1",
+        "2": "Camera 2", 
+        "3": "Camera 3"
+      },
+      "default": "1",
+      "requiresRestart": true,
+      "passedVia": "environment",
+      "envVariable": "PITRAC_SLOT2_CAMERA_INDEX"
+    },
     "logging.level": {
       "category": "Logging",
       "showInBasic": true,

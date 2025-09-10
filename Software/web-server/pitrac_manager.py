@@ -136,6 +136,16 @@ class PiTracProcessManager:
         elif camera == "camera2" and "camera2_gain" in cameras_config:
             cmd.append(f"--camera_gain={cameras_config['camera2_gain']}")
 
+        slot1_config = cameras_config.get("slot1") or {}
+        slot2_config = cameras_config.get("slot2") or {}
+        
+        if camera == "camera1":
+            camera_index = slot1_config.get("index", "0")  # Default to camera 0
+            cmd.append(f"--camera={camera_index}")
+        elif camera == "camera2":
+            camera_index = slot2_config.get("index", "1")  # Default to camera 1
+            cmd.append(f"--camera={camera_index}")
+
         merged_config = self.config_manager.get_config()
 
         golfer_orientation = (
@@ -230,11 +240,23 @@ class PiTracProcessManager:
             else:
                 env["PITRAC_SLOT2_LENS_TYPE"] = "1"
 
+            if "index" in slot1:
+                env["PITRAC_SLOT1_CAMERA_INDEX"] = str(slot1["index"])
+            else:
+                env["PITRAC_SLOT1_CAMERA_INDEX"] = "0"  # Default to camera 0
+
+            if "index" in slot2:
+                env["PITRAC_SLOT2_CAMERA_INDEX"] = str(slot2["index"])
+            elif is_single_pi:
+                env["PITRAC_SLOT2_CAMERA_INDEX"] = "1"  # Default to camera 1
+            else:
+                env["PITRAC_SLOT2_CAMERA_INDEX"] = "1"
+
             logger.info(
-                f"Camera configuration - Slot1: Type={env.get('PITRAC_SLOT1_CAMERA_TYPE')}, Lens={env.get('PITRAC_SLOT1_LENS_TYPE')}"
+                f"Camera configuration - Slot1: Type={env.get('PITRAC_SLOT1_CAMERA_TYPE')}, Lens={env.get('PITRAC_SLOT1_LENS_TYPE')}, Index={env.get('PITRAC_SLOT1_CAMERA_INDEX')}"
             )
             logger.info(
-                f"Camera configuration - Slot2: Type={env.get('PITRAC_SLOT2_CAMERA_TYPE')}, Lens={env.get('PITRAC_SLOT2_LENS_TYPE')}"
+                f"Camera configuration - Slot2: Type={env.get('PITRAC_SLOT2_CAMERA_TYPE')}, Lens={env.get('PITRAC_SLOT2_LENS_TYPE')}, Index={env.get('PITRAC_SLOT2_CAMERA_INDEX')}"
             )
 
             Path(f"{home_dir}/LM_Shares/Images").mkdir(parents=True, exist_ok=True)
