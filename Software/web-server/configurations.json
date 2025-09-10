@@ -40,6 +40,25 @@
       "passedVia": "cli",
       "cliArgument": "--practice_ball"
     },
+    "logging.level": {
+      "category": "Logging",
+      "showInBasic": true,
+      "basicSubcategory": "System",
+      "displayName": "Log Level",
+      "description": "Control the verbosity of system logging for PiTrac processes",
+      "type": "select",
+      "options": {
+        "trace": "Trace - Most verbose, for deep debugging",
+        "debug": "Debug - Detailed debugging information",
+        "info": "Info - Normal operational messages",
+        "warn": "Warning - Important notices (default)",
+        "error": "Error - Only errors"
+      },
+      "default": "info",
+      "requiresRestart": true,
+      "passedVia": "cli",
+      "cliArgument": "--logging_level"
+    },
     "gs_config.logging.kArtifactSaveLevel": {
       "category": "Logging",
       "showInBasic": true,

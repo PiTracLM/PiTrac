@@ -1,5 +1,7 @@
 import asyncio
+import json
 import logging
+import os
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -306,6 +308,201 @@ class PiTracServer:
         async def pitrac_status() -> Dict[str, Any]:
             """Get the status of the PiTrac launch monitor process"""
             return self.pitrac_manager.get_status()
+        
+        @self.app.get("/logs", response_class=HTMLResponse)
+        async def logs_page(request: Request) -> Response:
+            """Serve logs viewer page"""
+            return self.templates.TemplateResponse(
+                "logs.html",
+                {"request": request}
+            )
+        
+        @self.app.websocket("/ws/logs")
+        async def websocket_logs(websocket: WebSocket) -> None:
+            """WebSocket endpoint for streaming logs"""
+            await websocket.accept()
+            
+            try:
+                data = await websocket.receive_json()
+                service = data.get("service", "pitrac")
+                
+                await self._stream_service_logs(websocket, service)
+                
+            except WebSocketDisconnect:
+                logger.debug("Logs WebSocket client disconnected")
+            except Exception as e:
+                logger.error(f"Error in logs WebSocket: {e}")
+                try:
+                    await websocket.close()
+                except:
+                    pass
+        
+        @self.app.get("/api/logs/services")
+        async def get_log_services() -> Dict[str, List[Dict[str, Any]]]:
+            """Get list of available services and their status"""
+            services = []
+            
+            pitrac_status = self.pitrac_manager.get_status()
+            services.append({
+                "id": "pitrac",
+                "name": "PiTrac Camera 1",
+                "status": "running" if pitrac_status["is_running"] else "stopped",
+                "pid": pitrac_status.get("pid")
+            })
+            
+            if pitrac_status.get("is_dual_camera"):
+                services.append({
+                    "id": "pitrac_camera2",
+                    "name": "PiTrac Camera 2",
+                    "status": "running" if pitrac_status.get("camera2_running") else "stopped",
+                    "pid": pitrac_status.get("camera2_pid")
+                })
+            
+            activemq_running = False
+            try:
+                result = subprocess.run(
+                    ["systemctl", "is-active", "activemq"],
+                    capture_output=True,
+                    text=True,
+                    timeout=1
+                )
+                activemq_running = result.stdout.strip() == "active"
+            except:
+                pass
+            
+            services.append({
+                "id": "activemq",
+                "name": "ActiveMQ Broker",
+                "status": "running" if activemq_running else "stopped",
+                "pid": None
+            })
+            
+            services.append({
+                "id": "pitrac-web",
+                "name": "PiTrac Web Server",
+                "status": "running",
+                "pid": os.getpid()
+            })
+            
+            return {"services": services}
+    
+    async def _stream_service_logs(self, websocket: WebSocket, service: str) -> None:
+        """Stream logs for a specific service via WebSocket"""
+        try:
+            if service == "pitrac":
+                await self._stream_systemd_logs(websocket, "pitrac")
+            elif service == "pitrac_camera2":
+                log_file = self.pitrac_manager.camera2_log_file
+                await self._stream_file_logs(websocket, log_file)
+            elif service == "activemq":
+                await self._stream_systemd_logs(websocket, "activemq")
+            elif service == "pitrac-web":
+                await self._stream_systemd_logs(websocket, "pitrac-web")
+            else:
+                await websocket.send_json({
+                    "error": f"Unknown service: {service}"
+                })
+                
+        except Exception as e:
+            logger.error(f"Error streaming logs for {service}: {e}")
+            try:
+                await websocket.send_json({
+                    "error": f"Failed to stream logs: {str(e)}"
+                })
+            except:
+                pass
+    
+    async def _stream_systemd_logs(self, websocket: WebSocket, unit: str) -> None:
+        """Stream systemd journal logs for a unit"""
+        try:
+            recent_proc = await asyncio.create_subprocess_exec(
+                "journalctl", "-u", unit, "-n", "100", "--no-pager", "--output=json",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL
+            )
+            
+            if recent_proc.stdout:
+                async for line in recent_proc.stdout:
+                    try:
+                        log_entry = json.loads(line.decode('utf-8', errors='replace'))
+                        await websocket.send_json({
+                            "timestamp": log_entry.get("__REALTIME_TIMESTAMP", ""),
+                            "message": log_entry.get("MESSAGE", ""),
+                            "level": log_entry.get("PRIORITY", "6"),
+                            "service": unit,
+                            "historical": True
+                        })
+                    except json.JSONDecodeError:
+                        continue
+                    except WebSocketDisconnect:
+                        return
+            
+            await recent_proc.wait()
+            
+            follow_proc = await asyncio.create_subprocess_exec(
+                "journalctl", "-u", unit, "-f", "--output=json",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL
+            )
+            
+            if follow_proc.stdout:
+                async for line in follow_proc.stdout:
+                    try:
+                        log_entry = json.loads(line.decode('utf-8', errors='replace'))
+                        await websocket.send_json({
+                            "timestamp": log_entry.get("__REALTIME_TIMESTAMP", ""),
+                            "message": log_entry.get("MESSAGE", ""),
+                            "level": log_entry.get("PRIORITY", "6"),
+                            "service": unit,
+                            "historical": False
+                        })
+                    except json.JSONDecodeError:
+                        continue
+                    except WebSocketDisconnect:
+                        follow_proc.terminate()
+                        return
+                        
+        except Exception as e:
+            logger.error(f"Error streaming systemd logs: {e}")
+    
+    async def _stream_file_logs(self, websocket: WebSocket, log_file: Path) -> None:
+        """Stream logs from a file"""
+        try:
+            if not log_file.exists():
+                await websocket.send_json({
+                    "message": f"Log file not found: {log_file}",
+                    "level": "warning"
+                })
+                return
+            
+            with open(log_file, 'r') as f:
+                lines = f.readlines()
+                recent = lines[-100:] if len(lines) > 100 else lines
+                for line in recent:
+                    await websocket.send_json({
+                        "message": line.rstrip(),
+                        "historical": True
+                    })
+            
+            follow_proc = await asyncio.create_subprocess_exec(
+                "tail", "-f", str(log_file),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL
+            )
+            
+            if follow_proc.stdout:
+                async for line in follow_proc.stdout:
+                    try:
+                        await websocket.send_json({
+                            "message": line.decode('utf-8', errors='replace').rstrip(),
+                            "historical": False
+                        })
+                    except WebSocketDisconnect:
+                        follow_proc.terminate()
+                        return
+                        
+        except Exception as e:
+            logger.error(f"Error streaming file logs: {e}")
     
     def _load_config(self) -> Dict[str, Any]:
         if not CONFIG_FILE.exists():

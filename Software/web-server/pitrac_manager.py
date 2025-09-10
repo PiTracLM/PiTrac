@@ -485,20 +485,25 @@ class PiTracProcessManager:
         """Get detailed status of PiTrac process(es)"""
         camera1_pid = self.get_pid()
         camera2_pid = self.get_camera2_pid()
+        
+        config = self._load_pitrac_config()
+        system_config = config.get("system") or {}
+        is_single_pi = system_config.get("mode", "single") == "single"
 
         status = {
-            "running": camera1_pid is not None or camera2_pid is not None,
+            "is_running": camera1_pid is not None or camera2_pid is not None,
+            "pid": camera1_pid,  # For backward compatibility
             "camera1_pid": camera1_pid,
             "camera2_pid": camera2_pid,
+            "camera1_running": camera1_pid is not None,
+            "camera2_running": camera2_pid is not None,
+            "is_dual_camera": is_single_pi,  # Single Pi with dual cameras
             "camera1_log_file": str(self.log_file),
             "camera2_log_file": str(self.camera2_log_file),
             "config_file": self.config_file,
             "binary": self.pitrac_binary,
+            "mode": system_config.get("mode", "single")
         }
-
-        config = self._load_pitrac_config()
-        system_config = config.get("system") or {}
-        status["mode"] = system_config.get("mode", "single")
 
         if self.log_file.exists():
             try:
