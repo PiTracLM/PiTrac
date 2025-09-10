@@ -468,8 +468,15 @@ class PiTracProcessManager:
 
     def get_pid(self) -> Optional[int]:
         """Get the PID of the running PiTrac camera1 process"""
-        if self.process and self.process.poll() is None:
-            return self.process.pid
+        if self.process:
+            poll_result = self.process.poll()
+            if poll_result is None:
+                return self.process.pid
+            else:
+                logger.debug(f"Camera1 process terminated with code {poll_result}")
+                self.process = None
+                if self.pid_file.exists():
+                    self.pid_file.unlink()
 
         if self.pid_file.exists():
             try:
@@ -487,8 +494,15 @@ class PiTracProcessManager:
 
     def get_camera2_pid(self) -> Optional[int]:
         """Get the PID of the running PiTrac camera2 process"""
-        if self.camera2_process and self.camera2_process.poll() is None:
-            return self.camera2_process.pid
+        if self.camera2_process:
+            poll_result = self.camera2_process.poll()
+            if poll_result is None:
+                return self.camera2_process.pid
+            else:
+                logger.debug(f"Camera2 process terminated with code {poll_result}")
+                self.camera2_process = None
+                if self.camera2_pid_file.exists():
+                    self.camera2_pid_file.unlink()
 
         if self.camera2_pid_file.exists():
             try:
