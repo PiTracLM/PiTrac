@@ -39,7 +39,7 @@ class ActiveMQListener(stomp.ConnectionListener):
 
         try:
             msgpack_data = self._extract_message_data(frame)
-            logger.info(f"MSGDEBUG: Extracted msgpack data: {len(msgpack_data)} bytes, first 50 bytes: {msgpack_data[:50]}")
+            logger.debug(f"Extracted msgpack data: {len(msgpack_data)} bytes")
             
             # Validate msgpack data before unpacking
             if len(msgpack_data) == 0:
@@ -47,7 +47,7 @@ class ActiveMQListener(stomp.ConnectionListener):
                 return
                 
             data = msgpack.unpackb(msgpack_data, raw=False, strict_map_key=False)
-            logger.info(f"MSGDEBUG: Unpacked message data: {data}")
+            logger.debug(f"Unpacked message data keys: {list(data) if isinstance(data, dict) else len(data) if isinstance(data, list) else type(data)}")
 
             if self.loop:
                 asyncio.run_coroutine_threadsafe(
@@ -58,8 +58,7 @@ class ActiveMQListener(stomp.ConnectionListener):
 
         except msgpack.exceptions.ExtraData as e:
             # This is likely a large binary image message - log but don't error
-            logger.info(f"MSGDEBUG: Large binary message #{self.message_count} - Extra data in msgpack: {e}")
-            logger.info(f"MSGDEBUG: Skipping image message (likely camera data)")
+            logger.info(f"Large binary message #{self.message_count} - Extra data in msgpack, skipping")
         except msgpack.exceptions.UnpackException as e:
             logger.error(f"Failed to unpack message #{self.message_count}: {e}")
         except Exception as e:
@@ -72,26 +71,26 @@ class ActiveMQListener(stomp.ConnectionListener):
             raise ValueError("Frame has no body attribute")
 
         body = frame.body
-        logger.info(f"MSGDEBUG: Frame body type: {type(body)}, length: {len(body) if hasattr(body, '__len__') else 'unknown'}")
-        logger.info(f"MSGDEBUG: Frame headers: {getattr(frame, 'headers', {})}")
+        logger.debug(f"Frame body type: {type(body)}, length: {len(body) if hasattr(body, '__len__') else 'unknown'}")
+        logger.debug(f"Frame headers: {getattr(frame, 'headers', {})}")
         
         # Handle different body types from STOMP protocol
         if isinstance(body, bytes):
             # Already bytes, use directly
-            logger.info("MSGDEBUG: Body is already bytes")
+            logger.debug("Body is already bytes")
         elif isinstance(body, str):
             # String body - need to handle encoding carefully
-            logger.info(f"MSGDEBUG: Body is string, length: {len(body)}, first 100 chars: {repr(body[:100])}")
+            logger.debug(f"Body is string, length: {len(body)}")
             
             # Check for base64 encoding header first
             if hasattr(frame, "headers") and frame.headers.get("encoding") == "base64":
-                logger.info("MSGDEBUG: Message has base64 encoding header")
+                logger.debug("Message has base64 encoding header")
                 try:
                     # Direct base64 decode from string
                     body = base64.b64decode(body)
-                    logger.info(f"MSGDEBUG: Successfully decoded base64 to {len(body)} bytes")
+                    logger.debug(f"Successfully decoded base64 to {len(body)} bytes")
                 except Exception as e:
-                    logger.warning(f"MSGDEBUG: Failed to decode base64 string: {e}")
+                    logger.warning(f"Failed to decode base64 string: {e}")
                     # Fall back to UTF-8 encoding
                     body = body.encode("utf-8")
             else:
@@ -103,25 +102,36 @@ class ActiveMQListener(stomp.ConnectionListener):
                     except (ValueError, TypeError):
                         pass
                 
-                # If content-length is much larger than string length, this is likely binary data
-                # that was incorrectly decoded as a string
-                if content_length and content_length > len(body) * 1.5:
-                    logger.info(f"MSGDEBUG: Detected binary data (content-length={content_length}, string_length={len(body)})")
-                    # This is binary data that was incorrectly decoded as UTF-8
-                    # Try to encode as latin-1 to preserve byte values
+                # Check for large binary image messages (Camera2 images)
+                ipc_message_type = frame.headers.get("IPCMessageType") if hasattr(frame, "headers") else None
+                if content_length and content_length > len(body) * 1.5 and ipc_message_type == "2":
+                    logger.info(f"Received Camera2 image message ({content_length} bytes)")
+                    # This is a Camera2 image - handle it specially
                     try:
                         body = body.encode("latin-1")
-                        logger.info("MSGDEBUG: Encoded binary string as latin-1")
+                        logger.debug("Encoded Camera2 image as latin-1")
+                        # Mark this as an image message for special processing
+                        self._handle_image_message(body, content_length)
+                        return  # Don't process as regular msgpack
                     except UnicodeEncodeError as e:
-                        logger.warning(f"MSGDEBUG: Failed to encode binary data as latin-1: {e}")
-                        # Skip this message as it's corrupted binary data
-                        logger.error(f"Skipping corrupted binary message #{self.message_count}")
+                        logger.warning(f"Failed to encode Camera2 image as latin-1: {e}")
+                        logger.info("Skipping corrupted Camera2 image")
+                        return
+                elif content_length and content_length > len(body) * 1.5:
+                    logger.info(f"Detected large binary data (content-length={content_length}, string_length={len(body)})")
+                    # Other binary data
+                    try:
+                        body = body.encode("latin-1")
+                        logger.debug("Encoded binary string as latin-1")
+                    except UnicodeEncodeError as e:
+                        logger.warning(f"Failed to encode binary data as latin-1: {e}")
+                        logger.info(f"Skipping corrupted binary message #{self.message_count}")
                         return
                 else:
                     # Regular text string - encode as UTF-8
                     try:
                         body = body.encode("utf-8")
-                        logger.info("MSGDEBUG: Encoded string as UTF-8")
+                        logger.debug("Encoded string as UTF-8")
                     except UnicodeEncodeError as e:
                         logger.error(f"Failed to encode string as UTF-8: {e}")
                         # Try latin-1 as fallback, but handle errors  
@@ -133,7 +143,7 @@ class ActiveMQListener(stomp.ConnectionListener):
                             raise ValueError(f"Cannot encode string body: {e}")
         else:
             # Unknown type, try to convert
-            logger.info(f"MSGDEBUG: Unexpected body type: {type(body)}")
+            logger.debug(f"Unexpected body type: {type(body)}")
             try:
                 if hasattr(body, '__iter__') and not isinstance(body, (str, bytes)):
                     # Iterable but not string/bytes - convert to bytes
@@ -141,7 +151,7 @@ class ActiveMQListener(stomp.ConnectionListener):
                 else:
                     # Try string conversion then UTF-8 encoding
                     body = str(body).encode("utf-8")
-                logger.info(f"MSGDEBUG: Converted {type(frame.body)} to bytes")
+                logger.debug(f"Converted {type(frame.body)} to bytes")
             except Exception as e:
                 logger.error(f"Cannot convert frame.body to bytes: {type(body)}, {e}")
                 raise ValueError(f"Unsupported body type: {type(body)}")

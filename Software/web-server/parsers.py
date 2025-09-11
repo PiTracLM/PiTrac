@@ -81,7 +81,12 @@ class ShotDataParser:
             result_type_str = f"Type {result_type}"
             logger.warning(f"Unknown result type: {result_type}")
 
-        is_status_message = result_type in [
+        # Special handling for result_type 7 which is overloaded in C++
+        # Real hits vs configuration messages that misuse kHit type
+        is_fake_hit_message = (result_type == 7 and 
+                              message in ["Club type was set", "Test message", "Configuration update"])
+        
+        is_status_message = (result_type in [
             ResultType.BALL_READY.value,  # 6 - kBallPlacedAndReadyForHit
             ResultType.INITIALIZING.value,  # 1
             ResultType.WAITING_FOR_BALL.value,  # 2
@@ -91,7 +96,7 @@ class ShotDataParser:
             ResultType.ERROR.value,  # 8
             ResultType.CALIBRATION.value,  # 9
             ResultType.UNKNOWN.value,  # 0
-        ]
+        ] or is_fake_hit_message)
 
         if is_status_message:
             return ShotData(
