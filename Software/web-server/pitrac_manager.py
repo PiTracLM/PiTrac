@@ -191,6 +191,14 @@ class PiTracProcessManager:
 
         metadata_args = self._build_cli_args_from_metadata(camera)
         cmd.extend(metadata_args)
+        
+        # Add web server share directory argument (with expanded path)
+        home_dir = str(Path.home())
+        metadata = self.config_manager.load_configurations_metadata()
+        env_defaults = metadata.get("environmentDefaults", {})
+        web_share_dir = env_defaults.get("webserverShareDir", {}).get("default", "~/LM_Shares/WebShare/")
+        expanded_web_share_dir = web_share_dir.replace("~", home_dir)
+        cmd.append(f"--web_server_share_dir={expanded_web_share_dir}")
 
         logger.info(f"Built command: {' '.join(cmd)}")
         return cmd
