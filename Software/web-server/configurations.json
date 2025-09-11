@@ -589,7 +589,8 @@
       "basicSubcategory": "Detection Methods",
       "displayName": "AI Model",
       "description": "Select YOLO model for AI-based ball detection",
-      "type": "text",
+      "type": "select",
+      "options": {},
       "default": "~/LM_Shares/models/high_performance_300e2/best.onnx",
       "requiresRestart": true
     },

@@ -362,15 +362,19 @@ class ConfigurationManager:
             setting_type = setting_info.get("type", "")
             
             if setting_type == "select" and "options" in setting_info:
-                valid_options = list(setting_info["options"].keys())
-                # Special case for ONNX model path - if no models found, allow any path
-                if key == "gs_config.ball_identification.kONNXModelPath" and not valid_options:
-                    # Allow any path if no models are found
+                if key == "gs_config.ball_identification.kONNXModelPath":
+                    available_models = self.get_available_models()
+                    if available_models:
+                        valid_options = list(available_models.values())
+                        str_value = str(value)
+                        if str_value not in valid_options:
+                            return False, f"Must be one of: {', '.join(available_models.keys())}"
                     return True, ""
-                # Convert value to string for comparison (handles both string and numeric inputs)
-                str_value = str(value)
-                if str_value not in valid_options:
-                    return False, f"Must be one of: {', '.join(valid_options)}"
+                else:
+                    valid_options = list(setting_info["options"].keys())
+                    str_value = str(value)
+                    if str_value not in valid_options:
+                        return False, f"Must be one of: {', '.join(valid_options)}"
             
             elif setting_type == "boolean":
                 if not isinstance(value, bool) and value not in [True, False, "true", "false"]:
