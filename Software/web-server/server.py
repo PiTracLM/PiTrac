@@ -166,10 +166,14 @@ class PiTracServer:
         @self.app.get("/api/config/defaults")
         async def get_defaults(key: Optional[str] = None) -> Dict[str, Any]:
             """Get system default configuration"""
-            config = self.config_manager.get_default(key)
-            if config is None and key:
-                return {"error": f"Configuration key '{key}' not found"}
-            return {"data": config}
+            if key:
+                config = self.config_manager.get_default(key)
+                if config is None:
+                    return {"error": f"Configuration key '{key}' not found"}
+                return {"data": config}
+            else:
+                config = self.config_manager.get_all_defaults_with_metadata()
+                return {"data": config}
 
         @self.app.get("/api/config/user")
         async def get_user_settings() -> Dict[str, Any]:

@@ -128,9 +128,9 @@ class ConfigurationManager:
             Configuration value or None if not found
         """
         if key is None:
-            return self.merged_config
+            return self.get_merged_with_metadata_defaults()
 
-        value = self.merged_config
+        value = self.get_merged_with_metadata_defaults()
         for part in key.split("."):
             if isinstance(value, dict) and part in value:
                 value = value[part]
@@ -138,6 +138,33 @@ class ConfigurationManager:
                 return None
 
         return value
+    
+    def get_merged_with_metadata_defaults(self) -> Dict[str, Any]:
+        """Get merged config including metadata-defined defaults"""
+        result = self.merged_config.copy()
+        
+        metadata = self.load_configurations_metadata()
+        settings_metadata = metadata.get("settings", {})
+        
+        for key, meta in settings_metadata.items():
+            if "default" in meta:
+                parts = key.split(".")
+                current = result
+                exists = True
+                
+                for i, part in enumerate(parts):
+                    if i == len(parts) - 1:
+                        if part not in current:
+                            exists = False
+                    else:
+                        if part not in current:
+                            current[part] = {}
+                        current = current[part]
+                
+                if not exists:
+                    current[parts[-1]] = meta["default"]
+        
+        return result
 
     def get_default(self, key: Optional[str] = None) -> Any:
         """Get default system configuration value"""
@@ -152,6 +179,29 @@ class ConfigurationManager:
                 return None
 
         return value
+    
+    def get_all_defaults_with_metadata(self) -> Dict[str, Any]:
+        """Get all defaults including metadata-defined defaults"""
+        defaults = self.system_config.copy()
+        
+        metadata = self.load_configurations_metadata()
+        settings_metadata = metadata.get("settings", {})
+        
+        for key, meta in settings_metadata.items():
+            if "default" in meta:
+                parts = key.split(".")
+                current = defaults
+                
+                for part in parts[:-1]:
+                    if part not in current:
+                        current[part] = {}
+                    current = current[part]
+                
+                final_key = parts[-1]
+                if final_key not in current:
+                    current[final_key] = meta["default"]
+        
+        return defaults
 
     def get_user_settings(self) -> Dict[str, Any]:
         """Get only user overrides"""
