@@ -682,6 +682,15 @@ async function saveChanges() {
             if (result.error) {
                 errors.push(`${key}: ${result.error}`);
             } else {
+                if (input) {
+                    input.dataset.original = String(value);
+                }
+                
+                const item = document.querySelector(`[data-key="${key}"]`);
+                if (item) {
+                    item.classList.remove('modified');
+                }
+                
                 if (value === defaultVal) {
                     resetCount++;
                 } else {
@@ -717,9 +726,6 @@ async function saveChanges() {
         } else {
             updateStatus(message || 'All changes saved successfully', 'success');
         }
-
-        // Reload to get fresh data
-        setTimeout(() => loadConfiguration(), 1000);
     }
 }
 
