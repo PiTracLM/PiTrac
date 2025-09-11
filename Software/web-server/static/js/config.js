@@ -160,6 +160,9 @@ function selectCategory(category) {
 function renderConfiguration(selectedCategory = null) {
     const content = document.getElementById('configContent');
     content.innerHTML = '';
+    
+    // Track which keys have been rendered to prevent duplicates
+    const renderedKeys = new Set();
 
     // Special handling for Basic category with subcategories
     if (selectedCategory === 'Basic' && basicSubcategories && Object.keys(basicSubcategories).length > 0) {
@@ -176,6 +179,10 @@ function renderConfiguration(selectedCategory = null) {
             group.appendChild(title);
 
             keys.forEach(key => {
+                // Skip if already rendered
+                if (renderedKeys.has(key)) return;
+                renderedKeys.add(key);
+                
                 const value = getNestedValue(currentConfig, key);
                 const defaultValue = getNestedValue(defaultConfig, key);
                 const isModified = getNestedValue(userSettings, key) !== undefined;
@@ -224,6 +231,10 @@ function renderConfiguration(selectedCategory = null) {
                 group.appendChild(basicHeader);
 
                 basicKeys.forEach(key => {
+                    // Skip if already rendered
+                    if (renderedKeys.has(key)) return;
+                    renderedKeys.add(key);
+                    
                     const value = getNestedValue(currentConfig, key);
                     const defaultValue = getNestedValue(defaultConfig, key);
                     const isModified = getNestedValue(userSettings, key) !== undefined;
@@ -234,6 +245,10 @@ function renderConfiguration(selectedCategory = null) {
             } else if (category === 'Basic') {
                 // For Basic category, all settings are basic by definition
                 keys.forEach(key => {
+                    // Skip if already rendered
+                    if (renderedKeys.has(key)) return;
+                    renderedKeys.add(key);
+                    
                     const value = getNestedValue(currentConfig, key);
                     const defaultValue = getNestedValue(defaultConfig, key);
                     const isModified = getNestedValue(userSettings, key) !== undefined;
@@ -253,6 +268,10 @@ function renderConfiguration(selectedCategory = null) {
                 }
 
                 advancedKeys.forEach(key => {
+                    // Skip if already rendered
+                    if (renderedKeys.has(key)) return;
+                    renderedKeys.add(key);
+                    
                     const value = getNestedValue(currentConfig, key);
                     const defaultValue = getNestedValue(defaultConfig, key);
                     const isModified = getNestedValue(userSettings, key) !== undefined;
