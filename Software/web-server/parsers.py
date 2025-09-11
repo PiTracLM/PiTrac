@@ -36,18 +36,43 @@ class ShotDataParser:
             result_type_str = f"Type {result_type}"
             logger.warning(f"Unknown result type: {result_type}")
 
-        return ShotData(
-            carry=carry_meters,
-            speed=round(speed_mpers * MPS_TO_MPH, 1),
-            launch_angle=round(launch_angle_deg, 1),
-            side_angle=round(side_angle_deg, 1),
-            back_spin=int(back_spin_rpm),
-            side_spin=int(side_spin_rpm),
-            result_type=result_type_str,
-            message=message,
-            timestamp=datetime.now().isoformat(),
-            images=image_file_paths,
-        )
+        is_status_message = result_type in [
+            ResultType.BALL_READY.value,  # 6 - kBallPlacedAndReadyForHit
+            ResultType.INITIALIZING.value,  # 1
+            ResultType.WAITING_FOR_BALL.value,  # 2
+            ResultType.WAITING_FOR_SIMULATOR.value,  # 3
+            ResultType.PAUSING_FOR_STABILIZATION.value,  # 4
+            ResultType.MULTIPLE_BALLS.value,  # 5
+            ResultType.ERROR.value,  # 8
+            ResultType.CALIBRATION.value,  # 9
+        ]
+
+        if is_status_message:
+            return ShotData(
+                carry=0.0,  # Status messages don't contain shot data
+                speed=0.0,
+                launch_angle=0.0,
+                side_angle=0.0,
+                back_spin=0,
+                side_spin=0,
+                result_type=result_type_str,
+                message=message,
+                timestamp=datetime.now().isoformat(),
+                images=[],
+            )
+        else:
+            return ShotData(
+                carry=carry_meters,
+                speed=round(speed_mpers * MPS_TO_MPH, 1),
+                launch_angle=round(launch_angle_deg, 1),
+                side_angle=round(side_angle_deg, 1),
+                back_spin=int(back_spin_rpm),
+                side_spin=int(side_spin_rpm),
+                result_type=result_type_str,
+                message=message,
+                timestamp=datetime.now().isoformat(),
+                images=image_file_paths,
+            )
 
     @staticmethod
     def parse_dict_format(data: Dict[str, Any], current: ShotData) -> ShotData:
@@ -92,6 +117,18 @@ class ShotDataParser:
 
     @staticmethod
     def validate_shot_data(shot_data: ShotData) -> bool:
+        if shot_data.result_type in [
+            "Ball Ready",  # kBallPlacedAndReadyForHit
+            "Initializing",
+            "Waiting For Ball",
+            "Waiting For Simulator", 
+            "Pausing For Stabilization",
+            "Multiple Balls",
+            "Error",
+            "Calibration",
+        ]:
+            logger.debug(f"Skipping validation for status message: {shot_data.result_type}")
+            return True
 
         if not 0 <= shot_data.speed <= 250:
             logger.warning(f"Suspicious speed value: {shot_data.speed} mph")

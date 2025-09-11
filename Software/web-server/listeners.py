@@ -35,10 +35,12 @@ class ActiveMQListener(stomp.ConnectionListener):
 
     def on_message(self, frame: Any) -> None:
         self.message_count += 1
+        logger.info(f"Received ActiveMQ message #{self.message_count}")
 
         try:
             msgpack_data = self._extract_message_data(frame)
             data = msgpack.unpackb(msgpack_data, raw=False, strict_map_key=False)
+            logger.debug(f"Unpacked message data: {data}")
 
             if self.loop:
                 asyncio.run_coroutine_threadsafe(
@@ -87,28 +89,61 @@ class ActiveMQListener(stomp.ConnectionListener):
     ) -> None:
         try:
             if isinstance(data, list):
-                shot_data = self.parser.parse_array_format(data)
+                parsed_data = self.parser.parse_array_format(data)
             else:
                 current = self.shot_store.get()
-                shot_data = self.parser.parse_dict_format(data, current)
+                parsed_data = self.parser.parse_dict_format(data, current)
 
-            if not self.parser.validate_shot_data(shot_data):
-                logger.warning("Shot data validation failed, but continuing...")
+            if not self.parser.validate_shot_data(parsed_data):
+                logger.warning("Data validation failed, but continuing...")
 
-            self.shot_store.update(shot_data)
-            await self.connection_manager.broadcast(shot_data.to_dict())
+            # Check if this is a status message (preserve existing shot data)
+            is_status_message = parsed_data.result_type in [
+                "Ball Ready",  # kBallPlacedAndReadyForHit
+                "Initializing",
+                "Waiting For Ball",
+                "Waiting For Simulator", 
+                "Pausing For Stabilization",
+                "Multiple Balls",
+                "Error",
+                "Calibration",
+            ]
 
-            logger.info(
-                f"Processed shot #{self.message_count}: "
-                f"speed={shot_data.speed} mph, "
-                f"launch={shot_data.launch_angle}°, "
-                f"side={shot_data.side_angle}°"
-            )
+            if is_status_message:
+                # For status messages, update only the status and message, preserve shot data
+                current = self.shot_store.get()
+                status_update = current.to_dict()
+                status_update.update({
+                    "result_type": parsed_data.result_type,
+                    "message": parsed_data.message,
+                    "timestamp": parsed_data.timestamp,
+                })
+                from models import ShotData
+                updated_data = ShotData.from_dict(status_update)
+                self.shot_store.update(updated_data)
+                await self.connection_manager.broadcast(updated_data.to_dict())
+
+                logger.info(
+                    f"Processed status #{self.message_count}: "
+                    f"type={parsed_data.result_type}, "
+                    f"message='{parsed_data.message}'"
+                )
+            else:
+                # This is actual shot data - update everything
+                self.shot_store.update(parsed_data)
+                await self.connection_manager.broadcast(parsed_data.to_dict())
+
+                logger.info(
+                    f"Processed shot #{self.message_count}: "
+                    f"speed={parsed_data.speed} mph, "
+                    f"launch={parsed_data.launch_angle}°, "
+                    f"side={parsed_data.side_angle}°"
+                )
 
         except ValueError as e:
-            logger.error(f"Invalid shot data format: {e}")
+            logger.error(f"Invalid data format: {e}")
         except Exception as e:
-            logger.error(f"Error processing shot data: {e}", exc_info=True)
+            logger.error(f"Error processing message: {e}", exc_info=True)
 
     def on_connected(self, frame: Any) -> None:
         logger.info("Connected to ActiveMQ")
