@@ -676,6 +676,451 @@ textarea.config-input {
     color: var(--warning);
 }
 
+/* New Features CSS */
+
+/* Settings Counter Display */
+.settings-counter {
+    display: flex;
+    gap: 1.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-hover);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    align-items: center;
+    justify-content: center;
+}
+
+.settings-counter span {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    background: var(--bg-card);
+    cursor: help;
+}
+
+.counter-custom {
+    border: 1px solid var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+.counter-default {
+    border: 1px solid var(--text-muted);
+    color: var(--text-muted);
+}
+
+.counter-total {
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+/* Default Value Styling */
+.config-item.using-default {
+    background: rgba(var(--text-muted-rgb, 128, 128, 128), 0.02);
+}
+
+.config-item.user-set {
+    background: rgba(var(--accent-primary-rgb, 102, 126, 234), 0.02);
+    border-left: 2px solid var(--accent-primary);
+    padding-left: calc(1rem - 2px);
+}
+
+.config-input.default-value {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.config-input.default-value::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
+    font-style: normal;
+}
+
+/* Default Badge */
+.default-badge {
+    display: inline-block;
+    padding: 0.125rem 0.375rem;
+    margin-left: 0.5rem;
+    background: var(--bg-hover);
+    color: var(--text-muted);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    vertical-align: middle;
+}
+
+/* Input Wrapper for Clear Button */
+.input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.input-wrapper .config-input {
+    padding-right: 2rem;
+}
+
+.clear-value-btn {
+    position: absolute;
+    right: 0.5rem;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.clear-value-btn:hover {
+    background: var(--bg-hover);
+    color: var(--error);
+}
+
+/* Restart Indicator */
+.restart-indicator {
+    color: var(--warning);
+    font-size: 0.9em;
+    margin-left: 0.5rem;
+    cursor: help;
+}
+
+/* Validation Error */
+.validation-error {
+    color: var(--error);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(239, 68, 68, 0.05);
+    border-radius: 4px;
+    border-left: 3px solid var(--error);
+}
+
+/* Dependency Warning Notification */
+.dependency-warning {
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+/* Enhanced Diff Viewer */
+.diff-viewer {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.diff-header {
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.diff-summary {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+}
+
+.diff-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+.diff-table th {
+    background: var(--bg-hover);
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.diff-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.diff-key-name {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.diff-key-path {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.diff-default code,
+.diff-user code {
+    background: var(--bg-hover);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
+
+.diff-footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Backup Manager */
+.backup-manager {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.backup-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.backup-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.backup-list {
+    border-top: 1px solid var(--border-color);
+    padding-top: 1.5rem;
+}
+
+.backup-info {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin: 0.5rem 0 1rem;
+}
+
+.backup-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: var(--bg-hover);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+}
+
+.backup-name {
+    font-weight: 500;
+}
+
+.backup-date {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+/* ONNX Model Selector */
+select option[value="__browse__"] {
+    font-style: italic;
+    color: var(--accent-primary);
+}
+
+/* Select inputs with clear button support */
+.input-wrapper select.config-input {
+    padding-right: 2.5rem;
+}
+
+/* Visual differentiation for modified values */
+.config-item.modified.user-set {
+    border-left: 3px solid var(--warning);
+    padding-left: calc(1rem - 3px);
+    background: linear-gradient(90deg, 
+        rgba(var(--warning-rgb, 237, 137, 54), 0.05) 0%,
+        rgba(var(--accent-primary-rgb, 102, 126, 234), 0.02) 100%);
+}
+
+/* Enhanced Mobile Responsiveness */
+@media (max-width: 768px) {
+    /* Improve touch targets */
+    .btn, .config-input, select, textarea {
+        min-height: 44px; /* iOS recommended */
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    /* Stack layout for mobile */
+    .config-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .category-sidebar {
+        position: sticky;
+        top: 60px;
+        background: var(--bg-card);
+        z-index: 10;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+    
+    .category-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        max-height: none;
+    }
+    
+    .category-item {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        white-space: nowrap;
+    }
+    
+    /* Improve config items for mobile */
+    .config-item {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+        padding: 0.75rem;
+    }
+    
+    .config-label {
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .input-container {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    /* Full width buttons on mobile */
+    .action-buttons {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .action-buttons button {
+        width: 100%;
+        padding: 0.75rem;
+        font-size: 1rem;
+    }
+    
+    /* Responsive tables */
+    .diff-table {
+        font-size: 0.75rem;
+    }
+    
+    .diff-table th,
+    .diff-table td {
+        padding: 0.5rem 0.25rem;
+    }
+    
+    .diff-footer {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .diff-footer button {
+        width: 100%;
+    }
+    
+    /* Backup manager mobile */
+    .backup-actions {
+        flex-direction: column;
+    }
+    
+    .backup-actions button {
+        width: 100%;
+    }
+    
+    .backup-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    /* Search improvements */
+    .search-container {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    /* Settings counter mobile */
+    .settings-counter {
+        flex-direction: column;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    .settings-counter span {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .search-input,
+    .clear-search {
+        width: 100%;
+    }
+    
+    /* Modal adjustments */
+    .modal-content {
+        width: 95%;
+        margin: 1rem;
+    }
+    
+    /* Dependency warning mobile */
+    .dependency-warning {
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+}
+
+/* Tablet adjustments */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .config-container {
+        grid-template-columns: 200px 1fr;
+    }
+    
+    .category-item {
+        font-size: 0.875rem;
+        padding: 0.4rem 0.8rem;
+    }
+    
+    .config-item {
+        grid-template-columns: 1fr 1fr auto;
+    }
+}
+
 .status-info {
     color: var(--info);
 }

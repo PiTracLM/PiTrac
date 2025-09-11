@@ -1,4 +1,8 @@
 // Configuration Manager JavaScript
+/* global saveChanges, resetAll, reloadConfig, showDiff, 
+   filterConfig, closeModal, setTheme, openImage, resetShot, controlPiTrac, 
+   resetValueFromDiff, resetAllFromDiff, clearSearch, searchConfig,
+   resetToDefault */
 
 let currentConfig = {};
 let defaultConfig = {};
@@ -267,6 +271,15 @@ function renderConfiguration(selectedCategory = null) {
 function createConfigItem(key, value, defaultValue, isModified) {
     const item = document.createElement('div');
     item.className = 'config-item';
+    
+    const isUserSet = getNestedValue(userSettings, key) !== undefined;
+    
+    if (isUserSet) {
+        item.classList.add('user-set');
+    } else {
+        item.classList.add('using-default');
+    }
+    
     if (isModified) {
         item.classList.add('modified');
     }
@@ -293,8 +306,20 @@ function createConfigItem(key, value, defaultValue, isModified) {
         return name;
     })();
 
-    // Build label HTML with optional description
-    let labelHTML = `<div class="config-label-name">${displayName}</div>`;
+    let labelHTML = `<div class="config-label-name">`;
+    labelHTML += displayName;
+    
+    // Note: isUserSet already defined above
+    if (!isUserSet) {
+        labelHTML += ` <span class="default-badge" title="Using default value">DEFAULT</span>`;
+    }
+    
+    if (metadata.requiresRestart) {
+        labelHTML += ` <span class="restart-indicator" title="Restart required for changes to take effect">⚠️</span>`;
+    }
+    
+    labelHTML += `</div>`;
+    
     if (metadata.description) {
         labelHTML += `<div class="config-description">${metadata.description}</div>`;
     }
@@ -307,16 +332,72 @@ function createConfigItem(key, value, defaultValue, isModified) {
     const inputContainer = document.createElement('div');
     inputContainer.className = 'input-container';
 
-    const input = createInput(key, value);
+    const input = createInput(key, value, defaultValue, isUserSet);
     input.className = 'config-input';
     input.dataset.key = key;
     input.dataset.original = String(value);
-    if (input.tagName === 'SELECT') {
-        input.onchange = () => handleValueChange(key, input.value, input.dataset.original);
-    } else {
-        input.oninput = () => handleValueChange(key, input.value, input.dataset.original);
+    input.dataset.default = String(defaultValue);
+    
+    if (!isUserSet) {
+        input.classList.add('default-value');
+        if (input.tagName === 'INPUT' && input.type === 'text') {
+            input.placeholder = `Default: ${defaultValue}`;
+        }
     }
-    inputContainer.appendChild(input);
+    
+    const inputWrapper = document.createElement('div');
+    inputWrapper.className = 'input-wrapper';
+    inputWrapper.appendChild(input);
+    
+    if (isUserSet || isModified) {
+        const clearBtn = document.createElement('button');
+        clearBtn.className = 'clear-value-btn';
+        clearBtn.innerHTML = '×';
+        clearBtn.title = 'Reset to default';
+        clearBtn.onclick = (e) => {
+            e.preventDefault();
+            resetValue(key);
+        };
+        inputWrapper.appendChild(clearBtn);
+    }
+    
+    const validationError = document.createElement('div');
+    validationError.className = 'validation-error';
+    validationError.style.display = 'none';
+    
+    const validateAndUpdate = async () => {
+        const isValid = await validateInput(key, input.value, validationError);
+        if (isValid) {
+            handleValueChange(key, input.value, input.dataset.original);
+            
+            if (input.value !== defaultValue) {
+                input.classList.remove('default-value');
+                item.classList.remove('using-default');
+                item.classList.add('user-set');
+                
+                if (!inputWrapper.querySelector('.clear-value-btn')) {
+                    const clearBtn = document.createElement('button');
+                    clearBtn.className = 'clear-value-btn';
+                    clearBtn.innerHTML = '×';
+                    clearBtn.title = 'Reset to default';
+                    clearBtn.onclick = (e) => {
+                        e.preventDefault();
+                        resetValue(key);
+                    };
+                    inputWrapper.appendChild(clearBtn);
+                }
+            }
+        }
+    };
+    
+    if (input.tagName === 'SELECT') {
+        input.onchange = validateAndUpdate;
+    } else {
+        input.oninput = validateAndUpdate;
+    }
+    
+    inputContainer.appendChild(inputWrapper);
+    inputContainer.appendChild(validationError);
 
     if (key === 'cameras.slot1.type' || key === 'cameras.slot2.type' ||
         key === 'cameras.slot1_type' || key === 'cameras.slot2_type') {
@@ -349,10 +430,12 @@ function createConfigItem(key, value, defaultValue, isModified) {
     const actions = document.createElement('div');
     actions.className = 'config-actions';
 
-    if (isModified) {
+    // Only show reset button for user-set values (not for defaults)
+    if (isUserSet && !isModified) {
         const resetBtn = document.createElement('button');
         resetBtn.className = 'btn btn-secondary btn-small';
         resetBtn.textContent = 'Reset';
+        resetBtn.title = 'Reset to default value';
         resetBtn.onclick = () => resetValue(key);
         actions.appendChild(resetBtn);
     }
@@ -363,8 +446,35 @@ function createConfigItem(key, value, defaultValue, isModified) {
 }
 
 // Create appropriate input based on value type
-function createInput(key, value) {
+function createInput(key, value, defaultValue, isUserSet) {
     const metadata = configMetadata[key] || {};
+
+    if (key.includes('ONNXModelPath') || key.includes('onnx_model')) {
+        const select = document.createElement('select');
+        
+        if (value) {
+            const currentOption = document.createElement('option');
+            currentOption.value = value;
+            currentOption.textContent = value.split('/').pop(); // Show just filename
+            currentOption.selected = true;
+            select.appendChild(currentOption);
+        }
+        
+        
+        if (metadata.options) {
+            Object.entries(metadata.options).forEach(([modelName, modelPath]) => {
+                if (modelPath !== value) { // Don't duplicate current value
+                    const option = document.createElement('option');
+                    option.value = modelPath;
+                    option.textContent = `🤖 ${modelName}`;
+                    select.appendChild(option);
+                }
+            });
+        }
+        
+        
+        return select;
+    }
 
     if (metadata.type === 'select' && metadata.options) {
         const select = document.createElement('select');
@@ -388,6 +498,9 @@ function createInput(key, value) {
         textarea.style.width = '100%';
         textarea.style.fontFamily = 'Monaco, Menlo, monospace';
         textarea.style.fontSize = '0.875rem';
+        if (!isUserSet) {
+            textarea.placeholder = `Default: ${JSON.stringify(defaultValue, null, 2)}`;
+        }
         return textarea;
     } else if (typeof value === 'boolean' || value === '0' || value === '1') {
         const select = document.createElement('select');
@@ -416,6 +529,9 @@ function createInput(key, value) {
         const input = document.createElement('input');
         input.type = 'text';
         input.value = value || '';
+        if (!isUserSet && defaultValue !== undefined) {
+            input.placeholder = `Default: ${defaultValue}`;
+        }
         return input;
     }
 }
@@ -425,6 +541,7 @@ async function handleValueChange(key, currentValue, originalValue) {
     try {
         let current = currentValue;
         let original = originalValue;
+        const defaultValue = getNestedValue(defaultConfig, key);
 
         if (current === 'true') current = true;
         else if (current === 'false') current = false;
@@ -433,10 +550,22 @@ async function handleValueChange(key, currentValue, originalValue) {
         if (original === 'true') original = true;
         else if (original === 'false') original = false;
         else if (!isNaN(original) && original !== '') original = Number(original);
+        
+        let defaultVal = defaultValue;
+        if (defaultVal === 'true' || defaultVal === '1') defaultVal = true;
+        else if (defaultVal === 'false' || defaultVal === '0') defaultVal = false;
+        else if (!isNaN(defaultVal) && defaultVal !== '') defaultVal = Number(defaultVal);
 
         const isModified = current !== original;
+        const isDifferentFromDefault = current !== defaultVal;
 
         setNestedValue(currentConfig, key, current);
+        
+        if (isDifferentFromDefault) {
+            setNestedValue(userSettings, key, current);
+        } else {
+            deleteNestedValue(userSettings, key);
+        }
 
         if (key === 'system.mode') {
             updateConditionalVisibility();
@@ -451,12 +580,58 @@ async function handleValueChange(key, currentValue, originalValue) {
                 modifiedSettings.delete(key);
                 item.classList.remove('modified');
             }
+            
+            if (isDifferentFromDefault) {
+                item.classList.remove('using-default');
+                item.classList.add('user-set');
+                
+                const badge = item.querySelector('.default-badge');
+                if (badge) badge.remove();
+                
+                const inputWrapper = item.querySelector('.input-wrapper');
+                if (inputWrapper && !inputWrapper.querySelector('.clear-value-btn')) {
+                    const clearBtn = document.createElement('button');
+                    clearBtn.className = 'clear-value-btn';
+                    clearBtn.innerHTML = '×';
+                    clearBtn.title = 'Reset to default';
+                    clearBtn.onclick = (e) => {
+                        e.preventDefault();
+                        resetValue(key);
+                    };
+                    inputWrapper.appendChild(clearBtn);
+                }
+                
+                const input = item.querySelector('.config-input');
+                if (input) {
+                    input.classList.remove('default-value');
+                }
+            } else {
+                item.classList.remove('user-set');
+                item.classList.add('using-default');
+                
+                let badge = item.querySelector('.default-badge');
+                if (!badge) {
+                    const labelName = item.querySelector('.config-label-name');
+                    if (labelName && !labelName.querySelector('.default-badge')) {
+                        const badgeHtml = ' <span class="default-badge" title="Using default value">DEFAULT</span>';
+                        labelName.insertAdjacentHTML('beforeend', badgeHtml);
+                    }
+                }
+                
+                const clearBtn = item.querySelector('.clear-value-btn');
+                if (clearBtn) clearBtn.remove();
+                
+                const input = item.querySelector('.config-input');
+                if (input) {
+                    input.classList.add('default-value');
+                }
+            }
         }
 
         updateModifiedCount();
 
         if (isModified) {
-            updateStatus(`Modified: ${key}`, 'success');
+            updateStatus(`Modified: ${key}`, 'info');
         }
     } catch (error) {
         console.error('Failed to handle value change:', error);
@@ -475,17 +650,25 @@ async function saveChanges() {
 
     const errors = [];
     const requiresRestart = [];
+    let savedCount = 0;
+    let resetCount = 0;
 
     for (const key of modifiedSettings) {
         const input = document.querySelector(`[data-key="${key}"] .config-input`);
         if (!input) continue;
 
         let value = input.value;
+        const defaultValue = getNestedValue(defaultConfig, key);
 
         // Convert value type
         if (value === 'true') value = true;
         else if (value === 'false') value = false;
         else if (!isNaN(value) && value !== '') value = Number(value);
+        
+        let defaultVal = defaultValue;
+        if (defaultVal === 'true' || defaultVal === '1') defaultVal = true;
+        else if (defaultVal === 'false' || defaultVal === '0') defaultVal = false;
+        else if (!isNaN(defaultVal) && defaultVal !== '') defaultVal = Number(defaultVal);
 
         try {
             const response = await fetch(`/api/config/${key}`, {
@@ -498,8 +681,16 @@ async function saveChanges() {
 
             if (result.error) {
                 errors.push(`${key}: ${result.error}`);
-            } else if (result.requires_restart) {
-                requiresRestart.push(key);
+            } else {
+                if (value === defaultVal) {
+                    resetCount++;
+                } else {
+                    savedCount++;
+                }
+                
+                if (result.requires_restart) {
+                    requiresRestart.push(key);
+                }
             }
         } catch (error) {
             errors.push(`${key}: ${error.message}`);
@@ -512,15 +703,28 @@ async function saveChanges() {
         modifiedSettings.clear();
         updateModifiedCount();
 
+        let message = '';
+        if (savedCount > 0) {
+            message += `Saved ${savedCount} custom setting${savedCount !== 1 ? 's' : ''}`;
+        }
+        if (resetCount > 0) {
+            if (message) message += ', ';
+            message += `Reset ${resetCount} to default${resetCount !== 1 ? 's' : ''}`;
+        }
+        
         if (requiresRestart.length > 0) {
-            updateStatus('Changes saved. Restart required for some settings.', 'warning');
+            updateStatus(message + '. Restart required for some settings.', 'warning');
         } else {
-            updateStatus('All changes saved successfully', 'success');
+            updateStatus(message || 'All changes saved successfully', 'success');
         }
 
         // Reload to get fresh data
         setTimeout(() => loadConfiguration(), 1000);
     }
+}
+
+function resetToDefault(key) {
+    resetValue(key);
 }
 
 // Reset single value
@@ -542,14 +746,41 @@ async function resetValue(key) {
             updateStatus(`Reset ${key} to default`, 'success');
             modifiedSettings.delete(key);
             updateModifiedCount();
+            
+            deleteNestedValue(userSettings, key);
 
             // Update UI
             const item = document.querySelector(`[data-key="${key}"]`);
             if (item) {
-                item.classList.remove('modified');
+                item.classList.remove('modified', 'user-set');
+                item.classList.add('using-default');
+                
                 const input = item.querySelector('.config-input');
                 if (input) {
                     input.value = defaultValue;
+                    input.classList.add('default-value');
+                    if (input.tagName === 'INPUT' && input.type === 'text') {
+                        input.placeholder = `Default: ${defaultValue}`;
+                    }
+                }
+                
+                let badge = item.querySelector('.default-badge');
+                if (!badge) {
+                    const labelName = item.querySelector('.config-label-name');
+                    if (labelName) {
+                        const badgeHtml = ' <span class="default-badge" title="Using default value">DEFAULT</span>';
+                        labelName.insertAdjacentHTML('beforeend', badgeHtml);
+                    }
+                }
+                
+                const clearBtn = item.querySelector('.clear-value-btn');
+                if (clearBtn) {
+                    clearBtn.remove();
+                }
+                
+                const actions = item.querySelector('.config-actions');
+                if (actions) {
+                    actions.innerHTML = '';
                 }
             }
         }
@@ -605,14 +836,60 @@ async function showDiff() {
             return;
         }
 
-        // Format diff for display
-        let diffHtml = '<h3>Configuration Differences</h3><ul>';
+        let diffHtml = `
+            <div class="diff-viewer">
+                <div class="diff-header">
+                    <h3>Configuration Differences</h3>
+                    <p class="diff-summary">${Object.keys(diff).length} settings modified from defaults</p>
+                </div>
+                <div class="diff-content">
+                    <table class="diff-table">
+                        <thead>
+                            <tr>
+                                <th>Setting</th>
+                                <th>Default Value</th>
+                                <th>Your Value</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+        
         Object.entries(diff).forEach(([key, values]) => {
-            diffHtml += `<li><strong>${key}</strong><br>`;
-            diffHtml += `Default: ${JSON.stringify(values.default)}<br>`;
-            diffHtml += `Current: ${JSON.stringify(values.user)}</li>`;
+            const defaultVal = formatValue(values.default);
+            const userVal = formatValue(values.user);
+            const metadata = configMetadata[key] || {};
+            const displayName = metadata.displayName || key.split('.').pop();
+            
+            diffHtml += `
+                <tr class="diff-row">
+                    <td class="diff-key">
+                        <div class="diff-key-name">${displayName}</div>
+                        <div class="diff-key-path">${key}</div>
+                    </td>
+                    <td class="diff-default">
+                        <code>${defaultVal}</code>
+                    </td>
+                    <td class="diff-user">
+                        <code>${userVal}</code>
+                    </td>
+                    <td class="diff-actions">
+                        <button class="btn btn-small" onclick="resetValueFromDiff('${key}')">Reset</button>
+                    </td>
+                </tr>
+            `;
         });
-        diffHtml += '</ul>';
+        
+        diffHtml += `
+                        </tbody>
+                    </table>
+                </div>
+                <div class="diff-footer">
+                    <button class="btn btn-primary" onclick="closeModal()">Close</button>
+                    <button class="btn btn-danger" onclick="resetAllFromDiff()">Reset All to Defaults</button>
+                </div>
+            </div>
+        `;
 
         showModal('Configuration Differences', diffHtml);
     } catch (error) {
@@ -621,79 +898,164 @@ async function showDiff() {
     }
 }
 
-// Export configuration
-async function exportConfig() {
-    try {
-        const response = await fetch('/api/config/export');
-        const config = await response.json();
-
-        // Create download
-        const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `pitrac_config_${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-
-        updateStatus('Configuration exported', 'success');
-    } catch (error) {
-        console.error('Failed to export:', error);
-        updateStatus('Failed to export configuration', 'error');
-    }
+function formatValue(value) {
+    if (value === null) return 'null';
+    if (value === undefined) return 'undefined';
+    if (typeof value === 'boolean') return value ? 'true' : 'false';
+    if (typeof value === 'string') return `"${value}"`;
+    if (typeof value === 'object') return JSON.stringify(value, null, 2);
+    return String(value);
 }
 
-// Import configuration
-function importConfig() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-
-    input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        try {
-            const text = await file.text();
-            const config = JSON.parse(text);
-
-            const response = await fetch('/api/config/import', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(config)
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                updateStatus('Configuration imported successfully', 'success');
-                loadConfiguration();
-            } else {
-                updateStatus(`Import failed: ${result.message}`, 'error');
-            }
-        } catch (error) {
-            console.error('Failed to import:', error);
-            updateStatus('Failed to import configuration', 'error');
-        }
-    };
-
-    input.click();
+async function resetValueFromDiff(key) {
+    await resetValue(key);
+    closeModal();
+    showDiff(); 
 }
 
-// Filter configuration
-function filterConfig() {
+function resetAllFromDiff() {
+    closeModal();
+    resetAll();
+}
+
+function searchConfig() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    
+    if (!searchTerm) {
+        document.querySelectorAll('.config-item').forEach(item => {
+            item.style.display = 'grid';
+        });
+        document.querySelectorAll('.config-group').forEach(group => {
+            group.style.display = 'block';
+        });
+        return;
+    }
 
+    let hasVisibleItems = false;
+    
+    document.querySelectorAll('.config-group').forEach(group => {
+        group.style.display = 'none';
+    });
+    
     document.querySelectorAll('.config-item').forEach(item => {
         const key = item.dataset.key.toLowerCase();
-        const label = item.querySelector('.config-label').textContent.toLowerCase();
-
-        if (key.includes(searchTerm) || label.includes(searchTerm)) {
+        const labelName = item.querySelector('.config-label-name')?.textContent.toLowerCase() || '';
+        const description = item.querySelector('.config-description')?.textContent.toLowerCase() || '';
+        
+        if (key.includes(searchTerm) || labelName.includes(searchTerm) || description.includes(searchTerm)) {
             item.style.display = 'grid';
+            const parentGroup = item.closest('.config-group');
+            if (parentGroup) {
+                parentGroup.style.display = 'block';
+            }
+            hasVisibleItems = true;
         } else {
             item.style.display = 'none';
         }
     });
+    
+    if (!hasVisibleItems) {
+        updateStatus('No settings found matching: ' + searchTerm, 'warning');
+    }
+}
+
+function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    searchConfig();
+}
+
+function filterConfig() {
+    searchConfig();
+}
+
+async function validateInput(key, value, errorElement) {
+    try {
+        const metadata = configMetadata[key] || {};
+        
+        if (metadata.type === 'number') {
+            const num = parseFloat(value);
+            if (isNaN(num)) {
+                errorElement.textContent = 'Must be a valid number';
+                errorElement.style.display = 'block';
+                return false;
+            }
+            if (metadata.min !== undefined && num < metadata.min) {
+                errorElement.textContent = `Minimum value is ${metadata.min}`;
+                errorElement.style.display = 'block';
+                return false;
+            }
+            if (metadata.max !== undefined && num > metadata.max) {
+                errorElement.textContent = `Maximum value is ${metadata.max}`;
+                errorElement.style.display = 'block';
+                return false;
+            }
+        }
+        
+        errorElement.style.display = 'none';
+        errorElement.textContent = '';
+        
+        checkDependencies(key, value);
+        
+        return true;
+    } catch (error) {
+        console.error('Validation error:', error);
+        return true; // Don't block on validation errors
+    }
+}
+
+function checkDependencies(key, value) {
+    const dependencies = {
+        'system.mode': {
+            'single': ['cameras.slot2 settings will be used for dual camera on single Pi'],
+            'dual_primary': ['This Pi will act as primary camera. Ensure secondary Pi is configured.'],
+            'dual_secondary': ['This Pi will act as secondary camera. Ensure primary Pi is configured.']
+        },
+        'cameras.slot1.type': {
+            '*': ['Camera type change may require recalibration']
+        },
+        'cameras.slot2.type': {
+            '*': ['Camera type change may require recalibration']
+        },
+        'network.broker_address': {
+            '*': ['Changing broker address will affect camera communication']
+        }
+    };
+    
+    const keyDeps = dependencies[key];
+    if (keyDeps) {
+        const warnings = keyDeps[value] || keyDeps['*'] || [];
+        if (warnings.length > 0) {
+            showDependencyWarning(key, warnings);
+        }
+    }
+}
+
+function showDependencyWarning(key, warnings) {
+    const message = `<strong>Changing ${key} affects:</strong><br>` + warnings.join('<br>');
+    
+    const notification = document.createElement('div');
+    notification.className = 'dependency-warning';
+    notification.innerHTML = message;
+    notification.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: var(--warning-bg, #fef3c7);
+        color: var(--warning-text, #92400e);
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        max-width: 300px;
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => notification.remove(), 300);
+    }, 5000);
 }
 
 // Utility functions
@@ -714,6 +1076,34 @@ function setNestedValue(obj, path, value) {
     current[parts[parts.length - 1]] = value;
 }
 
+function deleteNestedValue(obj, path) {
+    const parts = path.split('.');
+    if (parts.length === 1) {
+        delete obj[parts[0]];
+        return;
+    }
+    
+    let current = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+        if (!(parts[i] in current)) {
+            return; // Path doesn't exist
+        }
+        current = current[parts[i]];
+    }
+    
+    delete current[parts[parts.length - 1]];
+    
+    let parent = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+        const nextParent = parent[parts[i]];
+        if (nextParent && Object.keys(nextParent).length === 0) {
+            delete parent[parts[i]];
+            break;
+        }
+        parent = nextParent;
+    }
+}
+
 function updateStatus(message, type = '') {
     const statusEl = document.getElementById('statusMessage');
     statusEl.textContent = message;
@@ -721,7 +1111,43 @@ function updateStatus(message, type = '') {
 }
 
 function updateModifiedCount() {
-    document.getElementById('modifiedCount').textContent = modifiedSettings.size;
+    const modifiedCount = modifiedSettings.size;
+    document.getElementById('modifiedCount').textContent = modifiedCount;
+    
+    let userSetCount = 0;
+    const countUserSettings = (obj, depth = 0) => {
+        if (depth > 10) return;
+        for (const key in obj) {
+            if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+                countUserSettings(obj[key], depth + 1);
+            } else {
+                userSetCount++;
+            }
+        }
+    };
+    countUserSettings(userSettings);
+    
+    const totalSettings = document.querySelectorAll('.config-item').length;
+    const defaultCount = totalSettings - userSetCount;
+    
+    let counterEl = document.getElementById('settingsCounter');
+    if (!counterEl) {
+        const statusBar = document.querySelector('.status-bar');
+        if (statusBar) {
+            counterEl = document.createElement('div');
+            counterEl.id = 'settingsCounter';
+            counterEl.className = 'settings-counter';
+            statusBar.insertBefore(counterEl, statusBar.firstChild);
+        }
+    }
+    
+    if (counterEl) {
+        counterEl.innerHTML = `
+            <span class="counter-custom" title="Settings you've customized">🔧 ${userSetCount} custom</span>
+            <span class="counter-default" title="Settings using default values">📎 ${defaultCount} defaults</span>
+            <span class="counter-total" title="Total number of settings">📊 ${totalSettings} total</span>
+        `;
+    }
 }
 
 function showModal(title, body) {
@@ -855,3 +1281,13 @@ function updateConditionalVisibility() {
         }
     });
 }
+
+window.saveChanges = saveChanges;
+window.reloadConfig = reloadConfig;
+window.showDiff = showDiff;
+window.resetAll = resetAll;
+window.searchConfig = searchConfig;
+window.clearSearch = clearSearch;
+window.resetToDefault = resetToDefault;
+window.resetValueFromDiff = resetValueFromDiff;
+window.resetAllFromDiff = resetAllFromDiff;
