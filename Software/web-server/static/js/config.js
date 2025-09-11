@@ -466,7 +466,7 @@ function createInput(key, value, defaultValue, isUserSet) {
                 if (modelPath !== value) { // Don't duplicate current value
                     const option = document.createElement('option');
                     option.value = modelPath;
-                    option.textContent = `[AI] ${modelName}`;
+                    option.textContent = modelName;
                     select.appendChild(option);
                 }
             });
