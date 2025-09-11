@@ -605,10 +605,7 @@
       "max": 16.0,
       "step": 0.1,
       "default": 1.0,
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "passedTo": "camera1",
-      "cliArgument": "--camera_gain"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera2Gain": {
       "category": "Cameras",
@@ -622,10 +619,7 @@
       "max": 16.0,
       "step": 0.1,
       "default": 1.0,
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "passedTo": "camera2",
-      "cliArgument": "--camera_gain"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera1SearchCenterX": {
       "category": "Cameras",

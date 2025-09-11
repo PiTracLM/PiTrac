@@ -470,27 +470,34 @@ function createInput(key, value, defaultValue, isUserSet) {
 
     if (key.includes('ONNXModelPath') || key.includes('onnx_model')) {
         const select = document.createElement('select');
-        
-        if (value) {
-            const currentOption = document.createElement('option');
-            currentOption.value = value;
-            currentOption.textContent = value.split('/').pop(); // Show just filename
-            currentOption.selected = true;
-            select.appendChild(currentOption);
-        }
-        
-        
-        if (metadata.options) {
+
+        if (metadata.options && Object.keys(metadata.options).length > 0) {
             Object.entries(metadata.options).forEach(([modelName, modelPath]) => {
-                if (modelPath !== value) { // Don't duplicate current value
-                    const option = document.createElement('option');
-                    option.value = modelPath;
-                    option.textContent = modelName;
-                    select.appendChild(option);
+                const option = document.createElement('option');
+                option.value = modelPath;
+                option.textContent = modelName;
+                if (modelPath === value) {
+                    option.selected = true;
                 }
+                select.appendChild(option);
             });
+        } else {
+            if (value) {
+                const option = document.createElement('option');
+                option.value = value;
+                const parts = value.split('/');
+                let displayName = 'Unknown Model';
+                for (let i = parts.length - 2; i >= 0; i--) {
+                    if (parts[i] && parts[i] !== 'weights' && parts[i] !== 'best.onnx') {
+                        displayName = parts[i];
+                        break;
+                    }
+                }
+                option.textContent = displayName;
+                option.selected = true;
+                select.appendChild(option);
+            }
         }
-        
         
         return select;
     }
