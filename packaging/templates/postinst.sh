@@ -137,6 +137,37 @@ case "$1" in
         # Configure libcamera settings
         echo "Configuring libcamera..."
 
+        # Install IMX296 NOIR sensor file if available
+        install_imx296_sensor_file() {
+            local pi_model="$1"
+            local source_file=""
+            local dest_dir=""
+            
+            case "$pi_model" in
+                "pi5")
+                    source_file="/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_noir.json.PI_5_FOR_PISP_DIRECTORY"
+                    dest_dir="/usr/share/libcamera/ipa/rpi/pisp"
+                    ;;
+                "pi4")
+                    source_file="/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_noir.json.PI_4_FOR_VC4_DIRECTORY"
+                    dest_dir="/usr/share/libcamera/ipa/rpi/vc4"
+                    ;;
+            esac
+            
+            if [ -n "$source_file" ] && [ -f "$source_file" ] && [ -d "$dest_dir" ]; then
+                echo "Installing IMX296 NOIR sensor configuration for $pi_model..."
+                cp "$source_file" "$dest_dir/imx296_noir.json"
+                chmod 644 "$dest_dir/imx296_noir.json"
+                echo "IMX296 NOIR sensor file installed"
+            elif [ -n "$source_file" ]; then
+                echo "Note: IMX296 NOIR sensor file not found at $source_file"
+                echo "This is only needed if using IMX296 NOIR cameras"
+            fi
+        }
+        
+        # Install sensor file for detected Pi model
+        install_imx296_sensor_file "$PI_MODEL"
+
         # Use existing example.yaml files as base for configuration
         # Both Pi 4 (vc4) and Pi 5 (pisp) ship with example.yaml
         for pipeline in pisp vc4; do
@@ -161,6 +192,32 @@ case "$1" in
                 fi
             fi
         done
+        
+        # Set up LIBCAMERA_RPI_CONFIG_FILE environment variable (CRITICAL for camera detection)
+        setup_libcamera_environment_postinst() {
+            local config_file=""
+            
+            case "$PI_MODEL" in
+                "pi5")
+                    config_file="/usr/share/libcamera/pipeline/rpi/pisp/rpi_apps.yaml"
+                    ;;
+                "pi4")
+                    config_file="/usr/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml"
+                    ;;
+            esac
+            
+            if [ -n "$config_file" ] && [ -f "$config_file" ]; then
+                echo "Setting up libcamera environment for $PI_MODEL..."
+                
+                # Add to system environment (for services)
+                if ! grep -q "LIBCAMERA_RPI_CONFIG_FILE" /etc/environment 2>/dev/null; then
+                    echo "LIBCAMERA_RPI_CONFIG_FILE=\"$config_file\"" >> /etc/environment
+                    echo "Added LIBCAMERA_RPI_CONFIG_FILE to system environment"
+                fi
+            fi
+        }
+        
+        setup_libcamera_environment_postinst
         
         if type -t create_pkgconfig_files &>/dev/null; then
             create_pkgconfig_files

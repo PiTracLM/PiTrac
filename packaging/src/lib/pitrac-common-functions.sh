@@ -46,6 +46,42 @@ apply_boost_cxx20_fix() {
 configure_libcamera() {
     log_info "Configuring libcamera..."
     
+    # Install IMX296 NOIR sensor file if available
+    install_imx296_sensor_file_dev() {
+        local pi_model=$(detect_pi_model)
+        local source_file=""
+        local dest_dir=""
+        
+        case "$pi_model" in
+            "pi5")
+                source_file="/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_noir.json.PI_5_FOR_PISP_DIRECTORY"
+                dest_dir="/usr/share/libcamera/ipa/rpi/pisp"
+                ;;
+            "pi4")
+                source_file="/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_noir.json.PI_4_FOR_VC4_DIRECTORY"
+                dest_dir="/usr/share/libcamera/ipa/rpi/vc4"
+                ;;
+        esac
+        
+        if [[ -n "$source_file" && -f "$source_file" && -d "$dest_dir" ]]; then
+            log_info "Installing IMX296 NOIR sensor configuration for $pi_model..."
+            if [[ -w "$dest_dir" ]]; then
+                cp "$source_file" "$dest_dir/imx296_noir.json"
+                chmod 644 "$dest_dir/imx296_noir.json"
+            else
+                sudo cp "$source_file" "$dest_dir/imx296_noir.json"
+                sudo chmod 644 "$dest_dir/imx296_noir.json"
+            fi
+            log_success "IMX296 NOIR sensor file installed"
+        elif [[ -n "$source_file" ]]; then
+            log_warn "IMX296 NOIR sensor file not found at $source_file"
+            log_warn "This is only needed if using IMX296 NOIR cameras"
+        fi
+    }
+    
+    # Install sensor file first
+    install_imx296_sensor_file_dev
+    
     for pipeline in pisp vc4; do
         local config_dir="/usr/share/libcamera/pipeline/rpi/${pipeline}"
         local example_file="${config_dir}/example.yaml"
@@ -77,6 +113,44 @@ configure_libcamera() {
             fi
         fi
     done
+    
+    # Set up LIBCAMERA_RPI_CONFIG_FILE environment variable (CRITICAL for camera detection)
+    setup_libcamera_environment
+}
+
+# Set up libcamera environment variable
+setup_libcamera_environment() {
+    local pi_model=$(detect_pi_model)
+    local config_file=""
+    
+    case "$pi_model" in
+        "pi5")
+            config_file="/usr/share/libcamera/pipeline/rpi/pisp/rpi_apps.yaml"
+            ;;
+        "pi4")
+            config_file="/usr/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml"
+            ;;
+    esac
+    
+    if [[ -n "$config_file" && -f "$config_file" ]]; then
+        log_info "Setting up libcamera environment for $pi_model..."
+        
+        # Set for current session
+        export LIBCAMERA_RPI_CONFIG_FILE="$config_file"
+        
+        # Add to system environment (for services)
+        local env_file="/etc/environment"
+        if ! grep -q "LIBCAMERA_RPI_CONFIG_FILE" "$env_file" 2>/dev/null; then
+            if [[ -w "$env_file" ]]; then
+                echo "LIBCAMERA_RPI_CONFIG_FILE=\"$config_file\"" >> "$env_file"
+            else
+                echo "LIBCAMERA_RPI_CONFIG_FILE=\"$config_file\"" | sudo tee -a "$env_file" >/dev/null
+            fi
+            log_success "Added LIBCAMERA_RPI_CONFIG_FILE to system environment"
+        fi
+        
+        log_success "libcamera environment configured"
+    fi
 }
 
 # Create pkg-config files for libraries that don't have them
@@ -255,9 +329,19 @@ install_camera_tools() {
     log_info "Installing camera tools..."
     
     local camera_tools_dir="$repo_root/Software/LMSourceCode/ImageProcessing/CameraTools"
+    local imaging_dir="$repo_root/Software/LMSourceCode/ImageProcessing"
+    
     if [[ -d "$camera_tools_dir" ]]; then
         mkdir -p "$dest_dir/ImageProcessing/CameraTools"
         cp -r "$camera_tools_dir"/* "$dest_dir/ImageProcessing/CameraTools/"
+        
+        # Install Pi-specific IMX296 NOIR sensor files
+        for sensor_file in "imx296_noir.json.PI_4_FOR_VC4_DIRECTORY" "imx296_noir.json.PI_5_FOR_PISP_DIRECTORY"; do
+            if [[ -f "$imaging_dir/$sensor_file" ]]; then
+                cp "$imaging_dir/$sensor_file" "$dest_dir/ImageProcessing/CameraTools/"
+                log_info "Installed sensor file: $sensor_file"
+            fi
+        done
         
         find "$dest_dir/ImageProcessing/CameraTools" -name "*.sh" -type f -exec chmod 755 {} \;
         if [[ -f "$dest_dir/ImageProcessing/CameraTools/imx296_trigger" ]]; then
