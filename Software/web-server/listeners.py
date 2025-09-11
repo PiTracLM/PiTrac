@@ -57,7 +57,9 @@ class ActiveMQListener(stomp.ConnectionListener):
                 logger.error("Event loop not set in listener")
 
         except msgpack.exceptions.ExtraData as e:
-            logger.error(f"Extra data in msgpack (message #{self.message_count}): {e}")
+            # This is likely a large binary image message - log but don't error
+            logger.info(f"MSGDEBUG: Large binary message #{self.message_count} - Extra data in msgpack: {e}")
+            logger.info(f"MSGDEBUG: Skipping image message (likely camera data)")
         except msgpack.exceptions.UnpackException as e:
             logger.error(f"Failed to unpack message #{self.message_count}: {e}")
         except Exception as e:
@@ -79,7 +81,7 @@ class ActiveMQListener(stomp.ConnectionListener):
             logger.info("MSGDEBUG: Body is already bytes")
         elif isinstance(body, str):
             # String body - need to handle encoding carefully
-            logger.info(f"MSGDEBUG: Body is string, first 100 chars: {repr(body[:100])}")
+            logger.info(f"MSGDEBUG: Body is string, length: {len(body)}, first 100 chars: {repr(body[:100])}")
             
             # Check for base64 encoding header first
             if hasattr(frame, "headers") and frame.headers.get("encoding") == "base64":
@@ -93,19 +95,42 @@ class ActiveMQListener(stomp.ConnectionListener):
                     # Fall back to UTF-8 encoding
                     body = body.encode("utf-8")
             else:
-                # Regular string - encode as UTF-8 (not latin-1)
-                try:
-                    body = body.encode("utf-8")
-                    logger.info("MSGDEBUG: Encoded string as UTF-8")
-                except UnicodeEncodeError as e:
-                    logger.error(f"Failed to encode string as UTF-8: {e}")
-                    # Try latin-1 as fallback, but handle errors  
+                # Check if this looks like binary data based on content-length vs string length
+                content_length = None
+                if hasattr(frame, "headers") and "content-length" in frame.headers:
                     try:
-                        body = body.encode("latin-1", errors="replace")
-                        logger.warning("Fell back to latin-1 encoding with replacement")
-                    except Exception as e2:
-                        logger.error(f"Failed to encode with latin-1 fallback: {e2}")
-                        raise ValueError(f"Cannot encode string body: {e}")
+                        content_length = int(frame.headers["content-length"])
+                    except (ValueError, TypeError):
+                        pass
+                
+                # If content-length is much larger than string length, this is likely binary data
+                # that was incorrectly decoded as a string
+                if content_length and content_length > len(body) * 1.5:
+                    logger.info(f"MSGDEBUG: Detected binary data (content-length={content_length}, string_length={len(body)})")
+                    # This is binary data that was incorrectly decoded as UTF-8
+                    # Try to encode as latin-1 to preserve byte values
+                    try:
+                        body = body.encode("latin-1")
+                        logger.info("MSGDEBUG: Encoded binary string as latin-1")
+                    except UnicodeEncodeError as e:
+                        logger.warning(f"MSGDEBUG: Failed to encode binary data as latin-1: {e}")
+                        # Skip this message as it's corrupted binary data
+                        logger.error(f"Skipping corrupted binary message #{self.message_count}")
+                        return
+                else:
+                    # Regular text string - encode as UTF-8
+                    try:
+                        body = body.encode("utf-8")
+                        logger.info("MSGDEBUG: Encoded string as UTF-8")
+                    except UnicodeEncodeError as e:
+                        logger.error(f"Failed to encode string as UTF-8: {e}")
+                        # Try latin-1 as fallback, but handle errors  
+                        try:
+                            body = body.encode("latin-1", errors="replace")
+                            logger.warning("Fell back to latin-1 encoding with replacement")
+                        except Exception as e2:
+                            logger.error(f"Failed to encode with latin-1 fallback: {e2}")
+                            raise ValueError(f"Cannot encode string body: {e}")
         else:
             # Unknown type, try to convert
             logger.info(f"MSGDEBUG: Unexpected body type: {type(body)}")
