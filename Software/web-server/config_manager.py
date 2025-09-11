@@ -352,7 +352,8 @@ class ConfigurationManager:
         Returns:
             Tuple of (is_valid, error_message)
         """
-        metadata = self._raw_metadata if hasattr(self, '_raw_metadata') else self._load_raw_metadata()
+        # Use load_configurations_metadata() to get metadata with dynamic options
+        metadata = self.load_configurations_metadata()
         settings_metadata = metadata.get("settings", {})
         validation_rules = metadata.get("validationRules", {})
         
@@ -362,6 +363,10 @@ class ConfigurationManager:
             
             if setting_type == "select" and "options" in setting_info:
                 valid_options = list(setting_info["options"].keys())
+                # Special case for ONNX model path - if no models found, allow any path
+                if key == "gs_config.ball_identification.kONNXModelPath" and not valid_options:
+                    # Allow any path if no models are found
+                    return True, ""
                 # Convert value to string for comparison (handles both string and numeric inputs)
                 str_value = str(value)
                 if str_value not in valid_options:
