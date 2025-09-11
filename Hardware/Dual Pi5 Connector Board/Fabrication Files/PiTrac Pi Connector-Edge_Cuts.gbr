@@ -1,0 +1,23 @@
+%TF.GenerationSoftware,KiCad,Pcbnew,9.0.4*%
+%TF.CreationDate,2025-09-04T23:05:58-07:00*%
+%TF.ProjectId,PiTrac Pi Connector,50695472-6163-4205-9069-20436f6e6e65,rev?*%
+%TF.SameCoordinates,Original*%
+%TF.FileFunction,Profile,NP*%
+%FSLAX46Y46*%
+G04 Gerber Fmt 4.6, Leading zero omitted, Abs format (unit mm)*
+G04 Created by KiCad (PCBNEW 9.0.4) date 2025-09-04 23:05:58*
+%MOMM*%
+%LPD*%
+G01*
+G04 APERTURE LIST*
+%TA.AperFunction,Profile*%
+%ADD10C,0.050000*%
+%TD*%
+G04 APERTURE END LIST*
+D10*
+X94000000Y-44500000D02*
+X154000000Y-44500000D01*
+X154000000Y-144500000D01*
+X94000000Y-144500000D01*
+X94000000Y-44500000D01*
+M02*
