@@ -107,21 +107,22 @@ class TestShotSimulation:
         assert mock_ws.send_json.call_count == shot_count
 
     def test_shot_result_types(self):
-        """Test different shot result types"""
+        """Test different shot result types with C++ string mapping"""
+        from parsers import ShotDataParser
+        
         result_types = {
             ResultType.UNKNOWN: "Unknown",
             ResultType.INITIALIZING: "Initializing",
             ResultType.WAITING_FOR_BALL: "Waiting For Ball",
-            ResultType.BALL_READY: "Ball Ready",
+            ResultType.BALL_READY: "Ball Placed",  # Updated to match C++ actual string
             ResultType.HIT: "Hit",
             ResultType.ERROR: "Error",
         }
 
         for enum_val, expected_text in result_types.items():
-            formatted = enum_val.name.replace("_", " ").title()
-            assert formatted == expected_text or formatted.replace(
-                " ", ""
-            ) == expected_text.replace(" ", "")
+            # Test that our mapping function returns the expected C++ string
+            mapped_string = ShotDataParser._get_result_type_string(enum_val.value)
+            assert mapped_string == expected_text, f"Expected '{expected_text}', got '{mapped_string}' for {enum_val.name}"
 
     @pytest.mark.asyncio
     async def test_shot_timestamp_generation(

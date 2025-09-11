@@ -25,19 +25,23 @@ namespace golf_sim {
 
         std::map<GsIPCResultType, std::string> result_table =
         { {   GsIPCResultType::kUnknown, "Unknown" },
+            { GsIPCResultType::kInitializing, "Initializing" },
             { GsIPCResultType::kWaitingForBallToAppear, "Waiting For Ball" },
-            { GsIPCResultType::kMultipleBallsPresent, "Multiple Balls Present" },
+            { GsIPCResultType::kWaitingForSimulatorArmed, "Waiting For Simulator" },
             { GsIPCResultType::kPausingForBallStabilization, "Waiting For Placement To Stabilize" },
+            { GsIPCResultType::kMultipleBallsPresent, "Multiple Balls Present" },
             { GsIPCResultType::kBallPlacedAndReadyForHit, "Ball Placed" },
             { GsIPCResultType::kHit, "Hit" },
             { GsIPCResultType::kError, "Error" },
-            { GsIPCResultType::kCalibrationResults, "Calibration Results" }
+            { GsIPCResultType::kCalibrationResults, "Calibration Results" },
+            { GsIPCResultType::kControlMessage, "Control Message" }
         };
 
         if (result_table.count(t) == 0) {
             s = "SYSTEM ERROR:  Invalid GsIPCResultType: " + std::to_string((int)t);
+        } else {
+            s = result_table[t];
         }
-        s = result_table[t];
 
         return s;
     }

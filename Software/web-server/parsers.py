@@ -11,6 +11,49 @@ logger = logging.getLogger(__name__)
 class ShotDataParser:
 
     @staticmethod
+    def _get_status_message_strings() -> List[str]:
+        """Get all strings that represent status messages (not shot data)"""
+        return [
+            "Ball Placed",  # kBallPlacedAndReadyForHit - C++ actual string
+            "Ball Ready",   # Legacy support for old enum conversion
+            "Initializing",
+            "Waiting For Ball",
+            "Waiting For Simulator",
+            "Waiting For Placement To Stabilize",  # C++ actual string
+            "Pausing For Stabilization",  # Legacy support
+            "Multiple Balls Present",  # C++ actual string
+            "Multiple Balls",  # Legacy support
+            "Error",
+            "Calibration Results",  # C++ actual string
+            "Calibration",  # Legacy support
+            "Unknown",
+            "Control Message",
+        ]
+
+    @staticmethod
+    def _get_result_type_string(result_type: int) -> str:
+        """Convert result type integer to the exact string that C++ FormatResultType sends"""
+        cpp_string_mapping = {
+            0: "Unknown",
+            1: "Initializing",
+            2: "Waiting For Ball",
+            3: "Waiting For Simulator",
+            4: "Waiting For Placement To Stabilize",
+            5: "Multiple Balls Present",
+            6: "Ball Placed",
+            7: "Hit",
+            8: "Error",
+            9: "Calibration Results",
+            10: "Control Message",
+        }
+        
+        if result_type in cpp_string_mapping:
+            return cpp_string_mapping[result_type]
+        else:
+            result_type_enum = ResultType(result_type)
+            return result_type_enum.name.replace("_", " ").title()
+
+    @staticmethod
     def parse_array_format(data: List[Any]) -> ShotData:
         if len(data) < EXPECTED_DATA_LENGTH:
             raise ValueError(
@@ -27,11 +70,13 @@ class ShotDataParser:
         # club_type = data[7]   # Currently unused
         result_type = data[8]
         message = data[9]
+        
+        logger.debug(f"Received result_type={result_type}, message='{message}'")
         # log_messages = data[10] if len(data) > 10 else []  # Currently unused
         image_file_paths = data[11] if len(data) > 11 else []
 
         try:
-            result_type_str = ResultType(result_type).name.replace("_", " ").title()
+            result_type_str = ShotDataParser._get_result_type_string(result_type)
         except ValueError:
             result_type_str = f"Type {result_type}"
             logger.warning(f"Unknown result type: {result_type}")
@@ -45,6 +90,7 @@ class ShotDataParser:
             ResultType.MULTIPLE_BALLS.value,  # 5
             ResultType.ERROR.value,  # 8
             ResultType.CALIBRATION.value,  # 9
+            ResultType.UNKNOWN.value,  # 0
         ]
 
         if is_status_message:
@@ -95,9 +141,7 @@ class ShotDataParser:
             try:
                 result_type_val = data["result_type"]
                 if isinstance(result_type_val, int):
-                    updates["result_type"] = (
-                        ResultType(result_type_val).name.replace("_", " ").title()
-                    )
+                    updates["result_type"] = ShotDataParser._get_result_type_string(result_type_val)
                 else:
                     updates["result_type"] = str(result_type_val)
             except ValueError:
@@ -117,17 +161,8 @@ class ShotDataParser:
 
     @staticmethod
     def validate_shot_data(shot_data: ShotData) -> bool:
-        if shot_data.result_type in [
-            "Ball Ready",  # kBallPlacedAndReadyForHit
-            "Initializing",
-            "Waiting For Ball",
-            "Waiting For Simulator", 
-            "Pausing For Stabilization",
-            "Multiple Balls",
-            "Error",
-            "Calibration",
-        ]:
-            logger.debug(f"Skipping validation for status message: {shot_data.result_type}")
+        if shot_data.result_type in ShotDataParser._get_status_message_strings():
+            logger.info(f"Validated status message: '{shot_data.result_type}' with message: '{shot_data.message}'")
             return True
 
         if not 0 <= shot_data.speed <= 250:

@@ -98,16 +98,7 @@ class ActiveMQListener(stomp.ConnectionListener):
                 logger.warning("Data validation failed, but continuing...")
 
             # Check if this is a status message (preserve existing shot data)
-            is_status_message = parsed_data.result_type in [
-                "Ball Ready",  # kBallPlacedAndReadyForHit
-                "Initializing",
-                "Waiting For Ball",
-                "Waiting For Simulator", 
-                "Pausing For Stabilization",
-                "Multiple Balls",
-                "Error",
-                "Calibration",
-            ]
+            is_status_message = parsed_data.result_type in ShotDataParser._get_status_message_strings()
 
             if is_status_message:
                 # For status messages, update only the status and message, preserve shot data
