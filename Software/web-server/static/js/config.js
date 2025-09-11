@@ -654,7 +654,7 @@ async function saveChanges() {
     let resetCount = 0;
 
     for (const key of modifiedSettings) {
-        const input = document.querySelector(`[data-key="${key}"] .config-input`);
+        const input = document.querySelector(`.config-input[data-key="${key}"]`);
         if (!input) continue;
 
         let value = input.value;
