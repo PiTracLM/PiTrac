@@ -167,18 +167,30 @@ class ConfigurationManager:
         return result
 
     def get_default(self, key: Optional[str] = None) -> Any:
-        """Get default system configuration value"""
+        """Get default system configuration value or metadata default"""
         if key is None:
-            return self.system_config
+            return self.get_all_defaults_with_metadata()
 
         value = self.system_config
-        for part in key.split("."):
+        parts = key.split(".")
+        found = True
+        
+        for part in parts:
             if isinstance(value, dict) and part in value:
                 value = value[part]
             else:
-                return None
-
-        return value
+                found = False
+                break
+        
+        if found:
+            return value
+            
+        metadata = self.load_configurations_metadata()
+        settings_metadata = metadata.get("settings", {})
+        if key in settings_metadata and "default" in settings_metadata[key]:
+            return settings_metadata[key]["default"]
+        
+        return None
     
     def get_all_defaults_with_metadata(self) -> Dict[str, Any]:
         """Get all defaults including metadata-defined defaults"""

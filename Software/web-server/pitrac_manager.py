@@ -116,7 +116,7 @@ class PiTracProcessManager:
                 if value:
                     args.append(cli_arg)
             else:
-                args.append(f"{cli_arg}={value}")
+                args.extend([cli_arg, str(value)])
         
         return args
     
