@@ -39,8 +39,15 @@ class ActiveMQListener(stomp.ConnectionListener):
 
         try:
             msgpack_data = self._extract_message_data(frame)
+            logger.info(f"MSGDEBUG: Extracted msgpack data: {len(msgpack_data)} bytes, first 50 bytes: {msgpack_data[:50]}")
+            
+            # Validate msgpack data before unpacking
+            if len(msgpack_data) == 0:
+                logger.warning(f"Empty msgpack data for message #{self.message_count}")
+                return
+                
             data = msgpack.unpackb(msgpack_data, raw=False, strict_map_key=False)
-            logger.debug(f"Unpacked message data: {data}")
+            logger.info(f"MSGDEBUG: Unpacked message data: {data}")
 
             if self.loop:
                 asyncio.run_coroutine_threadsafe(
@@ -62,25 +69,57 @@ class ActiveMQListener(stomp.ConnectionListener):
         if not hasattr(frame, "body"):
             raise ValueError("Frame has no body attribute")
 
-        if isinstance(frame.body, bytes):
-            body = frame.body
+        body = frame.body
+        logger.info(f"MSGDEBUG: Frame body type: {type(body)}, length: {len(body) if hasattr(body, '__len__') else 'unknown'}")
+        logger.info(f"MSGDEBUG: Frame headers: {getattr(frame, 'headers', {})}")
+        
+        # Handle different body types from STOMP protocol
+        if isinstance(body, bytes):
+            # Already bytes, use directly
+            logger.info("MSGDEBUG: Body is already bytes")
+        elif isinstance(body, str):
+            # String body - need to handle encoding carefully
+            logger.info(f"MSGDEBUG: Body is string, first 100 chars: {repr(body[:100])}")
+            
+            # Check for base64 encoding header first
+            if hasattr(frame, "headers") and frame.headers.get("encoding") == "base64":
+                logger.info("MSGDEBUG: Message has base64 encoding header")
+                try:
+                    # Direct base64 decode from string
+                    body = base64.b64decode(body)
+                    logger.info(f"MSGDEBUG: Successfully decoded base64 to {len(body)} bytes")
+                except Exception as e:
+                    logger.warning(f"MSGDEBUG: Failed to decode base64 string: {e}")
+                    # Fall back to UTF-8 encoding
+                    body = body.encode("utf-8")
+            else:
+                # Regular string - encode as UTF-8 (not latin-1)
+                try:
+                    body = body.encode("utf-8")
+                    logger.info("MSGDEBUG: Encoded string as UTF-8")
+                except UnicodeEncodeError as e:
+                    logger.error(f"Failed to encode string as UTF-8: {e}")
+                    # Try latin-1 as fallback, but handle errors  
+                    try:
+                        body = body.encode("latin-1", errors="replace")
+                        logger.warning("Fell back to latin-1 encoding with replacement")
+                    except Exception as e2:
+                        logger.error(f"Failed to encode with latin-1 fallback: {e2}")
+                        raise ValueError(f"Cannot encode string body: {e}")
         else:
+            # Unknown type, try to convert
+            logger.info(f"MSGDEBUG: Unexpected body type: {type(body)}")
             try:
-                body = bytes(frame.body, "latin-1")
-            except (UnicodeDecodeError, TypeError) as e:
-                logger.warning(
-                    f"Failed to decode with latin-1: {e}, falling back to byte conversion"
-                )
-                body = bytes(
-                    [ord(c) if ord(c) < 256 else ord(c) & 0xFF for c in frame.body]
-                )
-
-        if hasattr(frame, "headers") and frame.headers.get("encoding") == "base64":
-            logger.debug("Message is base64 encoded, decoding...")
-            base64_str = body.decode("utf-8") if isinstance(body, bytes) else body
-            decoded = base64.b64decode(base64_str)
-            logger.debug(f"Decoded {len(decoded)} bytes from base64")
-            return decoded
+                if hasattr(body, '__iter__') and not isinstance(body, (str, bytes)):
+                    # Iterable but not string/bytes - convert to bytes
+                    body = bytes(body)
+                else:
+                    # Try string conversion then UTF-8 encoding
+                    body = str(body).encode("utf-8")
+                logger.info(f"MSGDEBUG: Converted {type(frame.body)} to bytes")
+            except Exception as e:
+                logger.error(f"Cannot convert frame.body to bytes: {type(body)}, {e}")
+                raise ValueError(f"Unsupported body type: {type(body)}")
 
         return body
 

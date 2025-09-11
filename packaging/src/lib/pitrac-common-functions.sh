@@ -339,6 +339,7 @@ install_camera_tools() {
         for sensor_file in "imx296_noir.json.PI_4_FOR_VC4_DIRECTORY" "imx296_noir.json.PI_5_FOR_PISP_DIRECTORY"; do
             if [[ -f "$imaging_dir/$sensor_file" ]]; then
                 cp "$imaging_dir/$sensor_file" "$dest_dir/ImageProcessing/CameraTools/"
+                chmod 644 "$dest_dir/ImageProcessing/CameraTools/$sensor_file"
                 log_info "Installed sensor file: $sensor_file"
             fi
         done
