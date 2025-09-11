@@ -211,6 +211,8 @@
             "kCamera1HighFPSGain": "15.0",
             "kCamera1Contrast": "1.0",
             "kCamera2Gain": "4.0",
+            "kCamera1SearchCenterX": "850",
+            "kCamera1SearchCenterY": "500",
             "kCamera2ComparisonGain": "0.8",
             "kCamera2CalibrateOrLocationGain": "1.0",
             "kCamera2Contrast": "1.2",

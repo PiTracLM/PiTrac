@@ -20,11 +20,15 @@ class ConfigurationManager:
     """Manages PiTrac configuration with JSON-based system"""
 
     def __init__(self):
-        self.system_config_path = Path("/etc/pitrac/golf_sim_config.json")
-        self.user_settings_path = (
-            Path.home() / ".pitrac" / "config" / "user_settings.json"
-        )
-        self.backup_dir = Path.home() / ".pitrac" / "backups"
+        self._raw_metadata = self._load_raw_metadata()
+        sys_paths = self._raw_metadata.get("systemPaths", {})
+        
+        def expand_path(path_str: str) -> Path:
+            return Path(path_str.replace("~", str(Path.home())))
+        
+        self.system_config_path = Path(sys_paths.get("systemConfigPath", {}).get("default", "/etc/pitrac/golf_sim_config.json"))
+        self.user_settings_path = expand_path(sys_paths.get("userSettingsPath", {}).get("default", "~/.pitrac/config/user_settings.json"))
+        self.backup_dir = expand_path(sys_paths.get("backupDirectory", {}).get("default", "~/.pitrac/backups"))
 
         self.system_config: Dict[str, Any] = {}
         self.user_settings: Dict[str, Any] = {}
@@ -34,9 +38,19 @@ class ConfigurationManager:
 
         self.reload()
 
+    def _load_raw_metadata(self) -> Dict[str, Any]:
+        """Load raw metadata from configurations.json without processing"""
+        try:
+            config_path = os.path.join(os.path.dirname(__file__), "configurations.json")
+            with open(config_path, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading configurations.json: {e}")
+            return {"settings": {}}
+    
     def _load_restart_required_params(self) -> set:
         """Load parameters that require restart from configurations.json metadata"""
-        metadata = self.load_configurations_metadata()
+        metadata = self._raw_metadata if hasattr(self, '_raw_metadata') else self._load_raw_metadata()
         settings_metadata = metadata.get("settings", {})
 
         restart_params = set()
@@ -288,8 +302,9 @@ class ConfigurationManager:
         Returns:
             Tuple of (is_valid, error_message)
         """
-        metadata = self.load_configurations_metadata()
+        metadata = self._raw_metadata if hasattr(self, '_raw_metadata') else self._load_raw_metadata()
         settings_metadata = metadata.get("settings", {})
+        validation_rules = metadata.get("validationRules", {})
         
         if key in settings_metadata:
             setting_info = settings_metadata[key]
@@ -308,31 +323,29 @@ class ConfigurationManager:
             
             elif setting_type == "number":
                 try:
-                    float(value)
+                    num_val = float(value)
+                    if "min" in setting_info and num_val < setting_info["min"]:
+                        return False, f"Must be at least {setting_info['min']}"
+                    if "max" in setting_info and num_val > setting_info["max"]:
+                        return False, f"Must be at most {setting_info['max']}"
                 except (TypeError, ValueError):
                     return False, "Must be a number"
             
             return True, ""
         
-        if "Gain" in key:
-            try:
-                float_val = float(value)
-                if not 0.5 <= float_val <= 16.0:
-                    return False, "Gain must be between 0.5 and 16.0"
-            except (TypeError, ValueError):
-                return False, "Gain must be a number"
-
-        elif "Port" in key:
-            try:
-                port = int(value)
-                if not 1 <= port <= 65535:
-                    return False, "Port must be between 1 and 65535"
-            except (TypeError, ValueError):
-                return False, "Port must be an integer"
-
-        elif any(x in key for x in ["Address", "Host"]):
-            if value and not isinstance(value, str):
-                return False, "Address must be a string"
+        for pattern, rule in validation_rules.items():
+            if pattern.lower() in key.lower():
+                if rule["type"] == "range":
+                    try:
+                        val = float(value) if pattern == "gain" else int(value)
+                        if not rule["min"] <= val <= rule["max"]:
+                            return False, rule["errorMessage"]
+                    except (TypeError, ValueError):
+                        return False, rule["errorMessage"]
+                elif rule["type"] == "string":
+                    if value and not isinstance(value, str):
+                        return False, rule["errorMessage"]
+                return True, ""
 
         return True, ""
 
@@ -342,17 +355,16 @@ class ConfigurationManager:
         Returns a dict of {display_name: path} for dropdown options.
         """
         models = {}
-
-        model_dirs = [
-            Path.home() / "LM_Shares" / "models",
-            Path("/opt/pitrac/models"),
-            Path.home()
-            / "dev"
-            / "PiTrac"
-            / "Software"
-            / "GroundTruthAnnotator"
-            / "experiments",
-        ]
+        metadata = self._raw_metadata if hasattr(self, '_raw_metadata') else self._load_raw_metadata()
+        sys_paths = metadata.get("systemPaths", {})
+        
+        model_search_paths = sys_paths.get("modelSearchPaths", {}).get("default", [])
+        model_file_patterns = sys_paths.get("modelFilePatterns", {}).get("default", [])
+        
+        model_dirs = []
+        for path_str in model_search_paths:
+            path = Path(path_str.replace("~", str(Path.home())))
+            model_dirs.append(path)
 
         for base_dir in model_dirs:
             if not base_dir.exists():
@@ -360,10 +372,9 @@ class ConfigurationManager:
 
             for model_dir in base_dir.iterdir():
                 if model_dir.is_dir():
-                    onnx_paths = [
-                        model_dir / "best.onnx",
-                        model_dir / "weights" / "best.onnx",
-                    ]
+                    onnx_paths = []
+                    for pattern in model_file_patterns:
+                        onnx_paths.append(model_dir / pattern)
 
                     for onnx_path in onnx_paths:
                         if onnx_path.exists():
@@ -399,6 +410,58 @@ class ConfigurationManager:
             print(f"Error loading configurations.json: {e}")
             return {"settings": {}}
 
+    def get_cli_parameters(self, target: str = "both") -> List[Dict[str, Any]]:
+        """Get all CLI parameters for a specific target (camera1, camera2, both)
+        
+        Args:
+            target: Target to filter by ('camera1', 'camera2', or 'both')
+            
+        Returns:
+            List of CLI parameter metadata dictionaries
+        """
+        metadata = self.load_configurations_metadata()
+        settings = metadata.get("settings", {})
+        
+        cli_params = []
+        for key, info in settings.items():
+            if info.get("passedVia") == "cli":
+                passed_to = info.get("passedTo", "both")
+                if passed_to == target or passed_to == "both" or target == "both":
+                    cli_params.append({
+                        "key": key,
+                        "cliArgument": info.get("cliArgument"),
+                        "passedTo": passed_to,
+                        "type": info.get("type"),
+                        "default": info.get("default")
+                    })
+        return cli_params
+    
+    def get_environment_parameters(self, target: str = "both") -> List[Dict[str, Any]]:
+        """Get all environment parameters for a specific target
+        
+        Args:
+            target: Target to filter by ('camera1', 'camera2', or 'both')
+            
+        Returns:
+            List of environment parameter metadata dictionaries
+        """
+        metadata = self.load_configurations_metadata()
+        settings = metadata.get("settings", {})
+        
+        env_params = []
+        for key, info in settings.items():
+            if info.get("passedVia") == "environment":
+                passed_to = info.get("passedTo", "both")
+                if passed_to == target or passed_to == "both" or target == "both":
+                    env_params.append({
+                        "key": key,
+                        "envVariable": info.get("envVariable"),
+                        "passedTo": passed_to,
+                        "type": info.get("type"),
+                        "default": info.get("default")
+                    })
+        return env_params
+
     def flatten_config(
         self, config: Dict[str, Any], prefix: str = ""
     ) -> Dict[str, Any]:
@@ -420,21 +483,13 @@ class ConfigurationManager:
         """
         metadata = self.load_configurations_metadata()
         settings_metadata = metadata.get("settings", {})
+        category_list = metadata.get("categoryList", [
+            "Basic", "Cameras", "Simulators", "Ball Detection", 
+            "AI Detection", "Storage", "Network", "Logging",
+            "Strobing", "Spin Analysis", "Calibration", "Advanced"
+        ])
 
-        categories = {
-            "Basic": [],
-            "Cameras": [],
-            "Simulators": [],
-            "Ball Detection": [],
-            "AI Detection": [],
-            "Storage": [],
-            "Network": [],
-            "Logging": [],
-            "Strobing": [],
-            "Spin Analysis": [],
-            "Calibration": [],
-            "Advanced": [],
-        }
+        categories = {cat: [] for cat in category_list}
 
         processed_keys = set()
 
@@ -456,34 +511,29 @@ class ConfigurationManager:
         return categories
 
     def auto_categorize_key(self, key: str) -> str:
-        """Auto-categorize keys that aren't in the metadata file."""
-        if "camera" in key.lower():
-            return "Cameras"
-        elif any(x in key for x in ["GSPro", "E6", "golf_simulator"]):
-            return "Simulators"
-        elif any(
-            x in key.lower() for x in ["onnx", "yolo", "sahi", "nms", "confidence"]
-        ):
-            return "AI Detection"
-        elif "strob" in key.lower():
-            return "Strobing"
-        elif "ball" in key.lower() or "hough" in key.lower():
-            return "Ball Detection"
-        elif (
-            any(x in key.lower() for x in ["log", "dir", "path", "file"])
-            and "logging" not in key.lower()
-        ):
-            return "Storage"
-        elif any(x in key.lower() for x in ["network", "broker", "port", "address"]):
-            return "Network"
-        elif "logging" in key.lower():
-            return "Logging"
-        elif "spin" in key.lower():
-            return "Spin Analysis"
-        elif "calibrat" in key.lower():
-            return "Calibration"
-        else:
-            return "Advanced"
+        """Auto-categorize keys using metadata-driven rules."""
+        metadata = self._raw_metadata if hasattr(self, '_raw_metadata') else self._load_raw_metadata()
+        rules = metadata.get("autoCategorizationRules", [])
+        
+        for rule in rules:
+            patterns = rule.get("pattern", [])
+            category = rule.get("category", "Advanced")
+            case_sensitive = rule.get("caseSensitive", False)
+            exclude = rule.get("exclude", [])
+            
+            if exclude:
+                if any(excl in key.lower() for excl in exclude):
+                    continue
+            
+            for pattern in patterns:
+                if case_sensitive:
+                    if pattern in key:
+                        return category
+                else:
+                    if pattern.lower() in key.lower():
+                        return category
+        
+        return "Advanced"
 
     def get_basic_subcategories(self):
         """Get subcategories for Basic settings."""

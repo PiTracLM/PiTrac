@@ -1,6 +1,314 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "description": "PiTrac configuration metadata and schema",
+  "cameraDefinitions": {
+    "camera1": {
+      "displayName": "Camera 1",
+      "slot": "slot1",
+      "defaultIndex": 0,
+      "envPrefix": "PITRAC_SLOT1"
+    },
+    "camera2": {
+      "displayName": "Camera 2", 
+      "slot": "slot2",
+      "defaultIndex": 1,
+      "envPrefix": "PITRAC_SLOT2"
+    }
+  },
+  "systemDefaults": {
+    "mode": "single",
+    "cameraRole": "camera1",
+    "configStructure": {
+      "systemKey": "system",
+      "camerasKey": "cameras"
+    }
+  },
+  "systemPaths": {
+    "pitracBinary": {
+      "displayName": "PiTrac Binary Path",
+      "description": "Path to the main pitrac_lm executable",
+      "type": "path",
+      "default": "/usr/lib/pitrac/pitrac_lm",
+      "requiresRestart": true,
+      "internal": true
+    },
+    "configFile": {
+      "displayName": "Configuration File",
+      "description": "Main configuration file path",
+      "type": "path",
+      "default": "/etc/pitrac/golf_sim_config.json",
+      "requiresRestart": true,
+      "internal": true
+    },
+    "systemConfigPath": {
+      "displayName": "System Config Path",
+      "description": "System-wide configuration file",
+      "type": "path",
+      "default": "/etc/pitrac/golf_sim_config.json",
+      "internal": true
+    },
+    "userSettingsPath": {
+      "displayName": "User Settings Path",
+      "description": "User-specific configuration overrides",
+      "type": "path",
+      "default": "~/.pitrac/config/user_settings.json",
+      "internal": true
+    },
+    "logDirectory": {
+      "displayName": "Log Directory",
+      "description": "Directory for log files",
+      "type": "path",
+      "default": "~/.pitrac/logs",
+      "internal": true
+    },
+    "pidDirectory": {
+      "displayName": "PID Directory",
+      "description": "Directory for process ID files",
+      "type": "path",
+      "default": "~/.pitrac/run",
+      "internal": true
+    },
+    "backupDirectory": {
+      "displayName": "Backup Directory",
+      "description": "Directory for configuration backups",
+      "type": "path",
+      "default": "~/.pitrac/backups",
+      "internal": true
+    },
+    "modelSearchPaths": {
+      "displayName": "Model Search Paths",
+      "description": "Directories to search for AI models",
+      "type": "array",
+      "default": [
+        "~/LM_Shares/models",
+        "/opt/pitrac/models",
+        "~/dev/PiTrac/Software/GroundTruthAnnotator/experiments"
+      ],
+      "internal": true
+    },
+    "modelFilePatterns": {
+      "displayName": "Model File Patterns",
+      "description": "File patterns to match when searching for models",
+      "type": "array",
+      "default": ["best.onnx", "weights/best.onnx"],
+      "internal": true
+    }
+  },
+  "processManagement": {
+    "camera1LogFile": {
+      "displayName": "Camera 1 Log File",
+      "description": "Log file for camera 1 process",
+      "type": "string",
+      "default": "pitrac.log",
+      "internal": true
+    },
+    "camera2LogFile": {
+      "displayName": "Camera 2 Log File",
+      "description": "Log file for camera 2 process",
+      "type": "string",
+      "default": "pitrac_camera2.log",
+      "internal": true
+    },
+    "camera1PidFile": {
+      "displayName": "Camera 1 PID File",
+      "description": "Process ID file for camera 1",
+      "type": "string",
+      "default": "pitrac.pid",
+      "internal": true
+    },
+    "camera2PidFile": {
+      "displayName": "Camera 2 PID File",
+      "description": "Process ID file for camera 2",
+      "type": "string",
+      "default": "pitrac_camera2.pid",
+      "internal": true
+    },
+    "processCheckCommand": {
+      "displayName": "Process Check Command",
+      "description": "Command pattern to validate process",
+      "type": "string",
+      "default": "pitrac_lm",
+      "internal": true
+    },
+    "startupDelayCamera2": {
+      "displayName": "Camera 2 Startup Delay",
+      "description": "Seconds to wait after starting camera 2",
+      "type": "number",
+      "default": 2,
+      "internal": true
+    },
+    "startupWaitCamera2Ready": {
+      "displayName": "Camera 2 Ready Wait",
+      "description": "Seconds to wait for camera 2 to be ready",
+      "type": "number",
+      "default": 1,
+      "internal": true
+    },
+    "startupDelayCamera1": {
+      "displayName": "Camera 1 Startup Delay",
+      "description": "Seconds to wait after starting camera 1",
+      "type": "number",
+      "default": 3,
+      "internal": true
+    },
+    "shutdownGracePeriod": {
+      "displayName": "Shutdown Grace Period",
+      "description": "Seconds to wait for graceful shutdown",
+      "type": "number",
+      "default": 5,
+      "internal": true
+    },
+    "shutdownCheckInterval": {
+      "displayName": "Shutdown Check Interval",
+      "description": "Seconds between shutdown status checks",
+      "type": "number",
+      "default": 0.1,
+      "internal": true
+    },
+    "postKillDelay": {
+      "displayName": "Post Kill Delay",
+      "description": "Seconds to wait after force killing process",
+      "type": "number",
+      "default": 0.5,
+      "internal": true
+    },
+    "restartDelay": {
+      "displayName": "Restart Delay",
+      "description": "Seconds to wait between stop and start during restart",
+      "type": "number",
+      "default": 1,
+      "internal": true
+    },
+    "recentLogLines": {
+      "displayName": "Recent Log Lines",
+      "description": "Number of recent log lines to include in status",
+      "type": "number",
+      "default": 10,
+      "internal": true
+    },
+    "terminationSignal": {
+      "displayName": "Termination Signal",
+      "description": "Signal to send for graceful shutdown",
+      "type": "string",
+      "default": "SIGTERM",
+      "internal": true
+    },
+    "killSignal": {
+      "displayName": "Kill Signal",
+      "description": "Signal to force kill process",
+      "type": "string",
+      "default": "SIGKILL",
+      "internal": true
+    }
+  },
+  "environmentDefaults": {
+    "ldLibraryPath": {
+      "displayName": "LD Library Path",
+      "description": "Library path for dynamic linking",
+      "type": "string",
+      "default": "/usr/lib/pitrac",
+      "internal": true
+    },
+    "pitracRoot": {
+      "displayName": "PiTrac Root",
+      "description": "Root directory for PiTrac installation",
+      "type": "string",
+      "default": "/usr/lib/pitrac",
+      "internal": true
+    },
+    "baseImageLoggingDir": {
+      "displayName": "Base Image Logging Directory",
+      "description": "Legacy environment variable for backward compatibility",
+      "type": "string",
+      "default": "~/LM_Shares/Images/",
+      "internal": true
+    },
+    "webserverShareDir": {
+      "displayName": "Web Server Share Directory",
+      "description": "Legacy environment variable for backward compatibility",
+      "type": "string",
+      "default": "~/LM_Shares/WebShare/",
+      "internal": true
+    },
+    "msgBrokerFullAddress": {
+      "displayName": "Message Broker Address",
+      "description": "Legacy environment variable for backward compatibility",
+      "type": "string",
+      "default": "tcp://localhost:61616",
+      "internal": true
+    }
+  },
+  "validationRules": {
+    "gain": {
+      "type": "range",
+      "min": 0.5,
+      "max": 16.0,
+      "errorMessage": "Gain must be between 0.5 and 16.0"
+    },
+    "port": {
+      "type": "range",
+      "min": 1,
+      "max": 65535,
+      "errorMessage": "Port must be between 1 and 65535"
+    },
+    "address": {
+      "type": "string",
+      "errorMessage": "Address must be a string"
+    }
+  },
+  "autoCategorizationRules": [
+    {
+      "pattern": ["camera"],
+      "category": "Cameras",
+      "caseSensitive": false
+    },
+    {
+      "pattern": ["GSPro", "E6", "golf_simulator"],
+      "category": "Simulators",
+      "caseSensitive": true
+    },
+    {
+      "pattern": ["onnx", "yolo", "sahi", "nms", "confidence"],
+      "category": "AI Detection",
+      "caseSensitive": false
+    },
+    {
+      "pattern": ["strob"],
+      "category": "Strobing",
+      "caseSensitive": false
+    },
+    {
+      "pattern": ["ball", "hough"],
+      "category": "Ball Detection",
+      "caseSensitive": false
+    },
+    {
+      "pattern": ["log", "dir", "path", "file"],
+      "category": "Storage",
+      "caseSensitive": false,
+      "exclude": ["logging"]
+    },
+    {
+      "pattern": ["network", "broker", "port", "address"],
+      "category": "Network",
+      "caseSensitive": false
+    },
+    {
+      "pattern": ["logging"],
+      "category": "Logging",
+      "caseSensitive": false
+    },
+    {
+      "pattern": ["spin"],
+      "category": "Spin Analysis",
+      "caseSensitive": false
+    },
+    {
+      "pattern": ["calibrat"],
+      "category": "Calibration",
+      "caseSensitive": false
+    }
+  ],
   "settings": {
     "system.mode": {
       "category": "System",
@@ -55,6 +363,7 @@
       "default": "right_handed",
       "requiresRestart": true,
       "passedVia": "cli",
+      "passedTo": "both",
       "cliArgument": "--golfer_orientation"
     },
     "gs_config.player.kUsePracticeBalls": {
@@ -67,6 +376,7 @@
       "default": false,
       "requiresRestart": true,
       "passedVia": "cli",
+      "passedTo": "both",
       "cliArgument": "--practice_ball"
     },
     "cameras.slot1.type": {
@@ -86,6 +396,7 @@
       "default": "4",
       "requiresRestart": true,
       "passedVia": "environment",
+      "passedTo": "camera1",
       "envVariable": "PITRAC_SLOT1_CAMERA_TYPE"
     },
     "cameras.slot1.lens": {
@@ -101,6 +412,7 @@
       "default": "1",
       "requiresRestart": true,
       "passedVia": "environment",
+      "passedTo": "camera1",
       "envVariable": "PITRAC_SLOT1_LENS_TYPE"
     },
     "cameras.slot2.type": {
@@ -121,6 +433,7 @@
       "default": "4",
       "requiresRestart": true,
       "passedVia": "environment",
+      "passedTo": "camera2",
       "envVariable": "PITRAC_SLOT2_CAMERA_TYPE"
     },
     "cameras.slot2.lens": {
@@ -137,6 +450,7 @@
       "default": "1",
       "requiresRestart": true,
       "passedVia": "environment",
+      "passedTo": "camera2",
       "envVariable": "PITRAC_SLOT2_LENS_TYPE"
     },
     "cameras.slot1.index": {
@@ -155,6 +469,7 @@
       "default": "0",
       "requiresRestart": true,
       "passedVia": "environment",
+      "passedTo": "camera1",
       "envVariable": "PITRAC_SLOT1_CAMERA_INDEX"
     },
     "cameras.slot2.index": {
@@ -174,6 +489,7 @@
       "default": "1",
       "requiresRestart": true,
       "passedVia": "environment",
+      "passedTo": "camera2",
       "envVariable": "PITRAC_SLOT2_CAMERA_INDEX"
     },
     "logging.level": {
@@ -193,6 +509,7 @@
       "default": "info",
       "requiresRestart": true,
       "passedVia": "cli",
+      "passedTo": "both",
       "cliArgument": "--logging_level"
     },
     "gs_config.logging.kArtifactSaveLevel": {
@@ -210,6 +527,7 @@
       "default": "final_results_only",
       "requiresRestart": true,
       "passedVia": "cli",
+      "passedTo": "both",
       "cliArgument": "--artifact_save_level"
     },
     "gs_config.debug.kShowDebugImages": {
@@ -221,6 +539,7 @@
       "default": false,
       "requiresRestart": true,
       "passedVia": "cli",
+      "passedTo": "both",
       "cliArgument": "--show_images"
     },
     "gs_config.debug.kWaitForKeyOnImages": {
@@ -232,6 +551,7 @@
       "default": false,
       "requiresRestart": true,
       "passedVia": "cli",
+      "passedTo": "both",
       "cliArgument": "--wait_keys"
     },
     "gs_config.ball_identification.kDetectionMethod": {
@@ -285,7 +605,10 @@
       "max": 16.0,
       "step": 0.1,
       "default": 1.0,
-      "requiresRestart": true
+      "requiresRestart": true,
+      "passedVia": "cli",
+      "passedTo": "camera1",
+      "cliArgument": "--camera_gain"
     },
     "gs_config.cameras.kCamera2Gain": {
       "category": "Cameras",
@@ -298,8 +621,41 @@
       "min": 0.5,
       "max": 16.0,
       "step": 0.1,
-      "default": 4.0,
-      "requiresRestart": true
+      "default": 1.0,
+      "requiresRestart": true,
+      "passedVia": "cli",
+      "passedTo": "camera2",
+      "cliArgument": "--camera_gain"
+    },
+    "gs_config.cameras.kCamera1SearchCenterX": {
+      "category": "Cameras",
+      "showInBasic": false,
+      "displayName": "Camera 1 Search Center X",
+      "description": "X coordinate for ball search center in Camera 1 (calibration parameter)",
+      "type": "number",
+      "min": 0,
+      "max": 1920,
+      "step": 10,
+      "default": 850,
+      "requiresRestart": true,
+      "passedVia": "cli",
+      "passedTo": "camera1",
+      "cliArgument": "--search_center_x"
+    },
+    "gs_config.cameras.kCamera1SearchCenterY": {
+      "category": "Cameras",
+      "showInBasic": false,
+      "displayName": "Camera 1 Search Center Y",
+      "description": "Y coordinate for ball search center in Camera 1 (calibration parameter)",
+      "type": "number",
+      "min": 0,
+      "max": 1080,
+      "step": 10,
+      "default": 500,
+      "requiresRestart": true,
+      "passedVia": "cli",
+      "passedTo": "camera1",
+      "cliArgument": "--search_center_y"
     },
     "gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress": {
       "category": "Simulators",
@@ -309,7 +665,10 @@
       "description": "IP address of E6 Connect simulator",
       "type": "text",
       "default": "",
-      "requiresRestart": false
+      "requiresRestart": false,
+      "passedVia": "cli",
+      "passedTo": "both",
+      "cliArgument": "--e6_host_address"
     },
     "gs_config.golf_simulator_interfaces.E6.kE6ConnectPort": {
       "category": "Simulators",
@@ -331,7 +690,10 @@
       "description": "IP address of GSPro simulator",
       "type": "text",
       "default": "",
-      "requiresRestart": false
+      "requiresRestart": false,
+      "passedVia": "cli",
+      "passedTo": "both",
+      "cliArgument": "--gspro_host_address"
     },
     "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectPort": {
       "category": "Simulators",
@@ -418,6 +780,39 @@
       "default": 5.2,
       "requiresRestart": false
     },
+    "gs_config.strobing.number_bits_for_fast_on_pulse_": {
+      "category": "Strobing",
+      "showInBasic": false,
+      "displayName": "Fast Strobe Pulse Width (bits)",
+      "description": "Number of bits used for fast strobe on-pulse width. Controls the duration of the fast strobe pulse.",
+      "type": "number",
+      "min": 1,
+      "max": 16,
+      "default": 1,
+      "requiresRestart": true
+    },
+    "gs_config.strobing.number_bits_for_slow_on_pulse_": {
+      "category": "Strobing",
+      "showInBasic": false,
+      "displayName": "Slow Strobe Pulse Width (bits)",
+      "description": "Number of bits used for slow strobe on-pulse width. Controls the duration of the slow strobe pulse.",
+      "type": "number",
+      "min": 1,
+      "max": 16,
+      "default": 8,
+      "requiresRestart": true
+    },
+    "gs_config.strobing.kPrimingPulseFPS": {
+      "category": "Strobing",
+      "showInBasic": false,
+      "displayName": "Priming Pulse FPS",
+      "description": "Frame rate for priming pulses sent to camera before capture. Used to stabilize camera exposure.",
+      "type": "number",
+      "min": 5,
+      "max": 60,
+      "default": 15,
+      "requiresRestart": true
+    },
     "gs_config.logging.kLogIntermediateExposureImagesToFile": {
       "category": "Logging",
       "showInBasic": true,
@@ -496,7 +891,10 @@
       "description": "ActiveMQ message broker address for dual camera mode",
       "type": "text",
       "default": "tcp://127.0.0.1:61616",
-      "requiresRestart": true
+      "requiresRestart": true,
+      "passedVia": "cli",
+      "passedTo": "both",
+      "cliArgument": "--msg_broker_address"
     },
     "gs_config.ipc_interface.kRefreshTimeSeconds": {
       "category": "Network",
@@ -589,6 +987,20 @@
       "requiresRestart": false
     }
   },
+  "categoryList": [
+    "Basic",
+    "Cameras", 
+    "Simulators",
+    "Ball Detection",
+    "AI Detection",
+    "Storage",
+    "Network",
+    "Logging",
+    "Strobing",
+    "Spin Analysis",
+    "Calibration",
+    "Advanced"
+  ],
   "categories": {
     "System": {
       "displayName": "System Settings",

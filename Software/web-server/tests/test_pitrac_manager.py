@@ -30,6 +30,71 @@ class TestPiTracProcessManager:
             "gs_config.cameras.kCamera1Gain": 1.0,
             "gs_config.cameras.kCamera2Gain": 4.0,
         }
+        
+        config_manager.load_configurations_metadata.return_value = {
+            "cameraDefinitions": {
+                "camera1": {
+                    "displayName": "Camera 1",
+                    "slot": "slot1",
+                    "defaultIndex": 0,
+                    "envPrefix": "PITRAC_SLOT1"
+                },
+                "camera2": {
+                    "displayName": "Camera 2",
+                    "slot": "slot2",
+                    "defaultIndex": 1,
+                    "envPrefix": "PITRAC_SLOT2"
+                }
+            },
+            "systemDefaults": {
+                "mode": "single",
+                "cameraRole": "camera1",
+                "configStructure": {
+                    "systemKey": "system",
+                    "camerasKey": "cameras"
+                }
+            },
+            "categoryList": [
+                "Basic", "Cameras", "Simulators", "Ball Detection",
+                "AI Detection", "Storage", "Network", "Logging",
+                "Strobing", "Spin Analysis", "Calibration", "Advanced"
+            ],
+            "systemPaths": {
+                "pitracBinary": {"default": "/usr/lib/pitrac/pitrac_lm"},
+                "configFile": {"default": "/etc/pitrac/golf_sim_config.json"},
+                "logDirectory": {"default": "~/.pitrac/logs"},
+                "pidDirectory": {"default": "~/.pitrac/run"},
+            },
+            "processManagement": {
+                "camera1LogFile": {"default": "pitrac.log"},
+                "camera2LogFile": {"default": "pitrac_camera2.log"},
+                "camera1PidFile": {"default": "pitrac.pid"},
+                "camera2PidFile": {"default": "pitrac_camera2.pid"},
+                "processCheckCommand": {"default": "pitrac_lm"},
+                "startupDelayCamera2": {"default": 2},
+                "startupWaitCamera2Ready": {"default": 1},
+                "startupDelayCamera1": {"default": 3},
+                "shutdownGracePeriod": {"default": 5},
+                "shutdownCheckInterval": {"default": 0.1},
+                "postKillDelay": {"default": 0.5},
+                "restartDelay": {"default": 1},
+                "recentLogLines": {"default": 10},
+                "terminationSignal": {"default": "SIGTERM"},
+                "killSignal": {"default": "SIGKILL"},
+            },
+            "environmentDefaults": {
+                "ldLibraryPath": {"default": "/usr/lib/pitrac"},
+                "pitracRoot": {"default": "/usr/lib/pitrac"},
+                "baseImageLoggingDir": {"default": "~/LM_Shares/Images/"},
+                "webserverShareDir": {"default": "~/LM_Shares/WebShare/"},
+                "msgBrokerFullAddress": {"default": "tcp://localhost:61616"},
+            },
+            "settings": {}
+        }
+        
+        config_manager.get_cli_parameters.return_value = []
+        config_manager.get_environment_parameters.return_value = []
+        
         return config_manager
 
     @pytest.fixture
