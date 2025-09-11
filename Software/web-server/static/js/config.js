@@ -212,7 +212,7 @@ function renderConfiguration(selectedCategory = null) {
             title.className = 'config-group-title';
             title.textContent = category;
             if (category === 'Basic') {
-                title.innerHTML = category + ' <span style="color: var(--warning);">★</span>';
+                title.innerHTML = category + ' <span style="color: var(--warning);">[Modified]</span>';
             }
             group.appendChild(title);
 
@@ -315,7 +315,7 @@ function createConfigItem(key, value, defaultValue, isModified) {
     }
     
     if (metadata.requiresRestart) {
-        labelHTML += ` <span class="restart-indicator" title="Restart required for changes to take effect">⚠️</span>`;
+        labelHTML += ` <span class="restart-indicator" title="Restart required for changes to take effect">[Restart Required]</span>`;
     }
     
     labelHTML += `</div>`;
@@ -466,7 +466,7 @@ function createInput(key, value, defaultValue, isUserSet) {
                 if (modelPath !== value) { // Don't duplicate current value
                     const option = document.createElement('option');
                     option.value = modelPath;
-                    option.textContent = `🤖 ${modelName}`;
+                    option.textContent = `[AI] ${modelName}`;
                     select.appendChild(option);
                 }
             });
@@ -1143,9 +1143,9 @@ function updateModifiedCount() {
     
     if (counterEl) {
         counterEl.innerHTML = `
-            <span class="counter-custom" title="Settings you've customized">🔧 ${userSetCount} custom</span>
-            <span class="counter-default" title="Settings using default values">📎 ${defaultCount} defaults</span>
-            <span class="counter-total" title="Total number of settings">📊 ${totalSettings} total</span>
+            <span class="counter-custom" title="Settings you've customized">${userSetCount} custom</span>
+            <span class="counter-default" title="Settings using default values">${defaultCount} defaults</span>
+            <span class="counter-total" title="Total number of settings">${totalSettings} total</span>
         `;
     }
 }
@@ -1256,7 +1256,11 @@ async function detectAndSetCameras(targetKey = null) {
 
 function checkVisibilityCondition(condition) {
     for (const [condKey, condValue] of Object.entries(condition)) {
-        const actualValue = getNestedValue(currentConfig, condKey);
+        let actualValue = getNestedValue(currentConfig, condKey);
+        // If value is not in currentConfig, use the default value
+        if (actualValue === undefined) {
+            actualValue = getNestedValue(defaultConfig, condKey);
+        }
         if (actualValue !== condValue) {
             return false;
         }

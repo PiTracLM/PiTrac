@@ -657,7 +657,7 @@ def main():
             print(f"Camera Tool: {diag['camera_tool']}")
             print("\nTools Available:")
             for tool, available in diag["tools_available"].items():
-                status = "✓" if available else "✗"
+                status = "[OK]" if available else "[X]"
                 print(f"  {status} {tool}")
             print("\nConfig Files:")
             for path, info in diag["config_files"].items():
@@ -681,7 +681,7 @@ def main():
         if result["warnings"]:
             print("\nWarnings:")
             for warning in result["warnings"]:
-                print(f"  ⚠ {warning}")
+                print(f"  WARNING: {warning}")
 
         if result["cameras"]:
             print("\nDetected Cameras:")

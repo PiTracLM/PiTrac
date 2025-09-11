@@ -108,7 +108,7 @@
 }
 
 .category-item[data-category="Basic"]::after {
-    content: "★";
+    content: "*";
     position: absolute;
     right: 1rem;
     color: var(--warning);
