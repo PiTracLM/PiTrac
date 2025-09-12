@@ -3,16 +3,16 @@
 
 /* Status Message */
 .status-message {
-    padding: 0.75rem 1rem;
-    margin: 0.5rem 0;
-    border-radius: 0.5rem;
-    font-weight: 500;
+    font-size: 0.875rem;
     transition: all 0.3s ease;
-    text-align: center;
-    min-height: 2.5rem;
     display: flex;
     align-items: center;
-    justify-content: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .status-message:empty {
@@ -20,27 +20,19 @@
 }
 
 .status-message.success {
-    background: rgba(34, 197, 94, 0.1);
-    color: #22c55e;
-    border: 1px solid rgba(34, 197, 94, 0.2);
+    color: var(--success);
 }
 
 .status-message.error {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: var(--error);
 }
 
 .status-message.warning {
-    background: rgba(251, 191, 36, 0.1);
-    color: #fbbf24;
-    border: 1px solid rgba(251, 191, 36, 0.2);
+    color: var(--warning);
 }
 
 .status-message.info {
-    background: rgba(59, 130, 246, 0.1);
-    color: #3b82f6;
-    border: 1px solid rgba(59, 130, 246, 0.2);
+    color: var(--info);
 }
 
 /* Config Container Layout */
@@ -344,21 +336,50 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem;
+    padding: 0.75rem 1rem;
     background: var(--bg-card);
     border-radius: 0.75rem;
     margin-bottom: 1.5rem;
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-sm);
+    min-height: 3.5rem;
+    gap: 1rem;
 }
 
-#status-message {
-    color: var(--text-secondary);
+.status-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    background: var(--bg-hover);
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-color);
+    white-space: nowrap;
+}
+
+.status-label {
+    color: var(--text-muted);
     font-size: 0.875rem;
 }
 
-.action-buttons {
+.status-value {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 1rem;
+    min-width: 1.5rem;
+    text-align: center;
+}
+
+.status-right {
     display: flex;
-    gap: 0.75rem;
+    gap: 0.5rem;
     flex-shrink: 0;
 }
 
@@ -675,23 +696,42 @@ textarea.config-input {
         padding-bottom: 0.5rem;
     }
     
-    .action-buttons {
+    .status-bar {
         flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+        padding: 1rem;
+    }
+    
+    .status-left {
+        justify-content: space-between;
         width: 100%;
     }
     
-    .btn {
+    .status-message {
+        text-align: right;
+    }
+    
+    .status-right {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+        width: 100%;
+    }
+    
+    .status-right .btn {
         width: 100%;
         justify-content: center;
+        font-size: 0.875rem;
+        padding: 0.6rem 0.5rem;
+    }
+    
+    .status-right .btn-primary {
+        grid-column: span 2;
     }
     
     .dropdown-menu {
         right: -1rem;
-    }
-    
-    .status-bar {
-        flex-direction: column;
-        gap: 1rem;
     }
 }
 

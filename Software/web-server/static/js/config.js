@@ -1138,6 +1138,11 @@ function updateModifiedCount() {
     const modifiedCount = modifiedSettings.size;
     document.getElementById('modifiedCount').textContent = modifiedCount;
     
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) {
+        saveBtn.disabled = modifiedCount === 0;
+    }
+    
     let userSetCount = 0;
     const countUserSettings = (obj, depth = 0) => {
         if (depth > 10) return;

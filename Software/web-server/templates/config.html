@@ -74,19 +74,25 @@
 
         <!-- Status Bar -->
         <div class="status-bar">
-            <div id="statusMessage" class="status-message"></div>
-            <div class="action-buttons">
-                <button class="btn btn-primary" onclick="saveChanges()">
-                    Save All Changes (<span id="modifiedCount">0</span>)
+            <div class="status-left">
+                <div class="status-indicator">
+                    <span class="status-label">Modified:</span>
+                    <span class="status-value" id="modifiedCount">0</span>
+                </div>
+                <div id="statusMessage" class="status-message"></div>
+            </div>
+            <div class="status-right">
+                <button class="btn btn-primary" onclick="saveChanges()" id="saveBtn" disabled>
+                    Save Changes
                 </button>
                 <button class="btn btn-secondary" onclick="reloadConfig()">
                     Reload
                 </button>
                 <button class="btn btn-secondary" onclick="showDiff()">
-                    View Diff
+                    Diff
                 </button>
                 <button class="btn btn-danger" onclick="resetAll()">
-                    Reset to Defaults
+                    Reset
                 </button>
             </div>
         </div>
