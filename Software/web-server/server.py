@@ -27,6 +27,7 @@ from parsers import ShotDataParser
 from config_manager import ConfigurationManager
 from pitrac_manager import PiTracProcessManager
 from camera_detector import CameraDetector
+from calibration_manager import CalibrationManager
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ class PiTracServer:
         self.parser = ShotDataParser()
         self.config_manager = ConfigurationManager()
         self.pitrac_manager = PiTracProcessManager(self.config_manager)
+        self.calibration_manager = CalibrationManager(self.config_manager)
         self.mq_conn: Optional[stomp.Connection] = None
         self.listener: Optional[ActiveMQListener] = None
         self.reconnect_task: Optional[asyncio.Task] = None
@@ -298,6 +300,56 @@ class PiTracServer:
         async def pitrac_status() -> Dict[str, Any]:
             """Get the status of the PiTrac launch monitor process"""
             return self.pitrac_manager.get_status()
+        
+        @self.app.get("/calibration", response_class=HTMLResponse)
+        async def calibration_page(request: Request) -> Response:
+            """Serve calibration UI page"""
+            return self.templates.TemplateResponse(
+                "calibration.html", {"request": request}
+            )
+        
+        @self.app.get("/api/calibration/status")
+        async def calibration_status() -> Dict[str, Any]:
+            """Get calibration status for all cameras"""
+            return self.calibration_manager.get_status()
+        
+        @self.app.get("/api/calibration/data")
+        async def get_calibration_data() -> Dict[str, Any]:
+            """Get current calibration data"""
+            return self.calibration_manager.get_calibration_data()
+        
+        @self.app.post("/api/calibration/ball-location/{camera}")
+        async def check_ball_location(camera: str) -> Dict[str, Any]:
+            """Check ball location for calibration setup"""
+            if camera not in ["camera1", "camera2"]:
+                return {"status": "error", "message": "Invalid camera"}
+            return await self.calibration_manager.check_ball_location(camera)
+        
+        @self.app.post("/api/calibration/auto/{camera}")
+        async def run_auto_calibration(camera: str) -> Dict[str, Any]:
+            """Run automatic calibration for specified camera"""
+            if camera not in ["camera1", "camera2"]:
+                return {"status": "error", "message": "Invalid camera"}
+            return await self.calibration_manager.run_auto_calibration(camera)
+        
+        @self.app.post("/api/calibration/manual/{camera}")
+        async def run_manual_calibration(camera: str) -> Dict[str, Any]:
+            """Run manual calibration for specified camera"""
+            if camera not in ["camera1", "camera2"]:
+                return {"status": "error", "message": "Invalid camera"}
+            return await self.calibration_manager.run_manual_calibration(camera)
+        
+        @self.app.post("/api/calibration/capture/{camera}")
+        async def capture_still(camera: str) -> Dict[str, Any]:
+            """Capture a still image for camera setup"""
+            if camera not in ["camera1", "camera2"]:
+                return {"status": "error", "message": "Invalid camera"}
+            return await self.calibration_manager.capture_still_image(camera)
+        
+        @self.app.post("/api/calibration/stop")
+        async def stop_calibration() -> Dict[str, Any]:
+            """Stop any running calibration process"""
+            return await self.calibration_manager.stop_calibration()
 
         @self.app.get("/api/cameras/detect")
         async def detect_cameras() -> Dict[str, Any]:

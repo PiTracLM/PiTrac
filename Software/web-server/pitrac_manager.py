@@ -79,10 +79,15 @@ class PiTracProcessManager:
         
         cli_params = self.config_manager.get_cli_parameters(target)
         
+        skip_args = {"--system_mode", "--run_single_pi", "--web_server_share_dir"}
+        
         for param in cli_params:
             key = param["key"]
             cli_arg = param["cliArgument"]
             param_type = param["type"]
+            
+            if cli_arg in skip_args:
+                continue
             
             value = merged_config
             for part in key.split("."):
@@ -99,7 +104,8 @@ class PiTracProcessManager:
                 if value:
                     args.append(cli_arg)
             else:
-                args.extend([cli_arg, str(value)])
+                # Use --key=value format for consistency
+                args.append(f"{cli_arg}={value}")
         
         return args
     

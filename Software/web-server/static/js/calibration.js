@@ -1,0 +1,492 @@
+/**
+ * PiTrac Calibration UI Controller
+ */
+
+class CalibrationManager {
+    constructor() {
+        this.currentStep = 1;
+        this.selectedCameras = [];
+        this.calibrationMethod = null;
+        this.calibrationInProgress = false;
+        this.statusPollInterval = null;
+        this.ballVerified = {
+            camera1: false,
+            camera2: false
+        };
+        
+        this.init();
+    }
+    
+    async init() {
+        await this.loadSystemStatus();
+        
+        await this.loadCalibrationData();
+        
+        this.setupEventListeners();
+        
+        this.startStatusPolling();
+    }
+    
+    setupEventListeners() {
+        document.querySelectorAll('input[name="camera"]').forEach(input => {
+            input.addEventListener('change', (e) => {
+                this.updateSelectedCameras(e.target.value);
+            });
+        });
+        
+        this.updateSelectedCameras('camera1');
+    }
+    
+    updateSelectedCameras(value) {
+        if (value === 'both') {
+            this.selectedCameras = ['camera1', 'camera2'];
+            document.getElementById('camera1-view').style.display = 'block';
+            document.getElementById('camera2-view').style.display = 'block';
+        } else {
+            this.selectedCameras = [value];
+            document.getElementById('camera1-view').style.display = 
+                value === 'camera1' ? 'block' : 'none';
+            document.getElementById('camera2-view').style.display = 
+                value === 'camera2' ? 'block' : 'none';
+        }
+    }
+    
+    async loadSystemStatus() {
+        try {
+            const configResponse = await fetch('/api/config');
+            if (configResponse.ok) {
+                const config = await configResponse.json();
+                const systemMode = config.system?.mode || 'single';
+                document.getElementById('system-mode').textContent = 
+                    systemMode === 'single' ? 'Single Pi' : 'Dual Pi';
+            }
+            
+            const statusResponse = await fetch('/api/pitrac/status');
+            if (statusResponse.ok) {
+                const status = await statusResponse.json();
+                const statusElement = document.getElementById('pitrac-status');
+                if (status.running) {
+                    statusElement.textContent = 'Running';
+                    statusElement.style.color = '#4CAF50';
+                } else {
+                    statusElement.textContent = 'Stopped';
+                    statusElement.style.color = '#f44336';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading system status:', error);
+        }
+    }
+    
+    async loadCalibrationData() {
+        try {
+            const response = await fetch('/api/calibration/data');
+            if (response.ok) {
+                const data = await response.json();
+                this.displayCurrentCalibration(data);
+            }
+        } catch (error) {
+            console.error('Error loading calibration data:', error);
+        }
+    }
+    
+    displayCurrentCalibration(data) {
+        const container = document.getElementById('current-calibration-data');
+        container.innerHTML = '';
+        
+        if (data.camera1) {
+            this.addCalibrationDataItem(container, 'Camera 1 Focal Length', 
+                data.camera1.focal_length?.toFixed(3) || 'Not set');
+            this.addCalibrationDataItem(container, 'Camera 1 X Offset', 
+                data.camera1.x_offset?.toFixed(1) || '0');
+            this.addCalibrationDataItem(container, 'Camera 1 Y Offset', 
+                data.camera1.y_offset?.toFixed(1) || '0');
+        }
+        
+        if (data.camera2) {
+            this.addCalibrationDataItem(container, 'Camera 2 Focal Length', 
+                data.camera2.focal_length?.toFixed(3) || 'Not set');
+            this.addCalibrationDataItem(container, 'Camera 2 X Offset', 
+                data.camera2.x_offset?.toFixed(1) || '0');
+            this.addCalibrationDataItem(container, 'Camera 2 Y Offset', 
+                data.camera2.y_offset?.toFixed(1) || '0');
+        }
+    }
+    
+    addCalibrationDataItem(container, label, value) {
+        const item = document.createElement('div');
+        item.className = 'calibration-data-item';
+        item.innerHTML = `
+            <span class="calibration-data-label">${label}:</span>
+            <span class="calibration-data-value">${value}</span>
+        `;
+        container.appendChild(item);
+    }
+    
+    nextStep() {
+        if (this.currentStep === 1) {
+            this.showStep(2);
+        } else if (this.currentStep === 2) {
+            const allVerified = this.selectedCameras.every(cam => this.ballVerified[cam]);
+            if (!allVerified) {
+                this.showMessage('Please verify ball placement for all selected cameras', 'error');
+                return;
+            }
+            this.showStep(3);
+        } else if (this.currentStep === 3) {
+        }
+    }
+    
+    prevStep() {
+        if (this.currentStep > 1) {
+            this.showStep(this.currentStep - 1);
+        }
+    }
+    
+    showStep(stepNumber) {
+        document.querySelectorAll('.wizard-content').forEach(content => {
+            content.style.display = 'none';
+        });
+        
+        document.getElementById(`step${stepNumber}`).style.display = 'block';
+        
+        document.querySelectorAll('.step').forEach(step => {
+            const stepNum = parseInt(step.dataset.step);
+            if (stepNum < stepNumber) {
+                step.classList.add('completed');
+                step.classList.remove('active');
+            } else if (stepNum === stepNumber) {
+                step.classList.add('active');
+                step.classList.remove('completed');
+            } else {
+                step.classList.remove('active', 'completed');
+            }
+        });
+        
+        this.currentStep = stepNumber;
+    }
+    
+    async captureImage(camera) {
+        try {
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = '⏳ Capturing...';
+            
+            const response = await fetch(`/api/calibration/capture/${camera}`, {
+                method: 'POST'
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (result.status === 'success') {
+                    const img = document.getElementById(`${camera}-image`);
+                    img.src = result.image_url;
+                    img.style.display = 'block';
+                    
+                    const placeholder = img.parentElement.querySelector('.camera-placeholder');
+                    if (placeholder) {
+                        placeholder.style.display = 'none';
+                    }
+                    
+                    this.showMessage(`Image captured for ${camera}`, 'success');
+                } else {
+                    this.showMessage(`Failed to capture image: ${result.message}`, 'error');
+                }
+            } else {
+                this.showMessage('Failed to capture image', 'error');
+            }
+        } catch (error) {
+            console.error('Error capturing image:', error);
+            this.showMessage('Error capturing image', 'error');
+        } finally {
+            const button = event.target;
+            button.disabled = false;
+            button.textContent = 'Capture Image';
+        }
+    }
+    
+    async checkBallLocation(camera) {
+        try {
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Checking...';
+            
+            const response = await fetch(`/api/calibration/ball-location/${camera}`, {
+                method: 'POST'
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                const statusDiv = document.getElementById(`${camera}-ball-status`);
+                
+                if (result.ball_found) {
+                    statusDiv.className = 'ball-status success';
+                    statusDiv.textContent = `Ball detected at position (${result.ball_info?.x || 0}, ${result.ball_info?.y || 0})`;
+                    this.ballVerified[camera] = true;
+                    
+                    const allVerified = this.selectedCameras.every(cam => this.ballVerified[cam]);
+                    if (allVerified) {
+                        document.getElementById('verify-next').disabled = false;
+                        document.getElementById('verification-message').className = 'alert alert-success';
+                        document.getElementById('verification-message').textContent = 
+                            '✅ Ball placement verified! Ready to proceed with calibration.';
+                    }
+                } else {
+                    statusDiv.className = 'ball-status error';
+                    statusDiv.textContent = 'Ball not detected - please adjust placement';
+                    this.ballVerified[camera] = false;
+                }
+            } else {
+                this.showMessage('Failed to check ball location', 'error');
+            }
+        } catch (error) {
+            console.error('Error checking ball location:', error);
+            this.showMessage('Error checking ball location', 'error');
+        } finally {
+            const button = event.target;
+            button.disabled = false;
+            button.textContent = 'Check Ball Location';
+        }
+    }
+    
+    selectMethod(method) {
+        this.calibrationMethod = method;
+        
+        document.querySelector('.calibration-options').style.display = 'none';
+        
+        document.getElementById('calibration-progress').style.display = 'block';
+        
+        this.startCalibration(method);
+    }
+    
+    async startCalibration(method) {
+        this.calibrationInProgress = true;
+        
+        document.getElementById('calibration-log-content').innerHTML = '';
+        this.addLogEntry('Starting calibration process...');
+        
+        for (const camera of this.selectedCameras) {
+            await this.calibrateCamera(camera, method);
+        }
+    }
+    
+    async calibrateCamera(camera, method) {
+        try {
+            this.addLogEntry(`Starting ${method} calibration for ${camera}...`);
+            
+            const progressBar = document.getElementById(`${camera}-progress`);
+            const statusText = document.getElementById(`${camera}-status`);
+            
+            progressBar.style.width = '10%';
+            statusText.textContent = 'Initializing...';
+            
+            const endpoint = method === 'auto' 
+                ? `/api/calibration/auto/${camera}`
+                : `/api/calibration/manual/${camera}`;
+            
+            const response = await fetch(endpoint, {
+                method: 'POST'
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                
+                this.pollCalibrationProgress(camera);
+                
+                await this.waitForCalibrationCompletion(camera);
+                
+                if (result.status === 'success') {
+                    this.addLogEntry(`${camera} calibration completed successfully`);
+                    progressBar.style.width = '100%';
+                    statusText.textContent = 'Completed';
+                    
+                    const allDone = this.selectedCameras.every(cam => {
+                        const status = document.getElementById(`${cam}-status`).textContent;
+                        return status === 'Completed' || status === 'Failed';
+                    });
+                    
+                    if (allDone) {
+                        await this.showCalibrationResults();
+                    }
+                } else {
+                    this.addLogEntry(`${camera} calibration failed: ${result.message}`);
+                    progressBar.style.width = '100%';
+                    progressBar.style.background = '#f44336';
+                    statusText.textContent = 'Failed';
+                }
+            } else {
+                throw new Error('Failed to start calibration');
+            }
+        } catch (error) {
+            console.error(`Error calibrating ${camera}:`, error);
+            this.addLogEntry(`Error calibrating ${camera}: ${error.message}`);
+        }
+    }
+    
+    async pollCalibrationProgress(camera) {
+        const pollInterval = setInterval(async () => {
+            try {
+                const response = await fetch('/api/calibration/status');
+                if (response.ok) {
+                    const status = await response.json();
+                    const cameraStatus = status[camera];
+                    
+                    if (cameraStatus) {
+                        const progressBar = document.getElementById(`${camera}-progress`);
+                        const statusText = document.getElementById(`${camera}-status`);
+                        
+                        progressBar.style.width = `${cameraStatus.progress}%`;
+                        statusText.textContent = cameraStatus.message;
+                        
+                        if (cameraStatus.status === 'completed' || 
+                            cameraStatus.status === 'failed' || 
+                            cameraStatus.status === 'error') {
+                            clearInterval(pollInterval);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error polling calibration status:', error);
+            }
+        }, 1000);
+        
+        this[`${camera}PollInterval`] = pollInterval;
+    }
+    
+    async waitForCalibrationCompletion(camera, timeout = 180000) {
+        const startTime = Date.now();
+        
+        while (Date.now() - startTime < timeout) {
+            const response = await fetch('/api/calibration/status');
+            if (response.ok) {
+                const status = await response.json();
+                const cameraStatus = status[camera];
+                
+                if (cameraStatus && 
+                    (cameraStatus.status === 'completed' || 
+                     cameraStatus.status === 'failed' || 
+                     cameraStatus.status === 'error')) {
+                    return cameraStatus;
+                }
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        throw new Error('Calibration timeout');
+    }
+    
+    async showCalibrationResults() {
+        const response = await fetch('/api/calibration/data');
+        if (response.ok) {
+            const data = await response.json();
+            
+            if (data.camera1) {
+                document.getElementById('camera1-focal').textContent = 
+                    data.camera1.focal_length?.toFixed(3) || '--';
+                document.getElementById('camera1-x').textContent = 
+                    data.camera1.x_offset?.toFixed(1) || '--';
+                document.getElementById('camera1-y').textContent = 
+                    data.camera1.y_offset?.toFixed(1) || '--';
+            }
+            
+            if (data.camera2) {
+                document.getElementById('camera2-focal').textContent = 
+                    data.camera2.focal_length?.toFixed(3) || '--';
+                document.getElementById('camera2-x').textContent = 
+                    data.camera2.x_offset?.toFixed(1) || '--';
+                document.getElementById('camera2-y').textContent = 
+                    data.camera2.y_offset?.toFixed(1) || '--';
+            }
+            
+            this.displayCurrentCalibration(data);
+        }
+        
+        this.showStep(4);
+        this.calibrationInProgress = false;
+    }
+    
+    async stopCalibration() {
+        if (confirm('Are you sure you want to stop the calibration process?')) {
+            try {
+                const response = await fetch('/api/calibration/stop', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    this.addLogEntry('Calibration stopped by user');
+                    this.calibrationInProgress = false;
+                    
+                    this.selectedCameras.forEach(camera => {
+                        if (this[`${camera}PollInterval`]) {
+                            clearInterval(this[`${camera}PollInterval`]);
+                        }
+                    });
+                    
+                    this.restart();
+                }
+            } catch (error) {
+                console.error('Error stopping calibration:', error);
+            }
+        }
+    }
+    
+    restart() {
+        this.currentStep = 1;
+        this.calibrationMethod = null;
+        this.calibrationInProgress = false;
+        this.ballVerified = {
+            camera1: false,
+            camera2: false
+        };
+        
+        this.showStep(1);
+        document.querySelector('.calibration-options').style.display = 'block';
+        document.getElementById('calibration-progress').style.display = 'none';
+        document.getElementById('verify-next').disabled = true;
+        
+        document.querySelectorAll('.camera-preview img').forEach(img => {
+            img.style.display = 'none';
+        });
+        document.querySelectorAll('.camera-placeholder').forEach(placeholder => {
+            placeholder.style.display = 'flex';
+        });
+        
+        document.querySelectorAll('.ball-status').forEach(status => {
+            status.textContent = '';
+            status.className = 'ball-status';
+        });
+        
+        document.querySelectorAll('.progress-fill').forEach(bar => {
+            bar.style.width = '0%';
+            bar.style.background = '';
+        });
+    }
+    
+    addLogEntry(message) {
+        const logContent = document.getElementById('calibration-log-content');
+        const timestamp = new Date().toLocaleTimeString();
+        const entry = document.createElement('div');
+        entry.textContent = `[${timestamp}] ${message}`;
+        logContent.appendChild(entry);
+        logContent.scrollTop = logContent.scrollHeight;
+    }
+    
+    showMessage(message, type = 'info') {
+        const messageDiv = document.getElementById('verification-message');
+        if (messageDiv) {
+            messageDiv.className = `alert alert-${type}`;
+            messageDiv.textContent = message;
+        }
+    }
+    
+    startStatusPolling() {
+        this.statusPollInterval = setInterval(() => {
+            if (!this.calibrationInProgress) {
+                this.loadSystemStatus();
+            }
+        }, 5000);
+    }
+}
+
+const calibration = new CalibrationManager();
