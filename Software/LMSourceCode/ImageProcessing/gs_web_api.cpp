@@ -21,7 +21,7 @@ bool WebApi::UpdateCalibration(const std::string& key, double value) {
     if (success) {
         GS_LOG_MSG(info, "Successfully updated calibration: " + key + " = " + std::to_string(value));
     } else {
-        GS_LOG_MSG(warn, "Failed to update calibration via web API: " + key + 
+        GS_LOG_MSG(warning, "Failed to update calibration via web API: " + key + 
                    ". Web server may not be running. Calibration saved locally to golf_sim_config.json");
     }
     
@@ -38,7 +38,7 @@ bool WebApi::UpdateCalibration(const std::string& key, const std::vector<double>
     if (success) {
         GS_LOG_MSG(info, "Successfully updated calibration array: " + key);
     } else {
-        GS_LOG_MSG(warn, "Failed to update calibration via web API: " + key + 
+        GS_LOG_MSG(warning, "Failed to update calibration via web API: " + key + 
                    ". Web server may not be running. Calibration saved locally to golf_sim_config.json");
     }
     
