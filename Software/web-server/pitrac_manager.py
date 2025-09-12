@@ -99,6 +99,10 @@ class PiTracProcessManager:
             
             if value is None:
                 continue
+            
+            # Skip empty string values for non-boolean parameters
+            if param_type != "boolean" and value == "":
+                continue
                 
             if param_type == "boolean":
                 if value:
@@ -135,7 +139,7 @@ class PiTracProcessManager:
                     value = None
                     break
             
-            if value is not None:
+            if value is not None and value != "":
                 env[env_var] = str(value)
         
         return env
