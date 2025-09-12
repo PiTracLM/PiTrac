@@ -1563,6 +1563,8 @@ int main(int argc, char *argv[])
             config_file_name = GolfSimOptions::GetCommandLineOptions().config_file_;
         }
 
+        GS_LOG_MSG(info, "Loading configuration from: " + config_file_name);
+
         if (!GolfSimConfiguration::Initialize(config_file_name)) {
             GS_LOG_MSG(error, "Could not initialize configuration module using config file: " + config_file_name + ".  Exiting.");
             return 0;
