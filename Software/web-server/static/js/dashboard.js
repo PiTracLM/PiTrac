@@ -132,7 +132,6 @@ async function resetShot() {
     try {
         const response = await fetch('/api/reset', { method: 'POST' });
         if (response.ok) {
-            // Shot reset successfully
         }
     } catch (error) {
         console.error('Error resetting shot:', error);
@@ -140,8 +139,11 @@ async function resetShot() {
 }
 
 
-const originalCheckPiTracStatus = checkPiTracStatus;
-async function checkPiTracStatus() {
+let originalCheckPiTracStatus;
+const dashboardCheckPiTracStatus = async function() {
+    if (!originalCheckPiTracStatus) {
+        originalCheckPiTracStatus = window.checkPiTracStatus;
+    }
     const isRunning = await originalCheckPiTracStatus();
     
     if (!isRunning) {
@@ -169,6 +171,11 @@ document.addEventListener('DOMContentLoaded', () => {
     connectWebSocket();
     
     updateBallStatus('Initializing', 'System starting up...');
+    
+    if (window.checkPiTracStatus) {
+        originalCheckPiTracStatus = window.checkPiTracStatus;
+        window.checkPiTracStatus = dashboardCheckPiTracStatus;
+    }
     
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) {

@@ -131,7 +131,7 @@ function appendLog(logData) {
     const logEntry = document.createElement('div');
     logEntry.className = 'log-entry';
     
-    const content = logData.content || '';
+    const content = logData.message || logData.content || '';
     if (content.includes('ERROR') || content.includes('[error]')) {
         logEntry.classList.add('error');
         stats.errors++;
@@ -144,11 +144,25 @@ function appendLog(logData) {
         logEntry.classList.add('debug');
     }
     
-    // Format timestamp
     if (logData.timestamp) {
         const timestamp = document.createElement('span');
         timestamp.className = 'log-timestamp';
-        timestamp.textContent = new Date(logData.timestamp).toLocaleTimeString();
+        
+        let dateObj;
+        if (typeof logData.timestamp === 'string' && logData.timestamp.length > 10) {
+            dateObj = new Date(parseInt(logData.timestamp) / 1000);
+        } else if (typeof logData.timestamp === 'number') {
+            dateObj = new Date(logData.timestamp);
+        } else {
+            dateObj = new Date(logData.timestamp);
+        }
+        
+        if (!isNaN(dateObj.getTime())) {
+            timestamp.textContent = dateObj.toLocaleTimeString();
+        } else {
+            timestamp.textContent = '';
+        }
+        
         logEntry.appendChild(timestamp);
     }
     
