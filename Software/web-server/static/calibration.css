@@ -1,26 +1,21 @@
-/* Calibration Page Styles */
+/* Calibration Page Styles - extends dashboard.css theme system */
 
-:root {
-    --primary-color: #4CAF50;
-    --secondary-color: #2196F3;
-    --danger-color: #f44336;
-    --warning-color: #ff9800;
-    --success-color: #4CAF50;
-    --dark-bg: #1a1a2e;
-    --card-bg: #16213e;
-    --text-primary: #ffffff;
-    --text-secondary: #b0b0b0;
-    --border-color: #2c3e50;
+/* Main content wrapper */
+.main-content {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
 }
 
 /* Status Bar */
 .status-bar {
     display: flex;
     gap: 2rem;
-    background: var(--card-bg);
+    background: var(--bg-card);
     padding: 1rem;
     border-radius: 8px;
     margin-bottom: 2rem;
+    box-shadow: var(--shadow-sm);
 }
 
 .status-item {
@@ -30,7 +25,7 @@
 }
 
 .status-label {
-    color: var(--text-secondary);
+    color: var(--text-muted);
     font-size: 0.9rem;
 }
 
@@ -41,10 +36,11 @@
 
 /* Calibration Wizard */
 .calibration-wizard {
-    background: var(--card-bg);
+    background: var(--bg-card);
     border-radius: 12px;
     padding: 2rem;
     margin-bottom: 2rem;
+    box-shadow: var(--shadow-md);
 }
 
 /* Wizard Steps */
@@ -89,13 +85,13 @@
 }
 
 .step.active .step-number {
-    background: var(--primary-color);
+    background: var(--accent-primary);
     color: white;
-    box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+    box-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
 }
 
 .step.completed .step-number {
-    background: var(--success-color);
+    background: var(--success);
     color: white;
 }
 
@@ -126,15 +122,15 @@
 
 /* Setup Instructions */
 .setup-instructions {
-    background: rgba(33, 150, 243, 0.1);
-    border: 1px solid var(--secondary-color);
+    background: var(--bg-hover);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1.5rem;
     margin-bottom: 2rem;
 }
 
 .setup-instructions h3 {
-    color: var(--secondary-color);
+    color: var(--text-primary);
     margin-bottom: 1rem;
 }
 
@@ -177,25 +173,28 @@
     flex-direction: column;
     align-items: center;
     padding: 1.5rem;
-    background: var(--dark-bg);
+    background: var(--bg-hover);
     border: 2px solid var(--border-color);
     border-radius: 8px;
     transition: all 0.3s ease;
 }
 
 .camera-option input:checked + .camera-card {
-    border-color: var(--primary-color);
-    background: rgba(76, 175, 80, 0.1);
+    border-color: var(--accent-primary);
+    background: var(--bg-hover);
+    box-shadow: var(--shadow-md);
 }
 
 .camera-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-md);
 }
 
 .camera-icon {
-    font-size: 2rem;
+    font-size: 1.5rem;
     margin-bottom: 0.5rem;
+    font-weight: bold;
+    color: var(--text-primary);
 }
 
 .camera-name {
@@ -228,9 +227,10 @@
 }
 
 .camera-view {
-    background: var(--dark-bg);
+    background: var(--bg-hover);
     border-radius: 8px;
     padding: 1.5rem;
+    border: 1px solid var(--border-color);
 }
 
 .camera-view h3 {
@@ -281,15 +281,15 @@
 }
 
 .ball-status.success {
-    background: rgba(76, 175, 80, 0.2);
-    border: 1px solid var(--success-color);
-    color: var(--success-color);
+    background: rgba(72, 187, 120, 0.2);
+    border: 1px solid var(--success);
+    color: var(--success);
 }
 
 .ball-status.error {
-    background: rgba(244, 67, 54, 0.2);
-    border: 1px solid var(--danger-color);
-    color: var(--danger-color);
+    background: rgba(245, 101, 101, 0.2);
+    border: 1px solid var(--error);
+    color: var(--error);
 }
 
 /* Calibration Options */
@@ -307,7 +307,7 @@
 }
 
 .method-card {
-    background: var(--dark-bg);
+    background: var(--bg-hover);
     border: 2px solid var(--border-color);
     border-radius: 12px;
     padding: 2rem;
@@ -318,13 +318,15 @@
 
 .method-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-    border-color: var(--primary-color);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--accent-primary);
 }
 
 .method-icon {
-    font-size: 3rem;
+    font-size: 2rem;
     margin-bottom: 1rem;
+    font-weight: bold;
+    color: var(--accent-primary);
 }
 
 .method-card h4 {
@@ -340,10 +342,11 @@
 
 /* Calibration Progress */
 .calibration-progress {
-    background: var(--dark-bg);
+    background: var(--bg-hover);
     border-radius: 8px;
     padding: 2rem;
     margin-top: 2rem;
+    border: 1px solid var(--border-color);
 }
 
 .progress-cameras {
@@ -368,7 +371,7 @@
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    background: var(--accent-gradient);
     border-radius: 4px;
     transition: width 0.3s ease;
     width: 0%;
@@ -412,8 +415,10 @@
 }
 
 .success-icon {
-    font-size: 5rem;
+    font-size: 3rem;
     margin-bottom: 2rem;
+    color: var(--success);
+    font-weight: bold;
 }
 
 .results-summary h3 {
@@ -429,13 +434,14 @@
 }
 
 .result-card {
-    background: var(--dark-bg);
+    background: var(--bg-hover);
     border-radius: 8px;
     padding: 1.5rem;
+    border: 1px solid var(--border-color);
 }
 
 .result-card h4 {
-    color: var(--primary-color);
+    color: var(--accent-primary);
     margin-bottom: 1.5rem;
 }
 
@@ -461,8 +467,8 @@
 
 /* Next Steps */
 .next-steps {
-    background: rgba(33, 150, 243, 0.1);
-    border: 1px solid var(--secondary-color);
+    background: var(--bg-hover);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1.5rem;
     margin-bottom: 2rem;
@@ -470,7 +476,7 @@
 }
 
 .next-steps h3 {
-    color: var(--secondary-color);
+    color: var(--text-primary);
     margin-bottom: 1rem;
 }
 
@@ -495,9 +501,10 @@
 
 /* Current Calibration Data */
 .current-calibration {
-    background: var(--card-bg);
+    background: var(--bg-card);
     border-radius: 12px;
     padding: 2rem;
+    box-shadow: var(--shadow-md);
 }
 
 .current-calibration h3 {
@@ -512,12 +519,13 @@
 }
 
 .calibration-data-item {
-    background: var(--dark-bg);
+    background: var(--bg-hover);
     padding: 1rem;
     border-radius: 8px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border: 1px solid var(--border-color);
 }
 
 .calibration-data-label {
@@ -544,14 +552,14 @@
 }
 
 .btn-primary {
-    background: var(--primary-color);
+    background: var(--accent-primary);
     color: white;
 }
 
 .btn-primary:hover {
-    background: #45a049;
+    background: var(--accent-secondary);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+    box-shadow: var(--shadow-md);
 }
 
 .btn-primary:disabled {
@@ -561,25 +569,34 @@
 }
 
 .btn-secondary {
-    background: var(--secondary-color);
-    color: white;
+    background: var(--text-secondary);
+    color: var(--bg-card);
+}
+
+[data-theme="dark"] .btn-secondary {
+    background: var(--border-color);
+    color: var(--text-primary);
 }
 
 .btn-secondary:hover {
-    background: #1976D2;
+    background: var(--text-muted);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+    box-shadow: var(--shadow-md);
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+    background: var(--text-secondary);
 }
 
 .btn-danger {
-    background: var(--danger-color);
+    background: var(--error);
     color: white;
 }
 
 .btn-danger:hover {
-    background: #d32f2f;
+    opacity: 0.9;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+    box-shadow: var(--shadow-md);
 }
 
 /* Alerts */
@@ -590,19 +607,46 @@
 }
 
 .alert-info {
-    background: rgba(33, 150, 243, 0.1);
-    border: 1px solid var(--secondary-color);
-    color: var(--secondary-color);
+    background: var(--bg-hover);
+    border: 1px solid var(--info);
+    color: var(--info);
 }
 
 .alert-success {
-    background: rgba(76, 175, 80, 0.1);
-    border: 1px solid var(--success-color);
-    color: var(--success-color);
+    background: rgba(72, 187, 120, 0.1);
+    border: 1px solid var(--success);
+    color: var(--success);
 }
 
 .alert-error {
-    background: rgba(244, 67, 54, 0.1);
-    border: 1px solid var(--danger-color);
-    color: var(--danger-color);
+    background: rgba(245, 101, 101, 0.1);
+    border: 1px solid var(--error);
+    color: var(--error);
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .main-content {
+        padding: 1rem;
+    }
+    
+    .calibration-wizard {
+        padding: 1rem;
+    }
+    
+    .wizard-steps {
+        margin-bottom: 2rem;
+    }
+    
+    .step-label {
+        font-size: 0.8rem;
+    }
+    
+    .camera-options {
+        grid-template-columns: 1fr;
+    }
+    
+    .result-cards {
+        grid-template-columns: 1fr;
+    }
 }
