@@ -297,6 +297,11 @@ body {
     color: var(--text-primary);
 }
 
+.mobile-control-buttons .control-btn {
+    width: 100%;
+    justify-content: center;
+}
+
 .control-btn:hover:not(:disabled) {
     transform: translateY(-1px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);

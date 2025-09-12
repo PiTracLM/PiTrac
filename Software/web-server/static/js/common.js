@@ -153,34 +153,114 @@ function updatePiTracButtons(isRunning) {
     
     if (isRunning) {
         startBtns.forEach(btn => {
-            btn.disabled = true;
-            btn.title = 'PiTrac is already running';
+            btn.style.display = 'none';
         });
         stopBtns.forEach(btn => {
+            btn.style.display = '';
             btn.disabled = false;
             btn.title = 'Stop PiTrac';
         });
         restartBtns.forEach(btn => {
+            btn.style.display = '';
             btn.disabled = false;
             btn.title = 'Restart PiTrac';
         });
     } else {
         startBtns.forEach(btn => {
+            btn.style.display = '';
             btn.disabled = false;
             btn.title = 'Start PiTrac';
         });
         stopBtns.forEach(btn => {
-            btn.disabled = true;
-            btn.title = 'PiTrac is not running';
+            btn.style.display = 'none';
         });
         restartBtns.forEach(btn => {
-            btn.disabled = true;
-            btn.title = 'PiTrac is not running';
+            btn.style.display = 'none';
         });
+    }
+}
+
+async function checkSystemStatus() {
+    try {
+        const response = await fetch('/health');
+        if (response.ok) {
+            const data = await response.json();
+
+            const mqDot = document.getElementById('mq-status-dot');
+            if (mqDot) {
+                if (data.activemq_connected) {
+                    mqDot.classList.remove('disconnected');
+                } else {
+                    mqDot.classList.add('disconnected');
+                }
+            }
+
+            return data;
+        }
+    } catch (error) {
+        console.error('Error checking system status:', error);
+    }
+    return null;
+}
+
+async function checkPiTracStatus() {
+    try {
+        const response = await fetch('/api/pitrac/status');
+        const status = await response.json();
+        updatePiTracButtons(status.is_running);
+        
+        const statusDot = document.getElementById('pitrac-status-dot');
+        if (statusDot) {
+            if (status.camera1_pid) {
+                statusDot.classList.add('connected');
+                statusDot.classList.remove('disconnected');
+                statusDot.title = `PiTrac Camera 1 Running (PID: ${status.camera1_pid})`;
+            } else {
+                statusDot.classList.remove('connected');
+                statusDot.classList.add('disconnected');
+                statusDot.title = 'PiTrac Camera 1 Stopped';
+            }
+        }
+        
+        const camera2Container = document.getElementById('camera2-status-container');
+        const camera2Dot = document.getElementById('pitrac-camera2-status-dot');
+        
+        if (status.mode === 'single') {
+            if (camera2Container) {
+                camera2Container.style.display = 'flex';
+            }
+            
+            if (camera2Dot) {
+                if (status.camera2_pid) {
+                    camera2Dot.classList.add('connected');
+                    camera2Dot.classList.remove('disconnected');
+                    camera2Dot.title = `PiTrac Camera 2 Running (PID: ${status.camera2_pid})`;
+                } else {
+                    camera2Dot.classList.remove('connected');
+                    camera2Dot.classList.add('disconnected');
+                    camera2Dot.title = 'PiTrac Camera 2 Stopped';
+                }
+            }
+        } else {
+            if (camera2Container) {
+                camera2Container.style.display = 'none';
+            }
+        }
+        
+        return status.is_running;
+    } catch (error) {
+        console.error('Failed to check PiTrac status:', error);
+        return false;
     }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     initDropdown();
+
+    checkSystemStatus();
+    checkPiTracStatus();
+    
+    setInterval(checkSystemStatus, 5000);
+    setInterval(checkPiTracStatus, 5000);
 });

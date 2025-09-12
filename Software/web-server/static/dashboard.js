@@ -139,93 +139,16 @@ async function resetShot() {
     }
 }
 
-async function checkSystemStatus() {
-    try {
-        const response = await fetch('/health');
-        if (response.ok) {
-            const data = await response.json();
 
-            const mqDot = document.getElementById('mq-status-dot');
-            if (data.activemq_connected) {
-                mqDot.classList.remove('disconnected');
-            } else {
-                mqDot.classList.add('disconnected');
-            }
-
-            const pitracDot = document.getElementById('pitrac-status-dot');
-            if (data.pitrac_running) {
-                pitracDot.classList.remove('disconnected');
-            } else {
-                pitracDot.classList.add('disconnected');
-            }
-
-            const camera2Dot = document.getElementById('pitrac-camera2-status-dot');
-            if (camera2Dot && !data.pitrac_running) {
-                camera2Dot.classList.add('disconnected');
-            }
-        }
-    } catch (error) {
-        console.error('Error checking system status:', error);
-    }
-}
-
+const originalCheckPiTracStatus = checkPiTracStatus;
 async function checkPiTracStatus() {
-    try {
-        const response = await fetch('/api/pitrac/status');
-        const status = await response.json();
-
-        if (typeof updatePiTracButtons === 'function') {
-            updatePiTracButtons(status.is_running);
-        }
-
-        if (!status.is_running) {
-            updateBallStatus(null, null, false);
-        }
-
-        // Camera 1 status
-        const statusDot = document.getElementById('pitrac-status-dot');
-        if (statusDot) {
-            if (status.camera1_pid) {
-                statusDot.classList.add('connected');
-                statusDot.classList.remove('disconnected');
-                statusDot.title = `PiTrac Camera 1 Running (PID: ${status.camera1_pid})`;
-            } else {
-                statusDot.classList.remove('connected');
-                statusDot.classList.add('disconnected');
-                statusDot.title = 'PiTrac Camera 1 Stopped';
-            }
-        }
-
-        // Camera 2 status (only shown in single-Pi mode)
-        const camera2Container = document.getElementById('camera2-status-container');
-        const camera2Dot = document.getElementById('pitrac-camera2-status-dot');
-
-        if (status.mode === 'single') {
-            // Show camera2 indicator in single-Pi mode
-            if (camera2Container) {
-                camera2Container.style.display = 'flex';
-            }
-
-            if (camera2Dot) {
-                if (status.camera2_pid) {
-                    camera2Dot.classList.add('connected');
-                    camera2Dot.classList.remove('disconnected');
-                    camera2Dot.title = `PiTrac Camera 2 Running (PID: ${status.camera2_pid})`;
-                } else {
-                    camera2Dot.classList.remove('connected');
-                    camera2Dot.classList.add('disconnected');
-                    camera2Dot.title = 'PiTrac Camera 2 Stopped';
-                }
-            }
-        } else {
-            // Hide camera2 indicator in dual-Pi mode
-            if (camera2Container) {
-                camera2Container.style.display = 'none';
-            }
-        }
-    } catch (error) {
-        console.error('Failed to check PiTrac status:', error);
+    const isRunning = await originalCheckPiTracStatus();
+    
+    if (!isRunning) {
+        updateBallStatus(null, null, false);
     }
+    
+    return isRunning;
 }
 
 function showStatusMessage(message, type = 'info') {
@@ -244,12 +167,6 @@ function showStatusMessage(message, type = 'info') {
 
 document.addEventListener('DOMContentLoaded', () => {
     connectWebSocket();
-    checkSystemStatus();
-    
-    setInterval(checkSystemStatus, 5000);
-    
-    checkPiTracStatus();
-    setInterval(checkPiTracStatus, 5000);
     
     updateBallStatus('Initializing', 'System starting up...');
     
