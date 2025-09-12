@@ -181,7 +181,7 @@ class PiTracServer:
             return {"data": self.config_manager.get_user_settings()}
 
         @self.app.get("/api/config/categories")
-        async def get_categories() -> Dict[str, List[str]]:
+        async def get_categories() -> Dict[str, Dict[str, List[str]]]:
             """Get configuration organized by categories"""
             return self.config_manager.get_categories()
 
