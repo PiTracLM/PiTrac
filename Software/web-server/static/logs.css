@@ -80,26 +80,20 @@
     color: var(--text-secondary);
 }
 
-.status-indicator {
+.logs-container .status-indicator {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     animation: pulse 2s infinite;
 }
 
-.status-indicator.connected {
+.logs-container .status-indicator.connected {
     background: #22c55e;
 }
 
-.status-indicator.disconnected {
+.logs-container .status-indicator.disconnected {
     background: #ef4444;
     animation: none;
-}
-
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
 }
 
 .logs-actions {

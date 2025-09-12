@@ -110,10 +110,6 @@
     animation: fadeIn 0.3s ease;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
 
 .wizard-content h2 {
     color: var(--text-primary);
@@ -539,38 +535,10 @@
     font-family: monospace;
 }
 
-/* Buttons */
-.btn {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    text-decoration: none;
-    display: inline-block;
-}
-
-.btn-primary {
-    background: var(--accent-primary);
-    color: white;
-}
-
-.btn-primary:hover {
-    background: var(--accent-secondary);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-}
-
 .btn-primary:disabled {
     background: var(--border-color);
     cursor: not-allowed;
     transform: none;
-}
-
-.btn-secondary {
-    background: var(--text-secondary);
-    color: var(--bg-card);
 }
 
 [data-theme="dark"] .btn-secondary {
@@ -578,25 +546,8 @@
     color: var(--text-primary);
 }
 
-.btn-secondary:hover {
-    background: var(--text-muted);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-}
-
 [data-theme="dark"] .btn-secondary:hover {
     background: var(--text-secondary);
-}
-
-.btn-danger {
-    background: var(--error);
-    color: white;
-}
-
-.btn-danger:hover {
-    opacity: 0.9;
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
 }
 
 /* Alerts */

@@ -1,449 +1,76 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PiTrac - Logs</title>
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-    <link rel="stylesheet" href="/static/dashboard.css">
-    <link rel="stylesheet" href="/static/logs.css">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-</head>
-<body>
-    <div class="container">
-        <!-- Header matching dashboard -->
-        <div class="header">
-            <div class="header-content">
-                <a href="/" style="display: flex; align-items: center; gap: 0.75rem; text-decoration: none; color: inherit;">
-                    <img src="/static/logos/PiTrac.svg" alt="PiTrac Logo" class="header-logo">
-                    <h1>Logs</h1>
-                </a>
+{% extends "base.html" %}
+
+{% block title %}PiTrac Logs{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/logs.css">
+{% endblock %}
+
+{% block content %}
+<div class="logs-container">
+    <div class="logs-header">
+        <div class="logs-controls-row">
+            <div class="service-selector">
+                <label for="serviceSelect">Service:</label>
+                <select id="serviceSelect" onchange="changeService()">
+                    <option value="">Loading services...</option>
+                </select>
             </div>
-            <div class="header-right">
-                <div class="dropdown">
-                    <button class="dropdown-toggle" aria-label="Menu">
-                        <svg fill="currentColor" viewBox="0 0 20 20" width="24" height="24">
-                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
-                        </svg>
-                    </button>
-                    <div class="dropdown-menu">
-                        <a href="/" class="dropdown-item">
-                            <svg fill="currentColor" viewBox="0 0 20 20" width="20" height="20">
-                                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
-                            </svg>
-                            Dashboard
-                        </a>
-                        <a href="/calibration" class="dropdown-item">
-                            <svg fill="currentColor" viewBox="0 0 20 20" width="20" height="20">
-                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
-                            </svg>
-                            Calibration
-                        </a>
-                        <a href="/config" class="dropdown-item">
-                            <svg fill="currentColor" viewBox="0 0 20 20" width="20" height="20">
-                                <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
-                            </svg>
-                            Configuration
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        <div class="theme-selector">
-                            <span class="dropdown-label">Theme</span>
-                            <div class="theme-options">
-                                <button class="theme-btn" data-theme="light" title="Light mode" onclick="setTheme('light')">
-                                    <svg fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>
-                                    </svg>
-                                </button>
-                                <button class="theme-btn" data-theme="dark" title="Dark mode" onclick="setTheme('dark')">
-                                    <svg fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
-                                    </svg>
-                                </button>
-                                <button class="theme-btn" data-theme="system" title="System theme" onclick="setTheme('system')">
-                                    <svg fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Logs Content -->
-        <div class="logs-container">
-            <div class="logs-header">
-                <div class="logs-controls-row">
-                    <div class="service-selector">
-                        <label for="serviceSelect">Service:</label>
-                        <select id="serviceSelect" onchange="changeService()">
-                            <option value="">Loading services...</option>
-                        </select>
-                    </div>
-                    
-                    <div class="service-info">
-                        <span id="serviceStatus" class="service-status" style="display: none;"></span>
-                        <div class="connection-status">
-                            <span class="status-indicator disconnected" id="connectionIndicator"></span>
-                            <span id="connectionText">Disconnected</span>
-                        </div>
-                    </div>
-                    
-                    <div class="logs-actions">
-                        <button id="pauseButton" class="action-btn" onclick="togglePause()">
-                            <svg fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M6 3.5a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5zm4 0a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5z"/>
-                            </svg>
-                            <span class="btn-text">Pause</span>
-                        </button>
-                        <button id="clearButton" class="action-btn danger" onclick="clearLogs()">
-                            <svg fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-                            </svg>
-                            <span class="btn-text">Clear</span>
-                        </button>
-                        <button class="action-btn" onclick="downloadLogs()">
-                            <svg fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
-                            </svg>
-                            <span class="btn-text">Download</span>
-                        </button>
-                    </div>
+            
+            <div class="service-info">
+                <span id="serviceStatus" class="service-status" style="display: none;"></span>
+                <div class="connection-status">
+                    <span class="status-indicator disconnected" id="connectionIndicator"></span>
+                    <span id="connectionText">Disconnected</span>
                 </div>
             </div>
             
-            <div class="log-viewer-wrapper">
-                <div class="log-viewer empty" id="logViewer"></div>
-                
-                <div class="log-stats">
-                    <div class="stat-item">
-                        <span class="stat-label">Lines:</span>
-                        <span class="stat-value" id="lineCount">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Errors:</span>
-                        <span class="stat-value" id="errorCount">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Warnings:</span>
-                        <span class="stat-value" id="warningCount">0</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <script>
-        // Theme management (from dashboard)
-        function setTheme(theme) {
-            document.documentElement.setAttribute('data-theme', theme);
-            localStorage.setItem('theme', theme);
-            updateThemeButtons();
-        }
-        
-        function updateThemeButtons() {
-            const theme = localStorage.getItem('theme') || 'light';
-            document.querySelectorAll('.theme-btn').forEach(btn => {
-                if (btn.dataset.theme === theme) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            });
-        }
-        
-        // Dropdown menu functionality
-        document.addEventListener('DOMContentLoaded', () => {
-            const dropdown = document.querySelector('.dropdown');
-            const toggle = document.querySelector('.dropdown-toggle');
-            
-            toggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                dropdown.classList.toggle('active');
-            });
-            
-            document.addEventListener('click', () => {
-                dropdown.classList.remove('active');
-            });
-            
-            document.querySelector('.dropdown-menu').addEventListener('click', (e) => {
-                e.stopPropagation();
-            });
-            
-            // Initialize theme
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            setTheme(savedTheme);
-        });
-        
-        // Logs viewer functionality
-        let ws = null;
-        let isPaused = false;
-        let currentService = null;
-        let logBuffer = [];
-        let maxLogLines = 1000;
-        let stats = { lines: 0, errors: 0, warnings: 0 };
-        
-        async function loadServices() {
-            try {
-                const response = await fetch('/api/logs/services');
-                const data = await response.json();
-                const select = document.getElementById('serviceSelect');
-                
-                select.innerHTML = '<option value="">Select a service...</option>';
-                
-                data.services.forEach(service => {
-                    const option = document.createElement('option');
-                    option.value = service.id;
-                    option.textContent = service.name;
-                    option.dataset.status = service.status;
-                    select.appendChild(option);
-                });
-                
-                // Auto-select first running service
-                const firstRunning = data.services.find(s => s.status === 'running');
-                if (firstRunning) {
-                    select.value = firstRunning.id;
-                    changeService();
-                }
-            } catch (error) {
-                console.error('Failed to load services:', error);
-                const select = document.getElementById('serviceSelect');
-                select.innerHTML = '<option value="">Error loading services</option>';
-            }
-        }
-        
-        function changeService() {
-            const select = document.getElementById('serviceSelect');
-            const selectedOption = select.options[select.selectedIndex];
-            
-            if (!select.value) {
-                disconnectWebSocket();
-                document.getElementById('serviceStatus').style.display = 'none';
-                document.getElementById('logViewer').className = 'log-viewer empty';
-                return;
-            }
-            
-            currentService = select.value;
-            const status = selectedOption.dataset.status;
-            
-            // Update status badge
-            const statusEl = document.getElementById('serviceStatus');
-            statusEl.textContent = status.charAt(0).toUpperCase() + status.slice(1);
-            statusEl.className = 'service-status ' + status;
-            statusEl.style.display = 'inline-flex';
-            
-            // Clear logs and reset stats
-            clearLogs();
-            document.getElementById('logViewer').className = 'log-viewer loading';
-            
-            // Connect WebSocket
-            connectWebSocket(currentService);
-        }
-        
-        function connectWebSocket(service) {
-            disconnectWebSocket();
-            
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws/logs`;
-            
-            ws = new WebSocket(wsUrl);
-            
-            ws.onopen = () => {
-                console.log('WebSocket connected');
-                updateConnectionStatus(true);
-                
-                // Send service selection
-                ws.send(JSON.stringify({ service: service }));
-                
-                // Remove loading state
-                const viewer = document.getElementById('logViewer');
-                viewer.classList.remove('loading', 'empty');
-            };
-            
-            ws.onmessage = (event) => {
-                if (!isPaused) {
-                    const data = JSON.parse(event.data);
-                    appendLog(data);
-                }
-            };
-            
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-                updateConnectionStatus(false);
-            };
-            
-            ws.onclose = () => {
-                console.log('WebSocket disconnected');
-                updateConnectionStatus(false);
-                
-                // Attempt to reconnect after 3 seconds if service is still selected
-                if (currentService) {
-                    setTimeout(() => {
-                        if (currentService === service) {
-                            connectWebSocket(service);
-                        }
-                    }, 3000);
-                }
-            };
-        }
-        
-        function disconnectWebSocket() {
-            if (ws) {
-                currentService = null;
-                ws.close();
-                ws = null;
-            }
-            updateConnectionStatus(false);
-        }
-        
-        function updateConnectionStatus(connected) {
-            const indicator = document.getElementById('connectionIndicator');
-            const text = document.getElementById('connectionText');
-            
-            if (connected) {
-                indicator.className = 'status-indicator connected';
-                text.textContent = 'Live';
-            } else {
-                indicator.className = 'status-indicator disconnected';
-                text.textContent = 'Disconnected';
-            }
-        }
-        
-        function appendLog(data) {
-            const viewer = document.getElementById('logViewer');
-            const line = document.createElement('div');
-            line.className = 'log-line';
-            
-            // Parse log level
-            let level = 'info';
-            const message = data.message || '';
-            
-            if (data.level) {
-                const priority = parseInt(data.level);
-                if (priority <= 2) level = 'error';
-                else if (priority === 3) level = 'warning';
-                else if (priority === 7) level = 'debug';
-                else level = 'info';
-            } else if (message.toLowerCase().includes('error') || message.includes('ERROR')) {
-                level = 'error';
-            } else if (message.toLowerCase().includes('warn') || message.includes('WARN')) {
-                level = 'warning';
-            } else if (message.toLowerCase().includes('debug') || message.includes('DEBUG')) {
-                level = 'debug';
-            } else if (message.toLowerCase().includes('trace') || message.includes('TRACE')) {
-                level = 'trace';
-            }
-            
-            line.classList.add(level);
-            if (data.historical) {
-                line.classList.add('historical');
-            }
-            
-            // Format timestamp if available
-            let prefix = '';
-            if (data.timestamp) {
-                const date = new Date(parseInt(data.timestamp) / 1000);
-                prefix = date.toLocaleTimeString() + ' ';
-            }
-            
-            line.textContent = prefix + message;
-            
-            logBuffer.push(line);
-            
-            // Limit buffer size
-            if (logBuffer.length > maxLogLines) {
-                const removed = logBuffer.shift();
-                if (removed.parentNode) {
-                    removed.remove();
-                }
-            }
-            
-            viewer.appendChild(line);
-            
-            // Auto-scroll to bottom if not paused
-            if (!isPaused) {
-                viewer.scrollTop = viewer.scrollHeight;
-            }
-            
-            // Update stats
-            stats.lines++;
-            if (level === 'error') stats.errors++;
-            if (level === 'warning') stats.warnings++;
-            updateStats();
-        }
-        
-        function updateStats() {
-            document.getElementById('lineCount').textContent = stats.lines;
-            document.getElementById('errorCount').textContent = stats.errors;
-            document.getElementById('warningCount').textContent = stats.warnings;
-        }
-        
-        function togglePause() {
-            isPaused = !isPaused;
-            const button = document.getElementById('pauseButton');
-            
-            if (isPaused) {
-                button.classList.add('active');
-                button.innerHTML = `
-                    <svg fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
-                        <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/>
-                    </svg>
-                    <span class="btn-text">Resume</span>
-                `;
-            } else {
-                button.classList.remove('active');
-                button.innerHTML = `
+            <div class="logs-actions">
+                <button id="pauseButton" class="action-btn" onclick="togglePause()">
                     <svg fill="currentColor" viewBox="0 0 16 16">
                         <path d="M6 3.5a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5zm4 0a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5z"/>
                     </svg>
                     <span class="btn-text">Pause</span>
-                `;
-            }
-        }
+                </button>
+                <button id="clearButton" class="action-btn danger" onclick="clearLogs()">
+                    <svg fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                        <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                    </svg>
+                    <span class="btn-text">Clear</span>
+                </button>
+                <button class="action-btn" onclick="downloadLogs()">
+                    <svg fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                        <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                    </svg>
+                    <span class="btn-text">Download</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="log-viewer-wrapper">
+        <div class="log-viewer empty" id="logViewer"></div>
         
-        function clearLogs() {
-            const viewer = document.getElementById('logViewer');
-            viewer.innerHTML = '';
-            logBuffer = [];
-            stats = { lines: 0, errors: 0, warnings: 0 };
-            updateStats();
-            
-            if (!currentService) {
-                viewer.className = 'log-viewer empty';
-            }
-        }
-        
-        function downloadLogs() {
-            if (logBuffer.length === 0) {
-                alert('No logs to download');
-                return;
-            }
-            
-            const content = logBuffer.map(el => el.textContent).join('\n');
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `pitrac-logs-${currentService || 'all'}-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-        
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            loadServices();
-        });
-        
-        // Clean up on page unload
-        window.addEventListener('beforeunload', () => {
-            disconnectWebSocket();
-        });
-    </script>
-</body>
-</html>
+        <div class="log-stats">
+            <div class="stat-item">
+                <span class="stat-label">Lines:</span>
+                <span class="stat-value" id="lineCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Errors:</span>
+                <span class="stat-value" id="errorCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Warnings:</span>
+                <span class="stat-value" id="warningCount">0</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/logs.js"></script>
+{% endblock %}

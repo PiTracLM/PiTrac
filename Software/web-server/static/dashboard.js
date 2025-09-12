@@ -1,74 +1,5 @@
+// Dashboard-specific functionality (theme and dropdown handled by common.js)
 let ws = null;
-let currentTheme = 'system';
-
-function getSystemTheme() {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
-function applyTheme(theme) {
-    const root = document.documentElement;
-
-    root.removeAttribute('data-theme');
-
-    document.querySelectorAll('.theme-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-
-    if (theme === 'system') {
-        const systemTheme = getSystemTheme();
-        root.setAttribute('data-theme', systemTheme);
-        document.querySelector('.theme-btn[data-theme="system"]').classList.add('active');
-    } else {
-        root.setAttribute('data-theme', theme);
-        document.querySelector(`.theme-btn[data-theme="${theme}"]`).classList.add('active');
-    }
-}
-
-function setTheme(theme) {
-    currentTheme = theme;
-    localStorage.setItem('pitrac-theme', theme);
-    applyTheme(theme);
-}
-
-function initTheme() {
-    const savedTheme = localStorage.getItem('pitrac-theme') || 'system';
-    currentTheme = savedTheme;
-    applyTheme(savedTheme);
-
-    // Initialize dropdown menu
-    initDropdown();
-}
-
-function initDropdown() {
-    const dropdown = document.querySelector('.dropdown');
-    const toggle = document.querySelector('.dropdown-toggle');
-
-    if (toggle && dropdown) {
-        toggle.addEventListener('click', (e) => {
-            e.stopPropagation();
-            dropdown.classList.toggle('active');
-        });
-
-        // Close dropdown when clicking outside
-        document.addEventListener('click', () => {
-            dropdown.classList.remove('active');
-        });
-
-        // Prevent dropdown from closing when clicking inside
-        const dropdownMenu = document.querySelector('.dropdown-menu');
-        if (dropdownMenu) {
-            dropdownMenu.addEventListener('click', (e) => {
-                e.stopPropagation();
-            });
-        }
-    }
-}
-
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-    if (currentTheme === 'system') {
-        applyTheme('system');
-    }
-});
 
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -114,10 +45,6 @@ function updateDisplay(data) {
     updateMetric('side_angle', data.side_angle || '0.0');
     updateMetric('back_spin', data.back_spin || '0');
     updateMetric('side_spin', data.side_spin || '0');
-
-    // These elements are commented out in HTML:
-    // document.getElementById('result_type').textContent = data.result_type || 'Waiting...';
-    // document.getElementById('message').textContent = data.message || '';
 
     // Update ball ready status indicator
     updateBallStatus(data.result_type, data.message, data.pitrac_running);
@@ -242,75 +169,14 @@ async function checkSystemStatus() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    initTheme();
-    connectWebSocket();
-    checkSystemStatus();
-
-    setInterval(checkSystemStatus, 5000);
-
-    checkPiTracStatus();
-    setInterval(checkPiTracStatus, 5000);
-
-    updateBallStatus('Initializing', 'System starting up...');
-
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) {
-            connectWebSocket();
-        }
-    });
-});
-
-async function controlPiTrac(action) {
-    const desktopButton = document.getElementById(`pitrac-${action}-btn-desktop`);
-    const mobileButton = document.getElementById(`pitrac-${action}-btn-mobile`);
-
-    if (desktopButton) {
-        desktopButton.disabled = true;
-        desktopButton.classList.add('loading');
-    }
-    if (mobileButton) {
-        mobileButton.disabled = true;
-        mobileButton.classList.add('loading');
-    }
-
-    try {
-        const response = await fetch(`/api/pitrac/${action}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-
-        const result = await response.json();
-
-        showStatusMessage(result.message || `PiTrac ${action} completed`, result.status === 'error' ? 'error' : 'success');
-
-        setTimeout(() => {
-            checkPiTracStatus();
-        }, 1000);
-
-    } catch (error) {
-        console.error(`Failed to ${action} PiTrac:`, error);
-        showStatusMessage(`Failed to ${action} PiTrac: ${error.message}`, 'error');
-    } finally {
-        if (desktopButton) {
-            desktopButton.disabled = false;
-            desktopButton.classList.remove('loading');
-        }
-        if (mobileButton) {
-            mobileButton.disabled = false;
-            mobileButton.classList.remove('loading');
-        }
-    }
-}
-
 async function checkPiTracStatus() {
     try {
         const response = await fetch('/api/pitrac/status');
         const status = await response.json();
 
-        updatePiTracButtons(status.is_running);
+        if (typeof updatePiTracButtons === 'function') {
+            updatePiTracButtons(status.is_running);
+        }
 
         if (!status.is_running) {
             updateBallStatus(null, null, false);
@@ -362,49 +228,7 @@ async function checkPiTracStatus() {
     }
 }
 
-function updatePiTracButtons(isRunning) {
-    const startBtnDesktop = document.getElementById('pitrac-start-btn-desktop');
-    const stopBtnDesktop = document.getElementById('pitrac-stop-btn-desktop');
-    const restartBtnDesktop = document.getElementById('pitrac-restart-btn-desktop');
-
-    const startBtnMobile = document.getElementById('pitrac-start-btn-mobile');
-    const stopBtnMobile = document.getElementById('pitrac-stop-btn-mobile');
-    const restartBtnMobile = document.getElementById('pitrac-restart-btn-mobile');
-
-    if (startBtnDesktop) {
-        startBtnDesktop.disabled = isRunning;
-        startBtnDesktop.style.display = isRunning ? 'none' : 'inline-flex';
-    }
-
-    if (stopBtnDesktop) {
-        stopBtnDesktop.disabled = !isRunning;
-        stopBtnDesktop.style.display = isRunning ? 'inline-flex' : 'none';
-    }
-
-    if (restartBtnDesktop) {
-        restartBtnDesktop.disabled = !isRunning;
-        restartBtnDesktop.style.display = isRunning ? 'inline-flex' : 'none';
-    }
-
-    if (startBtnMobile) {
-        startBtnMobile.disabled = isRunning;
-        startBtnMobile.style.display = isRunning ? 'none' : 'flex';
-    }
-
-    if (stopBtnMobile) {
-        stopBtnMobile.disabled = !isRunning;
-        stopBtnMobile.style.display = isRunning ? 'flex' : 'none';
-    }
-
-    if (restartBtnMobile) {
-        restartBtnMobile.disabled = !isRunning;
-        restartBtnMobile.style.display = isRunning ? 'flex' : 'none';
-    }
-}
-
 function showStatusMessage(message, type = 'info') {
-    // Status message: [type] message
-
     const statusMessage = document.getElementById('ball-status-message');
     if (statusMessage) {
         const originalMessage = statusMessage.textContent;
@@ -417,3 +241,21 @@ function showStatusMessage(message, type = 'info') {
         }, 3000);
     }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    connectWebSocket();
+    checkSystemStatus();
+    
+    setInterval(checkSystemStatus, 5000);
+    
+    checkPiTracStatus();
+    setInterval(checkPiTracStatus, 5000);
+    
+    updateBallStatus('Initializing', 'System starting up...');
+    
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) {
+            connectWebSocket();
+        }
+    });
+});
