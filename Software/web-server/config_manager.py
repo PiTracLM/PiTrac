@@ -491,7 +491,11 @@ class ConfigurationManager:
             # Preserve arrays and objects as-is (for calibration matrices, etc.)
             current[final_key] = value
         else:
-            current[final_key] = str(value)
+            # Convert to string and expand paths with ~
+            str_value = str(value)
+            if "~/" in str_value:
+                str_value = str_value.replace("~", str(Path.home()))
+            current[final_key] = str_value
     
     def get_available_models(self) -> Dict[str, str]:
         """
