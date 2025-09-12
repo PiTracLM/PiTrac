@@ -8,7 +8,6 @@ let currentConfig = {};
 let defaultConfig = {};
 let userSettings = {};
 let categories = {};
-let basicSubcategories = {};
 let configMetadata = {};
 const modifiedSettings = new Set();
 let ws = null;
@@ -51,12 +50,11 @@ async function loadConfiguration() {
         updateModifiedCount();
 
         // Load all configuration data in parallel
-        const [configRes, defaultsRes, userRes, categoriesRes, subcategoriesRes, metadataRes] = await Promise.all([
+        const [configRes, defaultsRes, userRes, categoriesRes, metadataRes] = await Promise.all([
             fetch('/api/config'),
             fetch('/api/config/defaults'),
             fetch('/api/config/user'),
             fetch('/api/config/categories'),
-            fetch('/api/config/basic-subcategories'),
             fetch('/api/config/metadata')
         ]);
 
@@ -64,7 +62,6 @@ async function loadConfiguration() {
         const defaultsData = await defaultsRes.json();
         const userData = await userRes.json();
         categories = await categoriesRes.json();
-        basicSubcategories = await subcategoriesRes.json();
         configMetadata = await metadataRes.json();
 
         currentConfig = configData.data || {};
@@ -90,14 +87,6 @@ function renderCategories() {
     const categoryList = document.getElementById('categoryList');
     categoryList.innerHTML = '';
 
-    // Ensure Basic category appears first if it exists
-    const categoryOrder = ['Basic'];
-    Object.keys(categories).forEach(cat => {
-        if (cat !== 'Basic') {
-            categoryOrder.push(cat);
-        }
-    });
-
     // Add "All Settings" option first
     const allItem = document.createElement('li');
     allItem.className = 'category-item';
@@ -106,25 +95,26 @@ function renderCategories() {
     allItem.onclick = () => selectCategory('all');
     categoryList.appendChild(allItem);
 
-    // Add categories in order
-    categoryOrder.forEach(category => {
-        if (categories[category]) {
+    // Add each category with its settings count
+    Object.keys(categories).forEach(category => {
+        const categoryData = categories[category];
+        const basicCount = categoryData.basic ? categoryData.basic.length : 0;
+        const advancedCount = categoryData.advanced ? categoryData.advanced.length : 0;
+        const totalCount = basicCount + advancedCount;
+        
+        if (totalCount > 0) {
             const li = document.createElement('li');
             li.className = 'category-item';
             li.dataset.category = category;
-            li.textContent = category + ` (${categories[category].length})`;
+            li.textContent = `${category} (${totalCount})`;
             li.onclick = () => selectCategory(category);
             categoryList.appendChild(li);
         }
     });
 
-    // Select Basic category by default (without adding active class here)
+    // Select 'all' by default
     setTimeout(() => {
-        if (categories['Basic']) {
-            selectCategory('Basic');
-        } else {
-            selectCategory('all');
-        }
+        selectCategory('all');
     }, 100);
 }
 
@@ -138,21 +128,11 @@ function selectCategory(category) {
         }
     });
 
-    // For Basic category, re-render with subcategories
-    if (category === 'Basic') {
-        renderConfiguration('Basic');
-    } else if (category === 'all') {
-        // Show all categories
+    // Render configuration for selected category
+    if (category === 'all') {
         renderConfiguration();
-        document.querySelectorAll('.config-group').forEach(group => {
-            group.style.display = 'block';
-        });
     } else {
-        // Filter to show only selected category
-        renderConfiguration();
-        document.querySelectorAll('.config-group').forEach(group => {
-            group.style.display = group.dataset.category === category ? 'block' : 'none';
-        });
+        renderConfiguration(category);
     }
 }
 
@@ -161,28 +141,32 @@ function renderConfiguration(selectedCategory = null) {
     const content = document.getElementById('configContent');
     content.innerHTML = '';
     
-    // Track which keys have been rendered to prevent duplicates
-    const renderedKeys = new Set();
+    // Determine which categories to render
+    const categoriesToRender = selectedCategory && selectedCategory !== 'all' 
+        ? { [selectedCategory]: categories[selectedCategory] }
+        : categories;
 
-    // Special handling for Basic category with subcategories
-    if (selectedCategory === 'Basic' && basicSubcategories && Object.keys(basicSubcategories).length > 0) {
-        // Render Basic settings grouped by subcategory
-        Object.entries(basicSubcategories).forEach(([subcategory, keys]) => {
-            const group = document.createElement('div');
-            group.className = 'config-group';
-            group.dataset.category = 'Basic';
-            group.dataset.subcategory = subcategory;
+    // Render each category
+    Object.entries(categoriesToRender).forEach(([category, categoryData]) => {
+        if (!categoryData) return;
+        
+        const group = document.createElement('div');
+        group.className = 'config-group';
+        group.dataset.category = category;
 
-            const title = document.createElement('h3');
-            title.className = 'config-group-title';
-            title.textContent = subcategory;
-            group.appendChild(title);
+        const title = document.createElement('h3');
+        title.className = 'config-group-title';
+        title.textContent = category;
+        group.appendChild(title);
 
-            keys.forEach(key => {
-                // Skip if already rendered
-                if (renderedKeys.has(key)) return;
-                renderedKeys.add(key);
-                
+        // Render basic settings if any
+        if (categoryData.basic && categoryData.basic.length > 0) {
+            const basicHeader = document.createElement('div');
+            basicHeader.className = 'config-section-header';
+            basicHeader.innerHTML = '<span class="section-label">Basic Settings</span>';
+            group.appendChild(basicHeader);
+
+            categoryData.basic.forEach(key => {
                 const value = getNestedValue(currentConfig, key);
                 const defaultValue = getNestedValue(defaultConfig, key);
                 const isModified = getNestedValue(userSettings, key) !== undefined;
@@ -190,100 +174,30 @@ function renderConfiguration(selectedCategory = null) {
                 const item = createConfigItem(key, value, defaultValue, isModified);
                 group.appendChild(item);
             });
+        }
 
-            content.appendChild(group);
-        });
-    } else {
-        Object.entries(categories).forEach(([category, keys]) => {
-            if (selectedCategory && selectedCategory !== 'all' && selectedCategory !== category) {
-                return;
+        // Render advanced settings if any
+        if (categoryData.advanced && categoryData.advanced.length > 0) {
+            // Only show header if there are also basic settings
+            if (categoryData.basic && categoryData.basic.length > 0) {
+                const advancedHeader = document.createElement('div');
+                advancedHeader.className = 'config-section-header';
+                advancedHeader.innerHTML = '<span class="section-label">Advanced Settings</span>';
+                group.appendChild(advancedHeader);
             }
 
-            const basicKeys = [];
-            const advancedKeys = [];
+            categoryData.advanced.forEach(key => {
+                const value = getNestedValue(currentConfig, key);
+                const defaultValue = getNestedValue(defaultConfig, key);
+                const isModified = getNestedValue(userSettings, key) !== undefined;
 
-            keys.forEach(key => {
-                const metadata = configMetadata[key] || {};
-                if (metadata.showInBasic) {
-                    basicKeys.push(key);
-                } else {
-                    advancedKeys.push(key);
-                }
+                const item = createConfigItem(key, value, defaultValue, isModified);
+                group.appendChild(item);
             });
+        }
 
-            const group = document.createElement('div');
-            group.className = 'config-group';
-            group.dataset.category = category;
-
-            const title = document.createElement('h3');
-            title.className = 'config-group-title';
-            title.textContent = category;
-            if (category === 'Basic') {
-                title.innerHTML = category + ' <span style="color: var(--warning);">[Modified]</span>';
-            }
-            group.appendChild(title);
-
-            // Render basic settings first (if any)
-            if (basicKeys.length > 0 && category !== 'Basic') {
-                const basicHeader = document.createElement('div');
-                basicHeader.className = 'config-section-header';
-                basicHeader.innerHTML = '<span class="section-label">Essential Settings</span>';
-                group.appendChild(basicHeader);
-
-                basicKeys.forEach(key => {
-                    // Skip if already rendered
-                    if (renderedKeys.has(key)) return;
-                    renderedKeys.add(key);
-                    
-                    const value = getNestedValue(currentConfig, key);
-                    const defaultValue = getNestedValue(defaultConfig, key);
-                    const isModified = getNestedValue(userSettings, key) !== undefined;
-
-                    const item = createConfigItem(key, value, defaultValue, isModified);
-                    group.appendChild(item);
-                });
-            } else if (category === 'Basic') {
-                // For Basic category, all settings are basic by definition
-                keys.forEach(key => {
-                    // Skip if already rendered
-                    if (renderedKeys.has(key)) return;
-                    renderedKeys.add(key);
-                    
-                    const value = getNestedValue(currentConfig, key);
-                    const defaultValue = getNestedValue(defaultConfig, key);
-                    const isModified = getNestedValue(userSettings, key) !== undefined;
-
-                    const item = createConfigItem(key, value, defaultValue, isModified);
-                    group.appendChild(item);
-                });
-            }
-
-            // Render advanced settings (if any and not in Basic category)
-            if (advancedKeys.length > 0 && category !== 'Basic') {
-                if (basicKeys.length > 0) {
-                    const advancedHeader = document.createElement('div');
-                    advancedHeader.className = 'config-section-header';
-                    advancedHeader.innerHTML = '<span class="section-label">Advanced Settings</span>';
-                    group.appendChild(advancedHeader);
-                }
-
-                advancedKeys.forEach(key => {
-                    // Skip if already rendered
-                    if (renderedKeys.has(key)) return;
-                    renderedKeys.add(key);
-                    
-                    const value = getNestedValue(currentConfig, key);
-                    const defaultValue = getNestedValue(defaultConfig, key);
-                    const isModified = getNestedValue(userSettings, key) !== undefined;
-
-                    const item = createConfigItem(key, value, defaultValue, isModified);
-                    group.appendChild(item);
-                });
-            }
-
-            content.appendChild(group);
-        });
-    }
+        content.appendChild(group);
+    });
 }
 
 // Create configuration item element

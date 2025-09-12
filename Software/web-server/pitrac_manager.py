@@ -56,32 +56,15 @@ class PiTracProcessManager:
         self.log_file.parent.mkdir(parents=True, exist_ok=True)
         self.pid_file.parent.mkdir(parents=True, exist_ok=True)
 
-    def _load_pitrac_config(self) -> Dict[str, Any]:
-        """Load PiTrac configuration from JSON config manager"""
-
+    def _get_system_mode(self) -> str:
+        """Get the system mode (single or dual Pi)"""
         config = self.config_manager.get_config()
-        metadata = self.config_manager.load_configurations_metadata()
-        system_defaults = metadata.get("systemDefaults", {})
-        camera_defs = metadata.get("cameraDefinitions", {})
-        
-        struct = system_defaults.get("configStructure", {})
-        system_key = struct.get("systemKey", "system")
-        cameras_key = struct.get("camerasKey", "cameras")
-        
-        transformed = {
-            system_key: {
-                "mode": config.get(system_key, {}).get("mode", system_defaults.get("mode", "single")),
-                "camera_role": config.get(system_key, {}).get("camera_role", system_defaults.get("cameraRole", "camera1")),
-            },
-            cameras_key: {}
-        }
-        
-        for cam_name, cam_def in camera_defs.items():
-            slot = cam_def.get("slot", f"slot{cam_name[-1]}")
-            default_idx = cam_def.get("defaultIndex", 0)
-            transformed[cameras_key][slot] = config.get(cameras_key, {}).get(slot, {"index": default_idx})
-        
-        return transformed
+        return config.get("system", {}).get("mode", "single")
+    
+    def _get_camera_role(self) -> str:
+        """Get the camera role for dual Pi mode"""
+        config = self.config_manager.get_config()
+        return config.get("system", {}).get("camera_role", "camera1")
 
     def _build_cli_args_from_metadata(self, camera: str = "camera1") -> list:
         """Build CLI arguments using metadata from configurations.json
@@ -151,54 +134,44 @@ class PiTracProcessManager:
         
         return env
 
-    def _build_command(self, camera: str = "camera1") -> list:
-        """Build the command to run pitrac_lm with proper arguments"""
-
+    def _build_command(self, camera: str = "camera1", config_file_path: Optional[Path] = None) -> list:
+        """Build the command to run pitrac_lm with proper arguments
+        
+        Args:
+            camera: Which camera to build command for ("camera1" or "camera2")
+            config_file_path: Path to the generated config file
+        """
         cmd = [self.pitrac_binary]
         
-        config = self._load_pitrac_config()
-        metadata = self.config_manager.load_configurations_metadata()
-        system_defaults = metadata.get("systemDefaults", {})
-        camera_defs = metadata.get("cameraDefinitions", {})
-        
-        struct = system_defaults.get("configStructure", {})
-        system_key = struct.get("systemKey", "system")
-        cameras_key = struct.get("camerasKey", "cameras")
-        
-        system_config = config.get(system_key) or {}
-        cameras_config = config.get(cameras_key) or {}
-        
-        default_mode = system_defaults.get("mode", "single")
-        is_single_pi = system_config.get("mode", default_mode) == "single"
-        if is_single_pi:
+        # Add system mode arguments
+        system_mode = self._get_system_mode()
+        if system_mode == "single":
             cmd.append(f"--system_mode={camera}")
             cmd.append("--run_single_pi")
         else:
-            default_role = system_defaults.get("cameraRole", "camera1")
-            camera_role = system_config.get("camera_role", default_role)
+            camera_role = self._get_camera_role()
             cmd.append(f"--system_mode={camera_role}")
-
-        if camera in camera_defs:
-            cam_def = camera_defs[camera]
-            slot = cam_def.get("slot")
-            default_idx = cam_def.get("defaultIndex", 0)
-            slot_config = cameras_config.get(slot) or {}
-            camera_index = slot_config.get("index", str(default_idx))
+        
+        # Add camera index if configured
+        config = self.config_manager.get_config()
+        camera_index = config.get("cameras", {}).get(f"{camera}", {}).get("index")
+        if camera_index is not None:
             cmd.append(f"--camera={camera_index}")
 
-        if Path(self.config_file).exists():
-            cmd.append(f"--config_file={self.config_file}")
-
-        metadata_args = self._build_cli_args_from_metadata(camera)
-        cmd.extend(metadata_args)
+        # Add the generated config file
+        if config_file_path and Path(config_file_path).exists():
+            cmd.append(f"--config_file={config_file_path}")
+        else:
+            logger.error("No config file path provided!")
         
-        # Add web server share directory argument (with expanded path)
-        home_dir = str(Path.home())
-        metadata = self.config_manager.load_configurations_metadata()
-        env_defaults = metadata.get("environmentDefaults", {})
-        web_share_dir = env_defaults.get("webserverShareDir", {}).get("default", "~/LM_Shares/WebShare/")
-        expanded_web_share_dir = web_share_dir.replace("~", home_dir)
-        cmd.append(f"--web_server_share_dir={expanded_web_share_dir}")
+        # Add CLI arguments from metadata
+        cli_args = self._build_cli_args_from_metadata(camera)
+        cmd.extend(cli_args)
+        
+        # Add web server share directory (from config)
+        web_share_dir = config.get("gs_config", {}).get("ipc_interface", {}).get("kWebServerShareDirectory", "~/LM_Shares/Images/")
+        expanded_dir = web_share_dir.replace("~", str(Path.home()))
+        cmd.append(f"--web_server_share_dir={expanded_dir}")
 
         logger.info(f"Built command: {' '.join(cmd)}")
         return cmd
@@ -215,66 +188,60 @@ class PiTracProcessManager:
         try:
             Path(self.log_file).parent.mkdir(parents=True, exist_ok=True)
             Path(self.pid_file).parent.mkdir(parents=True, exist_ok=True)
-
-            config = self._load_pitrac_config()
-            metadata = self.config_manager.load_configurations_metadata()
-            system_defaults = metadata.get("systemDefaults", {})
-            struct = system_defaults.get("configStructure", {})
-            system_key = struct.get("systemKey", "system")
             
-            system_config = config.get(system_key) or {}
-            default_mode = system_defaults.get("mode", "single")
-            is_single_pi = system_config.get("mode", default_mode) == "single"
+            # Generate the golf_sim_config.json from configurations metadata
+            try:
+                generated_config_path = self.config_manager.generate_golf_sim_config()
+                logger.info(f"Generated config file at: {generated_config_path}")
+            except RuntimeError as e:
+                logger.error(f"Failed to generate config: {e}")
+                return {
+                    "status": "error",
+                    "message": f"Failed to generate configuration: {e}",
+                    "error": str(e)
+                }
 
-            metadata = self.config_manager.load_configurations_metadata()
-            env_defaults = metadata.get("environmentDefaults", {})
+            # Get system mode to determine single vs dual Pi
+            system_mode = self._get_system_mode()
+            is_single_pi = system_mode == "single"
+
+            # Set up environment variables
             env = os.environ.copy()
             home_dir = str(Path.home())
             
-            env["LD_LIBRARY_PATH"] = env_defaults.get("ldLibraryPath", {}).get("default", "/usr/lib/pitrac")
-            env["PITRAC_ROOT"] = env_defaults.get("pitracRoot", {}).get("default", "/usr/lib/pitrac")
+            # Set standard environment variables
+            env["LD_LIBRARY_PATH"] = "/usr/lib/pitrac"
+            env["PITRAC_ROOT"] = "/usr/lib/pitrac"
+            env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = "~/LM_Shares/Images/".replace("~", home_dir)
+            env["PITRAC_WEBSERVER_SHARE_DIR"] = "~/LM_Shares/WebShare/".replace("~", home_dir)
+            env["PITRAC_MSG_BROKER_FULL_ADDRESS"] = "tcp://localhost:61616"
             
-            base_img_dir = env_defaults.get("baseImageLoggingDir", {}).get("default", "~/LM_Shares/Images/")
-            env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = base_img_dir.replace("~", home_dir)
-            
-            web_share_dir = env_defaults.get("webserverShareDir", {}).get("default", "~/LM_Shares/WebShare/")
-            env["PITRAC_WEBSERVER_SHARE_DIR"] = web_share_dir.replace("~", home_dir)
-            
-            env["PITRAC_MSG_BROKER_FULL_ADDRESS"] = env_defaults.get("msgBrokerFullAddress", {}).get("default", "tcp://localhost:61616")
-            
-            camera_defs = metadata.get("cameraDefinitions", {})
-            
+            # Set camera-specific environment variables
             if is_single_pi:
-                for cam_name, cam_def in camera_defs.items():
-                    env_cam = self._set_environment_from_metadata(cam_name)
-                    env_prefix = cam_def.get("envPrefix", f"PITRAC_SLOT{cam_name[-1]}")
-                    
-                    for key, value in env_cam.items():
-                        if key.startswith(env_prefix):
-                            env[key] = value
-                    
-                    logger.info(f"{cam_def.get('displayName', cam_name)} env: {[(k,v) for k,v in env.items() if k.startswith(env_prefix)]}")
-            else:
-                first_camera = list(camera_defs.keys())[0] if camera_defs else "camera1"
-                env_cam1 = self._set_environment_from_metadata(first_camera)
+                # Single Pi mode: set env vars for both cameras
+                env_cam1 = self._set_environment_from_metadata("camera1")
+                env_cam2 = self._set_environment_from_metadata("camera2")
                 env.update(env_cam1)
-                cam_def = camera_defs.get(first_camera, {})
-                env_prefix = cam_def.get("envPrefix", "PITRAC_SLOT1")
-                logger.info(f"{cam_def.get('displayName', first_camera)} env: {[(k,v) for k,v in env.items() if k.startswith(env_prefix)]}")
+                env.update(env_cam2)
+                logger.info(f"Set environment for both cameras")
+            else:
+                # Dual Pi mode: only set env for camera1
+                env_cam1 = self._set_environment_from_metadata("camera1")
+                env.update(env_cam1)
+                logger.info(f"Set environment for camera1 only")
 
             Path(env["PITRAC_BASE_IMAGE_LOGGING_DIR"]).mkdir(parents=True, exist_ok=True)
             Path(env["PITRAC_WEBSERVER_SHARE_DIR"]).mkdir(parents=True, exist_ok=True)
 
             if is_single_pi:
-                camera_defs = metadata.get("cameraDefinitions", {})
-                camera_names = list(camera_defs.keys())
-                second_camera = camera_names[1] if len(camera_names) > 1 else "camera2"
+                # In single Pi mode, start camera2 first
+                second_camera = "camera2"
                 
                 logger.info(
                     f"Starting {second_camera} process FIRST for single-Pi dual camera mode..."
                 )
 
-                cmd2 = self._build_command(second_camera)
+                cmd2 = self._build_command(second_camera, config_file_path=generated_config_path)
 
                 with open(self.camera2_log_file, "a") as log2:
                     self.camera2_process = subprocess.Popen(
@@ -311,11 +278,11 @@ class PiTracProcessManager:
                             "log_file": str(self.camera2_log_file),
                         }
 
-            camera_defs = metadata.get("cameraDefinitions", {})
-            first_camera = list(camera_defs.keys())[0] if camera_defs else "camera1"
+            # Start camera1 (primary camera)
+            first_camera = "camera1"
             
             logger.info(f"Starting {first_camera} process...")
-            cmd = self._build_command(first_camera)
+            cmd = self._build_command(first_camera, config_file_path=generated_config_path)
 
             with open(self.log_file, "a") as log:
                 self.process = subprocess.Popen(
@@ -555,15 +522,9 @@ class PiTracProcessManager:
         camera1_pid = self.get_pid()
         camera2_pid = self.get_camera2_pid()
 
-        config = self._load_pitrac_config()
-        metadata = self.config_manager.load_configurations_metadata()
-        system_defaults = metadata.get("systemDefaults", {})
-        struct = system_defaults.get("configStructure", {})
-        system_key = struct.get("systemKey", "system")
-        
-        system_config = config.get(system_key) or {}
-        default_mode = system_defaults.get("mode", "single")
-        is_single_pi = system_config.get("mode", default_mode) == "single"
+        # Get system mode
+        system_mode = self._get_system_mode()
+        is_single_pi = system_mode == "single"
 
         status = {
             "is_running": camera1_pid is not None or camera2_pid is not None,
@@ -577,7 +538,7 @@ class PiTracProcessManager:
             "camera2_log_file": str(self.camera2_log_file),
             "config_file": self.config_file,
             "binary": self.pitrac_binary,
-            "mode": system_config.get("mode", "single"),
+            "mode": system_mode,
         }
 
         if self.log_file.exists():

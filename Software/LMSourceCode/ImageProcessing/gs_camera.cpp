@@ -16,6 +16,7 @@
 #include "libcamera_interface.h"
 
 #include "gs_camera.h"
+#include "gs_web_api.h"
 
 
 namespace golf_sim {
@@ -4466,6 +4467,11 @@ namespace golf_sim {
 
             GolfSimConfiguration::SetTreeValue(focal_length_tag_name, average_focal_length);
             GolfSimConfiguration::SetTreeValue(camera_angles_tag_name, camera_angles);
+            
+            WebApi::UpdateCalibration(focal_length_tag_name, average_focal_length);
+            
+            std::vector<double> angles_vector = {camera_angles[0], camera_angles[1]};
+            WebApi::UpdateCalibration(camera_angles_tag_name, angles_vector);
 
             std::string config_file_name = "golf_sim_config.json";
 

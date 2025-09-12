@@ -1,15 +1,14 @@
 """Configuration Manager for PiTrac Web Server
 
-Handles reading and writing JSON configuration files with a two-tier system:
-1. System defaults: /etc/pitrac/golf_sim_config.json (read-only)
-2. User overrides: ~/.pitrac/config/user_settings.json (read-write, sparse)
+Handles reading and writing JSON configuration files with a three-tier system:
+1. Generated defaults: From configurations.json metadata
+2. Calibration data: ~/.pitrac/config/calibration_data.json (preserved across regenerations)
+3. User overrides: ~/.pitrac/config/user_settings.json (read-write, sparse)
 """
 
 import json
 import logging
 import os
-import shutil
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -26,12 +25,12 @@ class ConfigurationManager:
         def expand_path(path_str: str) -> Path:
             return Path(path_str.replace("~", str(Path.home())))
         
-        self.system_config_path = Path(sys_paths.get("systemConfigPath", {}).get("default", "/etc/pitrac/golf_sim_config.json"))
+        # Configuration paths for three-tier system
         self.user_settings_path = expand_path(sys_paths.get("userSettingsPath", {}).get("default", "~/.pitrac/config/user_settings.json"))
-        self.backup_dir = expand_path(sys_paths.get("backupDirectory", {}).get("default", "~/.pitrac/backups"))
+        self.calibration_data_path = expand_path("~/.pitrac/config/calibration_data.json")
 
-        self.system_config: Dict[str, Any] = {}
         self.user_settings: Dict[str, Any] = {}
+        self.calibration_data: Dict[str, Any] = {}
         self.merged_config: Dict[str, Any] = {}
 
         self.restart_required_params = self._load_restart_required_params()
@@ -62,12 +61,13 @@ class ConfigurationManager:
         return restart_params
 
     def reload(self) -> None:
-        """Reload all configuration files"""
-        self.system_config = self._load_json(self.system_config_path)
+        """Reload configuration from metadata, calibration data, and user settings"""
         self.user_settings = self._load_json(self.user_settings_path)
-        self.merged_config = self._merge_configs()
+        self.calibration_data = self._load_json(self.calibration_data_path)
+        # Build merged config from metadata defaults + calibration + user overrides
+        self.merged_config = self._build_config_from_metadata()
         self.restart_required_params = self._load_restart_required_params()
-        logger.info(f"Loaded configuration: {len(self.user_settings)} user overrides")
+        logger.info(f"Loaded configuration: {len(self.calibration_data)} calibration fields, {len(self.user_settings)} user overrides")
 
     def _load_json(self, path: Path) -> Dict[str, Any]:
         """Load JSON file safely"""
@@ -98,9 +98,28 @@ class ConfigurationManager:
             logger.error(f"Failed to save {path}: {e}")
             return False
 
-    def _merge_configs(self) -> Dict[str, Any]:
-        """Merge system defaults with user overrides"""
-
+    def _build_config_from_metadata(self) -> Dict[str, Any]:
+        """Build configuration from metadata defaults, calibration data, and user overrides"""
+        config = {}
+        metadata = self.load_configurations_metadata()
+        settings_metadata = metadata.get("settings", {})
+        
+        # First, add all defaults from metadata
+        for key, setting_info in settings_metadata.items():
+            if "default" in setting_info:
+                parts = key.split(".")
+                current = config
+                
+                # Navigate/create nested structure
+                for part in parts[:-1]:
+                    if part not in current:
+                        current[part] = {}
+                    current = current[part]
+                
+                # Set the default value
+                current[parts[-1]] = setting_info["default"]
+        
+        # Helper function for deep merging
         def deep_merge(base: Dict, override: Dict) -> Dict:
             """Recursively merge override into base"""
             result = base.copy()
@@ -114,8 +133,12 @@ class ConfigurationManager:
                 else:
                     result[key] = value
             return result
-
-        return deep_merge(self.system_config, self.user_settings)
+        
+        # Apply calibration data (persistent layer)
+        config = deep_merge(config, self.calibration_data)
+        
+        # Then apply user overrides (highest priority)
+        return deep_merge(config, self.user_settings)
 
     def get_config(self, key: Optional[str] = None) -> Any:
         """Get configuration value or entire config
@@ -140,50 +163,13 @@ class ConfigurationManager:
         return value
     
     def get_merged_with_metadata_defaults(self) -> Dict[str, Any]:
-        """Get merged config including metadata-defined defaults"""
-        result = self.merged_config.copy()
-        
-        metadata = self.load_configurations_metadata()
-        settings_metadata = metadata.get("settings", {})
-        
-        for key, meta in settings_metadata.items():
-            if "default" in meta:
-                parts = key.split(".")
-                current = result
-                exists = True
-                
-                for i, part in enumerate(parts):
-                    if i == len(parts) - 1:
-                        if part not in current:
-                            exists = False
-                    else:
-                        if part not in current:
-                            current[part] = {}
-                        current = current[part]
-                
-                if not exists:
-                    current[parts[-1]] = meta["default"]
-        
-        return result
+        """Get merged config (already includes metadata defaults)"""
+        return self.merged_config.copy()
 
     def get_default(self, key: Optional[str] = None) -> Any:
-        """Get default system configuration value or metadata default"""
+        """Get default value from metadata"""
         if key is None:
             return self.get_all_defaults_with_metadata()
-
-        value = self.system_config
-        parts = key.split(".")
-        found = True
-        
-        for part in parts:
-            if isinstance(value, dict) and part in value:
-                value = value[part]
-            else:
-                found = False
-                break
-        
-        if found:
-            return value
             
         metadata = self.load_configurations_metadata()
         settings_metadata = metadata.get("settings", {})
@@ -193,8 +179,8 @@ class ConfigurationManager:
         return None
     
     def get_all_defaults_with_metadata(self) -> Dict[str, Any]:
-        """Get all defaults including metadata-defined defaults"""
-        defaults = self.system_config.copy()
+        """Get all defaults from metadata"""
+        defaults = {}
         
         metadata = self.load_configurations_metadata()
         settings_metadata = metadata.get("settings", {})
@@ -230,27 +216,48 @@ class ConfigurationManager:
             Tuple of (success, message, requires_restart)
         """
         default_value = self.get_default(key)
+        is_calibration = self._is_calibration_field(key)
 
+        # If resetting to default
         if value == default_value:
-            if self._delete_from_dict(self.user_settings, key):
-                self._save_json(self.user_settings_path, self.user_settings)
-                self.reload()
-                return (
-                    True,
-                    f"Reset {key} to default value",
-                    key in self.restart_required_params,
-                )
+            # Remove from appropriate storage
+            if is_calibration:
+                if self._delete_from_dict(self.calibration_data, key):
+                    self._save_json(self.calibration_data_path, self.calibration_data)
+                    self.reload()
+                    return (
+                        True,
+                        f"Reset calibration {key} to default value",
+                        key in self.restart_required_params,
+                    )
+            else:
+                if self._delete_from_dict(self.user_settings, key):
+                    self._save_json(self.user_settings_path, self.user_settings)
+                    self.reload()
+                    return (
+                        True,
+                        f"Reset {key} to default value",
+                        key in self.restart_required_params,
+                    )
             return True, "Value already at default", False
 
-        if self._set_in_dict(self.user_settings, key, value):
-            self._backup_config()
-
-            if self._save_json(self.user_settings_path, self.user_settings):
-                self.reload()
-                requires_restart = key in self.restart_required_params
-                return True, f"Set {key} = {value}", requires_restart
-
-            return False, "Failed to save configuration", False
+        # Setting a new value
+        if is_calibration:
+            # Save to calibration data
+            if self._set_in_dict(self.calibration_data, key, value):
+                if self._save_json(self.calibration_data_path, self.calibration_data):
+                    self.reload()
+                    requires_restart = key in self.restart_required_params
+                    return True, f"Set calibration {key} = {value}", requires_restart
+                return False, "Failed to save calibration data", False
+        else:
+            # Save to user settings
+            if self._set_in_dict(self.user_settings, key, value):
+                if self._save_json(self.user_settings_path, self.user_settings):
+                    self.reload()
+                    requires_restart = key in self.restart_required_params
+                    return True, f"Set {key} = {value}", requires_restart
+                return False, "Failed to save configuration", False
 
         return False, "Failed to set value", False
 
@@ -303,7 +310,6 @@ class ConfigurationManager:
 
     def reset_all(self) -> Tuple[bool, str]:
         """Reset all user settings to defaults"""
-        self._backup_config()
 
         self.user_settings = {}
 
@@ -313,24 +319,6 @@ class ConfigurationManager:
 
         return False, "Failed to reset configuration"
 
-    def _backup_config(self) -> Optional[Path]:
-        """Create backup of current user settings"""
-        if not self.user_settings:
-            return None
-
-        try:
-            self.backup_dir.mkdir(parents=True, exist_ok=True)
-
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = self.backup_dir / f"user_settings_{timestamp}.json"
-
-            shutil.copy2(self.user_settings_path, backup_path)
-            logger.info(f"Created backup: {backup_path}")
-            return backup_path
-
-        except (IOError, OSError) as e:
-            logger.error(f"Failed to create backup: {e}")
-            return None
 
     def get_diff(self) -> Dict[str, Any]:
         """Get differences between user settings and defaults
@@ -351,7 +339,8 @@ class ConfigurationManager:
                 elif value != default.get(key):
                     diff[current_path] = {"user": value, "default": default[key]}
 
-        compare_nested(self.user_settings, self.system_config)
+        default_config = self.get_all_defaults_with_metadata()
+        compare_nested(self.user_settings, default_config)
         return diff
 
     def validate_config(self, key: str, value: Any) -> Tuple[bool, str]:
@@ -420,6 +409,90 @@ class ConfigurationManager:
 
         return True, ""
 
+    def generate_golf_sim_config(self) -> Path:
+        """Generate golf_sim_config.json from configurations metadata and user settings
+        
+        This method creates a complete golf_sim_config.json file by:
+        1. Taking all settings marked with passedVia: "json" 
+        2. Getting their values (default + user overrides)
+        3. Building the nested JSON structure expected by pitrac_lm
+        
+        Returns:
+            Path to the generated configuration file
+        
+        Raises:
+            RuntimeError: If generation fails
+        """
+        try:
+            config = {}
+            metadata = self.load_configurations_metadata()
+            settings_metadata = metadata.get("settings", {})
+            
+            if not settings_metadata:
+                raise RuntimeError("No settings found in configurations metadata")
+            
+            # Process all settings and build the JSON structure
+            json_settings_count = 0
+            for key, setting_info in settings_metadata.items():
+                # Skip non-JSON routed settings
+                passed_via = setting_info.get("passedVia", "json")  # Default to json if not specified
+                if passed_via in ["cli", "environment"]:
+                    continue
+                
+                # Get the merged value (default + calibration + user override)
+                value = self.get_config(key)
+                if value is not None:
+                    # Build nested structure from dot notation key
+                    self._set_nested_json(config, key, value)
+                    json_settings_count += 1
+            
+            if json_settings_count == 0:
+                raise RuntimeError("No JSON settings found to generate config")
+            
+            # Save to generated location
+            generated_path = self.user_settings_path.parent / "generated_golf_sim_config.json"
+            if not self._save_json(generated_path, config):
+                raise RuntimeError(f"Failed to save generated config to {generated_path}")
+            
+            logger.info(f"Generated golf_sim_config.json with {json_settings_count} settings at {generated_path}")
+            return generated_path
+            
+        except Exception as e:
+            logger.error(f"Failed to generate golf_sim_config.json: {e}")
+            raise RuntimeError(f"Config generation failed: {e}")
+    
+    def _set_nested_json(self, config: dict, key: str, value: Any):
+        """Set value in nested JSON structure based on dot notation key
+        
+        Args:
+            config: The config dict to modify
+            key: Dot notation key (e.g., "gs_config.cameras.kCamera1Gain")
+            value: The value to set
+        """
+        parts = key.split(".")
+        current = config
+        
+        # Navigate/create the nested structure
+        for part in parts[:-1]:
+            if part not in current:
+                current[part] = {}
+            current = current[part]
+        
+        # Set the final value
+        final_key = parts[-1]
+        
+        # Convert boolean values to "0" or "1" strings for compatibility
+        if isinstance(value, bool):
+            current[final_key] = "1" if value else "0"
+        elif value is None:
+            # Don't set None values
+            return
+        elif isinstance(value, (list, dict)):
+            # Preserve arrays and objects as-is (for calibration matrices, etc.)
+            current[final_key] = value
+        else:
+            current[final_key] = str(value)
+    
     def get_available_models(self) -> Dict[str, str]:
         """
         Discover available YOLO models from the models directory.
@@ -546,101 +619,77 @@ class ConfigurationManager:
                 result[full_key] = value
         return result
 
-    def get_categories(self) -> Dict[str, List[str]]:
-        """Get configuration organized by categories based on configurations.json
+    def get_categories(self) -> Dict[str, Dict[str, List[str]]]:
+        """Get configuration organized by categories with basic/advanced subcategories
 
         Returns:
-            Dictionary with category names and their parameters
+            Dictionary with category names containing basic and advanced settings
         """
         metadata = self.load_configurations_metadata()
         settings_metadata = metadata.get("settings", {})
         category_list = metadata.get("categoryList", [
-            "Basic", "Cameras", "Simulators", "Ball Detection", 
+            "Cameras", "Simulators", "Ball Detection", 
             "AI Detection", "Storage", "Network", "Logging",
-            "Strobing", "Spin Analysis", "Calibration", "Advanced"
+            "Strobing", "Spin Analysis", "Calibration", "System",
+            "Testing", "Debugging", "Club Data", "Display"
         ])
 
-        categories = {cat: [] for cat in category_list}
+        # Initialize categories with basic and advanced subcategories
+        categories = {cat: {"basic": [], "advanced": []} for cat in category_list}
 
         processed_keys = set()
 
         for key, setting_info in settings_metadata.items():
             processed_keys.add(key)
-            if setting_info.get("showInBasic", False):
-                categories["Basic"].append(key)
             category = setting_info.get("category", "Advanced")
+            
+            # Determine if this is a basic or advanced setting
+            # Use showInBasic for backward compatibility, but prefer subcategory field
+            subcategory = setting_info.get("subcategory", "advanced")
+            if subcategory not in ["basic", "advanced"]:
+                # Fallback to showInBasic for backward compatibility
+                subcategory = setting_info.get("subcategory", "advanced")
+            
             if category in categories:
-                categories[category].append(key)
+                categories[category][subcategory].append(key)
 
-        for key in self.flatten_config(self.merged_config).keys():
-            if key not in processed_keys:
-                category = self.auto_categorize_key(key)
-                categories[category].append(key)
+        # No auto-categorization - all items must have explicit categories
 
-        categories = {k: v for k, v in categories.items() if v}
+        # Remove empty categories
+        categories = {k: v for k, v in categories.items() if v["basic"] or v["advanced"]}
 
         return categories
 
-    def auto_categorize_key(self, key: str) -> str:
-        """Auto-categorize keys using metadata-driven rules."""
-        metadata = self._raw_metadata if hasattr(self, '_raw_metadata') else self._load_raw_metadata()
-        rules = metadata.get("autoCategorizationRules", [])
+    def _is_calibration_field(self, key: str) -> bool:
+        """Check if a field is calibration-related and should be persisted separately
         
-        for rule in rules:
-            patterns = rule.get("pattern", [])
-            category = rule.get("category", "Advanced")
-            case_sensitive = rule.get("caseSensitive", False)
-            exclude = rule.get("exclude", [])
+        Args:
+            key: Configuration key to check
             
-            if exclude:
-                if any(excl in key.lower() for excl in exclude):
-                    continue
-            
-            for pattern in patterns:
-                if case_sensitive:
-                    if pattern in key:
-                        return category
-                else:
-                    if pattern.lower() in key.lower():
-                        return category
-        
-        return "Advanced"
+        Returns:
+            True if this is a calibration field
+        """
+        calibration_patterns = [
+            "CalibrationMatrix",
+            "DistortionVector",
+            "Camera1Angles",
+            "Camera2Angles",
+            "Camera1FocalLength",
+            "Camera2FocalLength",
+            "Camera1Positions",
+            "Camera2Positions",
+            "Camera1Offset",
+            "Camera2Offset",
+            "calibration.",
+            "kAutoCalibration",
+            "_ENCLOSURE_"
+        ]
+        return any(pattern in key for pattern in calibration_patterns)
+    
+    # Auto-categorization removed - all items must have explicit categories
 
     def get_basic_subcategories(self):
-        """Get subcategories for Basic settings."""
-        metadata = self.load_configurations_metadata()
-        settings_metadata = metadata.get("settings", {})
+        """DEPRECATED: Use get_categories() instead which now includes subcategories."""
+        # Return empty dict for backward compatibility
+        return {}
 
-        subcategories = {}
-        for key, setting_info in settings_metadata.items():
-            if setting_info.get("showInBasic", False):
-                subcat = setting_info.get("basicSubcategory", "Other")
-                if subcat not in subcategories:
-                    subcategories[subcat] = []
-                subcategories[subcat].append(key)
-
-        return subcategories
-
-    def export_config(self) -> Dict[str, Any]:
-        """Export current configuration for backup/sharing"""
-        return {
-            "version": "1.0",
-            "exported_at": datetime.now().isoformat(),
-            "user_settings": self.user_settings,
-            "system_version": self.system_config.get("version", "unknown"),
-        }
-
-    def import_config(self, config_data: Dict[str, Any]) -> Tuple[bool, str]:
-        """Import configuration from exported data"""
-        if "user_settings" not in config_data:
-            return False, "Invalid configuration format"
-
-        self._backup_config()
-
-        self.user_settings = config_data["user_settings"]
-
-        if self._save_json(self.user_settings_path, self.user_settings):
-            self.reload()
-            return True, "Configuration imported successfully"
-
-        return False, "Failed to import configuration"
