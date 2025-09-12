@@ -285,12 +285,20 @@ class CalibrationManager:
         if system_mode == "single":
             cmd.extend([
                 "--run_single_pi",
+                f"--system_mode={camera}_still",
+                "--cam_still_mode"
+            ])
+        else:
+            cmd.extend([
+                f"--system_mode={camera}_still",
                 "--cam_still_mode"
             ])
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_file = f"calibration_{camera}_{timestamp}.png"
-        output_path = Path.home() / "LM_Shares" / "Images" / output_file
+        images_dir = Path.home() / "LM_Shares" / "Images"
+        images_dir.mkdir(parents=True, exist_ok=True)
+        output_path = images_dir / output_file
         
         cmd.extend([
             f"--output_filename={output_path}",
