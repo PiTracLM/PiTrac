@@ -28,6 +28,7 @@ from config_manager import ConfigurationManager
 from pitrac_manager import PiTracProcessManager
 from camera_detector import CameraDetector
 from calibration_manager import CalibrationManager
+from testing_tools_manager import TestingToolsManager
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class PiTracServer:
         self.config_manager = ConfigurationManager()
         self.pitrac_manager = PiTracProcessManager(self.config_manager)
         self.calibration_manager = CalibrationManager(self.config_manager)
+        self.testing_manager = TestingToolsManager(self.config_manager)
         self.mq_conn: Optional[stomp.Connection] = None
         self.listener: Optional[ActiveMQListener] = None
         self.reconnect_task: Optional[asyncio.Task] = None
@@ -350,6 +352,55 @@ class PiTracServer:
         async def stop_calibration() -> Dict[str, Any]:
             """Stop any running calibration process"""
             return await self.calibration_manager.stop_calibration()
+
+        @self.app.get("/testing", response_class=HTMLResponse)
+        async def testing_page(request: Request) -> Response:
+            """Serve testing tools UI page"""
+            return self.templates.TemplateResponse(
+                "testing.html", {"request": request}
+            )
+        
+        @self.app.get("/api/testing/tools")
+        async def get_testing_tools() -> Dict[str, Any]:
+            """Get available testing tools organized by category"""
+            return self.testing_manager.get_available_tools()
+        
+        @self.app.post("/api/testing/run/{tool_id}")
+        async def run_testing_tool(tool_id: str) -> Dict[str, Any]:
+            """Run a specific testing tool"""
+            if self.pitrac_manager.is_running():
+                return {
+                    "status": "error",
+                    "message": "Cannot run testing tools while PiTrac is running. Please stop PiTrac first."
+                }
+            
+            asyncio.create_task(self._run_tool_async(tool_id))
+            
+            return {
+                "status": "started",
+                "message": f"Tool {tool_id} started",
+                "tool_id": tool_id
+            }
+        
+        @self.app.post("/api/testing/stop/{tool_id}")
+        async def stop_testing_tool(tool_id: str) -> Dict[str, Any]:
+            """Stop a running testing tool"""
+            return await self.testing_manager.stop_tool(tool_id)
+        
+        @self.app.get("/api/testing/status")
+        async def get_testing_status() -> Dict[str, Any]:
+            """Get status of running testing tools"""
+            running = self.testing_manager.get_running_tools()
+            
+            results = {}
+            if hasattr(self.testing_manager, 'completed_results'):
+                results = self.testing_manager.completed_results
+                self.testing_manager.completed_results = {}
+            
+            return {
+                "running": running,
+                "results": results
+            }
 
         @self.app.get("/api/cameras/detect")
         async def detect_cameras() -> Dict[str, Any]:
@@ -735,6 +786,25 @@ class PiTracServer:
 
         self.reconnect_task = asyncio.create_task(self.reconnect_activemq_loop())
         logger.info("Started ActiveMQ reconnection monitor")
+
+    async def _run_tool_async(self, tool_id: str) -> None:
+        """Helper method to run a testing tool asynchronously"""
+        try:
+            result = await self.testing_manager.run_tool(tool_id)
+            
+            if not hasattr(self.testing_manager, 'completed_results'):
+                self.testing_manager.completed_results = {}
+            self.testing_manager.completed_results[tool_id] = result
+            
+            logger.info(f"Testing tool {tool_id} completed with status: {result.get('status')}")
+        except Exception as e:
+            logger.error(f"Error running testing tool {tool_id}: {e}")
+            if not hasattr(self.testing_manager, 'completed_results'):
+                self.testing_manager.completed_results = {}
+            self.testing_manager.completed_results[tool_id] = {
+                "status": "error",
+                "message": str(e)
+            }
 
     async def shutdown_event(self) -> None:
         logger.info("Shutting down PiTrac Web Server...")
