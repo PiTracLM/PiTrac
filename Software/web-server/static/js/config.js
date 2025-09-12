@@ -146,58 +146,136 @@ function renderConfiguration(selectedCategory = null) {
         ? { [selectedCategory]: categories[selectedCategory] }
         : categories;
 
-    // Render each category
-    Object.entries(categoriesToRender).forEach(([category, categoryData]) => {
-        if (!categoryData) return;
+    if (selectedCategory === null || selectedCategory === 'all') {
+        const hasBasicSettings = Object.entries(categoriesToRender).some(([_, categoryData]) => 
+            categoryData && categoryData.basic && categoryData.basic.length > 0
+        );
         
-        const group = document.createElement('div');
-        group.className = 'config-group';
-        group.dataset.category = category;
-
-        const title = document.createElement('h3');
-        title.className = 'config-group-title';
-        title.textContent = category;
-        group.appendChild(title);
-
-        // Render basic settings if any
-        if (categoryData.basic && categoryData.basic.length > 0) {
+        if (hasBasicSettings) {
+            const basicSection = document.createElement('div');
+            basicSection.className = 'config-section';
+            
             const basicHeader = document.createElement('div');
-            basicHeader.className = 'config-section-header';
-            basicHeader.innerHTML = '<span class="section-label">Basic Settings</span>';
-            group.appendChild(basicHeader);
-
-            categoryData.basic.forEach(key => {
-                const value = getNestedValue(currentConfig, key);
-                const defaultValue = getNestedValue(defaultConfig, key);
-                const isModified = getNestedValue(userSettings, key) !== undefined;
-
-                const item = createConfigItem(key, value, defaultValue, isModified);
-                group.appendChild(item);
+            basicHeader.className = 'config-main-section-header';
+            basicHeader.innerHTML = '<h2>Basic Settings</h2>';
+            basicSection.appendChild(basicHeader);
+            
+            Object.entries(categoriesToRender).forEach(([category, categoryData]) => {
+                if (!categoryData || !categoryData.basic || categoryData.basic.length === 0) return;
+                
+                const group = document.createElement('div');
+                group.className = 'config-group';
+                group.dataset.category = category;
+                
+                const title = document.createElement('h3');
+                title.className = 'config-group-title';
+                title.textContent = category;
+                group.appendChild(title);
+                
+                categoryData.basic.forEach(key => {
+                    const value = getNestedValue(currentConfig, key);
+                    const defaultValue = getNestedValue(defaultConfig, key);
+                    const isModified = getNestedValue(userSettings, key) !== undefined;
+                    
+                    const item = createConfigItem(key, value, defaultValue, isModified);
+                    group.appendChild(item);
+                });
+                
+                basicSection.appendChild(group);
             });
+            
+            content.appendChild(basicSection);
         }
+        
+        const hasAdvancedSettings = Object.entries(categoriesToRender).some(([_, categoryData]) => 
+            categoryData && categoryData.advanced && categoryData.advanced.length > 0
+        );
+        
+        if (hasAdvancedSettings) {
+            const advancedSection = document.createElement('div');
+            advancedSection.className = 'config-section';
+            
+            const advancedHeader = document.createElement('div');
+            advancedHeader.className = 'config-main-section-header';
+            advancedHeader.innerHTML = '<h2>Advanced Settings</h2>';
+            advancedSection.appendChild(advancedHeader);
+            
+            Object.entries(categoriesToRender).forEach(([category, categoryData]) => {
+                if (!categoryData || !categoryData.advanced || categoryData.advanced.length === 0) return;
+                
+                const group = document.createElement('div');
+                group.className = 'config-group';
+                group.dataset.category = category;
+                
+                const title = document.createElement('h3');
+                title.className = 'config-group-title';
+                title.textContent = category;
+                group.appendChild(title);
+                
+                categoryData.advanced.forEach(key => {
+                    const value = getNestedValue(currentConfig, key);
+                    const defaultValue = getNestedValue(defaultConfig, key);
+                    const isModified = getNestedValue(userSettings, key) !== undefined;
+                    
+                    const item = createConfigItem(key, value, defaultValue, isModified);
+                    group.appendChild(item);
+                });
+                
+                advancedSection.appendChild(group);
+            });
+            
+            content.appendChild(advancedSection);
+        }
+    } else {
+        Object.entries(categoriesToRender).forEach(([category, categoryData]) => {
+            if (!categoryData) return;
+            
+            const group = document.createElement('div');
+            group.className = 'config-group';
+            group.dataset.category = category;
 
-        // Render advanced settings if any
-        if (categoryData.advanced && categoryData.advanced.length > 0) {
-            // Only show header if there are also basic settings
+            const title = document.createElement('h3');
+            title.className = 'config-group-title';
+            title.textContent = category;
+            group.appendChild(title);
+
             if (categoryData.basic && categoryData.basic.length > 0) {
-                const advancedHeader = document.createElement('div');
-                advancedHeader.className = 'config-section-header';
-                advancedHeader.innerHTML = '<span class="section-label">Advanced Settings</span>';
-                group.appendChild(advancedHeader);
+                const basicHeader = document.createElement('div');
+                basicHeader.className = 'config-section-header';
+                basicHeader.innerHTML = '<span class="section-label">Basic Settings</span>';
+                group.appendChild(basicHeader);
+
+                categoryData.basic.forEach(key => {
+                    const value = getNestedValue(currentConfig, key);
+                    const defaultValue = getNestedValue(defaultConfig, key);
+                    const isModified = getNestedValue(userSettings, key) !== undefined;
+
+                    const item = createConfigItem(key, value, defaultValue, isModified);
+                    group.appendChild(item);
+                });
             }
 
-            categoryData.advanced.forEach(key => {
-                const value = getNestedValue(currentConfig, key);
-                const defaultValue = getNestedValue(defaultConfig, key);
-                const isModified = getNestedValue(userSettings, key) !== undefined;
+            if (categoryData.advanced && categoryData.advanced.length > 0) {
+                if (categoryData.basic && categoryData.basic.length > 0) {
+                    const advancedHeader = document.createElement('div');
+                    advancedHeader.className = 'config-section-header';
+                    advancedHeader.innerHTML = '<span class="section-label">Advanced Settings</span>';
+                    group.appendChild(advancedHeader);
+                }
 
-                const item = createConfigItem(key, value, defaultValue, isModified);
-                group.appendChild(item);
-            });
-        }
+                categoryData.advanced.forEach(key => {
+                    const value = getNestedValue(currentConfig, key);
+                    const defaultValue = getNestedValue(defaultConfig, key);
+                    const isModified = getNestedValue(userSettings, key) !== undefined;
 
-        content.appendChild(group);
-    });
+                    const item = createConfigItem(key, value, defaultValue, isModified);
+                    group.appendChild(item);
+                });
+            }
+
+            content.appendChild(group);
+        });
+    }
 }
 
 // Create configuration item element

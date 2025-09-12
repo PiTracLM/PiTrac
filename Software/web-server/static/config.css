@@ -205,6 +205,31 @@
     border-radius: 0.25rem;
 }
 
+/* Main section headers for Basic/Advanced grouping */
+.config-main-section-header {
+    margin: 2rem 0 1.5rem 0;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.config-main-section-header:first-child {
+    margin-top: 0;
+}
+
+.config-main-section-header h2 {
+    margin: 0;
+    color: var(--primary);
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.config-section {
+    margin-bottom: 3rem;
+}
+
+.config-section:last-child {
+    margin-bottom: 0;
+}
 
 /* Dropdown Menu Styles */
 .dropdown {
