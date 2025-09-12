@@ -159,8 +159,18 @@ namespace golf_sim {
         auto consoleSink = boost::log::add_console_log(std::clog);
         consoleSink->set_formatter(logFmt);
 
+        // Use ~/.pitrac/logs/ for text logs
+        std::string log_dir;
+        const char* home = std::getenv("HOME");
+        if (home != nullptr) {
+            log_dir = std::string(home) + "/.pitrac/logs/";
+        } else {
+            // Fallback if HOME not set
+            log_dir = "/tmp/pitrac/logs/";
+        }
+        
         auto fsSink = boost::log::add_file_log(
-            boost::log::keywords::file_name = "Logs/test_%Y-%m-%d_%H-%M-%S.%N.log",
+            boost::log::keywords::file_name = log_dir + "test_%Y-%m-%d_%H-%M-%S.%N.log",
             boost::log::keywords::rotation_size = 10 * 1024 * 1024,
             boost::log::keywords::min_free_space = 30 * 1024 * 1024,
             boost::log::keywords::open_mode = std::ios_base::app);

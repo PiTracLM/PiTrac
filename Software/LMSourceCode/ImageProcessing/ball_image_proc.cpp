@@ -367,25 +367,21 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingRadiiDpParam", kPlacedNarrowingRadiiDpParam);
 
         // ONNX Detection Configuration
-
-
-        // ONNX Detection Configuration
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kDetectionMethod", kDetectionMethod);
+        
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXModelPath", kONNXModelPath);
-
-		// Get the ONNX path from the .json file and then use the PITRAC_ROOT environment variable to help compute the absolute path
-        // We expect that environment variable to be set in both the Pi and Windows environments
-        std::string root_path = GolfSimConfiguration::GetPiTracRootPath();
-        if (root_path.empty()) {
-            GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXModelPath", kONNXModelPath);
+        
+        if (!kONNXModelPath.empty() && kONNXModelPath[0] != '/' && kONNXModelPath[0] != '~') {
+            std::string root_path = GolfSimConfiguration::GetPiTracRootPath();
+            if (!root_path.empty()) {
+                kONNXModelPath = root_path + "/" + kONNXModelPath;
+                GS_LOG_MSG(info, "Using PITRAC_ROOT environment variable to set ONNX model path to: " + kONNXModelPath);
+            }
         }
-		else {
-            kONNXModelPath = root_path + "/" + kONNXModelPath;
-			GS_LOG_MSG(info, "Using PITRAC_ROOT environment variable to set ONNX model path to: " + kONNXModelPath);
-		}
+        else {
+            GS_LOG_MSG(info, "Using absolute or home-relative ONNX model path from config: " + kONNXModelPath);
+        }
 
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kDetectionMethod", kDetectionMethod);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBallPlacementDetectionMethod", kBallPlacementDetectionMethod);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXConfidenceThreshold", kONNXConfidenceThreshold);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXNMSThreshold", kONNXNMSThreshold);
