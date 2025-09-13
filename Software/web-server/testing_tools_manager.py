@@ -93,14 +93,6 @@ class TestingToolsManager:
                 "requires_sudo": False,
                 "timeout": 30
             },
-            "test_e6_connect": {
-                "name": "Test E6 Connect",
-                "description": "Test E6 Connect server connectivity",
-                "category": "connectivity",
-                "args": ["--system_mode", "test_e6_connect"],
-                "requires_sudo": False,
-                "timeout": 30
-            }
         }
 
     def get_available_tools(self) -> Dict[str, Any]:
@@ -145,6 +137,11 @@ class TestingToolsManager:
             config_path = self.config_manager.generate_golf_sim_config()
 
             cmd = [self.pitrac_binary]
+
+            system_mode = self.config_manager.get_config().get("system", {}).get("mode", "single")
+            if system_mode == "single" and tool_id not in ["test_gspro_server", "test_e6_connect"]:
+                cmd.append("--run_single_pi")
+
             cmd.extend(tool_info["args"])
             cmd.append(f"--config_file={config_path}")
 
