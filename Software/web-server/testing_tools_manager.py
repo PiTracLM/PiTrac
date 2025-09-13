@@ -8,6 +8,8 @@ import json
 import logging
 import os
 import subprocess
+import glob
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
@@ -216,16 +218,24 @@ class TestingToolsManager:
             )
             
             self.running_processes[tool_id] = process
-            
+
+            start_time = time.time()
+
             try:
                 stdout, stderr = await asyncio.wait_for(
                     process.communicate(),
                     timeout=tool_info["timeout"]
                 )
-                
+
                 output = stdout.decode() if stdout else ""
                 error = stderr.decode() if stderr else ""
-                
+
+                log_content = await self._find_and_read_test_log(start_time)
+                if log_content:
+                    if output:
+                        output += "\n\n=== Test Log ===\n"
+                    output += log_content
+
                 result = {
                     "status": "success" if process.returncode == 0 else "failed",
                     "output": output,
@@ -302,6 +312,49 @@ class TestingToolsManager:
                 "status": "error",
                 "message": str(e)
             }
+
+    async def _find_and_read_test_log(self, start_time: float) -> Optional[str]:
+        """Find and read the test log file created after start_time
+
+        Args:
+            start_time: Unix timestamp when the test started
+
+        Returns:
+            Content of the log file if found, None otherwise
+        """
+        try:
+            log_dir = Path.home() / ".pitrac" / "logs"
+            if not log_dir.exists():
+                return None
+
+            pattern = str(log_dir / "test_*.log")
+            log_files = glob.glob(pattern)
+
+            latest_log = None
+            latest_mtime = 0
+
+            for log_file in log_files:
+                mtime = os.path.getmtime(log_file)
+                if mtime >= start_time and mtime > latest_mtime:
+                    latest_log = log_file
+                    latest_mtime = mtime
+
+            if latest_log:
+                logger.info(f"Found test log file: {latest_log}")
+                with open(latest_log, 'r') as f:
+                    lines = f.readlines()
+                    if len(lines) > 1000:
+                        content = "... (truncated) ...\n" + "".join(lines[-1000:])
+                    else:
+                        content = "".join(lines)
+                    return content
+            else:
+                logger.debug("No test log file found")
+
+        except Exception as e:
+            logger.error(f"Error reading test log: {e}")
+
+        return None
 
     def get_running_tools(self) -> List[str]:
         """Get list of currently running tools"""
