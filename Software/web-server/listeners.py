@@ -111,12 +111,12 @@ class ActiveMQListener(stomp.ConnectionListener):
                         body = body.encode("latin-1")
                         logger.debug("Encoded Camera2 image as latin-1")
                         # Mark this as an image message for special processing
-                        self._handle_image_message(body, content_length)
-                        return  # Don't process as regular msgpack
+                        #self._handle_image_message(body, content_length)
+                        return b""
                     except UnicodeEncodeError as e:
                         logger.warning(f"Failed to encode Camera2 image as latin-1: {e}")
                         logger.info("Skipping corrupted Camera2 image")
-                        return
+                        return b""
                 elif content_length and content_length > len(body) * 1.5:
                     logger.info(f"Detected large binary data (content-length={content_length}, string_length={len(body)})")
                     # Other binary data
@@ -126,7 +126,7 @@ class ActiveMQListener(stomp.ConnectionListener):
                     except UnicodeEncodeError as e:
                         logger.warning(f"Failed to encode binary data as latin-1: {e}")
                         logger.info(f"Skipping corrupted binary message #{self.message_count}")
-                        return
+                        return b""
                 else:
                     # Regular text string - encode as UTF-8
                     try:

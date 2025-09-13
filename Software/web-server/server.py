@@ -49,7 +49,7 @@ class PiTracServer:
         self.listener: Optional[ActiveMQListener] = None
         self.reconnect_task: Optional[asyncio.Task] = None
         self.shutdown_flag = False
-
+        self.background_tasks: set[asyncio.Task] = set()
         IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
         self.app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -374,7 +374,9 @@ class PiTracServer:
                     "message": "Cannot run testing tools while PiTrac is running. Please stop PiTrac first."
                 }
             
-            asyncio.create_task(self._run_tool_async(tool_id))
+            task = asyncio.create_task(self._run_tool_async(tool_id))
+            self.background_tasks.add(task)
+            task.add_done_callback(self.background_tasks.discard)
             
             return {
                 "status": "started",
@@ -810,6 +812,13 @@ class PiTracServer:
         logger.info("Shutting down PiTrac Web Server...")
 
         self.shutdown_flag = True
+
+        for task in self.background_tasks:
+            if not task.done():
+                task.cancel()
+
+        if self.background_tasks:
+            await asyncio.gather(*self.background_tasks, return_exceptions=True)
 
         if self.reconnect_task and not self.reconnect_task.done():
             self.reconnect_task.cancel()

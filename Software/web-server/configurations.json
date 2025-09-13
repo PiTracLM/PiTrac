@@ -419,47 +419,6 @@
       "passedTo": "camera2",
       "envVariable": "PITRAC_SLOT2_LENS_TYPE"
     },
-    "cameras.slot1.index": {
-      "category": "Cameras",
-      "subcategory": "basic",
-      "basicSubcategory": "Hardware",
-      "displayName": "Camera 1 Hardware Index",
-      "description": "Hardware camera index for Camera 1 (0-based, use 'rpicam-hello --list-cameras' to see available cameras)",
-      "type": "select",
-      "options": {
-        "0": "Camera 0",
-        "1": "Camera 1",
-        "2": "Camera 2",
-        "3": "Camera 3"
-      },
-      "default": "0",
-      "requiresRestart": true,
-      "passedVia": "environment",
-      "passedTo": "camera1",
-      "envVariable": "PITRAC_SLOT1_CAMERA_INDEX"
-    },
-    "cameras.slot2.index": {
-      "category": "Cameras",
-      "subcategory": "basic",
-      "basicSubcategory": "Hardware",
-      "displayName": "Camera 2 Hardware Index",
-      "description": "Hardware camera index for Camera 2 (0-based, use 'rpicam-hello --list-cameras' to see available cameras) - Only used in single Pi mode",
-      "visibleWhen": {
-        "system.mode": "single"
-      },
-      "type": "select",
-      "options": {
-        "0": "Camera 0",
-        "1": "Camera 1",
-        "2": "Camera 2",
-        "3": "Camera 3"
-      },
-      "default": "1",
-      "requiresRestart": true,
-      "passedVia": "environment",
-      "passedTo": "camera2",
-      "envVariable": "PITRAC_SLOT2_CAMERA_INDEX"
-    },
     "logging.level": {
       "category": "Logging",
       "subcategory": "basic",
@@ -578,7 +537,7 @@
       "min": 0.5,
       "max": 16.0,
       "step": 0.1,
-      "default": 1.0,
+      "default": 6.0,
       "requiresRestart": true,
       "passedVia": "json",
       "passedTo": "both"
@@ -596,7 +555,7 @@
       "min": 0.5,
       "max": 16.0,
       "step": 0.1,
-      "default": 1.0,
+      "default": 6.0,
       "requiresRestart": true,
       "passedVia": "json",
       "passedTo": "both"
@@ -1194,7 +1153,7 @@
       "min": 0.5,
       "max": 16.0,
       "step": 0.1,
-      "default": 1.5,
+      "default": 4.0,
       "requiresRestart": true,
       "passedVia": "json",
       "passedTo": "both"
@@ -1973,7 +1932,7 @@
       "type": "number",
       "min": 50,
       "max": 300,
-      "default": 130,
+      "default": 120,
       "requiresRestart": false,
       "passedVia": "json",
       "passedTo": "both"
@@ -1987,7 +1946,7 @@
       "min": 0.5,
       "max": 3.0,
       "step": 0.1,
-      "default": 1.7,
+      "default": 1.5,
       "requiresRestart": false,
       "passedVia": "json",
       "passedTo": "both"
@@ -2456,7 +2415,7 @@
       "type": "number",
       "min": 30,
       "max": 150,
-      "default": 60,
+      "default": 70,
       "requiresRestart": false,
       "passedVia": "json",
       "passedTo": "both"

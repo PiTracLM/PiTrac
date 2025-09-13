@@ -162,11 +162,6 @@ class PiTracProcessManager:
             camera_role = self._get_camera_role()
             cmd.append(f"--system_mode={camera_role}")
         
-        # Add camera index if configured
-        config = self.config_manager.get_config()
-        camera_index = config.get("cameras", {}).get(f"{camera}", {}).get("index")
-        if camera_index is not None:
-            cmd.append(f"--camera={camera_index}")
 
         # Add the generated config file
         if config_file_path and Path(config_file_path).exists():
@@ -177,8 +172,9 @@ class PiTracProcessManager:
         # Add CLI arguments from metadata
         cli_args = self._build_cli_args_from_metadata(camera)
         cmd.extend(cli_args)
-        
+
         # Add web server share directory (from config)
+        config = self.config_manager.get_config()
         web_share_dir = config.get("gs_config", {}).get("ipc_interface", {}).get("kWebServerShareDirectory", "~/LM_Shares/Images/")
         expanded_dir = web_share_dir.replace("~", str(Path.home()))
         cmd.append(f"--web_server_share_dir={expanded_dir}")
@@ -269,9 +265,13 @@ class PiTracProcessManager:
                     await asyncio.sleep(self.startup_delay_camera2)
 
                     if self.camera2_process.poll() is None:
-                        logger.info(
-                            f"PiTrac camera2 started successfully with PID {self.camera2_process.pid}"
-                        )
+                        try:
+                            pid = self.camera2_process.pid
+                            logger.info(
+                                f"PiTrac camera2 started successfully with PID {pid}"
+                            )
+                        except (AttributeError, OSError) as e:
+                            logger.warning(f"Race condition getting camera2 PID: {e}")
 
                         logger.info(
                             "Waiting for camera2 to be ready before starting camera1..."
@@ -279,6 +279,15 @@ class PiTracProcessManager:
                         await asyncio.sleep(self.startup_wait_camera2_ready)
                     else:
                         logger.error("Camera2 process exited immediately")
+                        if self.camera2_process:
+                            try:
+                                self.camera2_process.wait(timeout=1.0)
+                            except subprocess.TimeoutExpired:
+                                self.camera2_process.kill()
+                                try:
+                                    self.camera2_process.wait(timeout=5.0)
+                                except subprocess.TimeoutExpired:
+                                    logger.warning("Camera2 process did not terminate after kill signal")
                         if self.camera2_pid_file.exists():
                             self.camera2_pid_file.unlink()
                         self.camera2_process = None
@@ -310,29 +319,51 @@ class PiTracProcessManager:
                 await asyncio.sleep(self.startup_delay_camera1)
 
                 if self.process.poll() is None:
-                    logger.info(
-                        f"PiTrac camera1 started successfully with PID {self.process.pid}"
-                    )
+                    try:
+                        pid = self.process.pid
+                        logger.info(
+                            f"PiTrac camera1 started successfully with PID {pid}"
+                        )
+                    except (AttributeError, OSError) as e:
+                        logger.warning(f"Race condition getting camera1 PID: {e}")
 
                     if is_single_pi:
                         if self.camera2_process and self.camera2_process.poll() is None:
-                            return {
-                                "status": "started",
-                                "message": "PiTrac started successfully (both cameras)",
-                                "camera1_pid": self.process.pid,
-                                "camera2_pid": self.camera2_process.pid,
-                            }
+                            try:
+                                cam1_pid = self.process.pid
+                                cam2_pid = self.camera2_process.pid
+                                return {
+                                    "status": "started",
+                                    "message": "PiTrac started successfully (both cameras)",
+                                    "camera1_pid": cam1_pid,
+                                    "camera2_pid": cam2_pid,
+                                }
+                            except (AttributeError, OSError) as e:
+                                logger.warning(f"Race condition getting PIDs: {e}")
                         else:
                             logger.error("Camera2 process died during camera1 startup")
-
-                            try:
-                                os.kill(self.process.pid, signal.SIGTERM)
-                            except ProcessLookupError:
-                                pass
+                            if self.process:
+                                try:
+                                    os.kill(self.process.pid, signal.SIGTERM)
+                                    self.process.wait(timeout=2.0)
+                                except (ProcessLookupError, subprocess.TimeoutExpired):
+                                    if self.process.poll() is None:
+                                        self.process.kill()
+                                        try:
+                                            self.process.wait(timeout=5.0)
+                                        except subprocess.TimeoutExpired:
+                                            logger.warning("Camera1 process did not terminate after kill signal")
+                                except Exception:
+                                    pass
                             if self.pid_file.exists():
                                 self.pid_file.unlink()
                             self.process = None
 
+                            if self.camera2_process and self.camera2_process.poll() is not None:
+                                try:
+                                    self.camera2_process.wait(timeout=2.0)
+                                except subprocess.TimeoutExpired:
+                                    pass
                             if self.camera2_pid_file.exists():
                                 self.camera2_pid_file.unlink()
                             self.camera2_process = None
@@ -350,6 +381,15 @@ class PiTracProcessManager:
                         }
                 else:
                     logger.error("PiTrac camera1 process exited immediately")
+                    if self.process:
+                        try:
+                            self.process.wait(timeout=1.0)
+                        except subprocess.TimeoutExpired:
+                            self.process.kill()
+                            try:
+                                self.process.wait(timeout=5.0)
+                            except subprocess.TimeoutExpired:
+                                logger.warning("Camera1 process did not terminate after kill signal")
 
                     if self.pid_file.exists():
                         self.pid_file.unlink()
@@ -358,7 +398,15 @@ class PiTracProcessManager:
                     if is_single_pi and self.camera2_process:
                         try:
                             os.kill(self.camera2_process.pid, signal.SIGTERM)
-                        except ProcessLookupError:
+                            self.camera2_process.wait(timeout=2.0)
+                        except (ProcessLookupError, subprocess.TimeoutExpired):
+                            if self.camera2_process.poll() is None:
+                                self.camera2_process.kill()
+                                try:
+                                    self.camera2_process.wait(timeout=5.0)
+                                except subprocess.TimeoutExpired:
+                                    logger.warning("Camera2 process did not terminate after kill signal")
+                        except Exception:
                             pass
                         if self.camera2_pid_file.exists():
                             self.camera2_pid_file.unlink()
@@ -384,8 +432,15 @@ class PiTracProcessManager:
 
             pid = self.get_pid()
             if pid:
-                os.kill(pid, self.termination_signal)
-                logger.info(f"Sent {self.termination_signal} to PiTrac camera1 process {pid}")
+                try:
+                    os.killpg(os.getpgid(pid), self.termination_signal)
+                    logger.info(f"Sent {self.termination_signal} to PiTrac camera1 process group {pid}")
+                except (ProcessLookupError, PermissionError):
+                    try:
+                        os.kill(pid, self.termination_signal)
+                        logger.info(f"Sent {self.termination_signal} to PiTrac camera1 process {pid}")
+                    except ProcessLookupError:
+                        pass
 
                 max_wait = self.shutdown_grace_period
                 for _ in range(int(max_wait / self.shutdown_check_interval)):
@@ -398,10 +453,19 @@ class PiTracProcessManager:
                 try:
                     os.kill(pid, 0)
                     logger.warning("PiTrac camera1 didn't stop gracefully, forcing...")
-                    os.kill(pid, self.kill_signal)
+                    try:
+                        os.killpg(os.getpgid(pid), self.kill_signal)
+                    except (ProcessLookupError, PermissionError):
+                        os.kill(pid, self.kill_signal)
                     await asyncio.sleep(self.post_kill_delay)
                 except ProcessLookupError:
                     pass
+
+                if self.process:
+                    try:
+                        self.process.wait(timeout=1.0)
+                    except (subprocess.TimeoutExpired, AttributeError):
+                        pass
 
                 if self.pid_file.exists():
                     self.pid_file.unlink()
@@ -411,8 +475,15 @@ class PiTracProcessManager:
 
             camera2_pid = self.get_camera2_pid()
             if camera2_pid:
-                os.kill(camera2_pid, self.termination_signal)
-                logger.info(f"Sent {self.termination_signal} to PiTrac camera2 process {camera2_pid}")
+                try:
+                    os.killpg(os.getpgid(camera2_pid), self.termination_signal)
+                    logger.info(f"Sent {self.termination_signal} to PiTrac camera2 process group {camera2_pid}")
+                except (ProcessLookupError, PermissionError):
+                    try:
+                        os.kill(camera2_pid, self.termination_signal)
+                        logger.info(f"Sent {self.termination_signal} to PiTrac camera2 process {camera2_pid}")
+                    except ProcessLookupError:
+                        pass
 
                 max_wait = self.shutdown_grace_period
                 for _ in range(int(max_wait / self.shutdown_check_interval)):
@@ -425,10 +496,19 @@ class PiTracProcessManager:
                 try:
                     os.kill(camera2_pid, 0)
                     logger.warning("PiTrac camera2 didn't stop gracefully, forcing...")
-                    os.kill(camera2_pid, self.kill_signal)
+                    try:
+                        os.killpg(os.getpgid(camera2_pid), self.kill_signal)
+                    except (ProcessLookupError, PermissionError):
+                        os.kill(camera2_pid, self.kill_signal)
                     await asyncio.sleep(self.post_kill_delay)
                 except ProcessLookupError:
                     pass
+
+                if self.camera2_process:
+                    try:
+                        self.camera2_process.wait(timeout=1.0)
+                    except (subprocess.TimeoutExpired, AttributeError):
+                        pass
 
                 if self.camera2_pid_file.exists():
                     self.camera2_pid_file.unlink()
@@ -478,14 +558,19 @@ class PiTracProcessManager:
     def get_pid(self) -> Optional[int]:
         """Get the PID of the running PiTrac camera1 process"""
         if self.process:
-            poll_result = self.process.poll()
-            if poll_result is None:
-                return self.process.pid
-            else:
-                logger.debug(f"Camera1 process terminated with code {poll_result}")
+            try:
+                poll_result = self.process.poll()
+                if poll_result is None:
+                    pid = self.process.pid
+                    return pid
+                else:
+                    logger.debug(f"Camera1 process terminated with code {poll_result}")
+                    self.process = None
+                    if self.pid_file.exists():
+                        self.pid_file.unlink()
+            except (AttributeError, OSError) as e:
+                logger.warning(f"Race condition in get_pid: {e}")
                 self.process = None
-                if self.pid_file.exists():
-                    self.pid_file.unlink()
 
         if self.pid_file.exists():
             try:
@@ -504,14 +589,19 @@ class PiTracProcessManager:
     def get_camera2_pid(self) -> Optional[int]:
         """Get the PID of the running PiTrac camera2 process"""
         if self.camera2_process:
-            poll_result = self.camera2_process.poll()
-            if poll_result is None:
-                return self.camera2_process.pid
-            else:
-                logger.debug(f"Camera2 process terminated with code {poll_result}")
+            try:
+                poll_result = self.camera2_process.poll()
+                if poll_result is None:
+                    pid = self.camera2_process.pid
+                    return pid
+                else:
+                    logger.debug(f"Camera2 process terminated with code {poll_result}")
+                    self.camera2_process = None
+                    if self.camera2_pid_file.exists():
+                        self.camera2_pid_file.unlink()
+            except (AttributeError, OSError) as e:
+                logger.warning(f"Race condition in get_camera2_pid: {e}")
                 self.camera2_process = None
-                if self.camera2_pid_file.exists():
-                    self.camera2_pid_file.unlink()
 
         if self.camera2_pid_file.exists():
             try:
