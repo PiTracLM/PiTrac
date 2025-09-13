@@ -33,7 +33,8 @@ class TestingToolsManager:
                 "category": "hardware",
                 "args": ["--pulse_test", "--system_mode", "camera1"],
                 "requires_sudo": False,
-                "timeout": 30
+                "timeout": 10,
+                "continuous_test": True
             },
             "camera1_still": {
                 "name": "Camera 1 Still Image",
@@ -254,12 +255,30 @@ class TestingToolsManager:
                 return result
                 
             except asyncio.TimeoutError:
-                process.kill()
+                process.terminate()
                 await process.wait()
-                return {
-                    "status": "timeout",
-                    "message": f"Tool {tool_id} timed out after {tool_info['timeout']} seconds"
-                }
+
+                if tool_info.get("continuous_test", False):
+                    log_content = await self._find_and_read_test_log(start_time)
+                    if log_content:
+                        return {
+                            "status": "success",
+                            "output": log_content,
+                            "message": f"Test ran for {tool_info['timeout']} seconds",
+                            "timestamp": datetime.now().isoformat()
+                        }
+                    else:
+                        return {
+                            "status": "success",
+                            "output": "Test completed but no log file found",
+                            "message": f"Test ran for {tool_info['timeout']} seconds",
+                            "timestamp": datetime.now().isoformat()
+                        }
+                else:
+                    return {
+                        "status": "timeout",
+                        "message": f"Tool {tool_id} timed out after {tool_info['timeout']} seconds"
+                    }
             finally:
                 if tool_id in self.running_processes:
                     del self.running_processes[tool_id]
