@@ -118,10 +118,10 @@ class TestingToolsManager:
 
     async def run_tool(self, tool_id: str) -> Dict[str, Any]:
         """Run a specific testing tool
-        
+
         Args:
             tool_id: ID of the tool to run
-            
+
         Returns:
             Dict with status, output, and any error messages
         """
@@ -130,39 +130,78 @@ class TestingToolsManager:
                 "status": "error",
                 "message": f"Unknown tool: {tool_id}"
             }
-        
+
         if tool_id in self.running_processes:
             return {
-                "status": "error", 
+                "status": "error",
                 "message": f"Tool {tool_id} is already running"
             }
-        
+
         tool_info = self.tools[tool_id]
-        
+
         try:
             config_path = self.config_manager.generate_golf_sim_config()
-            
+
             cmd = [self.pitrac_binary]
             cmd.extend(tool_info["args"])
             cmd.append(f"--config_file={config_path}")
-            
+
             config = self.config_manager.get_config()
-            
+
+            cmd.append(f"--msg_broker_address=tcp://localhost:61616")
+
             web_share_dir = config.get("gs_config", {}).get("ipc_interface", {}).get(
                 "kWebServerShareDirectory", "~/LM_Shares/Images/"
             )
-            expanded_dir = web_share_dir.replace("~", str(Path.home()))
-            cmd.append(f"--web_server_share_dir={expanded_dir}")
-            
+            expanded_web_dir = web_share_dir.replace("~", str(Path.home()))
+            cmd.append(f"--web_server_share_dir={expanded_web_dir}")
+
+            base_image_dir = str(Path.home() / "LM_Shares/Images")
+            cmd.append(f"--base_image_logging_dir={base_image_dir}")
+
             cmd.append("--logging_level=trace")
-            
+
             env = os.environ.copy()
             env["LD_LIBRARY_PATH"] = "/usr/lib/pitrac"
             env["PITRAC_ROOT"] = "/usr/lib/pitrac"
             env["PITRAC_MSG_BROKER_FULL_ADDRESS"] = "tcp://localhost:61616"
-            env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = str(Path.home() / "LM_Shares/Images")
+            env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = base_image_dir
             env["PITRAC_WEBSERVER_SHARE_DIR"] = str(Path.home() / "LM_Shares/WebShare")
             env["DISPLAY"] = ":0.0"
+
+            env_params_cam1 = self.config_manager.get_environment_parameters("camera1")
+            env_params_cam2 = self.config_manager.get_environment_parameters("camera2")
+            merged_config = self.config_manager.get_config()
+
+            for param in env_params_cam1:
+                key = param["key"]
+                env_var = param["envVariable"]
+
+                value = merged_config
+                for part in key.split("."):
+                    if isinstance(value, dict):
+                        value = value.get(part)
+                    else:
+                        value = None
+                        break
+
+                if value is not None and value != "":
+                    env[env_var] = str(value)
+
+            for param in env_params_cam2:
+                key = param["key"]
+                env_var = param["envVariable"]
+
+                value = merged_config
+                for part in key.split("."):
+                    if isinstance(value, dict):
+                        value = value.get(part)
+                    else:
+                        value = None
+                        break
+
+                if value is not None and value != "":
+                    env[env_var] = str(value)
             
             if tool_info["requires_sudo"]:
                 cmd = ["sudo", "-E"] + cmd
