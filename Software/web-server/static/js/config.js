@@ -508,6 +508,18 @@ function createInput(key, value, defaultValue, isUserSet) {
         return select;
     }
 
+    if (metadata.type === 'ip_address') {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = value || '';
+        input.pattern = '^(([0-9]{1,3}\\.){3}[0-9]{1,3})(:[0-9]{1,5})?$';
+        input.placeholder = 'e.g., 192.168.1.100 or 192.168.1.100:921';
+        if (!isUserSet && defaultValue !== undefined && defaultValue !== '') {
+            input.placeholder = `Default: ${defaultValue}`;
+        }
+        return input;
+    }
+
     // Handle arrays and complex objects
     if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
         const textarea = document.createElement('textarea');
@@ -995,7 +1007,7 @@ function filterConfig() {
 async function validateInput(key, value, errorElement) {
     try {
         const metadata = configMetadata[key] || {};
-        
+
         if (metadata.type === 'number') {
             const num = parseFloat(value);
             if (isNaN(num)) {
@@ -1014,12 +1026,41 @@ async function validateInput(key, value, errorElement) {
                 return false;
             }
         }
-        
+
+        if (metadata.type === 'ip_address' && value) {
+            const ipPortPattern = /^(([0-9]{1,3}\.){3}[0-9]{1,3})(:[0-9]{1,5})?$/;
+            if (!ipPortPattern.test(value)) {
+                errorElement.textContent = 'Invalid IP address format. Use format: 192.168.1.100 or 192.168.1.100:921';
+                errorElement.style.display = 'block';
+                return false;
+            }
+
+            const parts = value.split(':');
+            const ipParts = parts[0].split('.');
+            for (const octet of ipParts) {
+                const num = parseInt(octet, 10);
+                if (num < 0 || num > 255) {
+                    errorElement.textContent = 'IP address octets must be between 0 and 255';
+                    errorElement.style.display = 'block';
+                    return false;
+                }
+            }
+
+            if (parts[1]) {
+                const port = parseInt(parts[1], 10);
+                if (port < 1 || port > 65535) {
+                    errorElement.textContent = 'Port must be between 1 and 65535';
+                    errorElement.style.display = 'block';
+                    return false;
+                }
+            }
+        }
+
         errorElement.style.display = 'none';
         errorElement.textContent = '';
-        
+
         checkDependencies(key, value);
-        
+
         return true;
     } catch (error) {
         console.error('Validation error:', error);
