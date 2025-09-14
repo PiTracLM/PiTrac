@@ -906,15 +906,7 @@ namespace golf_sim {
         GolfSimIpcSystem::ShutdownIPCSystem();
 
         if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1 ||
-               GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1TestStandalone ||
-               GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2 ||
-               GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2TestStandalone ||
-               GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kRunCam2ProcessForPi1Processing ||
-               GolfSimOptions::GetCommandLineOptions().camera_still_mode_ ||
-               GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1AutoCalibrate ||
-               GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2AutoCalibrate ||
-               GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1BallLocation ||
-               GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2BallLocation) {
+               GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1TestStandalone) {
             PulseStrobe::DeinitGPIOSystem();
         }
         return true;
@@ -958,9 +950,6 @@ namespace golf_sim {
         // the GPIO system
         if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1 ||
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1TestStandalone ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2 ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2TestStandalone ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kRunCam2ProcessForPi1Processing ||
             GolfSimOptions::GetCommandLineOptions().camera_still_mode_ ||
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1AutoCalibrate ||
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2AutoCalibrate ||
