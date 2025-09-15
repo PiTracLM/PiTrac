@@ -111,8 +111,16 @@ class TestLogsAPI:
                 time.sleep(0.1)
                 assert True
 
-    async def test_websocket_logs_connection_basic(self, app):
+    @patch("server.PiTracServer._stream_systemd_logs")
+    @patch("server.PiTracServer._stream_file_logs")
+    async def test_websocket_logs_connection_basic(self, mock_stream_file, mock_stream_systemd, app):
         """Test basic WebSocket logs connection"""
+        async def mock_stream(websocket, unit):
+            await websocket.send_json({"message": "Test log", "service": unit})
+
+        mock_stream_systemd.side_effect = mock_stream
+        mock_stream_file.side_effect = mock_stream
+
         with TestClient(app) as client:
             with client.websocket_connect("/ws/logs") as websocket:
                 websocket.send_json({"service": "pitrac-web"})
@@ -209,8 +217,16 @@ class TestLogsAPI:
 
                 assert mock_stream_systemd.called
 
-    async def test_websocket_logs_connection_handling(self, app):
+    @patch("server.PiTracServer._stream_systemd_logs")
+    @patch("server.PiTracServer._stream_file_logs")
+    async def test_websocket_logs_connection_handling(self, mock_stream_file, mock_stream_systemd, app):
         """Test proper connection handling and cleanup"""
+        async def mock_stream(websocket, unit):
+            await websocket.send_json({"message": "Test log", "service": unit})
+
+        mock_stream_systemd.side_effect = mock_stream
+        mock_stream_file.side_effect = mock_stream
+
         with TestClient(app) as client:
             with client.websocket_connect("/ws/logs") as websocket:
                 websocket.send_json({"service": "pitrac-web"})
@@ -237,8 +253,16 @@ class TestLogsAPI:
             assert isinstance(service["id"], str) and len(service["id"]) > 0
             assert isinstance(service["name"], str) and len(service["name"]) > 0
 
-    async def test_websocket_logs_different_service_types(self, app):
+    @patch("server.PiTracServer._stream_systemd_logs")
+    @patch("server.PiTracServer._stream_file_logs")
+    async def test_websocket_logs_different_service_types(self, mock_stream_file, mock_stream_systemd, app):
         """Test streaming logs from different service types"""
+        async def mock_stream(websocket, unit):
+            await websocket.send_json({"message": f"Test log for {unit}", "service": unit})
+
+        mock_stream_systemd.side_effect = mock_stream
+        mock_stream_file.side_effect = mock_stream
+
         services = ["pitrac", "activemq", "pitrac-web"]
 
         for service_name in services:

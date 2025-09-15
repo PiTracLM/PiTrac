@@ -34,3 +34,30 @@ good-names = ["i", "j", "k", "ex", "Run", "_", "id", "ws"]
 [tool.isort]
 profile = "black"
 line_length = 120
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "--cov=.",
+    "--cov-report=term",
+    "--cov-report=xml",
+    "--cov-fail-under=60",
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "smoke: Smoke tests",
+    "slow: Slow tests",
+]
+
+# For concurrent execution, users can add -n auto or -n 4
+# Example: pytest -n auto
+# CI will use: pytest -n auto

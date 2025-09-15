@@ -42,7 +42,9 @@ jobs:
     - name: Run tests with coverage
       working-directory: Software/web-server
       run: |
-        python -m pytest --tb=short --cov=. --cov-report=xml --cov-report=term --cov-fail-under=60
+        # Run tests in parallel using all available CPU cores
+        # -n auto automatically detects the number of CPUs
+        python -m pytest -n auto --tb=short --cov=. --cov-report=xml --cov-report=term --cov-fail-under=60
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
