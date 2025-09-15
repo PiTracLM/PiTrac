@@ -7,8 +7,7 @@ nav_order: 5
 
 # PiTrac CLI Interface
 
-The `pitrac` command provides a unified interface for all PiTrac operations. Built with Bashly for maintainability and consistency.
-
+The `pitrac` command provides minimal service management capabilities. **All PiTrac operations including process control, configuration, testing, and calibration are now performed through the web UI at port 8080.** 
 ## CLI Architecture
 
 ### Bashly Framework
@@ -40,274 +39,59 @@ Global Options:
   --debug          Enable debug mode
 ```
 
-## Command Reference
+## Web UI 
 
-### Run Command
+- **PiTrac Process Management** - Start/stop the launch monitor
+- **Configuration Management** - All settings through a graphical interface
+- **Testing Suite** - Hardware tests, camera tests, and calibration
+- **Shot Monitoring** - Real-time shot display and history
+- **System Status** - View logs, diagnostics, and system health
+- **Calibration Wizard** - Step-by-step camera calibration
 
-Starts the launch monitor:
+Access the web interface at: `http://your-pi-ip:8080`
+
+## Essential CLI Commands
+
+The CLI provides only basic service management:
+
+### Web Server Commands (Primary Usage)
 
 ```bash
-# Basic usage
-pitrac run
+# Start the web server - THIS IS THE MAIN COMMAND YOU NEED
+pitrac web start
 
-# Run in foreground (don't daemonize)
-pitrac run --foreground
-pitrac run -f
+# Stop the web server
+pitrac web stop
 
-# Override system mode
-pitrac run --system-mode camera2
+# Check web server status
+pitrac web status
 
-# Override configuration
-pitrac run --msg-broker-address tcp://10.0.0.41:61616
-pitrac run --base-image-logging-dir ~/Images
-pitrac run --web-server-share-dir ~/WebShare
-pitrac run --e6-host-address 192.168.1.100
-pitrac run --gspro-host-address 192.168.1.50
+# View web server logs
+pitrac web logs
+
+# Get web UI URL
+pitrac web url
 ```
 
-### Stop Command
+**Note:** Once the web server is running, all PiTrac operations are performed through the web UI.
 
-Stops the launch monitor:
+### Supporting Service Commands
 
-```bash
-# Basic stop
-pitrac stop
-
-# Force stop (SIGKILL instead of SIGTERM)
-pitrac stop --force
-pitrac stop -f
-
-# Stop with timeout
-pitrac stop --timeout 10
-```
-
-### Status Command
-
-Shows system status:
+Manage supporting services (rarely needed):
 
 ```bash
-# Basic status
-pitrac status
-
-# JSON format output
-pitrac status --json
-
-# Include service status
-pitrac status --services
-```
-
-### Test Commands
-
-Run various system tests:
-
-```bash
-# Quick image processing test (no camera needed)
-pitrac test quick
-
-# Hardware components test
-pitrac test hardware
-pitrac test hardware --skip-camera
-pitrac test hardware --skip-gpio
-
-# Test strobe pulses (Ctrl+C to stop)
-pitrac test pulse
-pitrac test pulse --duration 10
-
-# Test specific camera
-pitrac test camera 1
-pitrac test camera 2
-
-# Test spin detection
-pitrac test spin
-
-# Test GSPro connection
-pitrac test gspro
-pitrac test gspro --host 192.168.1.100
-
-# Run automated test suite
-pitrac test automated
-pitrac test automated --suite basic
-pitrac test automated --suite full
-pitrac test automated --suite performance
-```
-
-### Configuration Commands
-
-Manage PiTrac configuration:
-
-```bash
-# Show current configuration
-pitrac config show
-pitrac config show --effective  # Show with overrides
-pitrac config show --yaml        # YAML format
-
-# Edit configuration file
-pitrac config edit
-pitrac config edit --editor vim
-
-# Get specific value
-pitrac config get system.mode
-pitrac config get cameras.slot1.type
-
-# Set configuration value (prints instruction to manually edit)
-pitrac config set system.mode camera2
-pitrac config set cameras.slot1.type 4 --global
-
-# Validate configuration
-pitrac config validate
-pitrac config validate --fix
-
-# Reset to defaults
-pitrac config reset
-pitrac config reset --backup
-
-# Apply preset
-pitrac config preset [preset_name]
-
-# Configuration backup/restore
-pitrac config backup
-pitrac config restore
-pitrac config diff
-pitrac config migrate
-
-# Show where value comes from
-pitrac config source cameras.slot1.type
-```
-
-### Camera Commands
-
-Camera utilities and testing:
-
-```bash
-# List available cameras
-pitrac camera list
-pitrac camera list --detailed
-
-# Test camera capture
-pitrac camera test 5          # Test for 5 seconds
-pitrac camera test 5 --camera 1
-pitrac camera test 5 --camera 2
-
-# Set camera trigger mode
-pitrac camera trigger internal
-pitrac camera trigger external
-pitrac camera trigger internal --camera 1
-pitrac camera trigger external --camera 2
-
-# Set camera timeout
-pitrac camera config timeout 5000
-```
-
-### Calibration Commands
-
-System calibration tools:
-
-```bash
-# Manual camera calibration
-pitrac calibrate camera 1
-pitrac calibrate camera 2
-pitrac calibrate camera 1 --interactive
-
-# Automatic calibration
-pitrac calibrate auto 1
-pitrac calibrate auto 2
-
-# Calibration wizard
-pitrac calibrate wizard
-```
-
-### Service Commands
-
-Control system services:
-
-```bash
-# Service management (requires action argument)
-pitrac service start
-pitrac service stop
-pitrac service restart
-pitrac service status
-pitrac service enable   # Enable auto-start
-pitrac service disable  # Disable auto-start
-```
-
-### External Service Commands
-
-Manage external services:
-
-```bash
-# TomEE web server
-pitrac tomee start
-pitrac tomee stop
-pitrac tomee restart
-pitrac tomee status
-pitrac tomee deploy
-pitrac tomee logs
-
 # ActiveMQ message broker
-pitrac activemq start
-pitrac activemq stop
-pitrac activemq restart
 pitrac activemq status
-pitrac activemq console
-```
 
-### Log Commands
-
-View and manage logs:
-
-```bash
-# View logs (last 50 lines by default)
-pitrac logs
-
-# Follow log output
-pitrac logs --follow
-pitrac logs -f
-
-# Specify number of lines
-pitrac logs --tail 100
-
-# Show service logs
-pitrac logs --service
-
-# Show all logs
-pitrac logs --all
-```
-
-### Setup Command
-
-Initial setup wizard:
-
-```bash
-# Run setup wizard
-pitrac setup
-
-# Specify Pi model
-pitrac setup --pi-model pi4
-pitrac setup --pi-model pi5
-pitrac setup --pi-model auto
-
-# Skip reboot prompt
-pitrac setup --skip-reboot
-```
-
-### Boot Command
-
-Boot configuration management:
-
-```bash
-# Configure boot settings
-pitrac boot config
-```
-
-### Version Command
-
-Show version information:
-
-```bash
+# Version information
 pitrac version
 ```
 
+**Note:** ActiveMQ is typically managed automatically during installation. Manual control is rarely necessary.
+
 ## Directory Structure
+
+Many CLI commands are deprecated as functionality moved to the web UI:
 
 ```
 packaging/
@@ -315,56 +99,14 @@ packaging/
 ├── pitrac              # Generated CLI script
 ├── generate.sh         # Script to regenerate CLI
 ├── src/
-│   ├── run.sh          # Run command
-│   ├── stop.sh         # Stop command
-│   ├── status.sh       # Status command
-│   ├── setup.sh        # Setup command
-│   ├── service.sh      # Service management
-│   ├── tomee.sh        # TomEE management
+│   ├── web.sh          # Web server management (PRIMARY)
 │   ├── activemq.sh     # ActiveMQ management
-│   ├── logs.sh         # Log viewing
 │   ├── version.sh      # Version info
-│   ├── boot/
-│   │   └── config.sh   # Boot configuration
-│   ├── config/
-│   │   ├── show.sh     # Show config
-│   │   ├── edit.sh     # Edit config
-│   │   ├── get.sh      # Get value
-│   │   ├── set.sh      # Set value
-│   │   ├── validate.sh # Validate config
-│   │   ├── reset.sh    # Reset config
-│   │   ├── preset.sh   # Apply preset
-│   │   ├── backup.sh   # Backup config
-│   │   ├── restore.sh  # Restore config
-│   │   ├── diff.sh     # Compare configs
-│   │   ├── migrate.sh  # Migrate config
-│   │   └── source.sh   # Show value source
-│   ├── camera/
-│   │   ├── list.sh     # List cameras
-│   │   ├── test.sh     # Test camera
-│   │   ├── trigger.sh  # Set trigger mode
-│   │   └── config/
-│   │       └── timeout.sh # Set timeout
-│   ├── test/
-│   │   ├── quick.sh    # Quick test
-│   │   ├── hardware.sh # Hardware test
-│   │   ├── camera.sh   # Camera test
-│   │   ├── pulse.sh    # Strobe test
-│   │   ├── spin.sh     # Spin test
-│   │   ├── gspro.sh    # GSPro test
-│   │   └── automated.sh # Test suite
-│   ├── calibrate/
-│   │   ├── camera.sh   # Camera calibration
-│   │   ├── auto.sh     # Auto calibration
-│   │   └── wizard.sh   # Calibration wizard
 │   └── lib/
-│       ├── config.sh       # Configuration functions
 │       ├── environment.sh  # Environment setup
-│       ├── hardware.sh     # Hardware detection
 │       ├── logging.sh      # Logging functions
 │       ├── process.sh      # Process management
-│       ├── services.sh     # Service functions
-│       └── validations.sh  # Input validation
+│       └── services.sh     # Service functions
 ```
 
 ## Key Implementation Details
@@ -373,8 +115,6 @@ packaging/
 The PiTrac binary is located at `/usr/lib/pitrac/pitrac_lm` (defined in `src/lib/environment.sh`).
 
 ### Configuration Files
-- Default config: `/etc/pitrac/pitrac.yaml`
-- Golf simulator config: `/etc/pitrac/golf_sim_config.json`
 - User config: `~/.pitrac/config/`
 
 ### Environment Variables
@@ -382,18 +122,6 @@ The CLI sets up various environment variables including:
 - `LD_LIBRARY_PATH` - Library paths
 - `PITRAC_ROOT` - Installation directory
 - Camera-specific environment variables based on configuration
-
-### Validation Functions
-The CLI includes comprehensive validation in `src/lib/validations.sh`:
-- `validate_integer()` - Integer validation
-- `validate_file_exists()` - File existence
-- `validate_dir_exists()` - Directory existence
-- `validate_system_mode()` - System mode validation
-- `validate_camera_slot()` - Camera slot validation
-- `validate_broker_address()` - Message broker address
-- `validate_yaml_file()` - YAML syntax validation
-- `validate_json_file()` - JSON syntax validation
-- And many more...
 
 ## Generating the CLI
 
@@ -410,12 +138,3 @@ docker run --rm -v "$PWD:/app" dannyben/bashly generate
 
 # The generated script will be: pitrac
 ```
-
-## Notes
-
-- The CLI is generated from `bashly.yml` using Bashly 1.3.1
-- Implementation files are in `src/` with a structure matching the command hierarchy
-- The CLI includes comprehensive validation and error handling
-- Service commands use systemctl for service management
-- Test commands can run with or without actual hardware
-- Configuration management is primarily through manual editing with helper commands

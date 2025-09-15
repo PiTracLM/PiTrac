@@ -7,40 +7,61 @@ nav_order: 6
 
 # PiTrac Testing Framework
 
-This guide documents the actual testing infrastructure available in PiTrac, based on the current codebase implementation.
+Testing in PiTrac is performed through the **web UI at port 8080**. The web interface provides a comprehensive testing suite with real-time feedback and logging.
 
-## Testing Overview
+## Web UI Testing Interface
 
-PiTrac uses multiple testing approaches:
-- **Boost Test Framework** for C++ unit tests
-- **CMake/CTest** for test compilation and execution  
-- **Bash scripts** for hardware and system testing
-- **GitHub Actions** for continuous integration
-- **CLI commands** via the `pitrac` tool for manual testing
+### Access Testing Tools
 
-## C++ Unit Tests
+1. Start the web server: `pitrac web start`
+2. Navigate to `http://your-pi-ip:8080`
+3. Click on the **Testing** section in the navigation menu
 
-### Test Framework
+### Available Testing Categories
 
-PiTrac uses the **Boost Test Framework** (not Google Test) for C++ unit testing.
+The web UI organizes testing tools into categories:
+
+#### Hardware Tests
+- **Strobe Pulse Test** - Test IR strobe functionality with configurable duration
+- **Camera Still Capture** - Capture test images from Camera 1 or Camera 2
+- **Ball Location Tests** - Verify ball detection for each camera
+
+#### Calibration Tests
+- **Ball Position Verification** - Check ball placement accuracy
+- **Camera Alignment Tests** - Verify camera positioning and angles
+
+#### System Tests
+- **Test Image Processing** - Run detection on sample images
+- **Automated Test Suite** - Comprehensive system validation
+- **Quick Test** - Fast image processing test without cameras
+
+#### Connectivity Tests
+- **GSPro Connection Test** - Verify simulator connectivity
+- **ActiveMQ Status Check** - Test message broker connection
+
+### Test Execution Features
+
+- **Real-time Output** - View test results as they execute
+- **Background Execution** - Tests run without blocking the UI
+- **Timeout Management** - Configurable test timeouts
+- **Result Storage** - Test results saved with timestamps
+- **Log Integration** - View detailed logs for each test
+
+## C++ Unit Tests (Development Only)
+
+For developers working on the core C++ codebase:
+
+### Framework
+PiTrac uses the **Boost Test Framework** for C++ unit testing.
 
 ### Test Locations
-
-Tests are located in module-specific directories:
 - `Software/LMSourceCode/ImageProcessing/Camera/tests/`
 - `Software/LMSourceCode/ImageProcessing/ImageAnalysis/tests/`
 
-### Building and Running Tests
-
-Tests are built using CMake (not Meson for test modules):
-
+### Building Tests
 ```bash
-# Build tests on Windows (PowerShell)
-cd Software/LMSourceCode/ImageProcessing
-./build_tests.ps1
-
-# Or manually with CMake
-cd Camera
+# Using CMake (for test modules)
+cd Software/LMSourceCode/ImageProcessing/Camera
 mkdir build && cd build
 cmake ..
 make
@@ -48,207 +69,81 @@ ctest
 ```
 
 ### Approval Testing
+The ImageAnalysis module uses approval testing for validating image processing results against known good outputs.
 
-The ImageAnalysis module uses an approval testing framework for validating image processing results against known good outputs.
+## Python Web Server Tests
 
-## PiTrac CLI Test Commands
-
-The `pitrac` CLI tool provides several test commands:
-
-### Hardware Testing
-```bash
-# Test hardware components (Pi model, GPIO, cameras, services)
-pitrac test hardware
-
-# Test strobe pulse timing
-pitrac test pulse
-
-# Test camera functionality
-pitrac test camera
-```
-
-### Software Testing
-```bash
-# Quick image processing test without cameras
-pitrac test quick
-
-# Spin detection test
-pitrac test spin
-
-# Full automated test suite
-pitrac test automated
-```
-
-### Simulator Testing
-```bash
-# Test GSPro simulator connection
-pitrac test gspro
-```
-
-## Hardware Test Implementation
-
-The main hardware test script is located at `packaging/src/test/hardware.sh` and validates:
-- Raspberry Pi model detection
-- Camera availability
-- GPIO chip detection
-- Service status (ActiveMQ, TomEE, PiTrac)
-
-Example test functions from the actual script:
+The web server includes its own test suite:
 
 ```bash
-test_pi() {
-    if [[ ! -f /proc/device-tree/model ]]; then
-        echo "❌ Not running on Raspberry Pi"
-        return 1
-    fi
-    # ... rest of implementation
-}
-
-test_cameras() {
-    local cmd camera_count
-    # Uses rpicam-hello for Pi 5, libcamera-hello for Pi 4
-    # ... implementation
-}
+cd Software/web-server
+# Install dev dependencies
+pip install -r requirements-dev.txt
+# Run tests
+python -m pytest tests/
 ```
 
-## Test Images
+Test coverage includes:
+- API endpoint testing
+- WebSocket functionality
+- Configuration management
+- Message parsing
+- Process management
 
-Test images are provided in:
-- `/usr/share/pitrac/test-images/` (when installed via package)
-- `packaging/build/package/debian/usr/share/pitrac/test-images/` (in source)
+## Test Image Library
 
-Available test images:
-- `teed-ball.png` - Golf ball on tee
-- `strobed.png` - Strobed ball capture
+PiTrac includes sample test images at `/usr/share/pitrac/test-images/` for testing without hardware:
+- Ball detection samples
+- Spin calculation samples
+- Various lighting conditions
 
-## Continuous Integration
+These images are automatically used by the web UI's testing tools.
 
-### GitHub Actions Workflows
+## Development Testing Workflow
 
-PiTrac uses GitHub Actions for CI, with workflows located in `.github/workflows/`:
+1. **Make code changes**
+2. **Rebuild**: `sudo ./build.sh dev` (in packaging/)
+3. **Access web UI**: `http://your-pi-ip:8080`
+4. **Navigate to Testing section**
+5. **Run relevant tests**
+6. **View results and logs in real-time**
 
-#### Camera Tests (`camera-tests.yml`)
-- **Runs on**: `windows-latest`
-- **Build System**: CMake
-- **Dependencies**: OpenCV, Boost (via vcpkg)
-- **Test Command**: `ctest -C Debug`
+## Best Practices
 
-#### Image Analysis Tests (`image-analysis-tests.yml`)
-- **Runs on**: `windows-latest`  
-- **Build System**: CMake
-- **Dependencies**: OpenCV, Boost
-- **Test Command**: `ctest -C Debug`
+1. **Use the web UI for all testing** - Better user experience and feedback
+2. **Run tests after installation** - Verify system setup
+3. **Test before calibration** - Ensure hardware is working
+4. **Check logs for details** - Web UI Logs section shows test output
+5. **Use test images for development** - Test without hardware setup
 
-Example workflow structure:
-```yaml
-name: Camera Tests
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install dependencies
-        run: vcpkg install opencv4 boost-test
-      - name: Build and test
-        run: |
-          cd Software/LMSourceCode/ImageProcessing/Camera
-          mkdir build && cd build
-          cmake ..
-          cmake --build . --config Debug
-          ctest -C Debug
-```
+## Troubleshooting Tests
 
-## Running Tests Locally
+### Test Failures in Web UI
 
-### Prerequisites
-- Boost Test library (>= 1.74)
-- OpenCV (>= 4.9.0)
-- CMake (for test builds)
-- Meson/Ninja (for main application)
+1. Check the **Logs** section for detailed error messages
+2. Verify hardware connections (cameras, GPIO)
+3. Ensure ActiveMQ is running: Check status indicators
+4. Confirm PiTrac process is not already running
 
-### Quick Test Execution
+### Camera Test Issues
 
-```bash
-# Run hardware tests on Pi
-pitrac test hardware
+- Verify camera is connected properly
+- Check `/boot/firmware/config.txt` (Pi 5) for `camera_auto_detect=1`
+- Use `rpicam-hello --list-cameras` to verify detection
 
-# Run quick software test
-pitrac test quick
+### Connectivity Test Failures
 
-# Run all automated tests
-pitrac test automated
-```
+- Check network configuration
+- Verify firewall settings
+- Ensure simulator software is running
+- Check port availability (GSPro uses specific ports)
 
-### Building C++ Tests
+## Test Result Interpretation
 
-```bash
-# Camera module tests
-cd Software/LMSourceCode/ImageProcessing/Camera
-mkdir build && cd build
-cmake ..
-make
-ctest
+The web UI provides clear pass/fail indicators:
+- **Green checkmark** - Test passed
+- **Red X** - Test failed
+- **Yellow warning** - Test completed with warnings
+- **Spinner** - Test in progress
 
-# Image Analysis tests  
-cd Software/LMSourceCode/ImageProcessing/ImageAnalysis
-mkdir build && cd build
-cmake ..
-make
-ctest
-```
-
-## Test Coverage
-
-Currently, PiTrac does not have coverage reporting configured. The following tools are **not** currently integrated:
-- gcovr
-- codecov
-- Coverage reports in CI
-
-## Known Limitations
-
-1. **No Python test framework** - Despite Python utilities existing, no pytest or similar framework is configured
-2. **No integration tests** - No automated message broker or simulator integration tests
-3. **No E2E test suite** - End-to-end testing must be done manually
-4. **Limited test data** - Only 2 test images provided
-5. **No coverage tracking** - Test coverage is not measured or reported
-6. **Windows-only CI** - GitHub Actions only test on Windows, not on actual Pi hardware
-
-## Adding New Tests
-
-### C++ Tests with Boost
-
-Create new test files following the existing pattern:
-
-```cpp
-#define BOOST_TEST_MODULE MyTestModule
-#include <boost/test/included/unit_test.hpp>
-
-BOOST_AUTO_TEST_CASE(test_something) {
-    BOOST_CHECK_EQUAL(1 + 1, 2);
-}
-```
-
-### Bash Test Scripts
-
-Add test functions to `packaging/src/test/hardware.sh` or create new scripts following the pattern:
-
-```bash
-test_new_feature() {
-    echo -n "Testing new feature... "
-    # Test implementation
-    if [[ condition ]]; then
-        echo "✅ PASSED"
-        return 0
-    else
-        echo "❌ FAILED"
-        return 1
-    fi
-}
-```
-
-## Summary
-
-The PiTrac testing framework provides basic unit testing via Boost Test, hardware validation through bash scripts, and manual testing via CLI commands. While not as comprehensive as initially documented, it covers essential functionality for development and validation.
-
-For production deployment, thorough manual testing on actual Raspberry Pi hardware is recommended, as CI only runs on Windows environments.
+Detailed results and logs are available by clicking on each test result.

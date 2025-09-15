@@ -9,31 +9,42 @@ nav_order: 1
 
 Understanding PiTrac's architecture is essential for effective development. This document provides a comprehensive overview of the system's components, their interactions, and the design decisions that shape the project.
 
-## System Architecture
+## Modern Architecture
 
-PiTrac is a sophisticated real-time computer vision system that transforms a Raspberry Pi into a professional golf launch monitor. The architecture balances performance requirements with hardware limitations through careful design choices.
+PiTrac uses a web-first architecture where all user interaction happens through a modern web interface. The system balances performance requirements with user experience through careful design choices.
 
 ### High-Level Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    User Interface Layer                  │
-│  ┌──────────┐  ┌─────────────┐  ┌──────────────────┐   │
-│  │ CLI Tool │  │ Web Monitor │  │ Simulator Client │   │
-│  └─────┬────┘  └──────┬──────┘  └────────┬─────────┘   │
-│        └───────────────┼──────────────────┘             │
-└────────────────────────┼────────────────────────────────┘
-                         │
-┌────────────────────────┼────────────────────────────────┐
-│                 Service Layer                            │
-│  ┌──────────────────────▼─────────────────────────┐     │
-│  │           Message Broker (ActiveMQ)            │     │
+│  ┌────────────────────────────────────────────────┐     │
+│  │         Web Dashboard (Port 8080)              │     │
+│  │  - Configuration Management                    │     │
+│  │  - Process Control (Start/Stop PiTrac)        │     │
+│  │  - Real-time Shot Display                     │     │
+│  │  - Testing & Calibration                      │     │
+│  │  - System Monitoring & Logs                   │     │
+│  └──────────────────┬─────────────────────────────┘     │
+│                     │                                    │
+│  ┌──────────────────▼─────────────────────────────┐     │
+│  │    Python FastAPI Web Server                   │     │
+│  │    (WebSocket + REST API)                      │     │
+│  └──────────────────┬─────────────────────────────┘     │
+└────────────────────┼────────────────────────────────────┘
+                     │
+┌────────────────────┼────────────────────────────────────┐
+│              Service Layer                               │
+│  ┌──────────────────▼─────────────────────────────┐     │
+│  │          Message Broker (ActiveMQ)             │     │
 │  └──────┬───────────┬──────────────┬──────────────┘     │
 │         │           │              │                     │
-│  ┌──────▼────┐ ┌───▼──────┐ ┌────▼────────┐           │
-│  │  PiTrac   │ │  TomEE   │ │  Simulator  │           │
-│  │  Core LM  │ │  Server  │ │  Interface  │           │
-│  └──────┬────┘ └──────────┘ └─────────────┘           │
+│  ┌──────▼────┐     │      ┌───────▼───────┐           │
+│  │  PiTrac   │     │      │   Simulator   │           │
+│  │  Core LM  │◄────┘      │   Interface   │           │
+│  │  (Managed │            │  (E6/GSPro)   │           │
+│  │   by Web) │            └───────────────┘           │
+│  └──────┬────┘                                         │
 └─────────┼───────────────────────────────────────────────┘
           │
 ┌─────────▼───────────────────────────────────────────────┐
@@ -48,9 +59,26 @@ PiTrac is a sophisticated real-time computer vision system that transforms a Ras
 
 ### Core Components
 
-#### PiTrac Launch Monitor Core (`pitrac_lm`)
+#### Web Dashboard 
 
-The heart of the system, written in C++20 for maximum performance:
+The modern Python-based web interface that replaces all CLI and manual operations:
+
+- **FastAPI Framework**: High-performance async web server
+- **WebSocket Support**: Real-time updates without polling
+- **Process Management**: Start/stop PiTrac processes dynamically
+- **Configuration UI**: Graphical configuration with validation
+- **Testing Suite**: Hardware and system tests with live feedback
+- **Calibration Wizard**: Step-by-step camera calibration
+- **Log Streaming**: Real-time log viewing and filtering
+
+Key files (`Software/web-server/`):
+- `server.py` - FastAPI application and routes
+- `listeners.py` - ActiveMQ message handlers
+- `managers.py` - Shot and session management
+- `static/js/` - Frontend JavaScript (vanilla JS, no framework)
+- `templates/` - Jinja2 HTML templates
+
+#### PiTrac Launch Monitor Core (`pitrac_lm`)
 
 - **Image Acquisition**: Interfaces with Pi cameras through libcamera
 - **Ball Detection**: Real-time computer vision using OpenCV
@@ -58,231 +86,162 @@ The heart of the system, written in C++20 for maximum performance:
 - **Message Publishing**: Sends results via ActiveMQ
 
 Key source files:
-- `ball_image_proc.cpp` - Main image processing pipeline (includes spin detection)
+- `ball_image_proc.cpp` - Main image processing pipeline
 - `gs_fsm.cpp` - Finite state machine for shot detection
 - `pulse_strobe.cpp` - Hardware strobe synchronization
+- `configuration_manager.cpp` - Configuration handling
 
-#### Configuration Management System
+#### Configuration Management
 
-A hierarchical system that provides flexibility while maintaining backward compatibility:
+A three-tier configuration system managed through the web UI:
 
-- **ConfigurationManager** - Central singleton managing all configuration
-- **Parameter Mapping** - Translates user-friendly names to technical parameters
-- **Multi-source Loading** - CLI → YAML → JSON precedence
-- **Validation Engine** - Type checking and range validation
+1. **System Defaults** - Built into the application
+2. **Calibration Data** - Camera-specific calibration parameters
+3. **User Overrides** - Settings changed through web UI
+
+Configuration flow:
+```
+Web UI Changes → REST API → YAML Files → ConfigurationManager → pitrac_lm
+```
 
 Key files:
-- `configuration_manager.cpp/h` - Core configuration logic
-- `gs_config.cpp/h` - Legacy configuration adapter
-- `parameter-mappings.yaml` - User to technical parameter mapping
-- `pitrac.yaml` - User configuration template
+- `~/.pitrac/config/` - User configuration (managed by web UI)
+- `configuration_manager.cpp` - C++ configuration logic
+- `Software/web-server/config_manager.py` - Python configuration handler
 
 #### Message Broker (ActiveMQ)
 
-Provides loose coupling between components:
+Provides communication between components:
 
-- **Asynchronous Communication** - Components don't block each other
-- **Topic-based Routing** - Publishers and subscribers by topic
-- **Reliability** - Message persistence and delivery guarantees
-- **Scalability** - Can distribute across multiple machines
+- **Asynchronous Messaging** - Non-blocking communication
+- **Topic-based Routing** - Publishers and subscribers
+- **Shot Data Distribution** - From pitrac_lm to web UI
+- **Status Updates** - System health and diagnostics
 
-Topics used:
-- `Golf.Sim` - All system messages (shots, status, commands)
+Topics:
+- `Golf.Sim` - Primary message topic for shot data
+- `Golf.Status` - System status messages
 
-#### Web Monitoring Interface (TomEE)
+#### Process Architecture
 
-Java-based web application for system monitoring:
+Unlike traditional service architectures, PiTrac uses dynamic process management:
 
-- **Real-time Display** - Shows current shot data and system status
-- **Club Selection** - Switch between Driver/Putter modes
-- **Debug Tools** - Current shot image viewer and log display
-- **Note**: Shot history and configuration UI are not yet implemented
+```python
+# Web server manages PiTrac processes
+class PiTracManager:
+    def start_camera(self, camera_num):
+        # Build command from web UI configuration
+        cmd = self.build_command(camera_num)
 
-#### Simulator Interfaces
+        # Spawn process (not a service)
+        process = subprocess.Popen(cmd)
 
-Translates PiTrac data for golf simulators:
+        # Monitor health
+        self.monitor_process(process)
 
-- **E6 Connect** - TCP socket protocol (port 2483)
-- **GSPro** - JSON over TCP protocol
-- **Note**: TruGolf uses the E6 interface (no separate implementation)
-
-Each interface handles:
-- Protocol translation
-- Network communication
-- Error recovery
-- Latency optimization
-
-### Data Flow
-
-Understanding how data moves through the system is crucial for development:
-
-#### Shot Detection Flow
-
-1. **Camera Trigger**
-   - Ball enters detection zone
-   - GPIO triggers both cameras simultaneously
-   - IR strobes flash for motion freeze
-
-2. **Image Capture**
-   - Camera captures strobed IR image with mutiple ball positions
-   - Images transferred to memory via CSI
-
-3. **Image Processing**
-   - Ball detection using YOLO or Hugh Circles
-   - Spin detection from ball markings
-
-4. **Physics Calculation**
-   - Velocity computation from position delta
-   - Launch angle and direction calculation
-   - Spin axis and rate determination
-
-5. **Result Publishing**
-   - Package data in standard format
-   - Publish to message broker
-   - Log to debug files if enabled
-
-6. **Simulator Transmission**
-   - Subscribe to shot messages
-   - Translate to simulator protocol
-   - Send over network
-
-
-#### Configuration Flow
-
-1. **Startup Loading**
-   - Load default JSON configuration
-   - Load user YAML overrides
-   - Apply environment variables
-   - Process command-line arguments
-
-2. **Runtime Access**
-   - Component requests parameter
-   - ConfigurationManager resolves value
-   - Validation ensures type safety
-   - Value returned to component
-
-3. **Dynamic Updates**
-   - Web UI changes setting
-   - Validation checks new value
-   - Configuration updated in memory
-   - Components notified of change
-
-### Hardware Abstraction
-
-PiTrac abstracts hardware differences to support multiple Pi models:
-
-#### Camera System
-- **libcamera** - Modern camera stack (Pi OS Bookworm+)
-- **Global Shutter Support** - Pi Camera v3 GS or equivalent
-- **Hardware Sync** - GPIO triggering for simultaneity
-
-#### GPIO Control
-- **lgpio Library** - Modern GPIO interface
-- **Chip Selection** - Automatic Pi4 (chip 0) vs Pi5 (chip 4)
-- **SPI Communication** - High-speed strobe control
-- **Interrupt Handling** - Low-latency ball detection
-
-#### Platform Detection
-```cpp
-// Automatic platform detection via GetPiModel()
-int gpio_chip = (GolfSimConfiguration::GetPiModel() == GolfSimConfiguration::PiModel::kRPi5) ? 4 : 0;
+    def stop_camera(self, camera_num):
+        # Graceful shutdown via signals
+        self.send_shutdown_signal(camera_num)
 ```
 
-### Performance Optimizations
+## Data Flow
 
-Meeting real-time requirements on limited hardware requires careful optimization:
+### Shot Detection Flow
 
+```
+1. User starts PiTrac via web UI
+2. Web server spawns pitrac_lm process
+3. Cameras capture images at 232 fps
+4. Ball detection triggers shot sequence
+5. Image processing calculates metrics
+6. Results published to ActiveMQ
+7. Web server receives via listener
+8. WebSocket broadcasts to browser
+9. UI updates in real-time
+```
 
-#### Build Optimizations
-- **Release Mode** - Uses Meson's `--buildtype=release` which applies `-O3` optimization
-- **Standard Optimizations** - Compiler optimizations for release builds
-- **Note**: Advanced optimizations (LTO, PGO, `-march=native`) are not currently enabled
+### Configuration Update Flow
 
-#### System Tuning
-- **CPU Governor** - Set to performance mode
-- **Memory Split** - Optimize GPU/CPU memory allocation
-- **Process Priority** - Real-time scheduling for core process
-- **Network Tuning** - Optimize TCP settings for low latency
+```
+1. User modifies setting in web UI
+2. Frontend validates input
+3. REST API updates configuration
+4. YAML file written to disk
+5. User clicks "Restart PiTrac" if needed
+6. Web server stops old process
+7. New process started with updated config
+```
 
-### Extensibility Points
+## Development Workflow
 
-The architecture provides some extension points with others planned:
+### Making Changes
 
-#### Currently Implemented
-- **Post-Processing Stages** - Working plugin system for image filters with 13+ stages
-- **Image Analyzer Interface** - Framework for custom ball detection (OpenCV implemented)
-- **Configuration Overrides** - YAML-based user configuration system
+1. **Code Changes**: Edit source files
+2. **Rebuild**: `sudo ./build.sh dev` in `packaging/`
+3. **Web Server Auto-Updates**: Automatically uses new code
+4. **Test via Web UI**: Use Testing section
+5. **Monitor Logs**: View in web UI Logs section
 
-### Development Considerations
+### Key Development Areas
 
-When developing PiTrac, keep these architectural principles in mind:
+- **Web Interface**: `Software/web-server/` (Python/JavaScript)
+- **Core Processing**: `Software/LMSourceCode/ImageProcessing/` (C++)
+- **Build System**: `packaging/` (Bash/Docker)
+- **Configuration**: Through web UI only
 
-#### Separation of Concerns
-Each component has a single, well-defined responsibility. Don't mix concerns like image processing with network communication.
+## Design Principles
 
-#### Loose Coupling
-Components communicate through well-defined interfaces (messages, configuration). Avoid direct dependencies between components.
+### Web-First Approach
 
-#### Performance First
-Every code change should consider performance impact. Profile before and after significant changes.
+- All user interaction through web UI
+- No manual configuration file editing
+- Real-time feedback and monitoring
 
-#### Hardware Awareness
-Code should account for hardware variations (Pi4 vs Pi5, different cameras). Use abstraction layers for hardware-specific code.
+### Process Management
 
-#### User Experience
-Features should be accessible to DIY builders. Avoid complexity that doesn't provide clear value.
+- Dynamic process spawning (not services)
+- User-initiated control
+- Graceful error handling
+- Health monitoring
 
-### System Limitations
+### Configuration Philosophy
 
-Understanding current limitations helps set realistic expectations:
+- GUI-based configuration only
+- Live validation and feedback
+- No manual YAML/JSON editing
+- Settings organized by category
 
-#### Hardware Constraints
-- **CPU Performance** - Pi4/5 processing power limits
-- **Memory Bandwidth** - Image transfer bottlenecks
-- **Network Latency** - Ethernet recommended over WiFi
+## Technology Stack
 
-#### Software Constraints
-- **Calibration Required** - Manual camera alignment
-- **Limited Club Data** - Ball-only tracking currently
+### Frontend
+- **Vanilla JavaScript** - No framework dependencies
+- **WebSocket** - Real-time updates
+- **Responsive CSS** - Mobile-friendly
+- **Jinja2 Templates** - Server-side rendering
 
-#### Future Improvements
-- **Club Tracking** - Add club head analysis
-- **Outdoor Mode** - Compensate for ambient IR
-- **AI Enhancement** - ML-based detection improvement
+### Backend
+- **Python 3.9+** - Web server
+- **FastAPI** - Modern async framework
+- **py-amqp-client** - ActiveMQ integration
+- **subprocess** - Process management
 
-### Debugging and Troubleshooting
+### Core Processing
+- **C++20** - Modern C++ features
+- **OpenCV** - Computer vision
+- **libcamera** - Camera interface
+- **Boost** - Utilities and testing
 
-The architecture includes comprehensive debugging support:
+### Infrastructure
+- **ActiveMQ** - Message broker
+- **systemd** - Service management
+- **Meson/Ninja** - Build system
 
-#### Debug Modes
-- **Image Logging** - Save processed frames for analysis
-- **Message Tracing** - Log all message broker traffic
-- **Performance Profiling** - Timing for each pipeline stage
-- **State Dumping** - System state on error conditions
+## Best Practices
 
-#### Debug Tools
-- **CLI Testing** - `pitrac test` subcommands (hardware, pulse, quick, spin, gspro, automated, camera)
-- **Log Analysis** - Structured logging with levels
-- **Image Viewer** - Visualize processing steps
-- **Network Monitor** - Track simulator communication
+1. **Always use web UI** for configuration and control
+2. **Never edit config files** manually
+3. **Monitor through web UI** for real-time status
+4. **Test via web interface** for immediate feedback
+5. **Check logs in web UI** for debugging
 
-### Integration with External Systems
-
-PiTrac is designed to integrate with various external systems:
-
-#### Simulator Protocols
-- **Network-based** - TCP/UDP protocols
-- **File-based** - Shared file exchange
-- **API-based** - REST/WebSocket interfaces
-
-#### Home Automation
-- **MQTT** - Publish shots to home automation
-- **Webhooks** - HTTP callbacks on events
-- **Database** - Store shots for analysis
-- **Cloud** - Optional cloud synchronization
-
-## Summary
-
-PiTrac's architecture balances several competing demands: real-time performance on limited hardware, ease of use for DIY builders, flexibility for different setups, and reliability for consistent shot tracking. Understanding these architectural patterns and trade-offs is essential for contributing effectively to the project.
-
-The modular design allows developers to work on specific components without deep knowledge of the entire system, while the message-based communication ensures changes in one area don't cascade throughout the codebase. This architecture has evolved through real-world use and continues to adapt as the project grows.
+The modern architecture prioritizes user experience while maintaining the high-performance core processing that makes PiTrac effective.

@@ -1,215 +1,243 @@
 ---
 layout: default
-title: Service Integration  
+title: Service Architecture
 parent: Development Guide
 nav_order: 9
 ---
 
-# Service Integration
+# Service Architecture
 
-PiTrac can be configured to run as a systemd service for automatic startup and management. This guide covers the actual service files and configurations that exist in the PiTrac codebase.
+PiTrac uses a modern service architecture where the launch monitor processes are managed through the web UI, not systemd. Only supporting services run as systemd services.
 
-## Available Service Files
+## Service Components
 
-The PiTrac codebase includes templates for two systemd service files:
+### 1. PiTrac Web Server (pitrac-web.service)
 
-### 1. PiTrac Service (pitrac.service)
-
-Located at `packaging/templates/pitrac.service`:
+The primary interface for all PiTrac operations:
 
 ```ini
 [Unit]
-Description=PiTrac Launch Monitor
-After=network.target activemq.service tomee.service
-Wants=activemq.service tomee.service
+Description=PiTrac Web Dashboard
+After=network.target activemq.service
+Wants=activemq.service
 
 [Service]
 Type=simple
-User=@PITRAC_USER@  # Set during installation
-Group=@PITRAC_GROUP@  # Set during installation
-WorkingDirectory=@PITRAC_HOME@  # User's home directory
-Environment="HOME=@PITRAC_HOME@"
-Environment="USER=@PITRAC_USER@"
-Environment="LD_LIBRARY_PATH=/usr/lib/pitrac"
-Environment="PITRAC_BASE_IMAGE_LOGGING_DIR=@PITRAC_HOME@/LM_Shares/Images/"
-Environment="PITRAC_WEBSERVER_SHARE_DIR=@PITRAC_HOME@/LM_Shares/WebShare/"
-Environment="PITRAC_MSG_BROKER_FULL_ADDRESS=tcp://localhost:61616"
-ExecStartPre=/bin/sleep 10
-ExecStart=/usr/bin/pitrac run --foreground --system_mode=camera1
+User=@PITRAC_USER@
+WorkingDirectory=/usr/lib/pitrac/web-server
+Environment="PATH=/usr/bin:/bin"
+ExecStart=/usr/bin/python3 /usr/lib/pitrac/web-server/main.py
 Restart=on-failure
 RestartSec=5
-StandardOutput=journal
-StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-### 2. TomEE Service (tomee.service)
+**Management:**
+```bash
+# Start web server (primary command)
+pitrac web start
 
-Located at `packaging/templates/tomee.service`:
+# Check status
+pitrac web status
+
+# View logs
+pitrac web logs
+```
+
+### 2. ActiveMQ Message Broker (activemq.service)
+
+Handles inter-process communication between PiTrac components:
 
 ```ini
 [Unit]
-Description=Apache TomEE
+Description=Apache ActiveMQ
 After=network.target
 
 [Service]
 Type=forking
-Environment="CATALINA_PID=/opt/tomee/temp/tomee.pid"
-Environment="CATALINA_HOME=/opt/tomee"
-Environment="CATALINA_BASE=/opt/tomee"
-Environment="CATALINA_OPTS=-server"
-Environment="JAVA_OPTS=-Djava.awt.headless=true"
-ExecStart=/usr/lib/pitrac/tomee-wrapper.sh start
-ExecStop=/usr/lib/pitrac/tomee-wrapper.sh stop
-User=tomee
-Group=tomee
-UMask=0007
-RestartSec=10
-Restart=always
+User=activemq
+Environment="JAVA_HOME=/usr/lib/jvm/default-java"
+ExecStart=/usr/share/activemq/bin/activemq start
+ExecStop=/usr/share/activemq/bin/activemq stop
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-### TomEE Wrapper Script
+**Note:** ActiveMQ is typically managed automatically and doesn't require manual intervention.
 
-The TomEE service uses a wrapper script (`packaging/templates/tomee-wrapper.sh`) that handles Java auto-detection:
+## Service Installation
+
+During installation (`sudo ./build.sh dev`), services are configured:
 
 ```bash
-#!/bin/bash
-# TomEE startup wrapper with Java auto-detection
+# Web server service installation
+/usr/lib/pitrac/web-service-install.sh install <username>
 
-# Auto-detect JAVA_HOME if not set
-if [ -z "$JAVA_HOME" ]; then
-    # Try common locations in order of preference
-    if [ -d "/usr/lib/jvm/default-java" ]; then
-        export JAVA_HOME="/usr/lib/jvm/default-java"
-    elif [ -d "/usr/lib/jvm/java-17-openjdk-arm64" ]; then
-        export JAVA_HOME="/usr/lib/jvm/java-17-openjdk-arm64"
-    elif [ -d "/usr/lib/jvm/java-11-openjdk-arm64" ]; then
-        export JAVA_HOME="/usr/lib/jvm/java-11-openjdk-arm64"
-    elif [ -x "/usr/bin/java" ]; then
-        # Fallback: detect from java binary
-        export JAVA_HOME=$(readlink -f /usr/bin/java | sed "s:/bin/java::")
-    fi
-fi
-
-# Execute the requested command
-case "$1" in
-    start)
-        exec /opt/tomee/bin/startup.sh
-        ;;
-    stop)
-        exec /opt/tomee/bin/shutdown.sh
-        ;;
-    *)
-        echo "Usage: $0 {start|stop}" >&2
-        exit 1
-        ;;
-esac
+# ActiveMQ configuration
+/usr/lib/pitrac/activemq-service-install.sh install activemq
 ```
 
-**Note**: The service file uses placeholder values (@PITRAC_USER@, @PITRAC_HOME@, etc.) that are replaced during installation with the actual user's information. This allows the service to work with any username.
+## Service Dependencies
 
-## Service Management
+```
+Network
+  ↓
+ActiveMQ (Message Broker)
+  ↓
+PiTrac Web Server
+  ↓
+PiTrac Launch Monitor (managed by web UI)
+```
 
-When installed via the APT package, the services can be managed with standard systemd commands:
+## Process Management Architecture
+
+### Web UI Process Control
+
+The web server manages PiTrac processes through:
+
+1. **Process Spawning** - Uses Python subprocess to start `pitrac_lm`
+2. **Health Monitoring** - Checks process status via PID files
+3. **Configuration Building** - Generates CLI arguments from web UI settings
+4. **Log Management** - Captures and streams process output
+5. **Graceful Shutdown** - Sends appropriate signals (SIGTERM/SIGKILL)
+
+### Process Lifecycle
+
+```python
+# Simplified process management in web server
+def start_pitrac():
+    # Build command from configuration
+    cmd = build_pitrac_command(config)
+
+    # Start process
+    process = subprocess.Popen(cmd, ...)
+
+    # Store PID for monitoring
+    save_pid(process.pid)
+
+    # Monitor health
+    schedule_health_check()
+
+def stop_pitrac():
+    # Get PID
+    pid = load_pid()
+
+    # Graceful shutdown
+    os.kill(pid, signal.SIGTERM)
+
+    # Wait for termination
+    wait_for_process_exit(pid, timeout=30)
+```
+
+## Service File Locations
+
+- **Service Templates**: `/usr/share/pitrac/templates/`
+- **Installed Services**: `/etc/systemd/system/`
+- **Service Installers**: `/usr/lib/pitrac/*-service-install.sh`
+- **PID Files**: `~/.pitrac/run/`
+- **Log Files**: `~/.pitrac/logs/`
+
+## Systemd Commands (For Supporting Services Only)
 
 ```bash
-# Start the PiTrac service
-sudo systemctl start pitrac
-
-# Stop the PiTrac service
-sudo systemctl stop pitrac
-
 # Check service status
-systemctl status pitrac
-
-# Enable auto-start at boot
-sudo systemctl enable pitrac
+systemctl status pitrac-web
+systemctl status activemq
 
 # View service logs
-journalctl -u pitrac -f
+journalctl -u pitrac-web -f
+journalctl -u activemq -f
+
+# Enable on boot
+sudo systemctl enable pitrac-web
+sudo systemctl enable activemq
+
+# Restart services
+sudo systemctl restart pitrac-web
+sudo systemctl restart activemq
 ```
 
-## CLI Integration
+## Development Considerations
 
-The PiTrac CLI (`packaging/pitrac`) includes service management commands:
+### Adding New Services
+
+If adding a new systemd service:
+
+1. Create template in `packaging/templates/`
+2. Add installer script in `packaging/src/lib/`
+3. Update `build.sh` to install service
+4. Document in this guide
+
+### Process vs Service Decision
+
+Use a systemd service when:
+- Process needs to run continuously
+- Automatic startup on boot required
+- No user interaction needed
+- Simple start/stop semantics
+
+Manage via web UI when:
+- Dynamic configuration needed
+- User control required
+- Complex startup sequences
+- Real-time monitoring important
+
+## Troubleshooting Services
+
+### Web Server Issues
 
 ```bash
-# Service management
-pitrac service start|stop|restart|status
+# Check if running
+systemctl status pitrac-web
 
-# TomEE management
-pitrac tomee start|stop|restart|status
+# Check port availability
+netstat -tln | grep 8080
 
-# View logs
-pitrac logs [--follow]
+# View detailed logs
+journalctl -u pitrac-web -n 100
 ```
 
-## Configuration
+### ActiveMQ Issues
 
-### Environment Variables
+```bash
+# Verify ActiveMQ is running
+systemctl status activemq
 
-The PiTrac service uses these environment variables (set in the service file):
+# Check if listening
+netstat -tln | grep 61616
 
-- `PITRAC_BASE_IMAGE_LOGGING_DIR` - Directory for saving captured images
-- `PITRAC_WEBSERVER_SHARE_DIR` - Directory for web interface data sharing
-- `PITRAC_MSG_BROKER_FULL_ADDRESS` - Message broker address (for ActiveMQ integration)
-- `LD_LIBRARY_PATH` - Library path for PiTrac dependencies
+# Test connection
+telnet localhost 61616
+```
 
-### System Modes
+### PiTrac Process Issues
 
-The service starts with `--system_mode=camera1` by default. Available system modes include:
+Since PiTrac is managed by the web UI:
 
-- `camera1` - Single camera operation
-- `camera2` - Dual camera operation
-- `test` - Test mode with sample images
-- `camera1_test_standalone` - Standalone test mode
-- Various calibration and testing modes
+1. Check web UI "PiTrac Process" section for status
+2. View logs in web UI "Logs" section
+3. Check for PID files: `ls ~/.pitrac/run/`
+4. Look for running processes: `pgrep pitrac_lm`
 
-## Dependencies
+## Best Practices
 
-### ActiveMQ Integration
+1. **Always use web UI for PiTrac control** - Don't try to run `pitrac_lm` manually
+2. **Monitor through web UI** - Real-time status and logs
+3. **Let services auto-start** - Enable systemd services for boot
+4. **Check dependencies** - Ensure ActiveMQ starts before web server
+5. **Use proper shutdown** - Stop via web UI before system shutdown
 
-While the service file references ActiveMQ, it's listed as a "Wants" dependency (not required). The codebase includes:
+## Migration Notes
 
-- ActiveMQ-CPP library build support (`packaging/src/activemq.sh`)
-- Installation scripts (`Dev/scripts/install_mq_broker.sh`)
-- Message broker address configuration
+If upgrading from older PiTrac versions:
 
-Note: ActiveMQ is used for the PiTrac Open Interface (POI) for simulator communication but is not required for basic operation.
+- Old `pitrac.service` is removed during installation
+- PiTrac process control moved to web UI
+- TomEE replaced with Python web server
+- Configuration now managed through web UI
 
-### TomEE Web Server
-
-TomEE provides a web interface for monitoring. The codebase includes:
-
-- TomEE installation scripts (`Dev/scripts/install_tomee.sh`)
-- Web application archive (`golfsim-1.0.0-noarch.war`)
-- JSP dashboard (`golfsim_tomee_webapp/src/main/webapp/WEB-INF/gs_dashboard.jsp`)
-
-## Actual vs Documentation
-
-**Important**: This documentation reflects what actually exists in the codebase. Some features mentioned in other documentation may be planned or aspirational:
-
-- No `activemq.service` file exists in the repository
-- No health check scripts (`pitrac-health-check`, `pitrac-check-deps`) exist
-- No recovery scripts (`pitrac-recovery`) exist
-- No Prometheus/Grafana monitoring integration exists
-- No MQTT/Paho integration exists
-- The service integration is simpler than depicted in some documentation
-
-## Installation
-
-When using the APT package installation:
-
-1. Service files are installed to `/etc/systemd/system/`
-2. The PiTrac binary is installed to `/usr/lib/pitrac/pitrac_lm`
-3. The CLI wrapper is installed to `/usr/bin/pitrac`
-4. Configuration files are placed in `/etc/pitrac/`
-
-## Summary
-
-PiTrac's service integration provides basic systemd management for the launch monitor and optional TomEE web server. The implementation is straightforward and focused on essential functionality rather than complex orchestration or monitoring features.
+The service architecture prioritizes user control and monitoring through the web interface while maintaining system services only for infrastructure components.
