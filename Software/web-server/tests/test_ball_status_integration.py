@@ -94,14 +94,10 @@ def run_test_sequence():
         time.sleep(2)
 
         print("\nReturning to ready state:")
-        send_test_message(
-            conn, GsIPCResultType.kBallPlacedAndReadyForHit, "Ball ready again!"
-        )
+        send_test_message(conn, GsIPCResultType.kBallPlacedAndReadyForHit, "Ball ready again!")
 
         print("\nTest sequence complete!")
-        print(
-            "Check the web interface at http://localhost:8000 to verify the UI updates"
-        )
+        print("Check the web interface at http://localhost:8000 to verify the UI updates")
 
     except Exception as e:
         print(f"Error during test: {e}")

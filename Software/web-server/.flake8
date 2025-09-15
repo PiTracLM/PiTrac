@@ -1,0 +1,28 @@
+[flake8]
+max-line-length = 120
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    build,
+    dist,
+    *.egg-info,
+    htmlcov,
+    .pytest_cache
+ignore =
+    # W503: line break before binary operator (conflicts with black)
+    W503,
+    # E203: whitespace before ':' (conflicts with black)
+    E203,
+    # E501: line too long (we use max-line-length)
+    E501
+per-file-ignores =
+    # F401: imported but unused
+    __init__.py:F401
+    # F841: local variable assigned but never used (common in tests)
+    tests/*.py:F841
+    # F401: server.app import is used by uvicorn
+    main.py:F401
+    # E402: module level imports not at top (path setup required first)
+    tests/conftest.py:E402

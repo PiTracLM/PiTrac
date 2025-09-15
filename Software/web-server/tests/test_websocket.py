@@ -121,9 +121,7 @@ class TestWebSocketAsync:
         assert call_args["speed"] == 145.5
         assert call_args["carry"] == 265.3
 
-    async def test_websocket_broadcast_to_multiple_clients(
-        self, server_instance, shot_data_instance
-    ):
+    async def test_websocket_broadcast_to_multiple_clients(self, server_instance, shot_data_instance):
         """Test that updates are broadcast to all connected clients"""
         mock_ws1 = AsyncMock()
         mock_ws1.send_json = AsyncMock()
@@ -149,9 +147,7 @@ class TestWebSocketAsync:
             assert call_args["speed"] == 145.5
             assert call_args["carry"] == 265.3
 
-    async def test_websocket_failed_client_removed(
-        self, server_instance, shot_data_instance
-    ):
+    async def test_websocket_failed_client_removed(self, server_instance, shot_data_instance):
         """Test that failed clients are removed from the list"""
         mock_ws_good = AsyncMock()
         mock_ws_good.send_json = AsyncMock()
@@ -180,9 +176,7 @@ class TestWebSocketAsync:
         mock_ws2 = AsyncMock()
 
         # Test concurrent operations
-        await asyncio.gather(
-            connection_manager.connect(mock_ws1), connection_manager.connect(mock_ws2)
-        )
+        await asyncio.gather(connection_manager.connect(mock_ws1), connection_manager.connect(mock_ws2))
 
         assert connection_manager.connection_count == 2
 

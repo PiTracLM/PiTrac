@@ -23,9 +23,7 @@ class ConnectionManager:
     def disconnect(self, websocket: WebSocket) -> None:
         with self._lock:
             self._connections.discard(websocket)
-        logger.info(
-            f"WebSocket disconnected. Total connections: {len(self._connections)}"
-        )
+        logger.info(f"WebSocket disconnected. Total connections: {len(self._connections)}")
 
     async def send_personal(self, data: Dict[str, Any], websocket: WebSocket) -> bool:
         try:

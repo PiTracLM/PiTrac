@@ -21,25 +21,25 @@ class PiTracProcessManager:
         self.process: Optional[subprocess.Popen] = None
         self.camera2_process: Optional[subprocess.Popen] = None
         self.config_manager = config_manager or ConfigurationManager()
-        
+
         metadata = self.config_manager.load_configurations_metadata()
         sys_paths = metadata.get("systemPaths", {})
         proc_mgmt = metadata.get("processManagement", {})
-        
+
         def expand_path(path_str: str) -> Path:
             return Path(path_str.replace("~", str(Path.home())))
-        
+
         self.pitrac_binary = sys_paths.get("pitracBinary", {}).get("default", "/usr/lib/pitrac/pitrac_lm")
         self.config_file = sys_paths.get("configFile", {}).get("default", "/etc/pitrac/golf_sim_config.json")
-        
+
         log_dir = expand_path(sys_paths.get("logDirectory", {}).get("default", "~/.pitrac/logs"))
         pid_dir = expand_path(sys_paths.get("pidDirectory", {}).get("default", "~/.pitrac/run"))
-        
+
         self.log_file = log_dir / proc_mgmt.get("camera1LogFile", {}).get("default", "pitrac.log")
         self.camera2_log_file = log_dir / proc_mgmt.get("camera2LogFile", {}).get("default", "pitrac_camera2.log")
         self.pid_file = pid_dir / proc_mgmt.get("camera1PidFile", {}).get("default", "pitrac.pid")
         self.camera2_pid_file = pid_dir / proc_mgmt.get("camera2PidFile", {}).get("default", "pitrac_camera2.pid")
-        
+
         self.process_check_command = proc_mgmt.get("processCheckCommand", {}).get("default", "pitrac_lm")
         self.startup_delay_camera2 = proc_mgmt.get("startupDelayCamera2", {}).get("default", 2)
         self.startup_wait_camera2_ready = proc_mgmt.get("startupWaitCamera2Ready", {}).get("default", 1)
@@ -49,7 +49,7 @@ class PiTracProcessManager:
         self.post_kill_delay = proc_mgmt.get("postKillDelay", {}).get("default", 0.5)
         self.restart_delay = proc_mgmt.get("restartDelay", {}).get("default", 1)
         self.recent_log_lines = proc_mgmt.get("recentLogLines", {}).get("default", 10)
-        
+
         self.termination_signal = getattr(signal, proc_mgmt.get("terminationSignal", {}).get("default", "SIGTERM"))
         self.kill_signal = getattr(signal, proc_mgmt.get("killSignal", {}).get("default", "SIGKILL"))
 
@@ -60,7 +60,7 @@ class PiTracProcessManager:
         """Get the system mode (single or dual Pi)"""
         config = self.config_manager.get_config()
         return config.get("system", {}).get("mode", "single")
-    
+
     def _get_camera_role(self) -> str:
         """Get the camera role for dual Pi mode"""
         config = self.config_manager.get_config()
@@ -68,27 +68,27 @@ class PiTracProcessManager:
 
     def _build_cli_args_from_metadata(self, camera: str = "camera1") -> list:
         """Build CLI arguments using metadata from configurations.json
-        
+
         This method uses the passedVia and passedTo metadata to automatically
         build CLI arguments instead of manual hardcoding.
         """
         args = []
         merged_config = self.config_manager.get_config()
-        
+
         target = camera  # "camera1" or "camera2"
-        
+
         cli_params = self.config_manager.get_cli_parameters(target)
-        
+
         skip_args = {"--system_mode", "--run_single_pi", "--web_server_share_dir"}
-        
+
         for param in cli_params:
             key = param["key"]
             cli_arg = param["cliArgument"]
             param_type = param["type"]
-            
+
             if cli_arg in skip_args:
                 continue
-            
+
             value = merged_config
             for part in key.split("."):
                 if isinstance(value, dict):
@@ -96,41 +96,41 @@ class PiTracProcessManager:
                 else:
                     value = None
                     break
-            
+
             if value is None:
                 continue
-            
+
             # Skip empty string values for non-boolean parameters
             if param_type != "boolean" and value == "":
                 continue
-                
+
             if param_type == "boolean":
                 if value:
                     args.append(cli_arg)
             else:
                 # Use --key=value format for consistency
                 args.append(f"{cli_arg}={value}")
-        
+
         return args
-    
+
     def _set_environment_from_metadata(self, camera: str = "camera1") -> dict:
         """Set environment variables using metadata from configurations.json
-        
+
         This method uses the passedVia and passedTo metadata to automatically
         set environment variables instead of manual hardcoding.
         """
         env = os.environ.copy()
         merged_config = self.config_manager.get_config()
-        
+
         target = camera  # "camera1" or "camera2"
-        
+
         # Get environment parameters for this target
         env_params = self.config_manager.get_environment_parameters(target)
-        
+
         for param in env_params:
             key = param["key"]
             env_var = param["envVariable"]
-            
+
             value = merged_config
             for part in key.split("."):
                 if isinstance(value, dict):
@@ -138,21 +138,21 @@ class PiTracProcessManager:
                 else:
                     value = None
                     break
-            
+
             if value is not None and value != "":
                 env[env_var] = str(value)
-        
+
         return env
 
     def _build_command(self, camera: str = "camera1", config_file_path: Optional[Path] = None) -> list:
         """Build the command to run pitrac_lm with proper arguments
-        
+
         Args:
             camera: Which camera to build command for ("camera1" or "camera2")
             config_file_path: Path to the generated config file
         """
         cmd = [self.pitrac_binary]
-        
+
         # Add system mode arguments
         system_mode = self._get_system_mode()
         if system_mode == "single":
@@ -161,21 +161,22 @@ class PiTracProcessManager:
         else:
             camera_role = self._get_camera_role()
             cmd.append(f"--system_mode={camera_role}")
-        
 
         # Add the generated config file
         if config_file_path and Path(config_file_path).exists():
             cmd.append(f"--config_file={config_file_path}")
         else:
             logger.error("No config file path provided!")
-        
+
         # Add CLI arguments from metadata
         cli_args = self._build_cli_args_from_metadata(camera)
         cmd.extend(cli_args)
 
         # Add web server share directory (from config)
         config = self.config_manager.get_config()
-        web_share_dir = config.get("gs_config", {}).get("ipc_interface", {}).get("kWebServerShareDirectory", "~/LM_Shares/Images/")
+        web_share_dir = (
+            config.get("gs_config", {}).get("ipc_interface", {}).get("kWebServerShareDirectory", "~/LM_Shares/Images/")
+        )
         expanded_dir = web_share_dir.replace("~", str(Path.home()))
         cmd.append(f"--web_server_share_dir={expanded_dir}")
 
@@ -194,18 +195,14 @@ class PiTracProcessManager:
         try:
             Path(self.log_file).parent.mkdir(parents=True, exist_ok=True)
             Path(self.pid_file).parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Generate the golf_sim_config.json from configurations metadata
             try:
                 generated_config_path = self.config_manager.generate_golf_sim_config()
                 logger.info(f"Generated config file at: {generated_config_path}")
             except RuntimeError as e:
                 logger.error(f"Failed to generate config: {e}")
-                return {
-                    "status": "error",
-                    "message": f"Failed to generate configuration: {e}",
-                    "error": str(e)
-                }
+                return {"status": "error", "message": f"Failed to generate configuration: {e}", "error": str(e)}
 
             # Get system mode to determine single vs dual Pi
             system_mode = self._get_system_mode()
@@ -214,14 +211,14 @@ class PiTracProcessManager:
             # Set up environment variables
             env = os.environ.copy()
             home_dir = str(Path.home())
-            
+
             # Set standard environment variables
             env["LD_LIBRARY_PATH"] = "/usr/lib/pitrac"
             env["PITRAC_ROOT"] = "/usr/lib/pitrac"
             env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = "~/LM_Shares/Images/".replace("~", home_dir)
             env["PITRAC_WEBSERVER_SHARE_DIR"] = "~/LM_Shares/WebShare/".replace("~", home_dir)
             env["PITRAC_MSG_BROKER_FULL_ADDRESS"] = "tcp://localhost:61616"
-            
+
             # Set camera-specific environment variables
             if is_single_pi:
                 # Single Pi mode: set env vars for both cameras
@@ -229,12 +226,12 @@ class PiTracProcessManager:
                 env_cam2 = self._set_environment_from_metadata("camera2")
                 env.update(env_cam1)
                 env.update(env_cam2)
-                logger.info(f"Set environment for both cameras")
+                logger.info("Set environment for both cameras")
             else:
                 # Dual Pi mode: only set env for camera1
                 env_cam1 = self._set_environment_from_metadata("camera1")
                 env.update(env_cam1)
-                logger.info(f"Set environment for camera1 only")
+                logger.info("Set environment for camera1 only")
 
             Path(env["PITRAC_BASE_IMAGE_LOGGING_DIR"]).mkdir(parents=True, exist_ok=True)
             Path(env["PITRAC_WEBSERVER_SHARE_DIR"]).mkdir(parents=True, exist_ok=True)
@@ -242,10 +239,8 @@ class PiTracProcessManager:
             if is_single_pi:
                 # In single Pi mode, start camera2 first
                 second_camera = "camera2"
-                
-                logger.info(
-                    f"Starting {second_camera} process FIRST for single-Pi dual camera mode..."
-                )
+
+                logger.info(f"Starting {second_camera} process FIRST for single-Pi dual camera mode...")
 
                 cmd2 = self._build_command(second_camera, config_file_path=generated_config_path)
 
@@ -267,15 +262,11 @@ class PiTracProcessManager:
                     if self.camera2_process.poll() is None:
                         try:
                             pid = self.camera2_process.pid
-                            logger.info(
-                                f"PiTrac camera2 started successfully with PID {pid}"
-                            )
+                            logger.info(f"PiTrac camera2 started successfully with PID {pid}")
                         except (AttributeError, OSError) as e:
                             logger.warning(f"Race condition getting camera2 PID: {e}")
 
-                        logger.info(
-                            "Waiting for camera2 to be ready before starting camera1..."
-                        )
+                        logger.info("Waiting for camera2 to be ready before starting camera1...")
                         await asyncio.sleep(self.startup_wait_camera2_ready)
                     else:
                         logger.error("Camera2 process exited immediately")
@@ -299,7 +290,7 @@ class PiTracProcessManager:
 
             # Start camera1 (primary camera)
             first_camera = "camera1"
-            
+
             logger.info(f"Starting {first_camera} process...")
             cmd = self._build_command(first_camera, config_file_path=generated_config_path)
 
@@ -321,9 +312,7 @@ class PiTracProcessManager:
                 if self.process.poll() is None:
                     try:
                         pid = self.process.pid
-                        logger.info(
-                            f"PiTrac camera1 started successfully with PID {pid}"
-                        )
+                        logger.info(f"PiTrac camera1 started successfully with PID {pid}")
                     except (AttributeError, OSError) as e:
                         logger.warning(f"Race condition getting camera1 PID: {e}")
 
@@ -542,7 +531,10 @@ class PiTracProcessManager:
                 return True
             except ProcessLookupError:
                 if self.pid_file.exists():
-                    self.pid_file.unlink()
+                    try:
+                        self.pid_file.unlink()
+                    except FileNotFoundError:
+                        pass
 
         camera2_pid = self.get_camera2_pid()
         if camera2_pid:
@@ -551,7 +543,10 @@ class PiTracProcessManager:
                 return True
             except ProcessLookupError:
                 if self.camera2_pid_file.exists():
-                    self.camera2_pid_file.unlink()
+                    try:
+                        self.camera2_pid_file.unlink()
+                    except FileNotFoundError:
+                        pass
 
         return False
 
@@ -567,7 +562,10 @@ class PiTracProcessManager:
                     logger.debug(f"Camera1 process terminated with code {poll_result}")
                     self.process = None
                     if self.pid_file.exists():
-                        self.pid_file.unlink()
+                        try:
+                            self.pid_file.unlink()
+                        except FileNotFoundError:
+                            pass
             except (AttributeError, OSError) as e:
                 logger.warning(f"Race condition in get_pid: {e}")
                 self.process = None
@@ -582,7 +580,10 @@ class PiTracProcessManager:
                             return pid
             except (ValueError, IOError, ProcessLookupError, FileNotFoundError):
                 if self.pid_file.exists():
-                    self.pid_file.unlink()
+                    try:
+                        self.pid_file.unlink()
+                    except FileNotFoundError:
+                        pass
 
         return None
 
@@ -598,7 +599,10 @@ class PiTracProcessManager:
                     logger.debug(f"Camera2 process terminated with code {poll_result}")
                     self.camera2_process = None
                     if self.camera2_pid_file.exists():
-                        self.camera2_pid_file.unlink()
+                        try:
+                            self.camera2_pid_file.unlink()
+                        except FileNotFoundError:
+                            pass
             except (AttributeError, OSError) as e:
                 logger.warning(f"Race condition in get_camera2_pid: {e}")
                 self.camera2_process = None
@@ -613,7 +617,10 @@ class PiTracProcessManager:
                             return pid
             except (ValueError, IOError, ProcessLookupError, FileNotFoundError):
                 if self.camera2_pid_file.exists():
-                    self.camera2_pid_file.unlink()
+                    try:
+                        self.camera2_pid_file.unlink()
+                    except FileNotFoundError:
+                        pass
 
         return None
 
@@ -646,7 +653,7 @@ class PiTracProcessManager:
                 with open(self.log_file, "r") as f:
                     lines = f.readlines()
                     status["camera1_recent_logs"] = (
-                        lines[-self.recent_log_lines:] if len(lines) > self.recent_log_lines else lines
+                        lines[-self.recent_log_lines :] if len(lines) > self.recent_log_lines else lines
                     )
             except Exception as e:
                 status["camera1_log_error"] = str(e)
@@ -656,7 +663,7 @@ class PiTracProcessManager:
                 with open(self.camera2_log_file, "r") as f:
                     lines = f.readlines()
                     status["camera2_recent_logs"] = (
-                        lines[-self.recent_log_lines:] if len(lines) > self.recent_log_lines else lines
+                        lines[-self.recent_log_lines :] if len(lines) > self.recent_log_lines else lines
                     )
             except Exception as e:
                 status["camera2_log_error"] = str(e)

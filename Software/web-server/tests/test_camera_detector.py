@@ -1,9 +1,7 @@
 """Tests for camera_detector module"""
 
-import json
-import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch, mock_open
+from unittest.mock import Mock, patch, mock_open
 import pytest
 from camera_detector import CameraDetector
 
@@ -15,20 +13,14 @@ class TestCameraDetector:
     def detector(self):
         """Create a CameraDetector instance"""
         with patch.object(CameraDetector, "_detect_pi_model", return_value="pi5"):
-            with patch.object(
-                CameraDetector, "_get_camera_command", return_value="rpicam-hello"
-            ):
-                with patch.object(
-                    CameraDetector, "_get_device_tree_root", return_value=None
-                ):
+            with patch.object(CameraDetector, "_get_camera_command", return_value="rpicam-hello"):
+                with patch.object(CameraDetector, "_get_device_tree_root", return_value=None):
                     return CameraDetector()
 
     def test_init(self):
         """Test CameraDetector initialization"""
         with patch.object(CameraDetector, "_detect_pi_model", return_value="pi4"):
-            with patch.object(
-                CameraDetector, "_get_camera_command", return_value="libcamera-hello"
-            ):
+            with patch.object(CameraDetector, "_get_camera_command", return_value="libcamera-hello"):
                 with patch.object(
                     CameraDetector,
                     "_get_device_tree_root",

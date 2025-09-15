@@ -29,6 +29,4 @@ if __name__ == "__main__":
     elif uvicorn_level == "critical":
         uvicorn_level = "error"
 
-    uvicorn.run(
-        "main:app", host="0.0.0.0", port=8080, reload=True, log_level=uvicorn_level
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True, log_level=uvicorn_level)

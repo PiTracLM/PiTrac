@@ -12,7 +12,7 @@ class TestShotSimulation:
     @pytest.mark.asyncio
     async def test_rapid_shot_sequence(self, server_instance, parser, shot_simulator):
         """Test handling rapid sequence of shots"""
-        shots = shot_simulator.generate_sequence(10)
+        shots = shot_simulator.generate_shot_sequence(10)
 
         for shot in shots:
             current = server_instance.shot_store.get()
@@ -25,11 +25,9 @@ class TestShotSimulation:
             await asyncio.sleep(0.01)
 
     @pytest.mark.asyncio
-    async def test_concurrent_shot_updates(
-        self, server_instance, parser, shot_simulator
-    ):
+    async def test_concurrent_shot_updates(self, server_instance, parser, shot_simulator):
         """Test handling concurrent shot updates"""
-        shots = shot_simulator.generate_sequence(5)
+        shots = shot_simulator.generate_shot_sequence(5)
 
         async def update_shot(shot_data):
             current = server_instance.shot_store.get()
@@ -44,7 +42,7 @@ class TestShotSimulation:
 
     def test_shot_data_validation(self, shot_simulator):
         """Test shot data validation and bounds"""
-        shot = shot_simulator.generate_shot()
+        shot = shot_simulator.generate_realistic_shot()
 
         assert 100 <= shot["speed"] <= 180
         assert 150 <= shot["carry"] <= 350
@@ -95,7 +93,7 @@ class TestShotSimulation:
         shot_count = 0
 
         while time.time() - start_time < 2:
-            shot = shot_simulator.generate_shot()
+            shot = shot_simulator.generate_realistic_shot()
             current = server_instance.shot_store.get()
             parsed_shot = parser.parse_dict_format(shot, current)
             server_instance.shot_store.update(parsed_shot)
@@ -109,7 +107,7 @@ class TestShotSimulation:
     def test_shot_result_types(self):
         """Test different shot result types with C++ string mapping"""
         from parsers import ShotDataParser
-        
+
         result_types = {
             ResultType.UNKNOWN: "Unknown",
             ResultType.INITIALIZING: "Initializing",
@@ -122,16 +120,16 @@ class TestShotSimulation:
         for enum_val, expected_text in result_types.items():
             # Test that our mapping function returns the expected C++ string
             mapped_string = ShotDataParser._get_result_type_string(enum_val.value)
-            assert mapped_string == expected_text, f"Expected '{expected_text}', got '{mapped_string}' for {enum_val.name}"
+            assert (
+                mapped_string == expected_text
+            ), f"Expected '{expected_text}', got '{mapped_string}' for {enum_val.name}"
 
     @pytest.mark.asyncio
-    async def test_shot_timestamp_generation(
-        self, server_instance, parser, shot_simulator
-    ):
+    async def test_shot_timestamp_generation(self, server_instance, parser, shot_simulator):
         """Test that timestamps are properly generated"""
         from datetime import datetime
 
-        shot = shot_simulator.generate_shot()
+        shot = shot_simulator.generate_realistic_shot()
 
         before = datetime.now()
         current = server_instance.shot_store.get()
@@ -148,7 +146,7 @@ class TestShotSimulation:
     @pytest.mark.asyncio
     async def test_shot_data_persistence(self, server_instance, parser, shot_simulator):
         """Test that shot data persists between requests"""
-        shot = shot_simulator.generate_shot()
+        shot = shot_simulator.generate_realistic_shot()
         current = server_instance.shot_store.get()
         parsed_shot = parser.parse_dict_format(shot, current)
         server_instance.shot_store.update(parsed_shot)
@@ -171,13 +169,9 @@ class TestShotSimulation:
             ("wedge", (70, 100), (50, 120)),
         ],
     )
-    def test_club_specific_shots(
-        self, shot_simulator, club_type, speed_range, carry_range
-    ):
+    def test_club_specific_shots(self, shot_simulator, club_type, speed_range, carry_range):
         """Test generating club-specific shot data"""
-        shot = shot_simulator.generate_shot(
-            speed_range=speed_range, carry_range=carry_range
-        )
+        shot = shot_simulator.generate_realistic_shot(speed_range=speed_range, carry_range=carry_range)
 
         assert speed_range[0] <= shot["speed"] <= speed_range[1]
         assert carry_range[0] <= shot["carry"] <= carry_range[1]

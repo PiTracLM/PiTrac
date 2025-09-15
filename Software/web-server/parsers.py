@@ -15,7 +15,7 @@ class ShotDataParser:
         """Get all strings that represent status messages (not shot data)"""
         return [
             "Ball Placed",  # kBallPlacedAndReadyForHit - C++ actual string
-            "Ball Ready",   # Legacy support for old enum conversion
+            "Ball Ready",  # Legacy support for old enum conversion
             "Initializing",
             "Waiting For Ball",
             "Waiting For Simulator",
@@ -46,7 +46,7 @@ class ShotDataParser:
             9: "Calibration Results",
             10: "Control Message",
         }
-        
+
         if result_type in cpp_string_mapping:
             return cpp_string_mapping[result_type]
         else:
@@ -56,9 +56,7 @@ class ShotDataParser:
     @staticmethod
     def parse_array_format(data: List[Any]) -> ShotData:
         if len(data) < EXPECTED_DATA_LENGTH:
-            raise ValueError(
-                f"Expected at least {EXPECTED_DATA_LENGTH} elements, got {len(data)}"
-            )
+            raise ValueError(f"Expected at least {EXPECTED_DATA_LENGTH} elements, got {len(data)}")
 
         carry_meters = data[0]
         speed_mpers = data[1]
@@ -70,7 +68,7 @@ class ShotDataParser:
         # club_type = data[7]   # Currently unused
         result_type = data[8]
         message = data[9]
-        
+
         logger.debug(f"Received result_type={result_type}, message='{message}'")
         # log_messages = data[10] if len(data) > 10 else []  # Currently unused
         image_file_paths = data[11] if len(data) > 11 else []
@@ -83,20 +81,27 @@ class ShotDataParser:
 
         # Special handling for result_type 7 which is overloaded in C++
         # Real hits vs configuration messages that misuse kHit type
-        is_fake_hit_message = (result_type == 7 and 
-                              message in ["Club type was set", "Test message", "Configuration update"])
-        
-        is_status_message = (result_type in [
-            ResultType.BALL_READY.value,  # 6 - kBallPlacedAndReadyForHit
-            ResultType.INITIALIZING.value,  # 1
-            ResultType.WAITING_FOR_BALL.value,  # 2
-            ResultType.WAITING_FOR_SIMULATOR.value,  # 3
-            ResultType.PAUSING_FOR_STABILIZATION.value,  # 4
-            ResultType.MULTIPLE_BALLS.value,  # 5
-            ResultType.ERROR.value,  # 8
-            ResultType.CALIBRATION.value,  # 9
-            ResultType.UNKNOWN.value,  # 0
-        ] or is_fake_hit_message)
+        is_fake_hit_message = result_type == 7 and message in [
+            "Club type was set",
+            "Test message",
+            "Configuration update",
+        ]
+
+        is_status_message = (
+            result_type
+            in [
+                ResultType.BALL_READY.value,  # 6 - kBallPlacedAndReadyForHit
+                ResultType.INITIALIZING.value,  # 1
+                ResultType.WAITING_FOR_BALL.value,  # 2
+                ResultType.WAITING_FOR_SIMULATOR.value,  # 3
+                ResultType.PAUSING_FOR_STABILIZATION.value,  # 4
+                ResultType.MULTIPLE_BALLS.value,  # 5
+                ResultType.ERROR.value,  # 8
+                ResultType.CALIBRATION.value,  # 9
+                ResultType.UNKNOWN.value,  # 0
+            ]
+            or is_fake_hit_message
+        )
 
         if is_status_message:
             return ShotData(

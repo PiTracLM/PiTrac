@@ -62,7 +62,7 @@ class TestAPIEndpoints:
         history = response.json()
         assert len(history) <= 3
 
-    def test_get_stats(self, client, server_instance):
+    def test_get_stats(self, client):
         """Test getting server statistics"""
         response = client.get("/api/stats")
         assert response.status_code == 200
@@ -76,9 +76,7 @@ class TestAPIEndpoints:
         """Test health check endpoint with all services running"""
         mock_activemq.is_connected.return_value = True
 
-        pgrep_result = type(
-            "obj", (object,), {"returncode": 0, "stdout": "", "stderr": ""}
-        )()
+        pgrep_result = type("obj", (object,), {"returncode": 0, "stdout": "", "stderr": ""})()
         ss_result = type(
             "obj",
             (object,),
@@ -102,9 +100,7 @@ class TestAPIEndpoints:
         """Test health check when ActiveMQ is disconnected but running"""
         mock_activemq.is_connected.return_value = False
 
-        pgrep_result = type(
-            "obj", (object,), {"returncode": 1, "stdout": "", "stderr": ""}
-        )()
+        pgrep_result = type("obj", (object,), {"returncode": 1, "stdout": "", "stderr": ""})()
         ss_result = type(
             "obj",
             (object,),
@@ -122,18 +118,12 @@ class TestAPIEndpoints:
         assert data["pitrac_running"] is False
 
     @patch("subprocess.run")
-    def test_health_check_services_not_running(
-        self, mock_subprocess, client, mock_activemq
-    ):
+    def test_health_check_services_not_running(self, mock_subprocess, client, mock_activemq):
         """Test health check when both services are not running"""
         mock_activemq.is_connected.return_value = False
 
-        pgrep_result = type(
-            "obj", (object,), {"returncode": 1, "stdout": "", "stderr": ""}
-        )()
-        ss_result = type(
-            "obj", (object,), {"returncode": 0, "stdout": "", "stderr": ""}
-        )()
+        pgrep_result = type("obj", (object,), {"returncode": 1, "stdout": "", "stderr": ""})()
+        ss_result = type("obj", (object,), {"returncode": 0, "stdout": "", "stderr": ""})()
 
         mock_subprocess.side_effect = [pgrep_result, ss_result]
 
@@ -146,9 +136,7 @@ class TestAPIEndpoints:
         assert data["pitrac_running"] is False
 
     @patch("subprocess.run")
-    def test_health_check_subprocess_exception(
-        self, mock_subprocess, client, mock_activemq
-    ):
+    def test_health_check_subprocess_exception(self, mock_subprocess, client, mock_activemq):
         """Test health check when subprocess commands fail"""
         mock_activemq.is_connected.return_value = True
 
@@ -172,9 +160,7 @@ class TestAPIEndpoints:
         response = client.get("/static/favicon.ico")
         assert response.status_code in [200, 404]
 
-    @pytest.mark.parametrize(
-        "image_name", ["test_shot.jpg", "shot_001.png", "capture.jpeg"]
-    )
+    @pytest.mark.parametrize("image_name", ["test_shot.jpg", "shot_001.png", "capture.jpeg"])
     def test_image_endpoint(self, client, tmp_path, image_name):
         """Test image serving endpoint"""
         with patch("constants.IMAGES_DIR", tmp_path):

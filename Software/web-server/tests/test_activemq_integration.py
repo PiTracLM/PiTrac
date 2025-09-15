@@ -16,9 +16,7 @@ class TestActiveMQIntegration:
         assert server_instance.mq_conn == mock_activemq
         assert mock_activemq.is_connected.return_value is True
 
-    def test_activemq_listener_processes_messages(
-        self, shot_store, connection_manager, parser
-    ):
+    def test_activemq_listener_processes_messages(self, shot_store, connection_manager, parser):
         """Test ActiveMQ listener processes incoming messages"""
         mock_loop = MagicMock()
         listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
@@ -54,9 +52,7 @@ class TestActiveMQIntegration:
         listener.on_error(mock_frame)
         assert listener.error_count == 1
 
-    def test_activemq_disconnection_handling(
-        self, shot_store, connection_manager, parser
-    ):
+    def test_activemq_disconnection_handling(self, shot_store, connection_manager, parser):
         """Test ActiveMQ disconnection handling"""
         listener = ActiveMQListener(shot_store, connection_manager, parser)
         assert listener.connected is False
@@ -69,14 +65,18 @@ class TestActiveMQIntegration:
 
     def test_malformed_message_handling(self, shot_store, connection_manager, parser):
         """Test handling of malformed messages"""
-        listener = ActiveMQListener(shot_store, connection_manager, parser)
+        mock_loop = MagicMock()
+        listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
 
+        # Use invalid msgpack format that will cause UnpackException (FormatError)
         mock_frame = MagicMock()
-        mock_frame.body = b"not valid msgpack data"
+        mock_frame.body = b"\xc1"  # Invalid msgpack format code
 
         with patch("listeners.logger") as mock_logger:
             listener.on_message(mock_frame)
+            # Should log an error due to UnpackException
             mock_logger.error.assert_called()
+            assert listener.message_count == 1
 
     def test_base64_encoded_message(self, shot_store, connection_manager, parser):
         """Test handling of base64 encoded messages"""
@@ -86,15 +86,17 @@ class TestActiveMQIntegration:
         shot_data = {"speed": 150.0, "carry": 270.0, "result_type": 7}
 
         packed_data = msgpack.packb(shot_data)
-        base64_data = base64.b64encode(packed_data)
+        assert packed_data is not None  # Type guard for mypy/pylance
+        base64_data = base64.b64encode(packed_data).decode("utf-8")  # Convert to string
 
         mock_frame = MagicMock()
-        mock_frame.body = base64_data
+        mock_frame.body = base64_data  # String body with base64 data
         mock_frame.headers = {"encoding": "base64"}
 
         with patch("asyncio.run_coroutine_threadsafe") as mock_run_coroutine:
             listener.on_message(mock_frame)
             mock_run_coroutine.assert_called_once()
+            assert listener.message_count == 1
 
     @pytest.mark.asyncio
     async def test_message_to_websocket_flow(self, server_instance, parser):
@@ -210,9 +212,7 @@ class TestActiveMQIntegration:
                 with patch.object(server, "setup_activemq") as mock_setup:
                     mock_setup.side_effect = [None, mock_conn]
 
-                    reconnect_task = asyncio.create_task(
-                        server.reconnect_activemq_loop()
-                    )
+                    reconnect_task = asyncio.create_task(server.reconnect_activemq_loop())
 
                     await asyncio.sleep(0.1)
                     server.shutdown_flag = True
@@ -301,6 +301,7 @@ class TestActiveMQIntegration:
             7,  # result_type (HIT)
             "Excellent strike!",  # message
             [],  # log_messages
+            [],  # image_file_paths
         ]
 
         packed_data = msgpack.packb(shot_data)
@@ -351,7 +352,6 @@ class TestActiveMQIntegration:
                     assert sleep_delays[0] == 5  # Initial retry delay
                     assert sleep_delays[1] == 10  # Doubled delay
 
-    
     @pytest.mark.asyncio
     async def test_process_broadcast_value_error(self):
         """Test _process_and_broadcast handling ValueError"""
@@ -359,15 +359,15 @@ class TestActiveMQIntegration:
         shot_store = MagicMock()
         connection_manager = MagicMock()
         parser = MagicMock()
-        
+
         listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
-        
+
         parser.parse_dict_format.side_effect = ValueError("Invalid format")
-        
+
         await listener._process_and_broadcast({"invalid": "data"})
-        
+
         assert shot_store.update.call_count == 0
-    
+
     @pytest.mark.asyncio
     async def test_process_broadcast_general_exception(self):
         """Test _process_and_broadcast handling general Exception"""
@@ -375,20 +375,21 @@ class TestActiveMQIntegration:
         shot_store = MagicMock()
         connection_manager = MagicMock()
         parser = MagicMock()
-        
+
         listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
-        
+
         shot_store.update.side_effect = Exception("Unexpected error")
-        
+
         from models import ShotData
+
         mock_shot = ShotData(speed=100.0)
         parser.parse_dict_format.return_value = mock_shot
         parser.validate_shot_data.return_value = True
-        
+
         await listener._process_and_broadcast({"speed": 100.0})
-        
+
         assert shot_store.update.call_count == 1
-    
+
     @pytest.mark.asyncio
     async def test_validate_shot_data_warning_path(self):
         """Test warning path when shot data validation fails"""
@@ -396,17 +397,18 @@ class TestActiveMQIntegration:
         shot_store = MagicMock()
         connection_manager = MagicMock()
         parser = MagicMock()
-        
+
         listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
-        
+
         from models import ShotData
+
         mock_shot = ShotData(speed=100.0)
         parser.parse_dict_format.return_value = mock_shot
         parser.validate_shot_data.return_value = False
-        
+
         connection_manager.broadcast = AsyncMock()
-        
+
         await listener._process_and_broadcast({"speed": 100.0})
-        
+
         assert shot_store.update.call_count == 1
         assert connection_manager.broadcast.called

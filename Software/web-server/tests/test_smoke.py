@@ -35,6 +35,11 @@ class TestSmoke:
         import parsers
         import listeners
         import constants
+        import config_manager
+        import pitrac_manager
+        import camera_detector
+        import calibration_manager
+        import testing_tools_manager
 
         assert hasattr(models, "ShotData")
         assert hasattr(models, "ResultType")
@@ -43,6 +48,11 @@ class TestSmoke:
         assert hasattr(parsers, "ShotDataParser")
         assert hasattr(listeners, "ActiveMQListener")
         assert hasattr(constants, "MPS_TO_MPH")
+        assert hasattr(config_manager, "ConfigurationManager")
+        assert hasattr(pitrac_manager, "PiTracProcessManager")
+        assert hasattr(camera_detector, "CameraDetector")
+        assert hasattr(calibration_manager, "CalibrationManager")
+        assert hasattr(testing_tools_manager, "TestingToolsManager")
 
     def test_fastapi_app_exists(self, app):
         """Test that FastAPI app is properly configured"""
@@ -50,13 +60,62 @@ class TestSmoke:
         assert app.title == "PiTrac Dashboard"
 
         routes = [route.path for route in app.routes]
+        # Core routes
         assert "/" in routes
+        assert "/health" in routes
+        assert "/ws" in routes
+
+        # Shot data routes
         assert "/api/shot" in routes
         assert "/api/reset" in routes
         assert "/api/history" in routes
         assert "/api/stats" in routes
-        assert "/health" in routes
-        assert "/ws" in routes
+
+        # Config routes
+        assert "/config" in routes
+        assert "/api/config" in routes
+        assert "/api/config/defaults" in routes
+        assert "/api/config/user" in routes
+        assert "/api/config/categories" in routes
+        assert "/api/config/metadata" in routes
+        assert "/api/config/diff" in routes
+        assert "/api/config/{key:path}" in routes
+        assert "/api/config/reset" in routes
+        assert "/api/config/reload" in routes
+        assert "/api/config/export" in routes
+        assert "/api/config/import" in routes
+
+        # PiTrac process management routes
+        assert "/api/pitrac/start" in routes
+        assert "/api/pitrac/stop" in routes
+        assert "/api/pitrac/restart" in routes
+        assert "/api/pitrac/status" in routes
+
+        # Calibration routes
+        assert "/calibration" in routes
+        assert "/api/calibration/status" in routes
+        assert "/api/calibration/data" in routes
+        assert "/api/calibration/ball-location/{camera}" in routes
+        assert "/api/calibration/auto/{camera}" in routes
+        assert "/api/calibration/manual/{camera}" in routes
+        assert "/api/calibration/capture/{camera}" in routes
+        assert "/api/calibration/stop" in routes
+
+        # Testing tools routes
+        assert "/testing" in routes
+        assert "/api/testing/tools" in routes
+        assert "/api/testing/run/{tool_id}" in routes
+        assert "/api/testing/stop/{tool_id}" in routes
+        assert "/api/testing/status" in routes
+
+        # Camera routes
+        assert "/api/cameras/detect" in routes
+        assert "/api/cameras/types" in routes
+
+        # Logs routes
+        assert "/logs" in routes
+        assert "/ws/logs" in routes
+        assert "/api/logs/services" in routes
 
     def test_templates_exist(self):
         """Test that template files exist"""
@@ -71,11 +130,14 @@ class TestSmoke:
         static_dir = Path(__file__).parent.parent / "static"
         assert static_dir.exists()
 
-        css_file = static_dir / "dashboard.css"
-        js_file = static_dir / "dashboard.js"
+        css_dir = static_dir / "css"
+        assert css_dir.exists()
 
-        assert css_file.exists()
-        assert js_file.exists()
+        js_dir = static_dir / "js"
+        assert js_dir.exists()
+
+        favicon = static_dir / "favicon.ico"
+        assert favicon.exists()
 
     def test_initial_shot_state(self, server_instance):
         """Test initial shot state is correct"""

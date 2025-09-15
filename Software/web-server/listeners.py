@@ -40,31 +40,29 @@ class ActiveMQListener(stomp.ConnectionListener):
         try:
             msgpack_data = self._extract_message_data(frame)
             logger.debug(f"Extracted msgpack data: {len(msgpack_data)} bytes")
-            
+
             # Validate msgpack data before unpacking
             if len(msgpack_data) == 0:
                 logger.warning(f"Empty msgpack data for message #{self.message_count}")
                 return
-                
+
             data = msgpack.unpackb(msgpack_data, raw=False, strict_map_key=False)
-            logger.debug(f"Unpacked message data keys: {list(data) if isinstance(data, dict) else len(data) if isinstance(data, list) else type(data)}")
+            logger.debug(
+                f"Unpacked message data keys: {list(data) if isinstance(data, dict) else len(data) if isinstance(data, list) else type(data)}"
+            )
 
             if self.loop:
-                asyncio.run_coroutine_threadsafe(
-                    self._process_and_broadcast(data), self.loop
-                )
+                asyncio.run_coroutine_threadsafe(self._process_and_broadcast(data), self.loop)
             else:
                 logger.error("Event loop not set in listener")
 
-        except msgpack.exceptions.ExtraData as e:
+        except msgpack.exceptions.ExtraData:
             # This is likely a large binary image message - log but don't error
             logger.info(f"Large binary message #{self.message_count} - Extra data in msgpack, skipping")
         except msgpack.exceptions.UnpackException as e:
             logger.error(f"Failed to unpack message #{self.message_count}: {e}")
         except Exception as e:
-            logger.error(
-                f"Error processing message #{self.message_count}: {e}", exc_info=True
-            )
+            logger.error(f"Error processing message #{self.message_count}: {e}", exc_info=True)
 
     def _extract_message_data(self, frame: Any) -> bytes:
         if not hasattr(frame, "body"):
@@ -73,7 +71,7 @@ class ActiveMQListener(stomp.ConnectionListener):
         body = frame.body
         logger.debug(f"Frame body type: {type(body)}, length: {len(body) if hasattr(body, '__len__') else 'unknown'}")
         logger.debug(f"Frame headers: {getattr(frame, 'headers', {})}")
-        
+
         # Handle different body types from STOMP protocol
         if isinstance(body, bytes):
             # Already bytes, use directly
@@ -81,7 +79,7 @@ class ActiveMQListener(stomp.ConnectionListener):
         elif isinstance(body, str):
             # String body - need to handle encoding carefully
             logger.debug(f"Body is string, length: {len(body)}")
-            
+
             # Check for base64 encoding header first
             if hasattr(frame, "headers") and frame.headers.get("encoding") == "base64":
                 logger.debug("Message has base64 encoding header")
@@ -101,7 +99,7 @@ class ActiveMQListener(stomp.ConnectionListener):
                         content_length = int(frame.headers["content-length"])
                     except (ValueError, TypeError):
                         pass
-                
+
                 # Check for large binary image messages (Camera2 images)
                 ipc_message_type = frame.headers.get("IPCMessageType") if hasattr(frame, "headers") else None
                 if content_length and content_length > len(body) * 1.5 and ipc_message_type == "2":
@@ -111,14 +109,16 @@ class ActiveMQListener(stomp.ConnectionListener):
                         body = body.encode("latin-1")
                         logger.debug("Encoded Camera2 image as latin-1")
                         # Mark this as an image message for special processing
-                        #self._handle_image_message(body, content_length)
+                        # self._handle_image_message(body, content_length)
                         return b""
                     except UnicodeEncodeError as e:
                         logger.warning(f"Failed to encode Camera2 image as latin-1: {e}")
                         logger.info("Skipping corrupted Camera2 image")
                         return b""
                 elif content_length and content_length > len(body) * 1.5:
-                    logger.info(f"Detected large binary data (content-length={content_length}, string_length={len(body)})")
+                    logger.info(
+                        f"Detected large binary data (content-length={content_length}, string_length={len(body)})"
+                    )
                     # Other binary data
                     try:
                         body = body.encode("latin-1")
@@ -134,7 +134,7 @@ class ActiveMQListener(stomp.ConnectionListener):
                         logger.debug("Encoded string as UTF-8")
                     except UnicodeEncodeError as e:
                         logger.error(f"Failed to encode string as UTF-8: {e}")
-                        # Try latin-1 as fallback, but handle errors  
+                        # Try latin-1 as fallback, but handle errors
                         try:
                             body = body.encode("latin-1", errors="replace")
                             logger.warning("Fell back to latin-1 encoding with replacement")
@@ -145,7 +145,7 @@ class ActiveMQListener(stomp.ConnectionListener):
             # Unknown type, try to convert
             logger.debug(f"Unexpected body type: {type(body)}")
             try:
-                if hasattr(body, '__iter__') and not isinstance(body, (str, bytes)):
+                if hasattr(body, "__iter__") and not isinstance(body, (str, bytes)):
                     # Iterable but not string/bytes - convert to bytes
                     body = bytes(body)
                 else:
@@ -158,9 +158,7 @@ class ActiveMQListener(stomp.ConnectionListener):
 
         return body
 
-    async def _process_and_broadcast(
-        self, data: Union[List[Any], Dict[str, Any]]
-    ) -> None:
+    async def _process_and_broadcast(self, data: Union[List[Any], Dict[str, Any]]) -> None:
         try:
             if isinstance(data, list):
                 parsed_data = self.parser.parse_array_format(data)
@@ -178,12 +176,15 @@ class ActiveMQListener(stomp.ConnectionListener):
                 # For status messages, update only the status and message, preserve shot data
                 current = self.shot_store.get()
                 status_update = current.to_dict()
-                status_update.update({
-                    "result_type": parsed_data.result_type,
-                    "message": parsed_data.message,
-                    "timestamp": parsed_data.timestamp,
-                })
+                status_update.update(
+                    {
+                        "result_type": parsed_data.result_type,
+                        "message": parsed_data.message,
+                        "timestamp": parsed_data.timestamp,
+                    }
+                )
                 from models import ShotData
+
                 updated_data = ShotData.from_dict(status_update)
                 self.shot_store.update(updated_data)
                 await self.connection_manager.broadcast(updated_data.to_dict())
@@ -217,9 +218,7 @@ class ActiveMQListener(stomp.ConnectionListener):
         self.error_count = 0
 
     def on_disconnected(self) -> None:
-        logger.warning(
-            f"Disconnected from ActiveMQ (processed {self.message_count} messages)"
-        )
+        logger.warning(f"Disconnected from ActiveMQ (processed {self.message_count} messages)")
         self.connected = False
 
     def on_heartbeat(self) -> None:

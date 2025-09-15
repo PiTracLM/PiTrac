@@ -92,9 +92,7 @@ def main():
     print()
 
     if sys.version_info < (3, 9):
-        print(
-            f"Warning: Python {sys.version_info.major}.{sys.version_info.minor} detected."
-        )
+        print(f"Warning: Python {sys.version_info.major}.{sys.version_info.minor} detected.")
         print("Recommended: Python 3.9 or higher")
 
     if not check_dependencies():

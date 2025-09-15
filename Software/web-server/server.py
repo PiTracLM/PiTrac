@@ -125,12 +125,8 @@ class PiTracServer:
 
             activemq_running = False
             try:
-                result = subprocess.run(
-                    ["ss", "-tln"], capture_output=True, text=True, timeout=1
-                )
-                activemq_running = (
-                    ":61616" in result.stdout or ":61613" in result.stdout
-                )
+                result = subprocess.run(["ss", "-tln"], capture_output=True, text=True, timeout=1)
+                activemq_running = ":61616" in result.stdout or ":61613" in result.stdout
             except Exception:
                 pass
 
@@ -213,9 +209,7 @@ class PiTracServer:
                     return {"error": error_msg}
 
                 # Set the value
-                success, message, requires_restart = self.config_manager.set_config(
-                    key, value
-                )
+                success, message, requires_restart = self.config_manager.set_config(key, value)
 
                 if success:
                     # Broadcast update to WebSocket clients
@@ -302,52 +296,50 @@ class PiTracServer:
         async def pitrac_status() -> Dict[str, Any]:
             """Get the status of the PiTrac launch monitor process"""
             return self.pitrac_manager.get_status()
-        
+
         @self.app.get("/calibration", response_class=HTMLResponse)
         async def calibration_page(request: Request) -> Response:
             """Serve calibration UI page"""
-            return self.templates.TemplateResponse(
-                "calibration.html", {"request": request}
-            )
-        
+            return self.templates.TemplateResponse("calibration.html", {"request": request})
+
         @self.app.get("/api/calibration/status")
         async def calibration_status() -> Dict[str, Any]:
             """Get calibration status for all cameras"""
             return self.calibration_manager.get_status()
-        
+
         @self.app.get("/api/calibration/data")
         async def get_calibration_data() -> Dict[str, Any]:
             """Get current calibration data"""
             return self.calibration_manager.get_calibration_data()
-        
+
         @self.app.post("/api/calibration/ball-location/{camera}")
         async def check_ball_location(camera: str) -> Dict[str, Any]:
             """Check ball location for calibration setup"""
             if camera not in ["camera1", "camera2"]:
                 return {"status": "error", "message": "Invalid camera"}
             return await self.calibration_manager.check_ball_location(camera)
-        
+
         @self.app.post("/api/calibration/auto/{camera}")
         async def run_auto_calibration(camera: str) -> Dict[str, Any]:
             """Run automatic calibration for specified camera"""
             if camera not in ["camera1", "camera2"]:
                 return {"status": "error", "message": "Invalid camera"}
             return await self.calibration_manager.run_auto_calibration(camera)
-        
+
         @self.app.post("/api/calibration/manual/{camera}")
         async def run_manual_calibration(camera: str) -> Dict[str, Any]:
             """Run manual calibration for specified camera"""
             if camera not in ["camera1", "camera2"]:
                 return {"status": "error", "message": "Invalid camera"}
             return await self.calibration_manager.run_manual_calibration(camera)
-        
+
         @self.app.post("/api/calibration/capture/{camera}")
         async def capture_still(camera: str) -> Dict[str, Any]:
             """Capture a still image for camera setup"""
             if camera not in ["camera1", "camera2"]:
                 return {"status": "error", "message": "Invalid camera"}
             return await self.calibration_manager.capture_still_image(camera)
-        
+
         @self.app.post("/api/calibration/stop")
         async def stop_calibration() -> Dict[str, Any]:
             """Stop any running calibration process"""
@@ -356,53 +348,44 @@ class PiTracServer:
         @self.app.get("/testing", response_class=HTMLResponse)
         async def testing_page(request: Request) -> Response:
             """Serve testing tools UI page"""
-            return self.templates.TemplateResponse(
-                "testing.html", {"request": request}
-            )
-        
+            return self.templates.TemplateResponse("testing.html", {"request": request})
+
         @self.app.get("/api/testing/tools")
         async def get_testing_tools() -> Dict[str, Any]:
             """Get available testing tools organized by category"""
             return self.testing_manager.get_available_tools()
-        
+
         @self.app.post("/api/testing/run/{tool_id}")
         async def run_testing_tool(tool_id: str) -> Dict[str, Any]:
             """Run a specific testing tool"""
             if self.pitrac_manager.is_running():
                 return {
                     "status": "error",
-                    "message": "Cannot run testing tools while PiTrac is running. Please stop PiTrac first."
+                    "message": "Cannot run testing tools while PiTrac is running. Please stop PiTrac first.",
                 }
-            
+
             task = asyncio.create_task(self._run_tool_async(tool_id))
             self.background_tasks.add(task)
             task.add_done_callback(self.background_tasks.discard)
-            
-            return {
-                "status": "started",
-                "message": f"Tool {tool_id} started",
-                "tool_id": tool_id
-            }
-        
+
+            return {"status": "started", "message": f"Tool {tool_id} started", "tool_id": tool_id}
+
         @self.app.post("/api/testing/stop/{tool_id}")
         async def stop_testing_tool(tool_id: str) -> Dict[str, Any]:
             """Stop a running testing tool"""
             return await self.testing_manager.stop_tool(tool_id)
-        
+
         @self.app.get("/api/testing/status")
         async def get_testing_status() -> Dict[str, Any]:
             """Get status of running testing tools"""
             running = self.testing_manager.get_running_tools()
-            
+
             results = {}
-            if hasattr(self.testing_manager, 'completed_results'):
+            if hasattr(self.testing_manager, "completed_results"):
                 results = self.testing_manager.completed_results
                 self.testing_manager.completed_results = {}
-            
-            return {
-                "running": running,
-                "results": results
-            }
+
+            return {"running": running, "results": results}
 
         @self.app.get("/api/cameras/detect")
         async def detect_cameras() -> Dict[str, Any]:
@@ -410,17 +393,13 @@ class PiTracServer:
             logger.info("Camera auto-detection initiated")
             try:
                 detector = CameraDetector()
-                logger.info(
-                    f"Using detection tool: {detector.camera_cmd}, Pi model: {detector.pi_model}"
-                )
+                logger.info(f"Using detection tool: {detector.camera_cmd}, Pi model: {detector.pi_model}")
 
                 result = detector.detect()
 
                 if result.get("success"):
                     camera_count = len(result.get("cameras", []))
-                    logger.info(
-                        f"Camera detection successful: {camera_count} camera(s) found"
-                    )
+                    logger.info(f"Camera detection successful: {camera_count} camera(s) found")
                     if camera_count > 0:
                         for cam in result["cameras"]:
                             logger.info(
@@ -441,9 +420,7 @@ class PiTracServer:
 
                 return result
             except Exception as e:
-                logger.error(
-                    f"Camera detection failed with exception: {e}", exc_info=True
-                )
+                logger.error(f"Camera detection failed with exception: {e}", exc_info=True)
                 return {
                     "success": False,
                     "message": f"Detection failed: {str(e)}",
@@ -508,11 +485,7 @@ class PiTracServer:
                     {
                         "id": "pitrac_camera2",
                         "name": "PiTrac Camera 2",
-                        "status": (
-                            "running"
-                            if pitrac_status.get("camera2_running")
-                            else "stopped"
-                        ),
+                        "status": ("running" if pitrac_status.get("camera2_running") else "stopped"),
                         "pid": pitrac_status.get("camera2_pid"),
                     }
                 )
@@ -643,18 +616,14 @@ class PiTracServer:
         """Stream logs from a file"""
         try:
             if not log_file.exists():
-                await websocket.send_json(
-                    {"message": f"Log file not found: {log_file}", "level": "warning"}
-                )
+                await websocket.send_json({"message": f"Log file not found: {log_file}", "level": "warning"})
                 return
 
             with open(log_file, "r") as f:
                 lines = f.readlines()
                 recent = lines[-100:] if len(lines) > 100 else lines
                 for line in recent:
-                    await websocket.send_json(
-                        {"message": line.rstrip(), "historical": True}
-                    )
+                    await websocket.send_json({"message": line.rstrip(), "historical": True})
 
             follow_proc = await asyncio.create_subprocess_exec(
                 "tail",
@@ -669,9 +638,7 @@ class PiTracServer:
                     try:
                         await websocket.send_json(
                             {
-                                "message": line.decode(
-                                    "utf-8", errors="replace"
-                                ).rstrip(),
+                                "message": line.decode("utf-8", errors="replace").rstrip(),
                                 "historical": False,
                             }
                         )
@@ -696,9 +663,7 @@ class PiTracServer:
             logger.error(f"Error loading config: {e}")
             return {}
 
-    def setup_activemq(
-        self, loop: Optional[asyncio.AbstractEventLoop] = None
-    ) -> Optional[stomp.Connection]:
+    def setup_activemq(self, loop: Optional[asyncio.AbstractEventLoop] = None) -> Optional[stomp.Connection]:
         try:
             config = self._load_config()
 
@@ -710,17 +675,11 @@ class PiTracServer:
             if broker_address.startswith("tcp://"):
                 broker_address = broker_address[6:]
 
-            broker_host = (
-                broker_address.split(":")[0]
-                if ":" in broker_address
-                else broker_address
-            )
+            broker_host = broker_address.split(":")[0] if ":" in broker_address else broker_address
 
             conn = stomp.Connection([(broker_host, STOMP_PORT)])
 
-            self.listener = ActiveMQListener(
-                self.shot_store, self.connection_manager, self.parser, loop
-            )
+            self.listener = ActiveMQListener(self.shot_store, self.connection_manager, self.parser, loop)
             conn.set_listener("", self.listener)
 
             conn.connect(username, password, wait=True)
@@ -764,9 +723,7 @@ class PiTracServer:
                     logger.info("Successfully reconnected to ActiveMQ")
                     retry_delay = 5
                 else:
-                    logger.warning(
-                        f"Failed to reconnect to ActiveMQ, retrying in {retry_delay} seconds"
-                    )
+                    logger.warning(f"Failed to reconnect to ActiveMQ, retrying in {retry_delay} seconds")
                     await asyncio.sleep(retry_delay)
                     retry_delay = min(retry_delay * 2, max_retry_delay)
 
@@ -782,9 +739,7 @@ class PiTracServer:
         self.mq_conn = self.setup_activemq(loop)
 
         if not self.mq_conn:
-            logger.warning(
-                "Could not connect to ActiveMQ at startup - will retry in background"
-            )
+            logger.warning("Could not connect to ActiveMQ at startup - will retry in background")
 
         self.reconnect_task = asyncio.create_task(self.reconnect_activemq_loop())
         logger.info("Started ActiveMQ reconnection monitor")
@@ -793,20 +748,17 @@ class PiTracServer:
         """Helper method to run a testing tool asynchronously"""
         try:
             result = await self.testing_manager.run_tool(tool_id)
-            
-            if not hasattr(self.testing_manager, 'completed_results'):
+
+            if not hasattr(self.testing_manager, "completed_results"):
                 self.testing_manager.completed_results = {}
             self.testing_manager.completed_results[tool_id] = result
-            
+
             logger.info(f"Testing tool {tool_id} completed with status: {result.get('status')}")
         except Exception as e:
             logger.error(f"Error running testing tool {tool_id}: {e}")
-            if not hasattr(self.testing_manager, 'completed_results'):
+            if not hasattr(self.testing_manager, "completed_results"):
                 self.testing_manager.completed_results = {}
-            self.testing_manager.completed_results[tool_id] = {
-                "status": "error",
-                "message": str(e)
-            }
+            self.testing_manager.completed_results[tool_id] = {"status": "error", "message": str(e)}
 
     async def shutdown_event(self) -> None:
         logger.info("Shutting down PiTrac Web Server...")
