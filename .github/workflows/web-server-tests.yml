@@ -1,3 +1,4 @@
+---
 name: Web Server Tests
 
 on:
@@ -15,41 +16,41 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.10', '3.11', '3.12']
-    
+
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    
-    - name: Cache pip packages
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-    
-    - name: Install dependencies
-      working-directory: Software/web-server
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements-test.txt
-    
-    - name: Run tests with coverage
-      working-directory: Software/web-server
-      run: |
-        # Run tests in parallel using all available CPU cores
-        # -n auto automatically detects the number of CPUs
-        python -m pytest -n auto --tb=short --cov=. --cov-report=xml --cov-report=term --cov-fail-under=60
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: Software/web-server/coverage.xml
-        flags: webserver
-        name: web-server-coverage
-        fail_ci_if_error: false
+      - uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        working-directory: Software/web-server
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Run tests with coverage
+        working-directory: Software/web-server
+        run: |
+          # Run tests in parallel using all available CPU cores
+          # -n auto automatically detects the number of CPUs
+          python -m pytest -n auto --tb=short --cov=. --cov-report=xml --cov-report=term --cov-fail-under=60
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: Software/web-server/coverage.xml
+          flags: webserver
+          name: web-server-coverage
+          fail_ci_if_error: false
