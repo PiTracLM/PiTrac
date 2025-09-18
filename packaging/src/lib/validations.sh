@@ -86,13 +86,6 @@ validate_host() {
   fi
 }
 
-validate_broker_address() {
-  local value="$1"
-  
-  if [[ ! "$value" =~ ^(tcp://)?[a-zA-Z0-9.-]+(:[0-9]+)?$ ]]; then
-    echo "Invalid broker address format. Expected: tcp://hostname:port"
-  fi
-}
 
 validate_path() {
   local value="$1"

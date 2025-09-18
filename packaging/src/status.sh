@@ -13,8 +13,7 @@ if [[ "$show_json" == "1" ]]; then
     "pid": $(is_pitrac_running && cat "$PITRAC_PID_FILE" 2>/dev/null || echo "null")
   },
   "services": {
-    "pitrac-web": $(is_service_running "pitrac-web" && echo "true" || echo "false"),
-    "activemq": $(is_service_running "activemq" && echo "true" || echo "false")
+    "pitrac-web": $(is_service_running "pitrac-web" && echo "true" || echo "false")
   },
   "hardware": {
     "pi_model": "$(detect_pi_model)",
@@ -45,11 +44,7 @@ else
       warn "  PiTrac web server is not running"
     fi
     
-    if is_service_running "activemq"; then
-      success "  ActiveMQ broker is running"
-    else
-      warn "  ActiveMQ broker is not running"
-    fi
+    # ZeroMQ is embedded in the application - no separate broker service
   fi
   
   echo ""

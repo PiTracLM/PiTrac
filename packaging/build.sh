@@ -250,7 +250,7 @@ build_dev() {
     # Boost libraries (runtime and dev)
     for pkg in libboost-system1.74.0 libboost-thread1.74.0 libboost-filesystem1.74.0 \
                libboost-program-options1.74.0 libboost-timer1.74.0 libboost-log1.74.0 \
-               libboost-regex1.74.0 libboost-dev libboost-all-dev libyaml-cpp-dev; do
+               libboost-regex1.74.0 libboost-dev libboost-all-dev; do
         if ! dpkg -l | grep -q "^ii  $pkg"; then
             missing_deps+=("$pkg")
         fi
@@ -445,22 +445,6 @@ EOF
         cp "$SCRIPT_DIR/templates/pitrac.yaml" /etc/pitrac/pitrac.yaml
     else
         log_info "  pitrac.yaml already exists, skipping"
-    fi
-
-    if [[ ! -f /etc/pitrac/golf_sim_config.json ]]; then
-        cp "$SCRIPT_DIR/templates/golf_sim_config.json" /etc/pitrac/golf_sim_config.json
-    else
-        log_info "  golf_sim_config.json already exists, skipping"
-    fi
-    
-    if [[ -d "$SCRIPT_DIR/templates/config" ]]; then
-        if [[ ! -f /etc/pitrac/config/parameter-mappings.yaml ]]; then
-            cp "$SCRIPT_DIR/templates/config/parameter-mappings.yaml" /etc/pitrac/config/parameter-mappings.yaml
-            log_info "  parameter-mappings.yaml installed"
-        else
-            log_info "  parameter-mappings.yaml already exists, skipping"
-        fi
-        
     fi
 
     # ZeroMQ is configured through the application - no service configuration needed

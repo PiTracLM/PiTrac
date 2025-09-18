@@ -14,19 +14,19 @@ else
   echo "Using specified Pi model: $pi_model"
 fi
 
-echo ""
-echo "Creating directory structure..."
-ensure_directories
-log_info "Directories created"
+# echo ""
+# echo "Creating directory structure..."
+# ensure_directories
+# log_info "Directories created"
 
-user_config_dir="${HOME}/.pitrac/config"
-user_config_file="${user_config_dir}/pitrac.yaml"
+# user_config_dir="${HOME}/.pitrac/config"
+# user_config_file="${user_config_dir}/pitrac.yaml"
 
-if [[ ! -f "$user_config_file" ]] && [[ -f "/etc/pitrac/pitrac.yaml" ]]; then
-  echo "Creating user configuration..."
-  cp "/etc/pitrac/pitrac.yaml" "$user_config_file"
-  log_info "User configuration created"
-fi
+# if [[ ! -f "$user_config_file" ]] && [[ -f "/etc/pitrac/pitrac.yaml" ]]; then
+#   echo "Creating user configuration..."
+#   cp "/etc/pitrac/pitrac.yaml" "$user_config_file"
+#   log_info "User configuration created"
+# fi
 
 echo ""
 echo "=== Boot Configuration ==="

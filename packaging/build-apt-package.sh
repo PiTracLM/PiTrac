@@ -226,25 +226,22 @@ bundle_dependencies() {
 create_configs() {
     log_info "Creating configs..."
     
-    cp "$SCRIPT_DIR/templates/pitrac.yaml" "$DEB_DIR/etc/pitrac/pitrac.yaml"
-    cp "$DEB_DIR/etc/pitrac/pitrac.yaml" "$DEB_DIR/usr/share/pitrac/config.yaml.default"
+    # cp "$SCRIPT_DIR/templates/pitrac.yaml" "$DEB_DIR/etc/pitrac/pitrac.yaml"
+    # cp "$DEB_DIR/etc/pitrac/pitrac.yaml" "$DEB_DIR/usr/share/pitrac/config.yaml.default"
     
     cp "$SCRIPT_DIR/templates/golf_sim_config.json" "$DEB_DIR/etc/pitrac/golf_sim_config.json"
     cp "$SCRIPT_DIR/templates/golf_sim_config.json" "$DEB_DIR/usr/share/pitrac/golf_sim_config.json.default"
     
     if [[ -d "$SCRIPT_DIR/templates/config" ]]; then
-        cp "$SCRIPT_DIR/templates/config/parameter-mappings.yaml" "$DEB_DIR/etc/pitrac/config/"
-        log_info "Parameter mappings installed"
+        # cp "$SCRIPT_DIR/templates/config/parameter-mappings.yaml" "$DEB_DIR/etc/pitrac/config/"
+        # log_info "Parameter mappings installed"
     else
         log_warn "Configuration templates not found in $SCRIPT_DIR/templates/config/"
     fi
 
-    cp "$SCRIPT_DIR/templates/pitrac.service.template" "$DEB_DIR/usr/share/pitrac/templates/pitrac.service.template"
     cp "$SCRIPT_DIR/templates/pitrac-web.service.template" "$DEB_DIR/usr/share/pitrac/templates/pitrac-web.service.template"
     
     
-    cp "$SCRIPT_DIR/src/lib/pitrac-service-install.sh" "$DEB_DIR/usr/lib/pitrac/pitrac-service-install.sh"
-    chmod 755 "$DEB_DIR/usr/lib/pitrac/pitrac-service-install.sh"
     
     if [[ -f "$SCRIPT_DIR/src/lib/web-service-install.sh" ]]; then
         cp "$SCRIPT_DIR/src/lib/web-service-install.sh" "$DEB_DIR/usr/lib/pitrac/web-service-install.sh"

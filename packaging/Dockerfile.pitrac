@@ -31,7 +31,6 @@ RUN apt-get install -y \
     libaprutil1 \
     libapr1-dev \
     libaprutil1-dev \
-    libyaml-cpp-dev \
     libssl3 \
     # ZeroMQ libraries
     libzmq3-dev \
