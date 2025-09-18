@@ -155,7 +155,7 @@
             "kWriteSpinAnalysisCsvFiles": "1"
         },
         "ipc_interface": {
-            "kWebActiveMQHostAddress": "PITRAC_MSG_BROKER_FULL_ADDRESS",
+            "kZeroMQEndpoint": "tcp://localhost:5556",
             "kMaxCam2ImageReceivedTimeMs": "40000"
         },
         "user_interface": {

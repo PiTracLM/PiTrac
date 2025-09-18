@@ -149,7 +149,7 @@
             "kWriteSpinAnalysisCsvFiles": "1"
         },
         "ipc_interface": {
-            "kWebActiveMQHostAddress": "tcp://localhost:61616",
+            "kZeroMQEndpoint": "tcp://localhost:5556",
             "kMaxCam2ImageReceivedTimeMs": "40000"
         },
         "user_interface": {

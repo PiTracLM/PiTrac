@@ -358,19 +358,6 @@ commands:
         help: Follow logs (with 'logs' action)
 
 
-  - name: activemq
-    alias: amq
-    help: Manage ActiveMQ broker
-    args:
-      - name: action
-        help: Action to perform
-        required: true
-        allowed: [start, stop, restart, status, logs, console, port]
-    flags:
-      - long: --follow
-        short: -f
-        help: Follow logs (with 'logs' action)
-
   # Log viewing
   - name: logs
     help: View PiTrac logs

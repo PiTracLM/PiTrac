@@ -140,7 +140,7 @@ class TestingToolsManager:
 
             config = self.config_manager.get_config()
 
-            cmd.append("--msg_broker_address=tcp://localhost:61616")
+            # ZeroMQ is now configured in config file, no need for broker address
 
             web_share_dir = (
                 config.get("gs_config", {})

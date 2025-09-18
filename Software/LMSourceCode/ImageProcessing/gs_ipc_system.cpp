@@ -5,7 +5,7 @@
 
 #ifdef __unix__  // Ignore in Windows environment
 
-#include "zeromq_ipc_system.h"
+#include "gs_ipc_system.h"
 
 #include <chrono>
 #include <cstring>
@@ -59,29 +59,15 @@ namespace golf_sim {
             }
         }
 
-        if (!GolfSimOptions::GetCommandLineOptions().msg_broker_address_.empty()) {
-            std::string broker_address = GolfSimOptions::GetCommandLineOptions().msg_broker_address_;
-
-            if (broker_address.find("tcp://") == 0) {
-                size_t port_pos = broker_address.find_last_of(':');
-                if (port_pos != std::string::npos) {
-                    std::string host = broker_address.substr(6, port_pos - 6);
-                    std::string port = broker_address.substr(port_pos + 1);
-
-                    kZeroMQPublisherEndpoint = "tcp://*:" + port;
-                    kZeroMQSubscriberEndpoint = "tcp://" + host + ":" + port;
-                }
-            }
-        } else {
-            std::string config_address;
-            GolfSimConfiguration::SetConstant("gs_config.ipc_interface.kZeroMQEndpoint", config_address);
-            if (!config_address.empty()) {
-                kZeroMQSubscriberEndpoint = config_address;
-                size_t port_pos = config_address.find_last_of(':');
-                if (port_pos != std::string::npos) {
-                    std::string port = config_address.substr(port_pos + 1);
-                    kZeroMQPublisherEndpoint = "tcp://*:" + port;
-                }
+        // Check for ZeroMQ endpoint configuration
+        std::string config_address;
+        GolfSimConfiguration::SetConstant("gs_config.ipc_interface.kZeroMQEndpoint", config_address);
+        if (!config_address.empty()) {
+            kZeroMQSubscriberEndpoint = config_address;
+            size_t port_pos = config_address.find_last_of(':');
+            if (port_pos != std::string::npos) {
+                std::string port = config_address.substr(port_pos + 1);
+                kZeroMQPublisherEndpoint = "tcp://*:" + port;
             }
         }
 

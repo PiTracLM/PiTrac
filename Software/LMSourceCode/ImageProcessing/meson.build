@@ -203,7 +203,7 @@ pitrac_lm_sources += ([
                         'gs_ipc_mat.cpp',
                         'gs_ipc_result.cpp',
                         'gs_ipc_test.cpp',
-                        'zeromq_ipc_system.cpp',
+                        'gs_ipc_system.cpp',
                         'zeromq_publisher.cpp',
                         'zeromq_subscriber.cpp',
 ])

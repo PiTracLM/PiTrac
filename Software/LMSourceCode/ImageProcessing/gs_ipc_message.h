@@ -9,9 +9,10 @@
 
 #ifdef __unix__  // Ignore in Windows environment
 
-#include <activemq/commands/ActiveMQBytesMessage.h>
-#include <cms/TextMessage.h>
 #include <opencv2/core.hpp>
+#include <vector>
+#include <string>
+#include <cstdint>
 
 #include "logging_tools.h"
 
@@ -19,14 +20,6 @@
 #include "gs_ipc_result.h"
 #include "gs_ipc_control_msg.h"
 
-
-
-
-using namespace activemq::core;
-using namespace decaf::util::concurrent;
-using namespace decaf::util;
-using namespace decaf::lang;
-using namespace cms;
 using namespace std;
 
 namespace golf_sim {
@@ -35,7 +28,7 @@ namespace golf_sim {
     // Some of the elements of the class may or may not be used or applicable
     // depending on the IPCMessageType.  For example, for kRequestForCamera2Image messages,
     // the contained Mat object (and related accessors) is not used.
-    class GolfSimIPCMessage : public activemq::commands::ActiveMQBytesMessage {
+    class GolfSimIPCMessage {
 
     public:
 

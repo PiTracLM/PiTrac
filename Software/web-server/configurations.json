@@ -852,18 +852,17 @@
       "passedVia": "json",
       "passedTo": "both"
     },
-    "gs_config.ipc_interface.kWebActiveMQHostAddress": {
+    "gs_config.ipc_interface.kZeroMQEndpoint": {
       "category": "Network",
       "subcategory": "basic",
       "basicSubcategory": "Network",
-      "displayName": "ActiveMQ Broker Address",
-      "description": "ActiveMQ message broker address for dual camera mode",
+      "displayName": "ZeroMQ Endpoint",
+      "description": "ZeroMQ endpoint for dual camera mode",
       "type": "text",
-      "default": "tcp://127.0.0.1:61616",
+      "default": "tcp://localhost:5556",
       "requiresRestart": true,
-      "passedVia": "cli",
-      "passedTo": "both",
-      "cliArgument": "--msg_broker_address"
+      "passedVia": "json",
+      "passedTo": "both"
     },
     "gs_config.ipc_interface.kRefreshTimeSeconds": {
       "category": "Network",

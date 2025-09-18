@@ -67,7 +67,7 @@ namespace golf_sim {
         static bool InitializeIPCSystem();
         static bool ShutdownIPCSystem();
 
-        // Message dispatchers (same interface as ActiveMQ version)
+        // Message dispatchers
         static bool DispatchRequestForCamera2ImageMessage(const GolfSimIPCMessage& message);
         static bool DispatchCamera2ImageMessage(const GolfSimIPCMessage& message);
         static bool DispatchCamera2PreImageMessage(const GolfSimIPCMessage& message);
