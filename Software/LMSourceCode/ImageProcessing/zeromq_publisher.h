@@ -9,6 +9,8 @@
 #include <queue>
 #include <mutex>
 #include <condition_variable>
+#include <map>
+#include <vector>
 
 namespace golf_sim {
 

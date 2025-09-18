@@ -148,7 +148,7 @@ void ZeroMQSubscriber::SubscriberThread() {
                 zmq::message_t data_msg;
 
                 auto result = subscriber_->recv(topic_msg);
-                if (!result || result->size == 0) {
+                if (!result || *result == 0) {
                     continue;
                 }
 

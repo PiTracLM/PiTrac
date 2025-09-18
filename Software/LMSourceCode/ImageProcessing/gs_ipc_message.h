@@ -48,7 +48,7 @@ namespace golf_sim {
         virtual ~GolfSimIPCMessage();
 
         // Returns a human-readable description of the message
-        virtual std::string Format();
+        virtual std::string Format() const;
 
         void SetMessageType(IPCMessageType &message_type);
         IPCMessageType GetMessageType() const;
