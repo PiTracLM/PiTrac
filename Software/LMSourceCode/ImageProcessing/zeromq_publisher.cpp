@@ -149,3 +149,5 @@ void ZeroMQPublisher::PublisherThread() {
         std::cerr << "Publisher thread error: " << e.what() << std::endl;
     }
 }
+
+} 
