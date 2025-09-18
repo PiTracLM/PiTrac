@@ -320,8 +320,8 @@ build_dev() {
     if ! dpkg -l | grep -q "^ii  libzmq3-dev"; then
         missing_deps+=("libzmq3-dev")
     fi
-    if ! dpkg -l | grep -q "^ii  libcppzmq-dev"; then
-        missing_deps+=("libcppzmq-dev")
+    if ! dpkg -l | grep -q "^ii  cppzmq-dev"; then
+        missing_deps+=("cppzmq-dev")
     fi
 
     if [ ${#missing_deps[@]} -gt 0 ]; then
