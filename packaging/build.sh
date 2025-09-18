@@ -58,9 +58,6 @@ check_artifacts() {
     if [ ! -f "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" ]; then
         missing+=("opencv")
     fi
-    if [ ! -f "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" ]; then
-        missing+=("activemq")
-    fi
     if [ ! -f "$ARTIFACT_DIR/lgpio-0.2.2-arm64.tar.gz" ]; then
         missing+=("lgpio")
     fi
@@ -188,7 +185,6 @@ clean_all() {
 
     # Remove Docker images
     docker rmi opencv-builder:arm64 2>/dev/null || true
-    docker rmi activemq-builder:arm64 2>/dev/null || true
     docker rmi lgpio-builder:arm64 2>/dev/null || true
     docker rmi pitrac-poc:arm64 2>/dev/null || true
 
@@ -320,9 +316,12 @@ build_dev() {
         missing_deps+=("yq")
     fi
 
-    # ActiveMQ message broker
-    if ! dpkg -l | grep -q "^ii  activemq"; then
-        missing_deps+=("activemq")
+    # ZeroMQ message library
+    if ! dpkg -l | grep -q "^ii  libzmq3-dev"; then
+        missing_deps+=("libzmq3-dev")
+    fi
+    if ! dpkg -l | grep -q "^ii  libcppzmq-dev"; then
+        missing_deps+=("libcppzmq-dev")
     fi
 
     if [ ${#missing_deps[@]} -gt 0 ]; then
@@ -336,13 +335,6 @@ build_dev() {
     mkdir -p /usr/lib/pitrac
     extract_all_dependencies "$ARTIFACT_DIR" "/usr/lib/pitrac"
     
-    if [[ ! -d /opt/activemq-cpp/include ]]; then
-        log_info "  Setting up ActiveMQ headers..."
-        tar xzf "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" -C /tmp/
-        mkdir -p /opt/activemq-cpp
-        cp -r /tmp/activemq-cpp/* /opt/activemq-cpp/
-        rm -rf /tmp/activemq-cpp
-    fi
 
     if [[ ! -d /opt/opencv/include/opencv4 ]]; then
         log_info "  Setting up OpenCV headers..."
@@ -371,10 +363,10 @@ build_dev() {
     apply_boost_cxx20_fix
 
     # Set build environment
-    export PKG_CONFIG_PATH="/opt/opencv/lib/pkgconfig:/opt/activemq-cpp/lib/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig"
+    export PKG_CONFIG_PATH="/opt/opencv/lib/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig"
     export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
-    export CMAKE_PREFIX_PATH="/opt/opencv:/opt/activemq-cpp"
-    export CPLUS_INCLUDE_PATH="/opt/opencv/include/opencv4:/opt/activemq-cpp/include/activemq-cpp-3.9.5"
+    export CMAKE_PREFIX_PATH="/opt/opencv"
+    export CPLUS_INCLUDE_PATH="/opt/opencv/include/opencv4"
     export PITRAC_ROOT="$REPO_ROOT/Software/LMSourceCode"
     export CXXFLAGS="-I/opt/opencv/include/opencv4"
 
@@ -471,53 +463,56 @@ EOF
         
     fi
 
-    # Configure ActiveMQ
-    if command -v activemq &>/dev/null || [[ -f /usr/share/activemq/bin/activemq ]]; then
-        log_info "Configuring ActiveMQ using template system..."
-        
-        mkdir -p /usr/share/pitrac/templates
-        cp "$SCRIPT_DIR/templates/activemq.xml.template" /usr/share/pitrac/templates/
-        cp "$SCRIPT_DIR/templates/log4j2.properties.template" /usr/share/pitrac/templates/
-        cp "$SCRIPT_DIR/templates/activemq-options.template" /usr/share/pitrac/templates/
-        
-        mkdir -p /usr/lib/pitrac
-        cp "$SCRIPT_DIR/src/lib/activemq-service-install.sh" /usr/lib/pitrac/
-        chmod 755 /usr/lib/pitrac/activemq-service-install.sh
-        
-        log_info "Installing ActiveMQ configuration..."
-        if /usr/lib/pitrac/activemq-service-install.sh install activemq; then
-            log_success "ActiveMQ configuration installed successfully"
-            
-            log_info "Restarting ActiveMQ service..."
-            # First enable the service (for boot)
-            systemctl enable activemq 2>/dev/null || true
-            
+    # ZeroMQ is configured through the application - no service configuration needed
+    log_info "ZeroMQ libraries are now installed and available for PiTrac"
 
-            manage_service_restart "activemq"
-            
-            if systemctl is-active --quiet activemq; then
-                
-                # Verify it's actually listening
-                if netstat -tln 2>/dev/null | grep -q ":61616 "; then
-                    log_success "ActiveMQ broker listening on port 61616"
-                else
-                    log_warn "ActiveMQ started but not listening on port 61616 yet"
-                    log_info "It may take a few seconds to fully initialize"
-                fi
-                
-                /usr/lib/pitrac/activemq-service-install.sh verify || true
-            else
-                log_warn "ActiveMQ configured but may need manual restart"
-                log_info "Check logs with: journalctl -u activemq -n 50"
-            fi
-        else
-            log_error "Failed to configure ActiveMQ"
-            log_info "Try running manually: /usr/lib/pitrac/activemq-service-install.sh install"
-        fi
-    else
-        log_error "ActiveMQ installation failed! This is a critical component."
-        log_info "Try manually installing with: sudo apt install activemq"
-        exit 1
+    # Clean up old ActiveMQ installation if it exists (from previous versions)
+    log_info "Checking for and removing old ActiveMQ installation..."
+
+    # Stop ActiveMQ service if running
+    if systemctl is-active --quiet activemq; then
+        log_info "Stopping ActiveMQ service..."
+        systemctl stop activemq || true
+    fi
+
+    # Disable ActiveMQ service
+    if systemctl list-unit-files | grep -q "activemq.service"; then
+        log_info "Disabling ActiveMQ service..."
+        systemctl disable activemq 2>/dev/null || true
+    fi
+
+    # Remove ActiveMQ configuration files
+    if [[ -d /etc/activemq ]] || [[ -d /usr/share/activemq ]]; then
+        log_info "Removing ActiveMQ configuration and files..."
+        rm -rf /etc/activemq 2>/dev/null || true
+        rm -rf /usr/share/activemq/conf/activemq.xml 2>/dev/null || true
+    fi
+
+    # Remove old ActiveMQ-CPP headers and libraries if they exist
+    if [[ -d /opt/activemq-cpp ]]; then
+        log_info "Removing old ActiveMQ-CPP installation..."
+        rm -rf /opt/activemq-cpp
+    fi
+
+    # Clean up ActiveMQ template files from PiTrac
+    if [[ -f /usr/share/pitrac/templates/activemq.xml.template ]]; then
+        log_info "Removing old ActiveMQ templates..."
+        rm -f /usr/share/pitrac/templates/activemq.xml.template
+        rm -f /usr/share/pitrac/templates/log4j2.properties.template
+        rm -f /usr/share/pitrac/templates/activemq-options.template
+    fi
+
+    # Remove ActiveMQ service installer script
+    if [[ -f /usr/lib/pitrac/activemq-service-install.sh ]]; then
+        rm -f /usr/lib/pitrac/activemq-service-install.sh
+    fi
+
+    # Note: We don't uninstall the activemq package itself in case user needs it for other purposes
+    # They can remove it manually with: sudo apt remove activemq
+
+    if command -v activemq &>/dev/null; then
+        log_warn "ActiveMQ package is still installed but no longer used by PiTrac"
+        log_info "You can remove it with: sudo apt remove activemq"
     fi
 
     # Clean up old PiTrac systemd service and processes if they exist
@@ -592,15 +587,8 @@ EOF
     
     mkdir -p /usr/share/pitrac/templates
     cp "$SCRIPT_DIR/templates/pitrac-web.service.template" /usr/share/pitrac/templates/
-    cp "$SCRIPT_DIR/templates/activemq.xml.template" /usr/share/pitrac/templates/ 2>/dev/null || true
-    cp "$SCRIPT_DIR/templates/log4j2.properties.template" /usr/share/pitrac/templates/ 2>/dev/null || true
-    cp "$SCRIPT_DIR/templates/activemq-options.template" /usr/share/pitrac/templates/ 2>/dev/null || true
     
     
-    if [[ -f "$SCRIPT_DIR/src/lib/activemq-service-install.sh" ]]; then
-        cp "$SCRIPT_DIR/src/lib/activemq-service-install.sh" /usr/lib/pitrac/
-        chmod 755 /usr/lib/pitrac/activemq-service-install.sh
-    fi
     
     if [[ -f "$SCRIPT_DIR/src/lib/web-service-install.sh" ]]; then
         cp "$SCRIPT_DIR/src/lib/web-service-install.sh" /usr/lib/pitrac/
@@ -674,13 +662,9 @@ EOF
         echo "  Enable on boot: sudo systemctl enable pitrac-web.service"
     fi
     echo ""
-    echo "ActiveMQ status:"
-    if systemctl is-active --quiet activemq; then
-        echo "  ActiveMQ broker is running on port 61616"
-    else
-        echo "  ActiveMQ is not running"
-        echo "  Start with: sudo systemctl start activemq"
-    fi
+    echo "ZeroMQ status:"
+    echo "  ZeroMQ libraries are installed and ready for use"
+    echo "  No broker service required - ZeroMQ is embedded in the application"
     echo ""
     echo "Manual testing (optional):"
     echo "  pitrac test quick   # Test image processing locally"

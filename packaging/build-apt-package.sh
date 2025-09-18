@@ -35,7 +35,7 @@ check_prerequisites() {
     log_info "Checking prerequisites..."
     
     local missing=0
-    for artifact in opencv-4.11.0-arm64.tar.gz activemq-cpp-3.9.5-arm64.tar.gz \
+    for artifact in opencv-4.11.0-arm64.tar.gz \
                     lgpio-0.2.2-arm64.tar.gz msgpack-cxx-6.1.1-arm64.tar.gz; do
         if [[ ! -f "$POC_DIR/deps-artifacts/$artifact" ]]; then
             log_error "Missing artifact: $artifact"
@@ -242,14 +242,6 @@ create_configs() {
     cp "$SCRIPT_DIR/templates/pitrac.service.template" "$DEB_DIR/usr/share/pitrac/templates/pitrac.service.template"
     cp "$SCRIPT_DIR/templates/pitrac-web.service.template" "$DEB_DIR/usr/share/pitrac/templates/pitrac-web.service.template"
     
-    if [[ -f "$SCRIPT_DIR/templates/activemq.xml.template" ]]; then
-        cp "$SCRIPT_DIR/templates/activemq.xml.template" "$DEB_DIR/usr/share/pitrac/templates/activemq.xml.template"
-        cp "$SCRIPT_DIR/templates/log4j2.properties.template" "$DEB_DIR/usr/share/pitrac/templates/log4j2.properties.template"
-        cp "$SCRIPT_DIR/templates/activemq-options.template" "$DEB_DIR/usr/share/pitrac/templates/activemq-options.template"
-        log_info "ActiveMQ templates installed"
-    else
-        log_warn "ActiveMQ templates not found"
-    fi
     
     cp "$SCRIPT_DIR/src/lib/pitrac-service-install.sh" "$DEB_DIR/usr/lib/pitrac/pitrac-service-install.sh"
     chmod 755 "$DEB_DIR/usr/lib/pitrac/pitrac-service-install.sh"
@@ -264,13 +256,6 @@ create_configs() {
         chmod 644 "$DEB_DIR/usr/lib/pitrac/pitrac-common-functions.sh"
     fi
     
-    if [[ -f "$SCRIPT_DIR/src/lib/activemq-service-install.sh" ]]; then
-        cp "$SCRIPT_DIR/src/lib/activemq-service-install.sh" "$DEB_DIR/usr/lib/pitrac/activemq-service-install.sh"
-        chmod 755 "$DEB_DIR/usr/lib/pitrac/activemq-service-install.sh"
-        log_info "ActiveMQ configuration installer installed"
-    else
-        log_warn "ActiveMQ configuration installer not found"
-    fi
 
     log_success "Configs created"
 }
@@ -286,7 +271,7 @@ Version: $VERSION
 Architecture: $ARCH
 Maintainer: $MAINTAINER
 Installed-Size: $size
-Depends: libc6 (>= 2.36), libstdc++6 (>= 12), libgcc-s1 (>= 12), libcamera0.0.3, libcamera-dev, libcamera-tools, rpicam-apps, libboost-system1.74.0, libboost-thread1.74.0, libboost-program-options1.74.0, libboost-filesystem1.74.0, libboost-log1.74.0, libboost-regex1.74.0, libboost-timer1.74.0, libfmt9, libssl3, libtbb12, libgstreamer1.0-0, libgstreamer-plugins-base1.0-0, libgtk-3-0, libavcodec59, libavformat59, libswscale6, libopenexr-3-1-30, libavutil57, libavdevice59, libexif12, libjpeg62-turbo, libtiff6, libpng16-16, libdrm2, libx11-6, libepoxy0, libqt5core5a, libqt5widgets5, libqt5gui5, libapr1, libaprutil1, libuuid1, activemq, default-jre-headless | openjdk-17-jre-headless, gpiod, net-tools, python3, python3-opencv, python3-numpy, python3-yaml, yq
+Depends: libc6 (>= 2.36), libstdc++6 (>= 12), libgcc-s1 (>= 12), libcamera0.0.3, libcamera-dev, libcamera-tools, rpicam-apps, libboost-system1.74.0, libboost-thread1.74.0, libboost-program-options1.74.0, libboost-filesystem1.74.0, libboost-log1.74.0, libboost-regex1.74.0, libboost-timer1.74.0, libfmt9, libssl3, libtbb12, libgstreamer1.0-0, libgstreamer-plugins-base1.0-0, libgtk-3-0, libavcodec59, libavformat59, libswscale6, libopenexr-3-1-30, libavutil57, libavdevice59, libexif12, libjpeg62-turbo, libtiff6, libpng16-16, libdrm2, libx11-6, libepoxy0, libqt5core5a, libqt5widgets5, libqt5gui5, libapr1, libaprutil1, libuuid1, libzmq3-dev, python3-zmq, gpiod, net-tools, python3, python3-opencv, python3-numpy, python3-yaml, yq
 Recommends: maven
 Section: misc
 Priority: optional
@@ -294,7 +279,7 @@ Homepage: https://github.com/jamespilgrim/PiTrac
 Description: $DESCRIPTION
  PiTrac uses Raspberry Pi cameras to track golf ball
  launch parameters. Includes pre-built binaries with
- OpenCV 4.11.0, ActiveMQ-CPP, and Python web server.
+ OpenCV 4.11.0, ZeroMQ, and Python web server.
 EOF
 
     cp "$SCRIPT_DIR/templates/postinst.sh" "$DEB_DIR/DEBIAN/postinst"

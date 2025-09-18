@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-import stomp
+import zmq.asyncio
 import yaml
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, Response
@@ -15,13 +15,9 @@ from fastapi.templating import Jinja2Templates
 
 from constants import (
     CONFIG_FILE,
-    DEFAULT_BROKER,
-    DEFAULT_PASSWORD,
-    DEFAULT_USERNAME,
     IMAGES_DIR,
-    STOMP_PORT,
 )
-from listeners import ActiveMQListener
+from zeromq_listener import ZeroMQListener
 from managers import ConnectionManager, ShotDataStore
 from parsers import ShotDataParser
 from config_manager import ConfigurationManager
@@ -45,8 +41,7 @@ class PiTracServer:
         self.pitrac_manager = PiTracProcessManager(self.config_manager)
         self.calibration_manager = CalibrationManager(self.config_manager)
         self.testing_manager = TestingToolsManager(self.config_manager)
-        self.mq_conn: Optional[stomp.Connection] = None
-        self.listener: Optional[ActiveMQListener] = None
+        self.listener: Optional[ZeroMQListener] = None
         self.reconnect_task: Optional[asyncio.Task] = None
         self.shutdown_flag = False
         self.background_tasks: set[asyncio.Task] = set()
@@ -109,7 +104,7 @@ class PiTracServer:
 
         @self.app.get("/health")
         async def health_check() -> Dict[str, Union[str, bool, int, Dict]]:
-            mq_connected = self.mq_conn.is_connected() if self.mq_conn else False
+            zeromq_connected = self.listener.connected if self.listener else False
 
             pitrac_running = False
             try:
@@ -123,19 +118,19 @@ class PiTracServer:
             except Exception:
                 pass
 
-            activemq_running = False
+            zeromq_running = False
             try:
                 result = subprocess.run(["ss", "-tln"], capture_output=True, text=True, timeout=1)
-                activemq_running = ":61616" in result.stdout or ":61613" in result.stdout
+                zeromq_running = ":5556" in result.stdout
             except Exception:
                 pass
 
             listener_stats = self.listener.get_stats() if self.listener else {}
 
             return {
-                "status": "healthy" if mq_connected else "degraded",
-                "activemq_connected": mq_connected,
-                "activemq_running": activemq_running,
+                "status": "healthy" if zeromq_connected else "degraded",
+                "zeromq_connected": zeromq_connected,
+                "zeromq_running": zeromq_running,
                 "pitrac_running": pitrac_running,
                 "websocket_clients": self.connection_manager.connection_count,
                 "listener_stats": listener_stats,
@@ -490,23 +485,13 @@ class PiTracServer:
                     }
                 )
 
-            activemq_running = False
-            try:
-                result = subprocess.run(
-                    ["systemctl", "is-active", "activemq"],
-                    capture_output=True,
-                    text=True,
-                    timeout=1,
-                )
-                activemq_running = result.stdout.strip() == "active"
-            except Exception:
-                pass
+            zeromq_running = self.listener.connected if self.listener else False
 
             services.append(
                 {
-                    "id": "activemq",
-                    "name": "ActiveMQ Broker",
-                    "status": "running" if activemq_running else "stopped",
+                    "id": "zeromq",
+                    "name": "ZeroMQ Listener",
+                    "status": "running" if zeromq_running else "stopped",
                     "pid": None,
                 }
             )
@@ -531,8 +516,8 @@ class PiTracServer:
             elif service == "pitrac_camera2":
                 log_file = self.pitrac_manager.camera2_log_file
                 await self._stream_file_logs(websocket, log_file)
-            elif service == "activemq":
-                await self._stream_systemd_logs(websocket, "activemq")
+            elif service == "zeromq":
+                await websocket.send_json({"message": "ZeroMQ listener runs within this process - check pitrac-web logs", "level": "info"})
             elif service == "pitrac-web":
                 await self._stream_systemd_logs(websocket, "pitrac-web")
             else:
@@ -663,67 +648,58 @@ class PiTracServer:
             logger.error(f"Error loading config: {e}")
             return {}
 
-    def setup_activemq(self, loop: Optional[asyncio.AbstractEventLoop] = None) -> Optional[stomp.Connection]:
+    async def setup_zeromq(self) -> bool:
+        """Setup ZeroMQ listener."""
         try:
             config = self._load_config()
 
+            # Get ZeroMQ endpoint from config, default to localhost:5556
             network_config = config.get("network", {})
-            broker_address = network_config.get("broker_address", DEFAULT_BROKER)
-            username = network_config.get("username", DEFAULT_USERNAME)
-            password = network_config.get("password", DEFAULT_PASSWORD)
+            zeromq_endpoint = network_config.get("zeromq_endpoint", "tcp://localhost:5556")
 
-            if broker_address.startswith("tcp://"):
-                broker_address = broker_address[6:]
+            self.listener = ZeroMQListener(
+                self.shot_store,
+                self.connection_manager,
+                self.parser,
+                endpoint=zeromq_endpoint
+            )
 
-            broker_host = broker_address.split(":")[0] if ":" in broker_address else broker_address
+            success = await self.listener.start()
+            if success:
+                logger.info(f"Connected to ZeroMQ at {zeromq_endpoint}")
+            else:
+                logger.error("Failed to start ZeroMQ listener")
 
-            conn = stomp.Connection([(broker_host, STOMP_PORT)])
+            return success
 
-            self.listener = ActiveMQListener(self.shot_store, self.connection_manager, self.parser, loop)
-            conn.set_listener("", self.listener)
-
-            conn.connect(username, password, wait=True)
-            conn.subscribe(destination="/topic/Golf.Sim", id=1, ack="auto")
-
-            logger.info(f"Connected to ActiveMQ at {broker_host}:{STOMP_PORT}")
-            return conn
-
-        except stomp.exception.ConnectFailedException as e:
-            logger.error(f"Failed to connect to ActiveMQ broker: {e}")
-            return None
         except Exception as e:
-            logger.error(f"Unexpected error connecting to ActiveMQ: {e}", exc_info=True)
-            return None
+            logger.error(f"Unexpected error connecting to ZeroMQ: {e}", exc_info=True)
+            return False
 
-    async def reconnect_activemq_loop(self) -> None:
-        """Background task to maintain ActiveMQ connection"""
-        loop = asyncio.get_event_loop()
+    async def reconnect_zeromq_loop(self) -> None:
+        """Background task to maintain ZeroMQ connection"""
         retry_delay = 5
         max_retry_delay = 60
 
         while not self.shutdown_flag:
             try:
-                if self.mq_conn and self.mq_conn.is_connected():
+                if self.listener and self.listener.connected:
                     retry_delay = 5
                     await asyncio.sleep(10)
                     continue
 
-                logger.info("ActiveMQ connection lost, attempting to reconnect...")
+                logger.info("ZeroMQ connection lost, attempting to reconnect...")
 
-                if self.mq_conn:
-                    try:
-                        self.mq_conn.disconnect()
-                    except Exception:
-                        pass
-                    self.mq_conn = None
+                if self.listener:
+                    await self.listener.stop()
 
-                self.mq_conn = self.setup_activemq(loop)
+                success = await self.setup_zeromq()
 
-                if self.mq_conn:
-                    logger.info("Successfully reconnected to ActiveMQ")
+                if success:
+                    logger.info("Successfully reconnected to ZeroMQ")
                     retry_delay = 5
                 else:
-                    logger.warning(f"Failed to reconnect to ActiveMQ, retrying in {retry_delay} seconds")
+                    logger.warning(f"Failed to reconnect to ZeroMQ, retrying in {retry_delay} seconds")
                     await asyncio.sleep(retry_delay)
                     retry_delay = min(retry_delay * 2, max_retry_delay)
 
@@ -734,15 +710,14 @@ class PiTracServer:
 
     async def startup_event(self) -> None:
         logger.info("Starting PiTrac Web Server...")
-        loop = asyncio.get_event_loop()
 
-        self.mq_conn = self.setup_activemq(loop)
+        success = await self.setup_zeromq()
 
-        if not self.mq_conn:
-            logger.warning("Could not connect to ActiveMQ at startup - will retry in background")
+        if not success:
+            logger.warning("Could not connect to ZeroMQ at startup - will retry in background")
 
-        self.reconnect_task = asyncio.create_task(self.reconnect_activemq_loop())
-        logger.info("Started ActiveMQ reconnection monitor")
+        self.reconnect_task = asyncio.create_task(self.reconnect_zeromq_loop())
+        logger.info("Started ZeroMQ reconnection monitor")
 
     async def _run_tool_async(self, tool_id: str) -> None:
         """Helper method to run a testing tool asynchronously"""
@@ -779,12 +754,12 @@ class PiTracServer:
             except asyncio.CancelledError:
                 pass
 
-        if self.mq_conn:
+        if self.listener:
             try:
-                self.mq_conn.disconnect()
-                logger.info("Disconnected from ActiveMQ")
+                await self.listener.stop()
+                logger.info("Disconnected from ZeroMQ")
             except Exception as e:
-                logger.error(f"Error disconnecting from ActiveMQ: {e}")
+                logger.error(f"Error disconnecting from ZeroMQ: {e}")
 
         for ws in self.connection_manager.connections:
             try:

@@ -49,8 +49,15 @@ elif neon == 'armv8-neon'
 endif
 
 ssl_dep = dependency('openssl', required : true)
-activemq_dep = dependency('activemq-cpp', required : true)
-apr_dep = cxx.find_library('apr-1', required : true)
+zmq_dep = cxx.find_library('zmq', required : true)
+cppzmq_dep = dependency('cppzmq', required : false)
+# Fallback if cppzmq is not available as a pkg-config package
+if not cppzmq_dep.found()
+    cppzmq_dep = declare_dependency(
+        dependencies: zmq_dep,
+        include_directories: include_directories('/usr/include', '/usr/local/include')
+    )
+endif
 
 libcamera_dep = dependency('libcamera', required : true)
 thread_dep = dependency('threads', required : true)
@@ -69,8 +76,8 @@ rpicam_app_dep = [libcamera_dep, lgpio_dep]
 
 
 pitrac_lm_module_deps = [
-	libcamera_dep, thread_dep, opencv_dep, lgpio_dep, rpicam_app_dep, 
-	fmt_dep, boost_dep, activemq_dep, ssl_dep, apr_dep, msgpack_dep, yamlcpp_dep,]
+	libcamera_dep, thread_dep, opencv_dep, lgpio_dep, rpicam_app_dep,
+	fmt_dep, boost_dep, zmq_dep, cppzmq_dep, ssl_dep, msgpack_dep, yamlcpp_dep,]
 
 
 
@@ -196,9 +203,9 @@ pitrac_lm_sources += ([
                         'gs_ipc_mat.cpp',
                         'gs_ipc_result.cpp',
                         'gs_ipc_test.cpp',
-                        'gs_ipc_system.cpp',
-                        'gs_message_consumer.cpp',
-                        'gs_message_producer.cpp',
+                        'zeromq_ipc_system.cpp',
+                        'zeromq_publisher.cpp',
+                        'zeromq_subscriber.cpp',
 ])
 
 pitrac_lm_sources += ([
@@ -206,9 +213,8 @@ pitrac_lm_sources += ([
 ])
 
 
-pitrac_lm_include_dirs = ([ 
-		'.', 
-		'/usr/include/apr-1.0',
+pitrac_lm_include_dirs = ([
+		'.',
 ])
 
 
