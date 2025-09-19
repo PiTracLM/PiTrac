@@ -100,7 +100,7 @@ class TestPiTracAPIEndpoints:
                 "camera1_pid": 12345,
                 "camera2_pid": None,
                 "mode": "single",
-                "config_file": "/etc/pitrac/golf_sim_config.json",
+                "generated_config_path": "/home/test/.pitrac/config/generated_golf_sim_config.json",
             }
         )
 
@@ -120,7 +120,7 @@ class TestPiTracAPIEndpoints:
                 "camera1_pid": None,
                 "camera2_pid": None,
                 "mode": "single",
-                "config_file": "/etc/pitrac/golf_sim_config.json",
+                "generated_config_path": "/home/test/.pitrac/config/generated_golf_sim_config.json",
             }
         )
 
@@ -139,7 +139,7 @@ class TestPiTracAPIEndpoints:
                 "camera1_pid": 12345,
                 "camera2_pid": 12346,
                 "mode": "dual",
-                "config_file": "/etc/pitrac/golf_sim_config.json",
+                "generated_config_path": "/home/test/.pitrac/config/generated_golf_sim_config.json",
             }
         )
 

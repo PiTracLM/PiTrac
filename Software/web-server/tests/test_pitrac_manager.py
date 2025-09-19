@@ -4,6 +4,7 @@ Comprehensive tests for the PiTrac Process Manager
 
 import signal
 import pytest
+from pathlib import Path
 from unittest.mock import Mock, patch, AsyncMock, mock_open
 
 from pitrac_manager import PiTracProcessManager
@@ -106,7 +107,6 @@ class TestPiTracProcessManager:
             assert manager.process is None
             assert manager.camera2_process is None
             assert manager.pitrac_binary == "/usr/lib/pitrac/pitrac_lm"
-            assert manager.config_file == "/etc/pitrac/golf_sim_config.json"
             assert manager.config_manager == mock_config_manager
 
             assert mock_mkdir.call_count >= 2
@@ -124,7 +124,7 @@ class TestPiTracProcessManager:
     def test_build_command_single_pi_mode(self, manager):
         """Test command building for single Pi mode"""
         with patch("pathlib.Path.exists", return_value=True):
-            cmd = manager._build_command(camera="camera1", config_file_path="/tmp/test_config.json")
+            cmd = manager._build_command(camera="camera1", config_file_path=Path("/tmp/test_config.json"))
 
         assert manager.pitrac_binary in cmd
         assert "--system_mode=camera1" in cmd
@@ -154,7 +154,7 @@ class TestPiTracProcessManager:
             dual_manager = PiTracProcessManager(config_manager=mock_config_manager)
 
         with patch("pathlib.Path.exists", return_value=True):
-            cmd = dual_manager._build_command(config_file_path="/tmp/test_config.json")
+            cmd = dual_manager._build_command(config_file_path=Path("/tmp/test_config.json"))
 
         assert dual_manager.pitrac_binary in cmd
         assert "--system_mode=camera2" in cmd
@@ -175,7 +175,7 @@ class TestPiTracProcessManager:
     def test_build_command_with_config_file(self, manager):
         """Test command building includes config file"""
         with patch("pathlib.Path.exists", return_value=True):
-            cmd = manager._build_command(camera="camera1", config_file_path="/tmp/test_config.json")
+            cmd = manager._build_command(camera="camera1", config_file_path=Path("/tmp/test_config.json"))
 
         assert "--config_file=/tmp/test_config.json" in cmd
 

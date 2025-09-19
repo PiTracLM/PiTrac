@@ -30,7 +30,6 @@ class PiTracProcessManager:
             return Path(path_str.replace("~", str(Path.home())))
 
         self.pitrac_binary = sys_paths.get("pitracBinary", {}).get("default", "/usr/lib/pitrac/pitrac_lm")
-        self.config_file = sys_paths.get("configFile", {}).get("default", "/etc/pitrac/golf_sim_config.json")
 
         log_dir = expand_path(sys_paths.get("logDirectory", {}).get("default", "~/.pitrac/logs"))
         pid_dir = expand_path(sys_paths.get("pidDirectory", {}).get("default", "~/.pitrac/run"))
@@ -108,6 +107,8 @@ class PiTracProcessManager:
                 if value:
                     args.append(cli_arg)
             else:
+                if param_type == "path" and value:
+                    value = str(value).replace("~", str(Path.home()))
                 # Use --key=value format for consistency
                 args.append(f"{cli_arg}={value}")
 
@@ -643,7 +644,7 @@ class PiTracProcessManager:
             "is_dual_camera": is_single_pi,  # Single Pi with dual cameras
             "camera1_log_file": str(self.log_file),
             "camera2_log_file": str(self.camera2_log_file),
-            "config_file": self.config_file,
+            "generated_config_path": str(Path.home() / ".pitrac/config/generated_golf_sim_config.json"),
             "binary": self.pitrac_binary,
             "mode": system_mode,
         }

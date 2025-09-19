@@ -32,21 +32,6 @@
       "requiresRestart": true,
       "internal": true
     },
-    "configFile": {
-      "displayName": "Configuration File",
-      "description": "Main configuration file path",
-      "type": "path",
-      "default": "/etc/pitrac/golf_sim_config.json",
-      "requiresRestart": true,
-      "internal": true
-    },
-    "systemConfigPath": {
-      "displayName": "System Config Path",
-      "description": "System-wide configuration file",
-      "type": "path",
-      "default": "/etc/pitrac/golf_sim_config.json",
-      "internal": true
-    },
     "userSettingsPath": {
       "displayName": "User Settings Path",
       "description": "User-specific configuration overrides",
