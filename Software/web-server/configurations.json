@@ -825,7 +825,8 @@
       "type": "path",
       "default": "~/LM_Shares/Images/",
       "requiresRestart": false,
-      "passedVia": "json",
+      "passedVia": "cli",
+      "cliArgument": "--base_image_logging_dir",
       "passedTo": "both"
     },
     "gs_config.ipc_interface.kWebServerShareDirectory": {
