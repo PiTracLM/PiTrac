@@ -3529,7 +3529,7 @@
     },
     "gs_config.testing.kAutomatedTestSuiteDirectory": {
       "type": "string",
-      "default": "/home/<PiTrac-Username>/Dev/PiTrac/Software/LMSourceCode/Testing/TestSuite_2025_02_07/",
+      "default": "/usr/share/pitrac/test-suites/TestSuite_2025_02_07/",
       "description": "Directory containing test suite images",
       "category": "testing",
       "ui_name": "Test Suite Directory"
@@ -3853,7 +3853,7 @@
     },
     "gs_config.calibration.kTestAutoCalibrationFileName": {
       "type": "string",
-      "default": "M:\\Dev\\PiTrac\\Software\\LMSourceCode\\Images\\autocalibrate_cam1_still_picture_1.png",
+      "default": "/usr/share/pitrac/calibration/checkerboard.png",
       "description": "Test file for auto calibration",
       "category": "calibration",
       "ui_name": "Test Auto Cal File"

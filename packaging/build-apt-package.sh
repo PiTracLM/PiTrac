@@ -155,8 +155,9 @@ install_binaries() {
 
 install_test_resources() {
     log_info "Installing test images and calibration tools..."
-    
+
     install_test_images "$DEB_DIR/usr/share/pitrac/test-images" "$REPO_ROOT"
+    install_test_suites "$DEB_DIR/usr/share/pitrac/test-suites" "$REPO_ROOT"
     install_camera_tools "$DEB_DIR/usr/lib/pitrac" "$REPO_ROOT"
     
     log_info "Staging ONNX models..."

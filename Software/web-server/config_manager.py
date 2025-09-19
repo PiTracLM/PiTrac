@@ -529,8 +529,8 @@ class ConfigurationManager:
         else:
             # Convert to string and expand paths with ~
             str_value = str(value)
-            if "~/" in str_value:
-                str_value = str_value.replace("~", str(Path.home()))
+            if str_value.startswith("~"):
+                str_value = str(Path(str_value).expanduser())
             current[final_key] = str_value
 
     def get_available_models(self) -> Dict[str, str]:

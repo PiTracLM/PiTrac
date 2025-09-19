@@ -245,13 +245,13 @@ get_install_user() {
 install_test_images() {
     local dest_dir="${1:-/usr/share/pitrac/test-images}"
     local repo_root="${2:-${REPO_ROOT:-/opt/PiTrac}}"
-    
+
     log_info "Installing test images..."
-    
+
     local test_images_dir="$repo_root/Software/LMSourceCode/Images"
     if [[ -d "$test_images_dir" ]]; then
         mkdir -p "$dest_dir"
-        
+
         if [[ -f "$test_images_dir/gs_log_img__log_ball_final_found_ball_img.png" ]]; then
             cp "$test_images_dir/gs_log_img__log_ball_final_found_ball_img.png" \
                "$dest_dir/teed-ball.png"
@@ -260,7 +260,7 @@ install_test_images() {
             cp "$test_images_dir/log_cam2_last_strobed_img.png" \
                "$dest_dir/strobed.png"
         fi
-        
+
         for img in "$test_images_dir"/*.png "$test_images_dir"/*.jpg "$test_images_dir"/*.jpeg; do
             if [[ -f "$img" ]]; then
                 local basename=$(basename "$img")
@@ -270,10 +270,38 @@ install_test_images() {
                 fi
             fi
         done
-        
+
         log_success "Test images installed"
     else
         log_warn "Test images directory not found: $test_images_dir"
+    fi
+}
+
+install_test_suites() {
+    local dest_dir="${1:-/usr/share/pitrac/test-suites}"
+    local repo_root="${2:-${REPO_ROOT:-/opt/PiTrac}}"
+
+    log_info "Installing test suites for automated testing..."
+
+    local testing_dir="$repo_root/Software/LMSourceCode/Testing"
+    if [[ -d "$testing_dir" ]]; then
+        mkdir -p "$dest_dir"
+
+        if [[ -d "$testing_dir/TestSuite_2025_02_07" ]]; then
+            log_info "  Copying TestSuite_2025_02_07..."
+            cp -r "$testing_dir/TestSuite_2025_02_07" "$dest_dir/"
+            log_success "  TestSuite_2025_02_07 installed"
+        fi
+
+        if [[ -d "$testing_dir/Left-Handed-Shots" ]]; then
+            log_info "  Copying Left-Handed-Shots test suite..."
+            cp -r "$testing_dir/Left-Handed-Shots" "$dest_dir/"
+            log_success "  Left-Handed-Shots test suite installed"
+        fi
+
+        log_success "Test suites installed to $dest_dir"
+    else
+        log_warn "Testing directory not found: $testing_dir"
     fi
 }
 
@@ -384,7 +412,7 @@ create_pitrac_directories() {
     log_info "Creating PiTrac directories..."
     
     mkdir -p /usr/lib/pitrac
-    mkdir -p /usr/share/pitrac/{templates,test-images,calibration,webapp}
+    mkdir -p /usr/share/pitrac/{templates,test-images,test-suites,calibration,webapp}
     mkdir -p /var/lib/pitrac
     mkdir -p /etc/pitrac
     
