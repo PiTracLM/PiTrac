@@ -103,6 +103,7 @@ std::map<std::string, std::string> ZeroMQSubscriber::ParseProperties(const std::
 
     if (start == std::string::npos) {
         return properties;
+    }
 
     std::string trimmed = json_str.substr(start, end - start + 1);
 
