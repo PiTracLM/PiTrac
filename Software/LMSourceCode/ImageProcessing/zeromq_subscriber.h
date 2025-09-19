@@ -9,6 +9,7 @@
 #include <functional>
 #include <vector>
 #include <map>
+#include <mutex>
 
 namespace golf_sim {
 
@@ -55,6 +56,7 @@ private:
     std::atomic<bool> should_stop_;
 
     std::vector<std::string> topic_filters_;
+    mutable std::mutex topic_mutex_;
 
     int high_water_mark_ = 1000;
     int receive_timeout_ms_ = 100;

@@ -53,7 +53,7 @@ namespace golf_sim {
         static bool SendIpcMessage(const GolfSimIPCMessage& ipc_message);
 
         // Serialization/deserialization helpers
-        static GolfSimIPCMessage* BuildIpcMessageFromZeroMQData(
+        static std::unique_ptr<GolfSimIPCMessage> BuildIpcMessageFromZeroMQData(
             const std::vector<uint8_t>& data,
             const std::map<std::string, std::string>& properties);
 

@@ -7,14 +7,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import zmq.asyncio
-import yaml
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from constants import (
-    CONFIG_FILE,
     IMAGES_DIR,
 )
 from zeromq_listener import ZeroMQListener
@@ -517,7 +515,9 @@ class PiTracServer:
                 log_file = self.pitrac_manager.camera2_log_file
                 await self._stream_file_logs(websocket, log_file)
             elif service == "zeromq":
-                await websocket.send_json({"message": "ZeroMQ listener runs within this process - check pitrac-web logs", "level": "info"})
+                await websocket.send_json(
+                    {"message": "ZeroMQ listener runs within this process - check pitrac-web logs", "level": "info"}
+                )
             elif service == "pitrac-web":
                 await self._stream_systemd_logs(websocket, "pitrac-web")
             else:
@@ -634,39 +634,49 @@ class PiTracServer:
         except Exception as e:
             logger.error(f"Error streaming file logs: {e}")
 
-    def _load_config(self) -> Dict[str, Any]:
-        if not CONFIG_FILE.exists():
-            logger.warning(f"Config file not found: {CONFIG_FILE}")
-            return {}
-
-        try:
-            with open(CONFIG_FILE, "r") as f:
-                config = yaml.safe_load(f) or {}
-                logger.info(f"Loaded config from {CONFIG_FILE}")
-                return config
-        except Exception as e:
-            logger.error(f"Error loading config: {e}")
-            return {}
-
     async def setup_zeromq(self) -> bool:
-        """Setup ZeroMQ listener."""
+        """Setup ZeroMQ listener with multi-camera support."""
         try:
-            config = self._load_config()
+            system_mode = self.config_manager.get_config("system.mode") or "single"
 
-            # Get ZeroMQ endpoint from config, default to localhost:5556
-            network_config = config.get("network", {})
-            zeromq_endpoint = network_config.get("zeromq_endpoint", "tcp://localhost:5556")
+            # Set ZeroMQ mode based on system configuration
+            # Config "dual" means dual Pi setup (1 camera per Pi)
+            if system_mode == "single":
+                # Single Pi with dual cameras (ports 5556 and 5557)
+                zeromq_mode = "dual"
+                zeromq_endpoint = "tcp://localhost:5556"
+            elif system_mode == "dual":
+                # Dual Pi setup
+                zeromq_mode = "dual_pi"
+                zeromq_endpoint = "tcp://localhost:5556"  # Will be overridden by env vars
+
+                # Log warning if environment variables not set
+                if not os.environ.get("PITRAC_CAMERA1_HOST") and not os.environ.get("PITRAC_CAMERA2_HOST"):
+                    logger.warning(
+                        "Dual Pi mode requires PITRAC_CAMERA1_HOST and PITRAC_CAMERA2_HOST environment variables"
+                    )
+            else:
+                # Unknown mode - default to single camera
+                logger.warning(f"Unknown system mode '{system_mode}', defaulting to single camera")
+                zeromq_mode = "single"
+                zeromq_endpoint = "tcp://localhost:5556"
 
             self.listener = ZeroMQListener(
                 self.shot_store,
                 self.connection_manager,
                 self.parser,
-                endpoint=zeromq_endpoint
+                config_manager=self.config_manager,
+                endpoint=zeromq_endpoint,
+                mode=zeromq_mode,
             )
 
             success = await self.listener.start()
             if success:
-                logger.info(f"Connected to ZeroMQ at {zeromq_endpoint}")
+                stats = self.listener.get_stats()
+                logger.info(f"ZeroMQ listener started in {zeromq_mode} mode")
+                for camera_name, camera_stats in stats.get("cameras", {}).items():
+                    if camera_stats["connected"]:
+                        logger.info(f"  - {camera_name}: connected to {camera_stats['endpoint']}")
             else:
                 logger.error("Failed to start ZeroMQ listener")
 

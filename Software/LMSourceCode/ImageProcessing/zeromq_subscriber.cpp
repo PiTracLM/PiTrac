@@ -94,28 +94,75 @@ void ZeroMQSubscriber::SetSystemIdToExclude(const std::string& system_id) {
 std::map<std::string, std::string> ZeroMQSubscriber::ParseProperties(const std::string& json_str) {
     std::map<std::string, std::string> properties;
 
-    if (json_str.size() < 2 || json_str[0] != '{' || json_str[json_str.size()-1] != '}') {
+    if (json_str.empty()) {
         return properties;
     }
 
-    std::string content = json_str.substr(1, json_str.size() - 2);
-    std::istringstream ss(content);
-    std::string item;
+    size_t start = json_str.find_first_not_of(" \t\n\r");
+    size_t end = json_str.find_last_not_of(" \t\n\r");
 
-    while (std::getline(ss, item, ',')) {
-        size_t colon_pos = item.find(':');
-        if (colon_pos != std::string::npos) {
-            std::string key = item.substr(0, colon_pos);
-            std::string value = item.substr(colon_pos + 1);
+    if (start == std::string::npos) {
+        return properties;
 
-            if (key.size() >= 2 && key[0] == '"' && key[key.size()-1] == '"') {
-                key = key.substr(1, key.size() - 2);
-            }
-            if (value.size() >= 2 && value[0] == '"' && value[value.size()-1] == '"') {
-                value = value.substr(1, value.size() - 2);
-            }
+    std::string trimmed = json_str.substr(start, end - start + 1);
 
-            properties[key] = value;
+    if (trimmed.size() < 2 || trimmed[0] != '{' || trimmed[trimmed.size()-1] != '}') {
+        std::cerr << "Invalid JSON structure in properties" << std::endl;
+        return properties;
+    }
+
+    if (trimmed == "{}") {
+        return properties;
+    }
+
+    std::string content = trimmed.substr(1, trimmed.size() - 2);
+    size_t pos = 0;
+
+    while (pos < content.length()) {
+        while (pos < content.length() && std::isspace(content[pos])) {
+            pos++;
+        }
+
+        if (pos >= content.length()) break;
+
+        if (content[pos] != '"') {
+            std::cerr << "Expected '\"' for key start" << std::endl;
+            break;
+        }
+        pos++;
+
+        size_t key_end = content.find('"', pos);
+        if (key_end == std::string::npos) {
+            std::cerr << "Unterminated key string" << std::endl;
+            break;
+        }
+
+        std::string key = content.substr(pos, key_end - pos);
+        pos = key_end + 1;
+
+\        while (pos < content.length() && (std::isspace(content[pos]) || content[pos] == ':')) {
+            pos++;
+        }
+
+        if (pos >= content.length() || content[pos] != '"') {
+            std::cerr << "Expected '\"' for value start" << std::endl;
+            break;
+        }
+        pos++; 
+
+        size_t value_end = content.find('"', pos);
+        if (value_end == std::string::npos) {
+            std::cerr << "Unterminated value string" << std::endl;
+            break;
+        }
+
+        std::string value = content.substr(pos, value_end - pos);
+        pos = value_end + 1;
+
+        properties[key] = value;
+
+        while (pos < content.length() && (std::isspace(content[pos]) || content[pos] == ',')) {
+            pos++;
         }
     }
 
@@ -131,12 +178,15 @@ void ZeroMQSubscriber::SubscriberThread() {
 
         subscriber_->connect(endpoint_);
 
-        for (const auto& filter : topic_filters_) {
-            subscriber_->set(zmq::sockopt::subscribe, filter);
-        }
+        {
+            std::lock_guard<std::mutex> lock(topic_mutex_);
+            for (const auto& filter : topic_filters_) {
+                subscriber_->set(zmq::sockopt::subscribe, filter);
+            }
 
-        if (topic_filters_.empty()) {
-            subscriber_->set(zmq::sockopt::subscribe, "");
+            if (topic_filters_.empty()) {
+                subscriber_->set(zmq::sockopt::subscribe, "");
+            }
         }
 
         std::cout << "ZeroMQ Subscriber connected and listening..." << std::endl;
@@ -180,7 +230,7 @@ void ZeroMQSubscriber::SubscriberThread() {
                 auto properties = ParseProperties(props_str);
 
                 if (!system_id_to_exclude_.empty()) {
-                    auto it = properties.find("LM_System_ID");
+                    auto it = properties.find("System_ID");
                     if (it != properties.end() && it->second == system_id_to_exclude_) {
                         continue;
                     }

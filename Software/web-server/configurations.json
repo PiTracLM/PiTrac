@@ -864,6 +864,30 @@
       "passedVia": "json",
       "passedTo": "both"
     },
+    "gs_config.ipc_interface.kCamera1Host": {
+      "category": "Network",
+      "subcategory": "basic",
+      "basicSubcategory": "Network",
+      "displayName": "Camera 1 Host",
+      "description": "Network host/endpoint for Camera 1 in dual Pi mode",
+      "type": "text",
+      "default": "localhost",
+      "requiresRestart": true,
+      "passedVia": "json",
+      "passedTo": "both"
+    },
+    "gs_config.ipc_interface.kCamera2Host": {
+      "category": "Network",
+      "subcategory": "basic",
+      "basicSubcategory": "Network",
+      "displayName": "Camera 2 Host",
+      "description": "Network host/endpoint for Camera 2 in dual Pi mode",
+      "type": "text",
+      "default": "localhost",
+      "requiresRestart": true,
+      "passedVia": "json",
+      "passedTo": "both"
+    },
     "gs_config.ipc_interface.kRefreshTimeSeconds": {
       "category": "Network",
       "subcategory": "basic",

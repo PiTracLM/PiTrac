@@ -162,9 +162,9 @@ namespace golf_sim {
 
         GS_LOG_TRACE_MSG(trace, "Dispatching ZeroMQ IPC message from topic: " + topic);
 
-        GolfSimIPCMessage* ipc_message = BuildIpcMessageFromZeroMQData(data, properties);
+        auto ipc_message = BuildIpcMessageFromZeroMQData(data, properties);
 
-        if (ipc_message == nullptr) {
+        if (!ipc_message) {
             LoggingTools::Warning("Unable to convert ZeroMQ data to GolfSimIPCMessage");
             return false;
         }
@@ -223,7 +223,6 @@ namespace golf_sim {
             }
         }
 
-        delete ipc_message;
         std::this_thread::yield();
         return result;
     }
@@ -250,7 +249,7 @@ namespace golf_sim {
         return result;
     }
 
-    GolfSimIPCMessage* GolfSimIpcSystem::BuildIpcMessageFromZeroMQData(
+    std::unique_ptr<GolfSimIPCMessage> GolfSimIpcSystem::BuildIpcMessageFromZeroMQData(
         const std::vector<uint8_t>& data,
         const std::map<std::string, std::string>& properties) {
 
@@ -268,7 +267,7 @@ namespace golf_sim {
                 return nullptr;
             }
 
-            GolfSimIPCMessage* ipc_message = new GolfSimIPCMessage(message_type);
+            auto ipc_message = std::make_unique<GolfSimIPCMessage>(message_type);
 
             if (message_type == GolfSimIPCMessage::IPCMessageType::kCamera2Image ||
                 message_type == GolfSimIPCMessage::IPCMessageType::kCamera2ReturnPreImage) {
@@ -278,6 +277,23 @@ namespace golf_sim {
 
                 ZeroMQImageMessage img_msg;
                 oh.get().convert(img_msg);
+
+                const int MAX_IMAGE_DIMENSION = 10000; // Reasonable max dimension
+                if (img_msg.image_rows <= 0 || img_msg.image_rows > MAX_IMAGE_DIMENSION ||
+                    img_msg.image_cols <= 0 || img_msg.image_cols > MAX_IMAGE_DIMENSION) {
+                    GS_LOG_TRACE_MSG(error, "Invalid image dimensions: " +
+                                     std::to_string(img_msg.image_rows) + "x" +
+                                     std::to_string(img_msg.image_cols));
+                    return nullptr;
+                }
+
+                size_t expected_size = img_msg.image_rows * img_msg.image_cols * CV_ELEM_SIZE(img_msg.image_type);
+                if (img_msg.image_data.size() != expected_size) {
+                    GS_LOG_TRACE_MSG(error, "Image data size mismatch. Expected: " +
+                                     std::to_string(expected_size) + ", Got: " +
+                                     std::to_string(img_msg.image_data.size()));
+                    return nullptr;
+                }
 
                 cv::Mat image(img_msg.image_rows, img_msg.image_cols, img_msg.image_type,
                              const_cast<uint8_t*>(img_msg.image_data.data()));
@@ -340,13 +356,25 @@ namespace golf_sim {
                 ipc_message.GetMessageType() == GolfSimIPCMessage::IPCMessageType::kCamera2ReturnPreImage) {
 
                 cv::Mat image = ipc_message.GetImageMat();
+
+                if (image.empty() || !image.data) {
+                    GS_LOG_TRACE_MSG(error, "Invalid image data - image is empty or data is null");
+                    return false;
+                }
+
+                const size_t MAX_IMAGE_SIZE = 100 * 1024 * 1024; // 100MB max
+                size_t data_size = image.total() * image.elemSize();
+
+                if (data_size == 0 || data_size > MAX_IMAGE_SIZE) {
+                    GS_LOG_TRACE_MSG(error, "Invalid image size: " + std::to_string(data_size));
+                    return false;
+                }
+
                 ZeroMQImageMessage img_msg;
                 img_msg.header = header;
                 img_msg.image_rows = image.rows;
                 img_msg.image_cols = image.cols;
                 img_msg.image_type = image.type();
-
-                size_t data_size = image.total() * image.elemSize();
                 img_msg.image_data.resize(data_size);
                 std::memcpy(img_msg.image_data.data(), image.data, data_size);
 

@@ -11,6 +11,7 @@
 #include <condition_variable>
 #include <map>
 #include <vector>
+#include <future>
 
 namespace golf_sim {
 
@@ -42,6 +43,7 @@ private:
     };
 
     void PublisherThread();
+    bool InitializeSocket();
 
     std::unique_ptr<zmq::context_t> context_;
     std::unique_ptr<zmq::socket_t> publisher_;
@@ -55,6 +57,7 @@ private:
     std::queue<Message> message_queue_;
     std::mutex queue_mutex_;
     std::condition_variable queue_cv_;
+    std::mutex socket_mutex_; 
 
     int high_water_mark_ = 1000;
     int linger_ms_ = 1000;
