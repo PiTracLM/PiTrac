@@ -140,7 +140,7 @@ std::map<std::string, std::string> ZeroMQSubscriber::ParseProperties(const std::
         std::string key = content.substr(pos, key_end - pos);
         pos = key_end + 1;
 
-\        while (pos < content.length() && (std::isspace(content[pos]) || content[pos] == ':')) {
+        while (pos < content.length() && (std::isspace(content[pos]) || content[pos] == ':')) {
             pos++;
         }
 
