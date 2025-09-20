@@ -563,13 +563,9 @@ class ConfigurationManager:
                     for onnx_path in onnx_paths:
                         if onnx_path.exists():
                             display_name = model_dir.name
-                            try:
-                                relative_path = onnx_path.relative_to(Path.home())
-                                path_str = f"~/{relative_path}"
-                            except ValueError:
-                                path_str = str(onnx_path)
-
-                            models[display_name] = path_str
+                            if display_name not in models:
+                                path_str = str(onnx_path.resolve())
+                                models[display_name] = path_str
                             break
 
         return dict(sorted(models.items()))

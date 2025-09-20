@@ -65,9 +65,7 @@
       "description": "Directories to search for AI models",
       "type": "array",
       "default": [
-        "~/LM_Shares/models",
-        "/opt/pitrac/models",
-        "~/dev/PiTrac/Software/GroundTruthAnnotator/experiments"
+        "~/LM_Shares/models"
       ],
       "internal": true
     },
