@@ -357,9 +357,6 @@ build_dev() {
     # Update library cache
     ldconfig
 
-    # Configure libcamera using common function
-    configure_libcamera
-
     # Create pkg-config files using common function
     create_pkgconfig_files
 
@@ -417,6 +414,10 @@ build_dev() {
 
 
     install_camera_tools "/usr/lib/pitrac" "$REPO_ROOT"
+
+    # Configure libcamera AFTER camera tools are installed
+    # This ensures IMX296 sensor files are available to be copied
+    configure_libcamera
 
     install_test_images "/usr/share/pitrac/test-images" "$REPO_ROOT"
 
@@ -648,6 +649,18 @@ EOF
         log_success "Web server updated"
     else
         log_warn "Web server source not found at $WEB_SERVER_DIR"
+    fi
+
+    # Configure cameras after web server is installed
+    log_info "Configuring cameras (if connected)..."
+    if [[ -x "$SCRIPT_DIR/scripts/configure-cameras.sh" ]]; then
+        # Run camera configuration script
+        # It will skip if no cameras are detected
+        "$SCRIPT_DIR/scripts/configure-cameras.sh" || {
+            log_warn "Camera configuration failed or skipped (non-critical)"
+        }
+    else
+        log_warn "Camera configuration script not found - skipping camera setup"
     fi
 
     create_pitrac_directories
