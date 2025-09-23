@@ -163,16 +163,44 @@ configure_boot_config() {
 
     sed -i '/# Added by PiTrac installer/d' "$config_path" 2>/dev/null || true
 
+    # Build config block dynamically, checking for existing values
     local config_block="# PiTrac Camera Configuration - Added by pitrac installer
-# DO NOT MODIFY - Managed automatically by PiTrac
+# DO NOT MODIFY - Managed automatically by PiTrac"
+
+    # Only add parameters that don't already exist
+    if ! grep -q "^camera_auto_detect=" "$config_path"; then
+        config_block="$config_block
 
 # Disable automatic camera detection for manual control
-camera_auto_detect=0
+camera_auto_detect=0"
+    else
+        log_info "  camera_auto_detect already exists, skipping"
+    fi
 
-# Core system parameters for PiTrac operation
-dtparam=spi=on
-force_turbo=1
+    config_block="$config_block
+
+# Core system parameters for PiTrac operation"
+
+    if ! grep -q "^dtparam=spi=on" "$config_path"; then
+        config_block="$config_block
+dtparam=spi=on"
+    else
+        log_info "  dtparam=spi=on already exists, skipping"
+    fi
+
+    if ! grep -q "^force_turbo=" "$config_path"; then
+        config_block="$config_block
+force_turbo=1"
+    else
+        log_info "  force_turbo already exists, skipping"
+    fi
+
+    if ! grep -q "^arm_boost=" "$config_path"; then
+        config_block="$config_block
 arm_boost=1"
+    else
+        log_info "  arm_boost already exists, skipping"
+    fi
 
     if [[ "$num_cameras" -eq 2 ]]; then
         config_block="$config_block

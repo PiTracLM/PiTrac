@@ -124,16 +124,16 @@ case "$1" in
         if [ -f "$CONFIG_FILE" ]; then
             echo "Configuring boot settings in $CONFIG_FILE..."
 
-            # Add settings if not present
-            grep -q "camera_auto_detect=1" "$CONFIG_FILE" || echo "camera_auto_detect=1" >> "$CONFIG_FILE"
-            grep -q "dtparam=i2c_arm=on" "$CONFIG_FILE" || echo "dtparam=i2c_arm=on" >> "$CONFIG_FILE"
-            grep -q "dtparam=spi=on" "$CONFIG_FILE" || echo "dtparam=spi=on" >> "$CONFIG_FILE"
-            grep -q "force_turbo=1" "$CONFIG_FILE" || echo "force_turbo=1" >> "$CONFIG_FILE"
+            # Add settings if not present (check for the parameter name, not specific value)
+            grep -q "^camera_auto_detect=" "$CONFIG_FILE" || echo "camera_auto_detect=1" >> "$CONFIG_FILE"
+            grep -q "^dtparam=i2c_arm=" "$CONFIG_FILE" || echo "dtparam=i2c_arm=on" >> "$CONFIG_FILE"
+            grep -q "^dtparam=spi=" "$CONFIG_FILE" || echo "dtparam=spi=on" >> "$CONFIG_FILE"
+            grep -q "^force_turbo=" "$CONFIG_FILE" || echo "force_turbo=1" >> "$CONFIG_FILE"
 
             if [ "$PI_MODEL" = "pi5" ]; then
-                grep -q "arm_boost=1" "$CONFIG_FILE" || echo "arm_boost=1" >> "$CONFIG_FILE"
+                grep -q "^arm_boost=" "$CONFIG_FILE" || echo "arm_boost=1" >> "$CONFIG_FILE"
             else
-                grep -q "gpu_mem=256" "$CONFIG_FILE" || echo "gpu_mem=256" >> "$CONFIG_FILE"
+                grep -q "^gpu_mem=" "$CONFIG_FILE" || echo "gpu_mem=256" >> "$CONFIG_FILE"
             fi
         fi
 
