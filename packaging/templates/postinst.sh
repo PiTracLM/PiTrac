@@ -32,11 +32,14 @@ case "$1" in
             if [ -f /usr/lib/pitrac/pitrac-common-functions.sh ]; then
                 . /usr/lib/pitrac/pitrac-common-functions.sh
                 if [ -d /usr/share/pitrac/models ]; then
-                    USER_MODELS_DIR="/home/$ACTUAL_USER/LM_Shares/models"
-                    mkdir -p "$USER_MODELS_DIR"
-                    cp -r /usr/share/pitrac/models/* "$USER_MODELS_DIR/" 2>/dev/null || true
-                    chown -R "$ACTUAL_USER:$ACTUAL_USER" "/home/$ACTUAL_USER/LM_Shares"
-                    echo "Installed ONNX models to $USER_MODELS_DIR"
+                    SYSTEM_MODELS_DIR="/etc/pitrac/models"
+                    mkdir -p "$SYSTEM_MODELS_DIR"
+                    cp -r /usr/share/pitrac/models/* "$SYSTEM_MODELS_DIR/" 2>/dev/null || true
+                    # Set proper permissions - models should be readable by all users
+                    chmod -R 644 "$SYSTEM_MODELS_DIR"/*/*.onnx 2>/dev/null || true
+                    chmod -R 755 "$SYSTEM_MODELS_DIR"/* 2>/dev/null || true
+                    chmod 755 "$SYSTEM_MODELS_DIR"
+                    echo "Installed ONNX models to $SYSTEM_MODELS_DIR"
                 fi
             fi
 

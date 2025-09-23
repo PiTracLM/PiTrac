@@ -65,7 +65,7 @@
       "description": "Directories to search for AI models",
       "type": "array",
       "default": [
-        "~/LM_Shares/models"
+        "/etc/pitrac/models"
       ],
       "internal": true
     },
@@ -476,7 +476,7 @@
         "experimental": "YOLO Neural Network (Fast)",
         "experimental_sahi": "YOLO + SAHI Slicing (Most Accurate)"
       },
-      "default": "legacy",
+      "default": "experimental",
       "requiresRestart": true,
       "passedVia": "json",
       "passedTo": "both"
@@ -492,7 +492,7 @@
         "legacy": "GetCalibratedBall/HoughCircles",
         "experimental": "YOLO (Fast & Accurate)"
       },
-      "default": "legacy",
+      "default": "experimental",
       "requiresRestart": true,
       "passedVia": "json",
       "passedTo": "both"
@@ -505,7 +505,7 @@
       "description": "Select YOLO model for AI-based ball detection",
       "type": "select",
       "options": {},
-      "default": "",
+      "default": "/etc/pitrac/models/high_performance_300e2/best.onnx",
       "requiresRestart": true,
       "passedVia": "json",
       "passedTo": "both"

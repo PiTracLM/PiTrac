@@ -308,40 +308,35 @@ install_test_suites() {
 install_onnx_models() {
     local repo_root="${1:-${REPO_ROOT:-/opt/PiTrac}}"
     local install_user="${2:-${SUDO_USER:-$(whoami)}}"
-    
+
     log_info "Installing ONNX models for AI detection..."
-    
+
     local models_dir="$repo_root/Software/GroundTruthAnnotator/experiments"
     if [[ -d "$models_dir" ]]; then
-        local user_home
-        if [[ "$install_user" == "root" ]]; then
-            user_home="/root"
-        else
-            user_home="/home/$install_user"
-        fi
-        
-        local user_models_dir="$user_home/LM_Shares/models"
-        mkdir -p "$user_models_dir"
-        
+        # Install to system location /etc/pitrac/models/
+        local system_models_dir="/etc/pitrac/models"
+        mkdir -p "$system_models_dir"
+
         local models_found=0
         for experiment in "$models_dir"/*/weights/best.onnx; do
             if [[ -f "$experiment" ]]; then
                 # Extract experiment name from path
                 local experiment_name=$(basename "$(dirname "$(dirname "$experiment")")")
-                
+
                 # Create experiment folder and copy model
-                mkdir -p "$user_models_dir/$experiment_name"
-                cp "$experiment" "$user_models_dir/$experiment_name/best.onnx"
+                mkdir -p "$system_models_dir/$experiment_name"
+                cp "$experiment" "$system_models_dir/$experiment_name/best.onnx"
                 log_info "  Installed model: $experiment_name/best.onnx"
                 models_found=$((models_found + 1))
             fi
         done
-        
+
         if [[ $models_found -gt 0 ]]; then
-            if [[ "$install_user" != "root" ]] && [[ -n "$install_user" ]]; then
-                chown -R "$install_user:$install_user" "$user_models_dir"
-            fi
-            log_success "Installed $models_found ONNX model(s) to $user_models_dir"
+            # Set proper permissions - models should be readable by all users
+            chmod -R 644 "$system_models_dir"/*/*.onnx 2>/dev/null || true
+            chmod -R 755 "$system_models_dir"/* 2>/dev/null || true
+            chmod 755 "$system_models_dir"
+            log_success "Installed $models_found ONNX model(s) to $system_models_dir"
         else
             log_warn "No ONNX models found in $models_dir"
         fi

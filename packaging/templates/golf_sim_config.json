@@ -13,7 +13,7 @@
         "ball_identification": {
             "kDetectionMethod": "legacy",
             "kBallPlacementDetectionMethod": "legacy",
-            "kONNXModelPath": "~/LM_Shares/models/high_performance_300e2/best.onnx",
+            "kONNXModelPath": "/etc/pitrac/models/high_performance_300e2/best.onnx",
             "kONNXConfidenceThreshold": "0.5",
             "kONNXNMSThreshold": "0.4",
             "kONNXInputSize": "1472",
