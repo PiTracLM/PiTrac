@@ -311,22 +311,29 @@ install_onnx_models() {
 
     log_info "Installing ONNX models for AI detection..."
 
-    local models_dir="$repo_root/Software/GroundTruthAnnotator/experiments"
+    local models_dir="$repo_root/Software/LMSourceCode/ml_models"
     if [[ -d "$models_dir" ]]; then
         # Install to system location /etc/pitrac/models/
         local system_models_dir="/etc/pitrac/models"
+
+        # Remove old models to prevent accumulation of outdated models
+        if [[ -d "$system_models_dir" ]]; then
+            log_info "Cleaning up old models in $system_models_dir..."
+            rm -rf "$system_models_dir"/*
+        fi
+
         mkdir -p "$system_models_dir"
 
         local models_found=0
-        for experiment in "$models_dir"/*/weights/best.onnx; do
-            if [[ -f "$experiment" ]]; then
-                # Extract experiment name from path
-                local experiment_name=$(basename "$(dirname "$(dirname "$experiment")")")
+        for model_path in "$models_dir"/*/weights/best.onnx; do
+            if [[ -f "$model_path" ]]; then
+                # Extract model name from path (e.g., pitrac-ball-detection-09-23-25)
+                local model_name=$(basename "$(dirname "$(dirname "$model_path")")")
 
-                # Create experiment folder and copy model
-                mkdir -p "$system_models_dir/$experiment_name"
-                cp "$experiment" "$system_models_dir/$experiment_name/best.onnx"
-                log_info "  Installed model: $experiment_name/best.onnx"
+                # Create folder and copy model
+                mkdir -p "$system_models_dir/$model_name"
+                cp "$model_path" "$system_models_dir/$model_name/best.onnx"
+                log_info "  Installed model: $model_name/best.onnx"
                 models_found=$((models_found + 1))
             fi
         done

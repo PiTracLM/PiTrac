@@ -161,22 +161,24 @@ install_test_resources() {
     install_camera_tools "$DEB_DIR/usr/lib/pitrac" "$REPO_ROOT"
     
     log_info "Staging ONNX models..."
-    local models_dir="$REPO_ROOT/Software/GroundTruthAnnotator/experiments"
+    local models_dir="$REPO_ROOT/Software/LMSourceCode/ml_models"
     if [[ -d "$models_dir" ]]; then
         mkdir -p "$DEB_DIR/usr/share/pitrac/models"
         local models_found=0
-        for experiment in "$models_dir"/*/weights/best.onnx; do
-            if [[ -f "$experiment" ]]; then
-                local experiment_name=$(basename "$(dirname "$(dirname "$experiment")")")
-                mkdir -p "$DEB_DIR/usr/share/pitrac/models/$experiment_name"
-                cp "$experiment" "$DEB_DIR/usr/share/pitrac/models/$experiment_name/best.onnx"
-                log_info "  Staged model: $experiment_name/best.onnx"
+        for model_path in "$models_dir"/*/weights/best.onnx; do
+            if [[ -f "$model_path" ]]; then
+                local model_name=$(basename "$(dirname "$(dirname "$model_path")")")
+                mkdir -p "$DEB_DIR/usr/share/pitrac/models/$model_name"
+                cp "$model_path" "$DEB_DIR/usr/share/pitrac/models/$model_name/best.onnx"
+                log_info "  Staged model: $model_name/best.onnx"
                 ((models_found++))
             fi
         done
         if [[ $models_found -gt 0 ]]; then
             log_success "Staged $models_found ONNX model(s)"
         fi
+    else
+        log_warn "ONNX models directory not found: $models_dir"
     fi
     
     local calib_dir="$REPO_ROOT/Software/CalibrateCameraDistortions"
