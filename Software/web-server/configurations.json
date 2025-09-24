@@ -505,7 +505,7 @@
       "description": "Select YOLO model for AI-based ball detection",
       "type": "select",
       "options": {},
-      "default": "/etc/pitrac/models/pitrac-ball-detection-09-23-25/best.onnx",
+      "default": "/etc/pitrac/models/pitrac-ball-detection-09-25-25/best.onnx",
       "requiresRestart": true,
       "passedVia": "json",
       "passedTo": "both"
