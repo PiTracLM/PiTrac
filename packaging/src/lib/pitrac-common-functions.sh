@@ -482,22 +482,43 @@ set_config_permissions() {
 install_deb_dependency() {
     local deb_file="$1"
     local package_name="$2"
+    local skip_if_installed="${3:-false}"
 
     if [[ ! -f "$deb_file" ]]; then
         log_warn "DEB package not found: $deb_file"
         return 1
     fi
 
+    # Check if package or similar is already installed
+    if [[ "$skip_if_installed" == "true" ]]; then
+        # For lgpio, check if system package is already installed
+        if [[ "$package_name" == "liblgpio1" ]] && dpkg -l | grep -qE "^ii\s+(liblgpio1|liblgpio-dev)"; then
+            log_info "  System lgpio packages already installed, skipping custom deb"
+            return 0
+        fi
+    fi
+
     log_info "  Installing $package_name from deb package..."
 
-    # Use dpkg to install the package
+    # Use dpkg to install the package, force overwrite if needed for our packages
     if dpkg -i "$deb_file" 2>/dev/null; then
         log_success "  $package_name installed successfully"
     else
         # Try to fix dependencies if installation fails
         log_warn "  Attempting to fix dependencies for $package_name..."
         apt-get -f install -y
-        dpkg -i "$deb_file"
+
+        # For lgpio conflicts, skip if system version exists
+        if [[ "$package_name" == "liblgpio1" ]] && dpkg -l | grep -qE "^ii\s+(liblgpio1|liblgpio-dev)"; then
+            log_warn "  Using system-installed lgpio instead of custom package"
+            return 0
+        fi
+
+        # Try again with force for other packages
+        dpkg -i "$deb_file" || {
+            log_error "  Failed to install $package_name"
+            return 1
+        }
     fi
 }
 
@@ -513,15 +534,27 @@ extract_all_dependencies() {
         if [[ -f "$artifacts_dir/libopencv4.11_4.11.0-1_arm64.deb" ]]; then
             log_info "Using DEB packages for dependency installation..."
 
+            # Check if system lgpio is already installed
+            if dpkg -l | grep -qE "^ii\s+(liblgpio1|liblgpio-dev)"; then
+                log_info "System lgpio packages detected - will use those instead of custom deb"
+            fi
+
             # Install runtime packages first (order matters for dependencies)
-            install_deb_dependency "$artifacts_dir/liblgpio1_0.2.2-1_arm64.deb" "liblgpio1"
+            # Skip lgpio if system version is installed
+            install_deb_dependency "$artifacts_dir/liblgpio1_0.2.2-1_arm64.deb" "liblgpio1" "true"
             install_deb_dependency "$artifacts_dir/libactivemq-cpp_3.9.5-1_arm64.deb" "libactivemq-cpp"
             install_deb_dependency "$artifacts_dir/libopencv4.11_4.11.0-1_arm64.deb" "libopencv4.11"
 
             # Install development packages (these depend on runtime packages)
             install_deb_dependency "$artifacts_dir/libactivemq-cpp-dev_3.9.5-1_arm64.deb" "libactivemq-cpp-dev"
             install_deb_dependency "$artifacts_dir/libopencv-dev_4.11.0-1_arm64.deb" "libopencv-dev"
-            install_deb_dependency "$artifacts_dir/libmsgpack-cxx-dev_6.1.1-1_all.deb" "libmsgpack-cxx-dev"
+
+            # msgpack is header-only, check if not already installed
+            if ! dpkg -l | grep -qE "^ii\s+libmsgpack-cxx-dev"; then
+                install_deb_dependency "$artifacts_dir/libmsgpack-cxx-dev_6.1.1-1_all.deb" "libmsgpack-cxx-dev"
+            else
+                log_info "System msgpack-cxx-dev already installed, skipping custom deb"
+            fi
 
             log_success "All DEB packages installed"
         elif [[ -f "$artifacts_dir/opencv-4.11.0-arm64.tar.gz" ]]; then
