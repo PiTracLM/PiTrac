@@ -292,12 +292,17 @@ build_dev() {
 
     # Core libraries
     for pkg in libcamera0.0.3 libcamera-dev libcamera-tools libfmt-dev libssl-dev libssl3 \
-               liblgpio-dev liblgpio1 libmsgpack-cxx-dev \
+               libmsgpack-cxx-dev \
                libapr1 libaprutil1 libapr1-dev libaprutil1-dev; do
         if ! dpkg -l | grep -q "^ii  $pkg"; then
             missing_deps+=("$pkg")
         fi
     done
+
+    # Check for lgpio separately - we use our custom version
+    if ! dpkg -l | grep -q "^ii  liblgpio1"; then
+        log_warn "Custom liblgpio1 package not installed - will install from deps-artifacts"
+    fi
     
     if ! command -v rpicam-hello &> /dev/null && ! command -v libcamera-hello &> /dev/null; then
         if apt-cache show rpicam-apps &> /dev/null; then
