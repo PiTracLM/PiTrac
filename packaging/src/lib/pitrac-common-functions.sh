@@ -479,18 +479,70 @@ set_config_permissions() {
     fi
 }
 
+install_deb_dependency() {
+    local deb_file="$1"
+    local package_name="$2"
+
+    if [[ ! -f "$deb_file" ]]; then
+        log_warn "DEB package not found: $deb_file"
+        return 1
+    fi
+
+    log_info "  Installing $package_name from deb package..."
+
+    # Use dpkg to install the package
+    if dpkg -i "$deb_file" 2>/dev/null; then
+        log_success "  $package_name installed successfully"
+    else
+        # Try to fix dependencies if installation fails
+        log_warn "  Attempting to fix dependencies for $package_name..."
+        apt-get -f install -y
+        dpkg -i "$deb_file"
+    fi
+}
+
 extract_all_dependencies() {
     local artifacts_dir="${1:-/opt/PiTrac/packaging/deps-artifacts}"
     local dest_dir="${2:-/usr/lib/pitrac}"
-    
-    log_info "Extracting all dependencies..."
-    
-    extract_dependency "$artifacts_dir/opencv-4.11.0-arm64.tar.gz" "opencv" "$dest_dir"
-    extract_dependency "$artifacts_dir/activemq-cpp-3.9.5-arm64.tar.gz" "activemq-cpp" "$dest_dir"
-    extract_dependency "$artifacts_dir/lgpio-0.2.2-arm64.tar.gz" "lgpio" "$dest_dir"
-    extract_dependency "$artifacts_dir/msgpack-cxx-6.1.1-arm64.tar.gz" "msgpack" "$dest_dir"
-    
-    log_success "All dependencies extracted"
+    local use_debs="${USE_DEB_PACKAGES:-true}"
+
+    log_info "Installing all dependencies..."
+
+    if [[ "$use_debs" == "true" ]]; then
+        # Check if deb packages exist
+        if [[ -f "$artifacts_dir/libopencv4.11_4.11.0-1_arm64.deb" ]]; then
+            log_info "Using DEB packages for dependency installation..."
+
+            # Install runtime packages first (order matters for dependencies)
+            install_deb_dependency "$artifacts_dir/liblgpio1_0.2.2-1_arm64.deb" "liblgpio1"
+            install_deb_dependency "$artifacts_dir/libactivemq-cpp_3.9.5-1_arm64.deb" "libactivemq-cpp"
+            install_deb_dependency "$artifacts_dir/libopencv4.11_4.11.0-1_arm64.deb" "libopencv4.11"
+
+            # Install development packages (these depend on runtime packages)
+            install_deb_dependency "$artifacts_dir/libactivemq-cpp-dev_3.9.5-1_arm64.deb" "libactivemq-cpp-dev"
+            install_deb_dependency "$artifacts_dir/libopencv-dev_4.11.0-1_arm64.deb" "libopencv-dev"
+            install_deb_dependency "$artifacts_dir/libmsgpack-cxx-dev_6.1.1-1_all.deb" "libmsgpack-cxx-dev"
+
+            log_success "All DEB packages installed"
+        elif [[ -f "$artifacts_dir/opencv-4.11.0-arm64.tar.gz" ]]; then
+            log_info "DEB packages not found, falling back to tar.gz extraction..."
+            use_debs="false"
+        else
+            log_error "No dependency packages found (neither .deb nor .tar.gz)"
+            return 1
+        fi
+    fi
+
+    # Fallback to tar.gz extraction if DEBs not available or disabled
+    if [[ "$use_debs" == "false" ]]; then
+        log_info "Using tar.gz archives for dependency installation..."
+        extract_dependency "$artifacts_dir/opencv-4.11.0-arm64.tar.gz" "opencv" "$dest_dir"
+        extract_dependency "$artifacts_dir/activemq-cpp-3.9.5-arm64.tar.gz" "activemq-cpp" "$dest_dir"
+        extract_dependency "$artifacts_dir/lgpio-0.2.2-arm64.tar.gz" "lgpio" "$dest_dir"
+        extract_dependency "$artifacts_dir/msgpack-cxx-6.1.1-arm64.tar.gz" "msgpack" "$dest_dir"
+    fi
+
+    log_success "All dependencies installed"
 }
 
 install_python_dependencies() {

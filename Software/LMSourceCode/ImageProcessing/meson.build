@@ -43,7 +43,14 @@ if cxx.get_id() == 'gcc'
 endif
 
 if cpu == 'aarch64' or neon == 'arm64'
-    cpp_arguments += '-ftree-vectorize'
+    cpp_arguments += [
+        '-mcpu=cortex-a76',
+        '-ftree-vectorize',
+        '-falign-functions=16',
+        '-falign-loops=16',
+        '-fomit-frame-pointer',
+        '-ffast-math'  # Includes funsafe-math-optimizations, fno-signed-zeros, fno-trapping-math
+    ]
 elif neon == 'armv8-neon'
     cpp_arguments += ['-mfpu=neon-fp-armv8', '-ftree-vectorize']
 endif

@@ -1,5 +1,7 @@
 lgpio 0.2.2 ARM64 Build
-Build Date: Sat Aug 16 16:46:54 UTC 2025
+Build Date: Thu Sep 25 20:46:14 UTC 2025
 Architecture: aarch64
+Target CPU: Cortex-A76 (Raspberry Pi 5)
+Optimizations: -O3 -flto -march=armv8.2-a+crc+crypto
 Debian Version: bookworm
-8a83698599ce0c169f9c90ba8839a1aa  /lgpio-0.2.2-arm64.tar.gz
+33c23d288a6481bfdff5279826ba1819  /lgpio-0.2.2-arm64.tar.gz

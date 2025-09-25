@@ -52,27 +52,57 @@ show_usage() {
 
 check_artifacts() {
     local missing=()
+    local use_debs="${USE_DEB_PACKAGES:-true}"
 
     log_info "Checking for pre-built artifacts..."
 
-    if [ ! -f "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" ]; then
-        missing+=("opencv")
-    fi
-    if [ ! -f "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" ]; then
-        missing+=("activemq")
-    fi
-    if [ ! -f "$ARTIFACT_DIR/lgpio-0.2.2-arm64.tar.gz" ]; then
-        missing+=("lgpio")
-    fi
-    if [ ! -f "$ARTIFACT_DIR/msgpack-cxx-6.1.1-arm64.tar.gz" ]; then
-        missing+=("msgpack")
+    if [[ "$use_debs" == "true" ]]; then
+        # Check for DEB packages first
+        if [ ! -f "$ARTIFACT_DIR/libopencv4.11_4.11.0-1_arm64.deb" ] && [ ! -f "$ARTIFACT_DIR/libopencv-dev_4.11.0-1_arm64.deb" ]; then
+            if [ ! -f "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" ]; then
+                missing+=("opencv")
+            fi
+        fi
+        if [ ! -f "$ARTIFACT_DIR/libactivemq-cpp_3.9.5-1_arm64.deb" ] && [ ! -f "$ARTIFACT_DIR/libactivemq-cpp-dev_3.9.5-1_arm64.deb" ]; then
+            if [ ! -f "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" ]; then
+                missing+=("activemq")
+            fi
+        fi
+        if [ ! -f "$ARTIFACT_DIR/liblgpio1_0.2.2-1_arm64.deb" ]; then
+            if [ ! -f "$ARTIFACT_DIR/lgpio-0.2.2-arm64.tar.gz" ]; then
+                missing+=("lgpio")
+            fi
+        fi
+        if [ ! -f "$ARTIFACT_DIR/libmsgpack-cxx-dev_6.1.1-1_all.deb" ]; then
+            if [ ! -f "$ARTIFACT_DIR/msgpack-cxx-6.1.1-arm64.tar.gz" ]; then
+                missing+=("msgpack")
+            fi
+        fi
+    else
+        # Check for tar.gz packages
+        if [ ! -f "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" ]; then
+            missing+=("opencv")
+        fi
+        if [ ! -f "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" ]; then
+            missing+=("activemq")
+        fi
+        if [ ! -f "$ARTIFACT_DIR/lgpio-0.2.2-arm64.tar.gz" ]; then
+            missing+=("lgpio")
+        fi
+        if [ ! -f "$ARTIFACT_DIR/msgpack-cxx-6.1.1-arm64.tar.gz" ]; then
+            missing+=("msgpack")
+        fi
     fi
 
     if [ ${#missing[@]} -gt 0 ]; then
         log_warn "Missing artifacts: ${missing[*]}"
         return 1
     else
-        log_success "All artifacts present"
+        if [[ "$use_debs" == "true" ]] && [ -f "$ARTIFACT_DIR/libopencv4.11_4.11.0-1_arm64.deb" ]; then
+            log_success "All DEB packages present"
+        else
+            log_success "All artifacts present"
+        fi
         return 0
     fi
 }
@@ -332,33 +362,12 @@ build_dev() {
         apt-get install -y "${missing_deps[@]}"
     fi
 
-    log_info "Extracting pre-built dependencies..."
+    log_info "Installing pre-built dependencies..."
     mkdir -p /usr/lib/pitrac
     extract_all_dependencies "$ARTIFACT_DIR" "/usr/lib/pitrac"
-    
-    if [[ ! -d /opt/activemq-cpp/include ]]; then
-        log_info "  Setting up ActiveMQ headers..."
-        tar xzf "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" -C /tmp/
-        mkdir -p /opt/activemq-cpp
-        cp -r /tmp/activemq-cpp/* /opt/activemq-cpp/
-        rm -rf /tmp/activemq-cpp
-    fi
-
-    if [[ ! -d /opt/opencv/include/opencv4 ]]; then
-        log_info "  Setting up OpenCV headers..."
-        tar xzf "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" -C /tmp/
-        mkdir -p /opt/opencv
-        cp -r /tmp/opencv/* /opt/opencv/
-        rm -rf /tmp/opencv
-    else
-        log_info "  OpenCV headers already installed"
-    fi
 
     # Update library cache
     ldconfig
-
-    # Create pkg-config files using common function
-    create_pkgconfig_files
 
     # Build PiTrac
     log_info "Building PiTrac..."
@@ -368,12 +377,13 @@ build_dev() {
     apply_boost_cxx20_fix
 
     # Set build environment
-    export PKG_CONFIG_PATH="/opt/opencv/lib/pkgconfig:/opt/activemq-cpp/lib/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig"
-    export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
-    export CMAKE_PREFIX_PATH="/opt/opencv:/opt/activemq-cpp"
-    export CPLUS_INCLUDE_PATH="/opt/opencv/include/opencv4:/opt/activemq-cpp/include/activemq-cpp-3.9.5"
+    # DEB packages install to standard locations
+    export PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
+    export LD_LIBRARY_PATH="/usr/lib/aarch64-linux-gnu:/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
+    export CMAKE_PREFIX_PATH="/usr"
+    export CPLUS_INCLUDE_PATH="/usr/include/opencv4:/usr/include/activemq-cpp-3.9.5"
     export PITRAC_ROOT="$REPO_ROOT/Software/LMSourceCode"
-    export CXXFLAGS="-I/opt/opencv/include/opencv4"
+    export CXXFLAGS="-I/usr/include/opencv4"
 
     # Create dummy closed source file if needed
     mkdir -p ClosedSourceObjectFiles
