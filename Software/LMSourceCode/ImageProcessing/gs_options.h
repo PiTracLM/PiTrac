@@ -114,8 +114,6 @@ namespace golf_sim {
 					"Causes camera1 system to act as though a ball was found even if none is present.")
 				("camera_gain", value<double>(&camera_gain_)->default_value(0.0),
 					"Amount of gain for taking pictures")
-				("msg_broker_address", value<std::string>(&msg_broker_address_)->default_value(""),
-					"Specify the full hostname or ip address and port of the host of the Active MQ broker. For example: tcp://10.0.0.41:61616 . Default is: <empty string>")
 				("base_image_logging_dir", value<std::string>(&base_image_logging_dir_)->default_value(""),
 					"Specify the full path (with an ending '/') where diagnostic images are to be written. Default is: <empty>")
 				("web_server_share_dir", value<std::string>(&web_server_share_dir_)->default_value(""),
@@ -158,7 +156,6 @@ namespace golf_sim {
 		std::string artifact_save_level_string_;
 		std::string logging_level_string_;
 		std::string command_line_file_;
-		std::string msg_broker_address_;
 		std::string base_image_logging_dir_;
 		std::string web_server_share_dir_;
 		std::string e6_host_address_;

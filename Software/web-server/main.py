@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 PiTrac Web Server - Lightweight replacement for TomEE
-Serves dashboard, handles ActiveMQ messages, and manages shot images
+Serves dashboard, handles ZeroMQ messages, and manages shot images
 """
 
 import logging

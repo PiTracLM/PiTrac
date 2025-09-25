@@ -135,8 +135,6 @@ void GolfSimOptions::Print() const
 	std::cout << "    send_test_results: " << std::to_string(send_test_results_) << std::endl;
 	if (!output_filename_.empty())
 		std::cout << "    output_filename: " << output_filename_ << std::endl;
-	if (!msg_broker_address_.empty())
-		std::cout << "    msg_broker_address_: " << msg_broker_address_ << std::endl;
 	if (!base_image_logging_dir_.empty())
 		std::cout << "    base_image_logging_dir_: " << base_image_logging_dir_ << std::endl;
 	if (!web_server_share_dir_.empty())

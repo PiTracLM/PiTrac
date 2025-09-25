@@ -5,281 +5,450 @@
 
 #ifdef __unix__  // Ignore in Windows environment
 
-#include "gs_globals.h"
-#include "logging_tools.h"
-
-#include "gs_ipc_message.h"
-#include "gs_options.h"
-#include "gs_config.h"
 #include "gs_ipc_system.h"
 
-#include "gs_message_consumer.h"
-#include "gs_message_producer.h"
+#include <chrono>
+#include <cstring>
+#include <random>
+#include <thread>
 
+#include "gs_globals.h"
+#include "logging_tools.h"
+#include "gs_options.h"
+#include "gs_config.h"
 
-using namespace activemq::core;
-using namespace decaf::util::concurrent;
-using namespace decaf::util;
-using namespace decaf::lang;
-using namespace cms;
 using namespace std;
 
 namespace golf_sim {
 
-    static std::string base64_encode(unsigned char const* bytes_to_encode, unsigned int in_len) {
-        static const std::string base64_chars =
-                     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                     "abcdefghijklmnopqrstuvwxyz"
-                     "0123456789+/";
+    std::string GolfSimIpcSystem::kZeroMQPublisherEndpoint = "tcp://*:5556";
+    std::string GolfSimIpcSystem::kZeroMQSubscriberEndpoint = "tcp://localhost:5556";
 
-        std::string ret;
-        int i = 0;
-        int j = 0;
-        unsigned char char_array_3[3];
-        unsigned char char_array_4[4];
+    const std::string GolfSimIpcSystem::kGolfSimTopicPrefix = "Golf.Sim";
+    const std::string GolfSimIpcSystem::kGolfSimMessageTopic = "Golf.Sim.Message";
+    const std::string GolfSimIpcSystem::kGolfSimResultsTopic = "Golf.Sim.Results";
+    const std::string GolfSimIpcSystem::kGolfSimControlTopic = "Golf.Sim.Control";
 
-        while (in_len--) {
-            char_array_3[i++] = *(bytes_to_encode++);
-            if (i == 3) {
-                char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-                char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
-                char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
-                char_array_4[3] = char_array_3[2] & 0x3f;
+    const std::string GolfSimIpcSystem::kZeroMQSystemIdProperty = "System_ID";
+    const std::string GolfSimIpcSystem::kZeroMQMessageTypeProperty = "Message_Type";
+    const std::string GolfSimIpcSystem::kZeroMQTimestampProperty = "Timestamp";
 
-                for(i = 0; (i <4) ; i++)
-                    ret += base64_chars[char_array_4[i]];
-                i = 0;
-            }
-        }
-
-        if (i) {
-            for(j = i; j < 3; j++)
-                char_array_3[j] = '\0';
-
-            char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-            char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
-            char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
-
-            for (j = 0; (j < i + 1); j++)
-                ret += base64_chars[char_array_4[j]];
-
-            while((i++ < 3))
-                ret += '=';
-        }
-
-        return ret;
-    }
-
-    std::string GolfSimIpcSystem::kWebActiveMQHostAddress = "";
-
-    const std::string GolfSimIpcSystem::kGolfSimMessageTypeTag = "Message Type";
-    const std::string GolfSimIpcSystem::kGolfSimMessageType = "GolfSimIPCMessage";
-    const std::string GolfSimIpcSystem::kGolfSimIPCMessageTypeTag = "IPCMessageType";
-
-    GolfSimMessageConsumer* GolfSimIpcSystem::consumer_ = nullptr;
-    GolfSimMessageProducer* GolfSimIpcSystem::producer_ = nullptr;
-
-    std::string GolfSimIpcSystem::kActiveMQLMIdProperty = "LM_System_ID";
-
-
+    std::unique_ptr<ZeroMQPublisher> GolfSimIpcSystem::publisher_ = nullptr;
+    std::unique_ptr<ZeroMQSubscriber> GolfSimIpcSystem::subscriber_ = nullptr;
+    std::string GolfSimIpcSystem::system_id_ = "";
     cv::Mat GolfSimIpcSystem::last_received_image_;
+    std::mutex GolfSimIpcSystem::system_mutex_;
+    std::atomic<bool> GolfSimIpcSystem::initialized_(false);
 
     bool GolfSimIpcSystem::InitializeIPCSystem() {
+        std::lock_guard<std::mutex> lock(system_mutex_);
 
-        // We prefer the command-line setting even if there's one in the .json config file
-        if (!GolfSimOptions::GetCommandLineOptions().msg_broker_address_.empty()) {
-            kWebActiveMQHostAddress = GolfSimOptions::GetCommandLineOptions().msg_broker_address_;
+        if (initialized_.load()) {
+            GS_LOG_TRACE_MSG(trace, "ZeroMQ IPC System already initialized");
+            return true;
         }
-        else {
-            // At least for now, we will still allow the message broker address to be set
-            // from the configuration .json file.
-            GolfSimConfiguration::SetConstant("gs_config.ipc_interface.kWebActiveMQHostAddress", kWebActiveMQHostAddress);
-            if (kWebActiveMQHostAddress.empty()) {
-                GS_LOG_TRACE_MSG(error, "GolfSimIpcSystem::InitializeIPCSystem - kWebActiveMQHostAddress not set.  Cannot connect with ActiveMQ system.");
-                return false;
+
+        if (system_id_.empty()) {
+            char hostname[256];
+            if (gethostname(hostname, sizeof(hostname)) == 0) {
+                system_id_ = std::string(hostname) + "_" + std::to_string(getpid());
+            } else {
+                std::random_device rd;
+                std::mt19937 gen(rd());
+                system_id_ = "system_" + std::to_string(gen());
             }
         }
 
-        activemq::library::ActiveMQCPP::initializeLibrary();
-
-
-        // Set the URI to point to the IP Address of your broker.
-        // add any optional params to the url to enable things like
-        // tightMarshalling or tcp logging etc.  See the CMS web site for
-        // a full list of configuration options.
-        //
-        //  http://activemq.apache.org/cms/
-        //
-        // Wire Format Options:
-        // =========================
-        // Use either stomp or openwire, the default ports are different for each
-        //
-        // Examples:
-        //    tcp://127.0.0.1:61616                      default to openwire
-        //    tcp://127.0.0.1:61616?wireFormat=openwire  same as above
-        //    tcp://127.0.0.1:61613?wireFormat=stomp     use stomp instead
-        //
-        // SSL:
-        // =========================
-        // To use SSL you need to specify the location of the trusted Root CA or the
-        // certificate for the broker you want to connect to.  Using the Root CA allows
-        // you to use failover with multiple servers all using certificates signed by
-        // the trusted root.  If using client authentication you also need to specify
-        // the location of the client Certificate.
-        //
-        //     System::setProperty( "decaf.net.ssl.keyStore", "<path>/client.pem" );
-        //     System::setProperty( "decaf.net.ssl.keyStorePassword", "password" );
-        //     System::setProperty( "decaf.net.ssl.trustStore", "<path>/rootCA.pem" );
-        //
-        // The you just specify the ssl transport in the URI, for example:
-        //
-        //     ssl://localhost:61617
-        //
-        std::string message_broker_host = kWebActiveMQHostAddress;
-
-        if (message_broker_host.empty()) {
-            GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem could not find host address in JSON config file.");
-            return false;
+        // Check for ZeroMQ endpoint configuration
+        std::string config_address;
+        GolfSimConfiguration::SetConstant("gs_config.ipc_interface.kZeroMQEndpoint", config_address);
+        if (!config_address.empty()) {
+            kZeroMQSubscriberEndpoint = config_address;
+            size_t port_pos = config_address.find_last_of(':');
+            if (port_pos != std::string::npos) {
+                std::string port = config_address.substr(port_pos + 1);
+                kZeroMQPublisherEndpoint = "tcp://*:" + port;
+            }
         }
 
-        std::string broker_URI = "failover:(" + message_broker_host + ")" + "?useCompression=true&initialReconnectDelay=2000&maxReconnectAttempts=2";
-            //        "?wireFormat=openwire"
-            //        "&transport.useInactivityMonitor=false"
-            //        "&connection.alwaysSyncSend=true"
-            //        "&connection.useAsyncSend=true"
-            //        "?transport.commandTracingEnabled=true"
-            //        "&transport.tcpTracingEnabled=true"
-            //        "&wireFormat.tightEncodingEnabled=true"
+        GS_LOG_TRACE_MSG(trace, "Initializing ZeroMQ IPC System");
+        GS_LOG_TRACE_MSG(trace, "Publisher endpoint: " + kZeroMQPublisherEndpoint);
+        GS_LOG_TRACE_MSG(trace, "Subscriber endpoint: " + kZeroMQSubscriberEndpoint);
+        GS_LOG_TRACE_MSG(trace, "System ID: " + system_id_);
 
-        GS_LOG_TRACE_MSG(trace, "Active-MQ broker_URI is: " + broker_URI);
+        try {
+            publisher_ = std::make_unique<ZeroMQPublisher>(kZeroMQPublisherEndpoint);
+            publisher_->SetHighWaterMark(1000);
+            publisher_->SetLinger(1000);
 
-        // Initialization order probably doesn't matter, but we will initialize the consumer first to
-        // clear out any messages before the producer starts.
-        consumer_ = GolfSimMessageConsumer::Initialize(broker_URI);
+            if (!publisher_->Start()) {
+                GS_LOG_TRACE_MSG(error, "Failed to start ZeroMQ publisher");
+                return false;
+            }
 
-        if (!consumer_) {
-            GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem could not Initialize consumer");
+            subscriber_ = std::make_unique<ZeroMQSubscriber>(kZeroMQSubscriberEndpoint);
+            subscriber_->SetHighWaterMark(1000);
+            subscriber_->SetReceiveTimeout(100);
+            subscriber_->SetSystemIdToExclude(system_id_);
+
+            subscriber_->SetMessageHandler(OnMessageReceived);
+
+            subscriber_->Subscribe(kGolfSimTopicPrefix);
+
+            if (!subscriber_->Start()) {
+                GS_LOG_TRACE_MSG(error, "Failed to start ZeroMQ subscriber");
+                publisher_->Stop();
+                return false;
+            }
+
+            initialized_ = true;
+            GS_LOG_TRACE_MSG(trace, "ZeroMQ IPC System initialized successfully");
+            return true;
+
+        } catch (const std::exception& e) {
+            GS_LOG_TRACE_MSG(error, "Exception initializing ZeroMQ IPC System: " + std::string(e.what()));
             return false;
         }
-
-        producer_ = GolfSimMessageProducer::Initialize(broker_URI);
-
-        if (!producer_) {
-            GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem could not Initialize producer");
-            return false;
-        }
-
-        std::this_thread::yield();
-
-        return true;
     }
-
 
     bool GolfSimIpcSystem::ShutdownIPCSystem() {
-        GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem::ShutdownIPC");
+        std::lock_guard<std::mutex> lock(system_mutex_);
 
-        consumer_->Shutdown();
-        producer_->Shutdown();
+        if (!initialized_.load()) {
+            return true;
+        }
 
-        // TBD - Give other threads a moment to shut down
-        sleep(4);
+        GS_LOG_TRACE_MSG(trace, "Shutting down ZeroMQ IPC System");
 
-        delete consumer_;
-        delete producer_;
+        if (subscriber_) {
+            subscriber_->Stop();
+            subscriber_.reset();
+        }
 
-        activemq::library::ActiveMQCPP::shutdownLibrary();
+        if (publisher_) {
+            publisher_->Stop();
+            publisher_.reset();
+        }
 
+        initialized_ = false;
+        GS_LOG_TRACE_MSG(trace, "ZeroMQ IPC System shutdown complete");
         return true;
     }
 
-	bool GolfSimIpcSystem::DispatchReceivedIpcMessage(const BytesMessage& message)  {
+    void GolfSimIpcSystem::OnMessageReceived(
+        const std::string& topic,
+        const std::vector<uint8_t>& data,
+        const std::map<std::string, std::string>& properties) {
 
-        GS_LOG_TRACE_MSG(trace, "DispatchReceivedIpcMessage::Dispatch Received Ipc Message.");
+        GS_LOG_TRACE_MSG(trace, "ZeroMQ message received on topic: " + topic);
 
-        GolfSimIPCMessage* ipc_message = BuildIpcMessageFromBytesMessage(message);
+        auto system_id_it = properties.find(kZeroMQSystemIdProperty);
+        if (system_id_it != properties.end() && system_id_it->second == system_id_) {
+            GS_LOG_TRACE_MSG(trace, "Ignoring own message");
+            return;
+        }
 
-        if (ipc_message == nullptr) {
-            LoggingTools::Warning("Unable to convert ActiveMQ Message to a GolfSimIPCMessage.");
+        try {
+            DispatchReceivedIpcMessage(topic, data, properties);
+        } catch (const std::exception& e) {
+            GS_LOG_TRACE_MSG(error, "Exception handling ZeroMQ message: " + std::string(e.what()));
+        }
+    }
+
+    bool GolfSimIpcSystem::DispatchReceivedIpcMessage(
+        const std::string& topic,
+        const std::vector<uint8_t>& data,
+        const std::map<std::string, std::string>& properties) {
+
+        GS_LOG_TRACE_MSG(trace, "Dispatching ZeroMQ IPC message from topic: " + topic);
+
+        auto ipc_message = BuildIpcMessageFromZeroMQData(data, properties);
+
+        if (!ipc_message) {
+            LoggingTools::Warning("Unable to convert ZeroMQ data to GolfSimIPCMessage");
             return false;
         }
 
         bool result = false;
 
-        GS_LOG_TRACE_MSG(trace, "DispatchReceivedIpcMessage::Dispatch - message type: " + ipc_message->Format());
+        GS_LOG_TRACE_MSG(trace, "Dispatching message type: " + ipc_message->Format());
 
         switch (ipc_message->GetMessageType()) {
             case GolfSimIPCMessage::IPCMessageType::kUnknown:
             {
-                LoggingTools::Warning("Received GolfSimIPCMessage of type kUnknown.");
+                LoggingTools::Warning("Received GolfSimIPCMessage of type kUnknown");
                 break;
             }
             case GolfSimIPCMessage::IPCMessageType::kCamera2Image:
             {
-                GS_LOG_TRACE_MSG(trace, "Dispatching kCamera2Image IPC message.");
+                GS_LOG_TRACE_MSG(trace, "Dispatching kCamera2Image IPC message");
                 result = DispatchCamera2ImageMessage(*ipc_message);
                 break;
-
             }
             case GolfSimIPCMessage::IPCMessageType::kCamera2ReturnPreImage:
             {
-                GS_LOG_TRACE_MSG(trace, "Dispatching kCamera2PreImage IPC message.");
+                GS_LOG_TRACE_MSG(trace, "Dispatching kCamera2PreImage IPC message");
                 result = DispatchCamera2PreImageMessage(*ipc_message);
                 break;
-
             }
             case GolfSimIPCMessage::IPCMessageType::kShutdown:
             {
-                GS_LOG_TRACE_MSG(trace, "Dispatching kShutdown IPC message.");
+                GS_LOG_TRACE_MSG(trace, "Dispatching kShutdown IPC message");
                 result = DispatchShutdownMessage(*ipc_message);
                 break;
             }
             case GolfSimIPCMessage::IPCMessageType::kRequestForCamera2Image:
             {
-                GS_LOG_TRACE_MSG(trace, "Dispatching kRequestForCamera2Image IPC message.");
-                DispatchRequestForCamera2ImageMessage(*ipc_message);
+                GS_LOG_TRACE_MSG(trace, "Dispatching kRequestForCamera2Image IPC message");
+                result = DispatchRequestForCamera2ImageMessage(*ipc_message);
                 break;
-
             }
             case GolfSimIPCMessage::IPCMessageType::kResults:
             {
-                GS_LOG_TRACE_MSG(trace, "Dispatching kResults IPC message.");
-                DispatchResultsMessage(*ipc_message);
+                GS_LOG_TRACE_MSG(trace, "Dispatching kResults IPC message");
+                result = DispatchResultsMessage(*ipc_message);
                 break;
-
             }
             case GolfSimIPCMessage::IPCMessageType::kControlMessage:
             {
-                GS_LOG_TRACE_MSG(trace, "Dispatching kControlMessage IPC message.");
-                DispatchControlMsgMessage(*ipc_message);
+                GS_LOG_TRACE_MSG(trace, "Dispatching kControlMessage IPC message");
+                result = DispatchControlMsgMessage(*ipc_message);
                 break;
             }
             default:
             {
                 GS_LOG_MSG(error, "Could not dispatch unknown IPC message of type " +
-                                            std::to_string((int)ipc_message->GetMessageType()));
+                                  std::to_string((int)ipc_message->GetMessageType()));
                 break;
             }
         }
 
-        // We own the new ipc_message, so clean it up here
-        delete ipc_message;
-
         std::this_thread::yield();
+        return result;
+    }
 
-		return true;
-	}
+    bool GolfSimIpcSystem::SendIpcMessage(const GolfSimIPCMessage& ipc_message) {
+        if (!initialized_.load() || !publisher_) {
+            GS_LOG_TRACE_MSG(error, "ZeroMQ IPC System not initialized");
+            return false;
+        }
 
+        GS_LOG_TRACE_MSG(trace, "Sending ZeroMQ IPC message: " + ipc_message.Format());
+
+        std::string topic;
+        std::vector<uint8_t> data;
+        std::map<std::string, std::string> properties;
+
+        if (!SerializeIpcMessageToZeroMQ(ipc_message, topic, data, properties)) {
+            GS_LOG_TRACE_MSG(error, "Failed to serialize IPC message to ZeroMQ format");
+            return false;
+        }
+
+        bool result = publisher_->SendMessage(topic, data, properties);
+        std::this_thread::yield();
+        return result;
+    }
+
+    std::unique_ptr<GolfSimIPCMessage> GolfSimIpcSystem::BuildIpcMessageFromZeroMQData(
+        const std::vector<uint8_t>& data,
+        const std::map<std::string, std::string>& properties) {
+
+        try {
+            auto type_it = properties.find(kZeroMQMessageTypeProperty);
+            if (type_it == properties.end()) {
+                GS_LOG_TRACE_MSG(error, "No message type in ZeroMQ message properties");
+                return nullptr;
+            }
+
+            int message_type_int = std::stoi(type_it->second);
+            auto message_type = static_cast<GolfSimIPCMessage::IPCMessageType>(message_type_int);
+
+            if (message_type == GolfSimIPCMessage::IPCMessageType::kUnknown) {
+                return nullptr;
+            }
+
+            auto ipc_message = std::make_unique<GolfSimIPCMessage>(message_type);
+
+            if (message_type == GolfSimIPCMessage::IPCMessageType::kCamera2Image ||
+                message_type == GolfSimIPCMessage::IPCMessageType::kCamera2ReturnPreImage) {
+
+                msgpack::object_handle oh;
+                msgpack::unpack(oh, reinterpret_cast<const char*>(data.data()), data.size());
+
+                ZeroMQImageMessage img_msg;
+                oh.get().convert(img_msg);
+
+                const int MAX_IMAGE_DIMENSION = 10000; // Reasonable max dimension
+                if (img_msg.image_rows <= 0 || img_msg.image_rows > MAX_IMAGE_DIMENSION ||
+                    img_msg.image_cols <= 0 || img_msg.image_cols > MAX_IMAGE_DIMENSION) {
+                    GS_LOG_TRACE_MSG(error, "Invalid image dimensions: " +
+                                     std::to_string(img_msg.image_rows) + "x" +
+                                     std::to_string(img_msg.image_cols));
+                    return nullptr;
+                }
+
+                size_t expected_size = img_msg.image_rows * img_msg.image_cols * CV_ELEM_SIZE(img_msg.image_type);
+                if (img_msg.image_data.size() != expected_size) {
+                    GS_LOG_TRACE_MSG(error, "Image data size mismatch. Expected: " +
+                                     std::to_string(expected_size) + ", Got: " +
+                                     std::to_string(img_msg.image_data.size()));
+                    return nullptr;
+                }
+
+                cv::Mat image(img_msg.image_rows, img_msg.image_cols, img_msg.image_type,
+                             const_cast<uint8_t*>(img_msg.image_data.data()));
+                ipc_message->SetImageMat(image);
+
+            } else if (message_type == GolfSimIPCMessage::IPCMessageType::kControlMessage) {
+
+                msgpack::object_handle oh;
+                msgpack::unpack(oh, reinterpret_cast<const char*>(data.data()), data.size());
+
+                ZeroMQControlMessage ctrl_msg;
+                oh.get().convert(ctrl_msg);
+
+                auto& control_msg = ipc_message->GetControlMessageForModification();
+                control_msg.control_type_ = static_cast<GsIPCControlMsgType>(ctrl_msg.control_type);
+
+            } else if (message_type == GolfSimIPCMessage::IPCMessageType::kResults) {
+
+                msgpack::object_handle oh;
+                msgpack::unpack(oh, reinterpret_cast<const char*>(data.data()), data.size());
+
+                ZeroMQResultMessage result_msg;
+                oh.get().convert(result_msg);
+
+                // TODO: Implement proper result deserialization
+
+            }
+
+            return ipc_message;
+
+        } catch (const std::exception& e) {
+            GS_LOG_TRACE_MSG(error, "Exception deserializing ZeroMQ message: " + std::string(e.what()));
+            return nullptr;
+        }
+    }
+
+    bool GolfSimIpcSystem::SerializeIpcMessageToZeroMQ(
+        const GolfSimIPCMessage& ipc_message,
+        std::string& topic,
+        std::vector<uint8_t>& data,
+        std::map<std::string, std::string>& properties) {
+
+        try {
+            topic = GetTopicForMessageType(ipc_message.GetMessageType());
+
+            properties[kZeroMQSystemIdProperty] = system_id_;
+            properties[kZeroMQMessageTypeProperty] = std::to_string(static_cast<int>(ipc_message.GetMessageType()));
+            properties[kZeroMQTimestampProperty] = std::to_string(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count());
+
+            ZeroMQMessageHeader header;
+            header.message_type = static_cast<int>(ipc_message.GetMessageType());
+            header.timestamp_ms = std::stoll(properties[kZeroMQTimestampProperty]);
+            header.system_id = system_id_;
+
+            msgpack::sbuffer buffer;
+
+            if (ipc_message.GetMessageType() == GolfSimIPCMessage::IPCMessageType::kCamera2Image ||
+                ipc_message.GetMessageType() == GolfSimIPCMessage::IPCMessageType::kCamera2ReturnPreImage) {
+
+                cv::Mat image = ipc_message.GetImageMat();
+
+                if (image.empty() || !image.data) {
+                    GS_LOG_TRACE_MSG(error, "Invalid image data - image is empty or data is null");
+                    return false;
+                }
+
+                const size_t MAX_IMAGE_SIZE = 100 * 1024 * 1024; // 100MB max
+                size_t data_size = image.total() * image.elemSize();
+
+                if (data_size == 0 || data_size > MAX_IMAGE_SIZE) {
+                    GS_LOG_TRACE_MSG(error, "Invalid image size: " + std::to_string(data_size));
+                    return false;
+                }
+
+                ZeroMQImageMessage img_msg;
+                img_msg.header = header;
+                img_msg.image_rows = image.rows;
+                img_msg.image_cols = image.cols;
+                img_msg.image_type = image.type();
+                img_msg.image_data.resize(data_size);
+                std::memcpy(img_msg.image_data.data(), image.data, data_size);
+
+                msgpack::pack(buffer, img_msg);
+
+            } else if (ipc_message.GetMessageType() == GolfSimIPCMessage::IPCMessageType::kControlMessage) {
+
+                ZeroMQControlMessage ctrl_msg;
+                ctrl_msg.header = header;
+                ctrl_msg.control_type = static_cast<int>(ipc_message.GetControlMessage().control_type_);
+
+                msgpack::pack(buffer, ctrl_msg);
+
+            } else if (ipc_message.GetMessageType() == GolfSimIPCMessage::IPCMessageType::kResults) {
+
+                ZeroMQResultMessage result_msg;
+                result_msg.header = header;
+
+                // TODO: Implement proper result serialization based on GsIPCResult structure
+                result_msg.result_data["type"] = "results";
+
+                msgpack::pack(buffer, result_msg);
+
+            } else {
+
+                ZeroMQSimpleMessage simple_msg;
+                simple_msg.header = header;
+
+                msgpack::pack(buffer, simple_msg);
+            }
+
+            data.resize(buffer.size());
+            std::memcpy(data.data(), buffer.data(), buffer.size());
+
+            return true;
+
+        } catch (const std::exception& e) {
+            GS_LOG_TRACE_MSG(error, "Exception serializing IPC message: " + std::string(e.what()));
+            return false;
+        }
+    }
+
+    std::string GolfSimIpcSystem::GetTopicForMessageType(GolfSimIPCMessage::IPCMessageType type) {
+        switch (type) {
+            case GolfSimIPCMessage::IPCMessageType::kResults:
+                return kGolfSimResultsTopic;
+            case GolfSimIPCMessage::IPCMessageType::kControlMessage:
+                return kGolfSimControlTopic;
+            default:
+                return kGolfSimMessageTopic;
+        }
+    }
+
+    GolfSimIPCMessage::IPCMessageType GolfSimIpcSystem::GetMessageTypeFromTopic(const std::string& topic) {
+        if (topic == kGolfSimResultsTopic) {
+            return GolfSimIPCMessage::IPCMessageType::kResults;
+        } else if (topic == kGolfSimControlTopic) {
+            return GolfSimIPCMessage::IPCMessageType::kControlMessage;
+        } else {
+            return GolfSimIPCMessage::IPCMessageType::kUnknown;
+        }
+    }
+
+    void GolfSimIpcSystem::SetSystemId(const std::string& system_id) {
+        system_id_ = system_id;
+    }
+
+    std::string GolfSimIpcSystem::GetSystemId() {
+        return system_id_;
+    }
 
     bool GolfSimIpcSystem::DispatchShutdownMessage(const GolfSimIPCMessage& message) {
-
         GS_LOG_TRACE_MSG(trace, "DispatchShutdownMessage Received Ipc Message.");
 
-        // TBD - Not sure if we just want to force the shutdown here or send an event into the
-        // FSM and have the FSM do so. Probably better to send the event and get out of this IPC
-        // consumer thread callback.
-
-        // This message is telling the system to shutdown and exit
-        // Let the FSM deal with the message by entering a related message into the queue
         GolfSimEventElement exitMessageReceived{ new GolfSimEvent::Exit{ } };
         GolfSimEventQueue::QueueEvent(exitMessageReceived);
 
@@ -287,16 +456,11 @@ namespace golf_sim {
     }
 
     bool GolfSimIpcSystem::DispatchResultsMessage(const GolfSimIPCMessage& message) {
-
-        // The LM system doesn't currently do anything if it gets a results message.
-        // These messages are mostly destined for the PiTrac GUI
         GS_LOG_TRACE_MSG(trace, "DispatchResultsMessage Received Ipc Message.");
-
         return true;
     }
 
     bool GolfSimIpcSystem::DispatchControlMsgMessage(const GolfSimIPCMessage& message) {
-
         GS_LOG_TRACE_MSG(trace, "DispatchControlMsgMessage Received Ipc Message.");
 
         GolfSimEventElement controlMessageReceived{ new GolfSimEvent::ControlMessage{ message.GetControlMessage().control_type_} };
@@ -305,140 +469,96 @@ namespace golf_sim {
         return true;
     }
 
-
-
-
     bool GolfSimIpcSystem::DispatchRequestForCamera2TestStillImage(const GolfSimIPCMessage& message) {
-
         GS_LOG_TRACE_MSG(trace, "DispatchRequestForCamera2TestStillImage Received Ipc Message.");
 
-        // This message is telling the camera 2 system to get ready to take a one-strobe picture, whereas
-        // the camera will be externally triggered from the camera 1 system once the ball appears
-        // to have been hit.
-        // The main difference between this and the usual camera2 picture request is that the
-        // TestStillImage will just take one strobe and immediately save it to a file.
-
         switch (GolfSimOptions::GetCommandLineOptions().system_mode_) {
-
             case SystemMode::kCamera1:
             case SystemMode::kCamera1TestStandalone:
             case SystemMode::kCamera2TestStandalone:
-                // This message is only for the  camera 2 system.  Ignore it
                 break;
 
             case SystemMode::kCamera2:
             case SystemMode::kRunCam2ProcessForPi1Processing:
             {
-                // TBD - Not sure we need this message?
                 break;
             }
             default:
             {
-                LoggingTools::Warning("GolfSimIpcSystem::DispatchRequestForCamera2TestStillImage found unknown command_line_options_.system_mode_ .");
+                LoggingTools::Warning("GolfSimIpcSystem::DispatchRequestForCamera2TestStillImage found unknown system_mode_");
                 return false;
-
-                break;
             }
         }
 
         return true;
     }
 
-    bool GolfSimIpcSystem::DispatchRequestForCamera2ImageMessage(const GolfSimIPCMessage& message)  {
-
+    bool GolfSimIpcSystem::DispatchRequestForCamera2ImageMessage(const GolfSimIPCMessage& message) {
         GS_LOG_TRACE_MSG(trace, "DispatchRequestForCamera2ImageMessage Received Ipc Message.");
 
-        // This message is telling the camera 2 system to get ready to take a picture, whereas
-        // the camera will be externally triggered from the camera 1 system once the ball appears
-        // to have been hit.
-
         switch (GolfSimOptions::GetCommandLineOptions().system_mode_) {
-
             case SystemMode::kCamera1:
-                // This message is only for the  camera 2 system.  Ignore it
                 break;
 
             case SystemMode::kCamera1TestStandalone:
             {
-                // A request for the camera 2 system to take a triggered picture has been sent.
-                // If we are in test mode for camera 1, camera 2 isn't around, so nothing
-                // will be done.  Just ignore it here on camera 1.
-
                 break;
             }
             case SystemMode::kCamera2:
             case SystemMode::kCamera2TestStandalone:
             case SystemMode::kRunCam2ProcessForPi1Processing:
             {
-                // Let the FSM deal with the message by entering a related message into the queue
                 GolfSimEventElement armCamera2MessageReceived{ new GolfSimEvent::ArmCamera2MessageReceived{ } };
                 GolfSimEventQueue::QueueEvent(armCamera2MessageReceived);
-
                 break;
             }
             case SystemMode::kCamera1AutoCalibrate:
             case SystemMode::kCamera2AutoCalibrate:
             {
-                // Do nothing.  Not relevant for these modes
+                break;
             }
             default:
             {
-                LoggingTools::Warning("GolfSimIpcSystem::DispatchRequestForCamera2ImageMessage found unknown command_line_options_.system_mode_ .");
+                LoggingTools::Warning("GolfSimIpcSystem::DispatchRequestForCamera2ImageMessage found unknown system_mode_");
                 return false;
-
-                break;
             }
         }
 
         return true;
     }
 
-
     bool GolfSimIpcSystem::DispatchCamera2ImageMessage(const GolfSimIPCMessage& message) {
-
         GS_LOG_TRACE_MSG(trace, "DispatchCamera2ImageMessage received Ipc Message.");
 
-        // If in still-image mode, we won't inform the state machine about the message.
-        // Instead just save the image so that someone can get to it.
         if (GolfSimOptions::GetCommandLineOptions().camera_still_mode_ ||
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1AutoCalibrate ||
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2AutoCalibrate ||
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1BallLocation ||
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2BallLocation) {
-            GS_LOG_TRACE_MSG(trace, "In still-picture, locate or AutoCalibrate camera mode.  Will save received image.");
+            GS_LOG_TRACE_MSG(trace, "In still-picture, locate or AutoCalibrate camera mode. Will save received image.");
 
             last_received_image_ = message.GetImageMat().clone();
-
             return true;
         }
 
-        // Let the FSM deal with the message by entering a related message into the queue
-
         switch (GolfSimOptions::GetCommandLineOptions().system_mode_) {
-
             case SystemMode::kCamera2:
             case SystemMode::kCamera2TestStandalone:
             {
-
-                // This message is only for the camera 1 system.  Ignore it for camera 2
-
                 break;
             }
             case SystemMode::kCamera1TestStandalone:
             case SystemMode::kCamera1:
             {
-                // Let the FSM deal with the message by entering a related message (including the image) into the queue
                 GolfSimEventElement cam2ImageMessageReceived{ new GolfSimEvent::Camera2ImageReceived{ message.GetImageMat() } };
                 GS_LOG_TRACE_MSG(trace, "    QueueEvent: " + cam2ImageMessageReceived.e_->Format());
                 GolfSimEventQueue::QueueEvent(cam2ImageMessageReceived);
-
                 break;
             }
-
             case SystemMode::kTest:
             default:
             {
-                LoggingTools::Warning("GolfSimIpcSystem::DispatchCamera2ImageMessage found unknown command_line_options_.system_mode_ .");
+                LoggingTools::Warning("GolfSimIpcSystem::DispatchCamera2ImageMessage found unknown system_mode_");
                 return false;
             }
         }
@@ -447,218 +567,35 @@ namespace golf_sim {
     }
 
     bool GolfSimIpcSystem::DispatchCamera2PreImageMessage(const GolfSimIPCMessage& message) {
-
         GS_LOG_TRACE_MSG(trace, "DispatchCamera2PreImageMessage received Ipc Message.");
 
-        // Let the FSM deal with the message by entering a related message into the queue
-
         switch (GolfSimOptions::GetCommandLineOptions().system_mode_) {
-
-        case SystemMode::kCamera2:
-        case SystemMode::kCamera2TestStandalone:
-        {
-
-            // This message is only for the camera 1 system.  Ignore it for camera 2
-
-            break;
-        }
-        case SystemMode::kCamera1TestStandalone:
-        case SystemMode::kCamera1:
-        {
-            // Let the FSM deal with the message by entering a related message (including the image) into the queue
-            GolfSimEventElement cam2PreImageMessageReceived{ new GolfSimEvent::Camera2PreImageReceived{ message.GetImageMat() } };
-            GS_LOG_TRACE_MSG(trace, "    QueueEvent: " + cam2PreImageMessageReceived.e_->Format());
-            GolfSimEventQueue::QueueEvent(cam2PreImageMessageReceived);
-
-            break;
-        }
-        case SystemMode::kTest:
-        default:
-        {
-            LoggingTools::Warning("GolfSimIpcSystem::DispatchCamera2PreImageMessage found unknown command_line_options_.system_mode_ .");
-            return false;
-        }
+            case SystemMode::kCamera2:
+            case SystemMode::kCamera2TestStandalone:
+            {
+                break;
+            }
+            case SystemMode::kCamera1TestStandalone:
+            case SystemMode::kCamera1:
+            {
+                GolfSimEventElement cam2PreImageMessageReceived{ new GolfSimEvent::Camera2PreImageReceived{ message.GetImageMat() } };
+                GS_LOG_TRACE_MSG(trace, "    QueueEvent: " + cam2PreImageMessageReceived.e_->Format());
+                GolfSimEventQueue::QueueEvent(cam2PreImageMessageReceived);
+                break;
+            }
+            case SystemMode::kTest:
+            default:
+            {
+                LoggingTools::Warning("GolfSimIpcSystem::DispatchCamera2PreImageMessage found unknown system_mode_");
+                return false;
+            }
         }
 
         return true;
     }
 
-
-    // Caller owns the resulting message.  Returns nullptr if an error.
-    GolfSimIPCMessage* GolfSimIpcSystem::BuildIpcMessageFromBytesMessage(const BytesMessage& active_mq_message) {
-
-        GS_LOG_TRACE_MSG(trace, "BuildIpcMessageFromBytesMessage called.");
-        GolfSimIPCMessage* ipc_message = nullptr;
-
-        try {
-            std::string main_message_type = active_mq_message.getStringProperty(kGolfSimMessageTypeTag);
-
-            if (main_message_type != kGolfSimMessageType) {
-                GS_LOG_TRACE_MSG(trace, "BuildIpcMessageFromBytesMessage received unexpected GolfSimMessageType: " + main_message_type);
-                return nullptr;
-            }
-
-            GolfSimIPCMessage::IPCMessageType ipc_message_type = (GolfSimIPCMessage::IPCMessageType)active_mq_message.getIntProperty(kGolfSimIPCMessageTypeTag);
-
-            if (ipc_message_type == GolfSimIPCMessage::IPCMessageType::kUnknown) {
-                return nullptr;
-            }
-
-            // We appear to have a valid GolfSimIpcMessage
-            GS_LOG_TRACE_MSG(trace, "BuildIpcMessageFromBytesMessage converting Active-MQ message of type " + main_message_type +
-                                        " and message-type " + std::to_string((int)ipc_message_type) + " to GolfSimIpcMessage");
-            ipc_message = new GolfSimIPCMessage(ipc_message_type);
-
-            if (ipc_message == nullptr) {
-                return nullptr;
-            }
-
-            if (ipc_message->GetMessageType() == GolfSimIPCMessage::IPCMessageType::kCamera2Image ||
-                ipc_message->GetMessageType() == GolfSimIPCMessage::IPCMessageType::kCamera2ReturnPreImage) {
-
-                GS_LOG_TRACE_MSG(trace, "BuildIpcMessageFromBytesMessage about to UnpackMatData.");
-                // The ActiveMQ message's Byte body has the serialized data from which
-                // the cv::Mat can be reconstructed.
-                char* body_data = (char*)active_mq_message.getBodyBytes();
-                ipc_message->UnpackMatData(body_data, active_mq_message.getBodyLength());
-
-                // The caller of getBodyBytes owns the data, so clean it up here
-                delete body_data;
-            }
-            else if (ipc_message->GetMessageType() == GolfSimIPCMessage::IPCMessageType::kResults) {
-
-                GS_LOG_TRACE_MSG(trace, "BuildIpcMessageFromBytesMessage will NOT UnpackMatData for IPCMessageType::kResults.");
-                // The ActiveMQ message's Byte body has the serialized data from which
-                // the GsIPCResults oiject can be reconstructed.
-                char* body_data = (char*)active_mq_message.getBodyBytes();
-
-                /*
-                int number_bytes = active_mq_message.getBodyLength();
-
-                msgpack::unpacked unpacked_result_data;
-                msgpack::unpack(unpacked_result_data, static_cast<const char*>(body_data), number_bytes);
-
-                auto unpacked_gs_ipc_result = unpacked_result_data.get().as<GsIPCResult>();
-
-                ipc_message->GetResultsForModification() = unpacked_gs_ipc_result;
-                */
-
-                // The caller of getBodyBytes owns the data, so clean it up here
-                delete body_data;
-            }
-            else if (ipc_message->GetMessageType() == GolfSimIPCMessage::IPCMessageType::kControlMessage) {
-
-                GS_LOG_TRACE_MSG(trace, "Unpacking data for a IPCMessageType::kControlMessage.");
-
-                // The ActiveMQ message's Byte body has the serialized data from which
-                // the GsIPCControlMsg oiject can be reconstructed.
-                char* body_data = (char*)active_mq_message.getBodyBytes();
-
-                int number_bytes = active_mq_message.getBodyLength();
-
-                GS_LOG_TRACE_MSG(trace, "Packed IPCMessageType::kControlMessage has length = " + std::to_string(number_bytes));
-
-                msgpack::object_handle oh;
-
-                msgpack::unpack(oh, body_data, number_bytes);
-
-                // Get the packed value(s)
-                int control_msg_type;
-                oh.get().convert(control_msg_type);
-
-                GS_LOG_TRACE_MSG(trace, "Packed control msg type = " + std::to_string(control_msg_type));
-
-                GsIPCControlMsg &msg = ipc_message->GetControlMessageForModification();
-                msg.control_type_ = (GsIPCControlMsgType)control_msg_type;
-
-                GS_LOG_TRACE_MSG(trace, "Unpacked IPCMessageType::kControlMessage - message was: " + ipc_message->GetControlMessage().Format());
-
-                // The caller of getBodyBytes owns the data, so clean it up here
-                delete body_data;
-            }
-        }
-        catch (CMSException& e) {
-            GS_LOG_TRACE_MSG(trace, "BuildIpcMessageFromBytesMessage received an exception.  Stack trace is:");
-            e.printStackTrace();
-            return nullptr;
-        }
-        catch (std::exception& ex) {
-            GS_LOG_TRACE_MSG(trace, "Exception! - " + std::string(ex.what()) + ".  Restarting...");
-        }
-
-        return ipc_message;
-    }
-
-
-    // Caller owns the resulting message.  Returns nullptr if an error.
-
-    std::unique_ptr<cms::BytesMessage> GolfSimIpcSystem::BuildBytesMessageObjectFromIpcMessage(const GolfSimIPCMessage& ipc_message) {
-
-        GS_LOG_TRACE_MSG(trace, "BuildBytesMessageObjectFromIpcMessage called with IPC message type =" + std::to_string((int)ipc_message.GetMessageType()));
-
-        // Need to ask the producer's session to create the new message for us
-        // (in order to setup some of the messages's internal values correctly).
-        std::unique_ptr<cms::BytesMessage> active_mq_message = producer_->getNewBytesMessage();
-
-        if (active_mq_message == nullptr) {
-            GS_LOG_MSG(error, "System::BuildBytesMessageObjectFromIpcMessage could not get a new BytesMessage.");
-            return nullptr;
-        }
-
-        active_mq_message->setStringProperty(kGolfSimMessageTypeTag, kGolfSimMessageType);
-        active_mq_message->setIntProperty(kGolfSimIPCMessageTypeTag, ipc_message.GetMessageType());
-
-        size_t image_mat_byte_length = 0;
-        unsigned char* data = ipc_message.GetImageMatBytePointer(image_mat_byte_length);
-
-        if ( (ipc_message.GetMessageType() == GolfSimIPCMessage::IPCMessageType::kCamera2Image ||
-            ipc_message.GetMessageType() == GolfSimIPCMessage::IPCMessageType::kCamera2ReturnPreImage) &&
-                data != nullptr) {
-
-            GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem::BuildBytesMessageObjectFromIpcMessage has image -- setting body data of length = " + std::to_string(image_mat_byte_length));
-            active_mq_message->setBodyBytes(data, image_mat_byte_length);
-        }
-        else if (ipc_message.GetMessageType() == GolfSimIPCMessage::IPCMessageType::kResults) {
-
-            msgpack::sbuffer serialized_result;
-
-            msgpack::pack(&serialized_result, ipc_message.GetResults());
-
-            GS_LOG_TRACE_MSG(trace, "Sending a result of: " + ipc_message.GetResults().Format());
-            GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem::BuildBytesMessageObjectFromIpcMessage setting body data for GsIPCResults of length = " +
-                            std::to_string(serialized_result.size()));
-
-            // For STOMP compatibility, we'll send as a text message with base64 encoding
-            // This avoids binary corruption when crossing the OpenWire-to-STOMP bridge
-            std::string base64_data = base64_encode((unsigned char*)serialized_result.data(), serialized_result.size());
-            active_mq_message->setStringProperty("encoding", "base64");
-            active_mq_message->setBodyBytes((unsigned char*)base64_data.c_str(), base64_data.length());
-        }
-
-        return active_mq_message;
-    }
-
-    bool GolfSimIpcSystem::SendIpcMessage(const GolfSimIPCMessage& ipc_message) {
-        GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem::SendIpcMessage");
-
-        std::unique_ptr<cms::BytesMessage> activeMQ_message = BuildBytesMessageObjectFromIpcMessage(ipc_message);
-
-        if (activeMQ_message == nullptr) {
-            GS_LOG_MSG(error, "GolfSimIpcSystem::SendIpcMessage failed to create activeMQ_message from the GolfSimIPCMessage.");
-            return false;
-        }
-
-        bool result = producer_->SendMessage(activeMQ_message.get());
-
-        std::this_thread::yield();
-
-        return result;
-    }
-
     bool GolfSimIpcSystem::SimulateCamera2ImageMessage() {
-        GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem::SimulateCame");
-
-        // Simulate a returned picture from camera 2 to allow for testing
+        GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem::SimulateCamera2ImageMessage");
 
         GolfSimIPCMessage ipc_message(GolfSimIPCMessage::IPCMessageType::kCamera2Image);
 
@@ -673,13 +610,9 @@ namespace golf_sim {
         printf("Serializing image in file %s\n", fname.c_str());
 
         ipc_message.SetImageMat(img);
-        GolfSimIpcSystem::SendIpcMessage(ipc_message);
-
-        std::this_thread::yield();
-        return true;
+        return SendIpcMessage(ipc_message);
     }
 
+} // namespace golf_sim
 
-}
-
-#endif // #ifdef __unix__  // Ignore in Windows environment
+#endif // #ifdef __unix__

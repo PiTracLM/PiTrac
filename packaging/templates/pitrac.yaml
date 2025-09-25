@@ -108,8 +108,9 @@ storage:
 # ----------------------------------------------------------------------------
 
 network:
-  # ActiveMQ broker (for dual camera mode)
-  # broker_address: "tcp://localhost:61616"
+  # ZeroMQ settings (for dual camera mode)
+  # zeromq_pub_endpoint: "tcp://*:5555"
+  # zeromq_sub_endpoint: "tcp://localhost:5556"
   
   # Web interface
   # web_refresh_seconds: 3    # Refresh interval (1-60 seconds)

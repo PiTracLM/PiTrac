@@ -33,7 +33,7 @@ class TestSmoke:
         import models
         import managers
         import parsers
-        import listeners
+        import zeromq_listener
         import constants
         import config_manager
         import pitrac_manager
@@ -46,7 +46,7 @@ class TestSmoke:
         assert hasattr(managers, "ConnectionManager")
         assert hasattr(managers, "ShotDataStore")
         assert hasattr(parsers, "ShotDataParser")
-        assert hasattr(listeners, "ActiveMQListener")
+        assert hasattr(zeromq_listener, "ZeroMQListener")
         assert hasattr(constants, "MPS_TO_MPH")
         assert hasattr(config_manager, "ConfigurationManager")
         assert hasattr(pitrac_manager, "PiTracProcessManager")
@@ -205,12 +205,3 @@ class TestSmoke:
         assert parsed.carry == 250.0
         assert parsed.timestamp is not None
 
-    @patch("server.stomp.Connection")
-    def test_activemq_connection_optional(self, mock_stomp, server_instance):
-        """Test that app works without ActiveMQ connection"""
-        mock_stomp.side_effect = Exception("Connection failed")
-
-        assert server_instance is not None
-        assert server_instance.app is not None
-        assert server_instance.shot_store is not None
-        assert server_instance.connection_manager is not None

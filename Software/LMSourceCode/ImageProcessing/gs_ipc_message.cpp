@@ -21,8 +21,8 @@ namespace golf_sim {
 
     }
 
-    std::string GolfSimIPCMessage::Format() {
-        std::string s = "GolfSimIPCMessage::Format() - message_type = " + std::to_string(message_type_) + ". Size = " + std::to_string(getSize()) + ".";
+    std::string GolfSimIPCMessage::Format() const {
+        std::string s = "GolfSimIPCMessage::Format() - message_type = " + std::to_string(message_type_) + ".";
 
         return s;
     }

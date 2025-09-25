@@ -46,9 +46,6 @@ commands:
         arg: mode
         help: Override system mode from config
         allowed: [camera1, camera2]
-      - long: --msg-broker-address
-        arg: address
-        help: "Override message broker address (e.g., tcp://10.0.0.41:61616)"
       - long: --base-image-logging-dir
         arg: dir
         help: Override image logging directory
@@ -100,107 +97,6 @@ commands:
         default: auto
       - long: --skip-reboot
         help: Don't prompt for reboot after setup
-
-  # Configuration management
-  - name: config
-    alias: cfg
-    help: Manage PiTrac configuration
-    commands:
-      - name: show
-        help: Display current configuration
-        flags:
-          - long: --yaml
-            help: Show raw YAML file instead of runtime configuration
-
-      - name: edit
-        help: Edit configuration file
-        examples:
-          - pitrac config edit
-          - pitrac config edit --editor vim
-        flags:
-          - long: --editor
-            arg: editor
-            help: Use specific editor
-            default: ${EDITOR:-nano}
-
-      - name: get
-        help: Get specific configuration value
-        args:
-          - name: key
-            help: Configuration key (e.g., system.mode)
-            required: true
-
-      - name: set
-        help: Set configuration value
-        args:
-          - name: key
-            help: Configuration key
-            required: true
-          - name: value
-            help: New value
-            required: true
-        flags:
-          - long: --global
-            help: Set in global config (requires sudo)
-
-      - name: validate
-        help: Validate configuration file
-        flags:
-          - long: --fix
-            help: Attempt to fix issues
-
-      - name: reset
-        help: Reset to default configuration
-        flags:
-          - long: --backup
-            help: Create backup before reset
-      
-      - name: preset
-        help: Apply a configuration preset
-        examples:
-          - pitrac config preset indoor
-          - pitrac config preset putting
-        args:
-          - name: preset_name
-            help: Preset to apply
-            required: true
-            allowed: [indoor, outdoor, putting, driver, debug]
-      
-      - name: diff
-        help: Show configuration differences from defaults
-        flags:
-          - long: --json
-            help: Output in JSON format
-      
-      - name: backup
-        help: Create configuration backup
-        flags:
-          - long: --name
-            arg: name
-            help: Backup name (default is timestamp)
-      
-      - name: restore
-        help: Restore configuration from backup
-        args:
-          - name: backup_name
-            help: Backup to restore (use 'list' to see available)
-            required: true
-        flags:
-          - long: --force
-            help: Force restore even if config exists
-      
-      - name: migrate
-        help: Migrate from old JSON configuration
-        flags:
-          - long: --dry-run
-            help: Show what would be migrated without changing files
-      
-      - name: source
-        help: Show where a configuration value comes from
-        args:
-          - name: key
-            help: Configuration key to check
-            required: true
 
   # Camera management
   - name: camera
@@ -357,19 +253,6 @@ commands:
         short: -f
         help: Follow logs (with 'logs' action)
 
-
-  - name: activemq
-    alias: amq
-    help: Manage ActiveMQ broker
-    args:
-      - name: action
-        help: Action to perform
-        required: true
-        allowed: [start, stop, restart, status, logs, console, port]
-    flags:
-      - long: --follow
-        short: -f
-        help: Follow logs (with 'logs' action)
 
   # Log viewing
   - name: logs

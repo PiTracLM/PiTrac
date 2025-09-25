@@ -1,0 +1,217 @@
+#include "zeromq_publisher.h"
+#include <chrono>
+#include <cstring>
+#include <iostream>
+
+namespace golf_sim {
+
+ZeroMQPublisher::ZeroMQPublisher(const std::string& endpoint)
+    : endpoint_(endpoint)
+    , running_(false)
+    , should_stop_(false) {
+}
+
+ZeroMQPublisher::~ZeroMQPublisher() {
+    Stop();
+}
+
+bool ZeroMQPublisher::Start() {
+    if (running_.load()) {
+        return true;
+    }
+
+    should_stop_ = false;
+
+    try {
+        context_ = std::make_unique<zmq::context_t>(1);
+
+        std::promise<bool> init_promise;
+        auto init_future = init_promise.get_future();
+
+        publisher_thread_ = std::thread([this, &init_promise]() {
+            bool success = InitializeSocket();
+            init_promise.set_value(success);
+            if (success) {
+                PublisherThread();
+            }
+        });
+
+        if (init_future.wait_for(std::chrono::seconds(5)) == std::future_status::timeout) {
+            std::cerr << "Timeout waiting for publisher socket initialization" << std::endl;
+            Stop();
+            return false;
+        }
+
+        bool success = init_future.get();
+        if (success) {
+            running_ = true;
+            std::cout << "ZeroMQ Publisher started on " << endpoint_ << std::endl;
+        } else {
+            Stop();
+        }
+        return success;
+
+    } catch (const zmq::error_t& e) {
+        std::cerr << "Failed to start ZeroMQ Publisher: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+void ZeroMQPublisher::Stop() {
+    if (!running_.load()) {
+        return;
+    }
+
+    should_stop_ = true;
+    queue_cv_.notify_all();
+
+    if (publisher_thread_.joinable()) {
+        publisher_thread_.join();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(socket_mutex_);
+        publisher_.reset();
+        context_.reset();
+    }
+
+    running_ = false;
+    std::cout << "ZeroMQ Publisher stopped" << std::endl;
+}
+
+bool ZeroMQPublisher::SendMessage(const std::string& topic,
+                                   const std::vector<uint8_t>& data,
+                                   const std::map<std::string, std::string>& properties) {
+    if (!running_.load()) {
+        std::cerr << "Publisher not running" << std::endl;
+        return false;
+    }
+
+    Message msg;
+    msg.topic = topic;
+    msg.data = data;
+    msg.properties = properties;
+
+    {
+        std::lock_guard<std::mutex> lock(queue_mutex_);
+        message_queue_.push(std::move(msg));
+    }
+
+    queue_cv_.notify_one();
+    return true;
+}
+
+bool ZeroMQPublisher::SendMessage(const std::string& topic,
+                                   const std::string& data,
+                                   const std::map<std::string, std::string>& properties) {
+    std::vector<uint8_t> vec_data(data.begin(), data.end());
+    return SendMessage(topic, vec_data, properties);
+}
+
+void ZeroMQPublisher::SetHighWaterMark(int hwm) {
+    high_water_mark_ = hwm;
+}
+
+void ZeroMQPublisher::SetLinger(int linger_ms) {
+    linger_ms_ = linger_ms;
+}
+
+bool ZeroMQPublisher::InitializeSocket() {
+    try {
+        std::lock_guard<std::mutex> lock(socket_mutex_);
+
+        if (!context_) {
+            std::cerr << "Context is null, cannot create socket" << std::endl;
+            return false;
+        }
+
+        publisher_ = std::make_unique<zmq::socket_t>(*context_, zmq::socket_type::pub);
+
+        try {
+            publisher_->set(zmq::sockopt::sndhwm, high_water_mark_);
+        } catch (const zmq::error_t& e) {
+            std::cerr << "Failed to set high water mark: " << e.what() << std::endl;
+        }
+
+        try {
+            publisher_->set(zmq::sockopt::linger, linger_ms_);
+        } catch (const zmq::error_t& e) {
+            std::cerr << "Failed to set linger time: " << e.what() << std::endl;
+        }
+
+        try {
+            publisher_->bind(endpoint_);
+        } catch (const zmq::error_t& e) {
+            std::cerr << "Failed to bind to " << endpoint_ << ": " << e.what() << std::endl;
+            if (e.num() == EADDRINUSE) {
+                std::cerr << "Address already in use. Another process may be using this port." << std::endl;
+            }
+            publisher_.reset();
+            return false;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        return true;
+    } catch (const zmq::error_t& e) {
+        std::cerr << "Unexpected error initializing publisher socket: " << e.what() << std::endl;
+        return false;
+    } catch (const std::exception& e) {
+        std::cerr << "Standard exception in InitializeSocket: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+void ZeroMQPublisher::PublisherThread() {
+    try {
+        while (!should_stop_.load()) {
+            std::unique_lock<std::mutex> lock(queue_mutex_);
+
+            queue_cv_.wait_for(lock, std::chrono::milliseconds(100),
+                              [this] { return !message_queue_.empty() || should_stop_.load(); });
+
+            while (!message_queue_.empty() && !should_stop_.load()) {
+                Message msg = std::move(message_queue_.front());
+                message_queue_.pop();
+                lock.unlock();
+
+                try {
+                    std::lock_guard<std::mutex> socket_lock(socket_mutex_);
+                    if (!publisher_) {
+                        break;
+                    }
+
+                    zmq::message_t topic_msg(msg.topic.size());
+                    std::memcpy(topic_msg.data(), msg.topic.data(), msg.topic.size());
+                    publisher_->send(topic_msg, zmq::send_flags::sndmore);
+
+                    std::string props_str = "{";
+                    bool first = true;
+                    for (const auto& [key, value] : msg.properties) {
+                        if (!first) props_str += ",";
+                        props_str += "\"" + key + "\":\"" + value + "\"";
+                        first = false;
+                    }
+                    props_str += "}";
+
+                    zmq::message_t props_msg(props_str.size());
+                    std::memcpy(props_msg.data(), props_str.data(), props_str.size());
+                    publisher_->send(props_msg, zmq::send_flags::sndmore);
+
+                    zmq::message_t data_msg(msg.data.size());
+                    std::memcpy(data_msg.data(), msg.data.data(), msg.data.size());
+                    publisher_->send(data_msg, zmq::send_flags::none);
+
+                } catch (const zmq::error_t& e) {
+                    std::cerr << "Error sending message: " << e.what() << std::endl;
+                }
+
+                lock.lock();
+            }
+        }
+
+    } catch (const zmq::error_t& e) {
+        std::cerr << "Publisher thread error: " << e.what() << std::endl;
+    }
+}
+
+} 

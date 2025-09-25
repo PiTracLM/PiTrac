@@ -18,28 +18,48 @@ from parsers import ShotDataParser
 from server import PiTracServer
 
 from utils.mock_factories import (
-    MockActiveMQFactory,
     MockWebSocketFactory,
 )
 from utils.test_helpers import ShotDataHelper
 
 
 @pytest.fixture
-def mock_activemq():
-    """Mock ActiveMQ connection using factory"""
-    with patch("server.stomp.Connection") as mock_conn:
-        mock_instance = MockActiveMQFactory.create_connection()
-        mock_conn.return_value = mock_instance
-        yield mock_instance
+def mock_zeromq():
+    """Mock ZeroMQ listener"""
+    from unittest.mock import MagicMock, AsyncMock
+
+    mock_listener = MagicMock()
+    mock_listener.connected = True
+    mock_listener.running = True
+    mock_listener.message_count = 0
+    mock_listener.error_count = 0
+    mock_listener.get_stats.return_value = {
+        "connected": True,
+        "running": True,
+        "messages_processed": 0,
+        "errors": 0,
+        "endpoint": "tcp://localhost:5556",
+        "topic_prefix": "Golf.Sim",
+    }
+    mock_listener.stop = AsyncMock(return_value=None)
+    mock_listener.start = AsyncMock(return_value=True)
+    return mock_listener
 
 
 @pytest.fixture
-def server_instance(mock_activemq):
+def server_instance(mock_zeromq):
     """Create PiTracServer instance with mocked dependencies"""
+    from unittest.mock import AsyncMock, MagicMock
+
     server = PiTracServer()
-    server.mq_conn = mock_activemq
-    server.shutdown_flag = False
+    server.listener = mock_zeromq
+    server.shutdown_flag = True  # Prevent background tasks from running
     server.reconnect_task = None
+
+    server.startup_event = AsyncMock()
+    server.shutdown_event = AsyncMock()
+    server.setup_zeromq = AsyncMock(return_value=True)
+
     return server
 
 

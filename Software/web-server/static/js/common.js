@@ -188,7 +188,7 @@ async function checkSystemStatus() {
 
             const mqDot = document.getElementById('mq-status-dot');
             if (mqDot) {
-                if (data.activemq_connected) {
+                if (data.zeromq_connected) {
                     mqDot.classList.remove('disconnected');
                 } else {
                     mqDot.classList.add('disconnected');

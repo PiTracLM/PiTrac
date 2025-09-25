@@ -1081,8 +1081,8 @@ function checkDependencies(key, value) {
         'cameras.slot2.type': {
             '*': ['Camera type change may require recalibration']
         },
-        'network.broker_address': {
-            '*': ['Changing broker address will affect camera communication']
+        'network.zeromq_endpoint': {
+            '*': ['Changing ZeroMQ endpoint will affect camera communication']
         }
     };
     

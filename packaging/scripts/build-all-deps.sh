@@ -12,7 +12,7 @@ NC='\033[0m'
 echo -e "${BLUE}=== Building All PiTrac Dependencies ===${NC}"
 echo ""
 
-DEPS=("lgpio" "msgpack" "activemq" "opencv")
+DEPS=("lgpio" "msgpack" "opencv")
 FAILED=()
 
 for dep in "${DEPS[@]}"; do

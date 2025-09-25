@@ -55,7 +55,7 @@ class TestLogsAPI:
 
         with TestClient(app) as client:
             with client.websocket_connect("/ws/logs") as websocket:
-                websocket.send_json({"service": "activemq"})
+                websocket.send_json({"service": "pitrac-web"})
 
                 time.sleep(0.1)
 
@@ -102,19 +102,28 @@ class TestLogsAPI:
                 except Exception:
                     assert True
 
-    async def test_websocket_logs_missing_service(self, app):
+    @patch("server.PiTracServer._stream_service_logs")
+    async def test_websocket_logs_missing_service(self, mock_stream, app):
         """Test WebSocket logs with missing service"""
+
+        async def mock_stream_func(websocket, service):
+            await websocket.send_json({"message": f"Streaming {service} logs", "service": service})
+            return
+
+        mock_stream.side_effect = mock_stream_func
+
         with TestClient(app) as client:
             with client.websocket_connect("/ws/logs") as websocket:
                 websocket.send_json({})
-
-                time.sleep(0.1)
-                assert True
+                response = websocket.receive_json()
+                assert "pitrac" in response.get("service", "")
+                websocket.close()
 
     @patch("server.PiTracServer._stream_systemd_logs")
     @patch("server.PiTracServer._stream_file_logs")
     async def test_websocket_logs_connection_basic(self, mock_stream_file, mock_stream_systemd, app):
         """Test basic WebSocket logs connection"""
+
         async def mock_stream(websocket, unit):
             await websocket.send_json({"message": "Test log", "service": unit})
 
@@ -140,7 +149,7 @@ class TestLogsAPI:
 
         with TestClient(app) as client:
             with client.websocket_connect("/ws/logs") as websocket:
-                websocket.send_json({"service": "activemq"})
+                websocket.send_json({"service": "pitrac-web"})
 
                 time.sleep(0.1)
 
@@ -181,7 +190,7 @@ class TestLogsAPI:
         with TestClient(app) as client1, TestClient(app) as client2:
             with client1.websocket_connect("/ws/logs") as ws1, client2.websocket_connect("/ws/logs") as ws2:
                 ws1.send_json({"service": "pitrac"})
-                ws2.send_json({"service": "activemq"})
+                ws2.send_json({"service": "pitrac-web"})
 
                 time.sleep(0.1)
 
@@ -211,7 +220,7 @@ class TestLogsAPI:
 
         with TestClient(app) as client:
             with client.websocket_connect("/ws/logs") as websocket:
-                websocket.send_json({"service": "activemq"})
+                websocket.send_json({"service": "pitrac-web"})
 
                 time.sleep(0.1)
 
@@ -221,6 +230,7 @@ class TestLogsAPI:
     @patch("server.PiTracServer._stream_file_logs")
     async def test_websocket_logs_connection_handling(self, mock_stream_file, mock_stream_systemd, app):
         """Test proper connection handling and cleanup"""
+
         async def mock_stream(websocket, unit):
             await websocket.send_json({"message": "Test log", "service": unit})
 
@@ -257,6 +267,7 @@ class TestLogsAPI:
     @patch("server.PiTracServer._stream_file_logs")
     async def test_websocket_logs_different_service_types(self, mock_stream_file, mock_stream_systemd, app):
         """Test streaming logs from different service types"""
+
         async def mock_stream(websocket, unit):
             await websocket.send_json({"message": f"Test log for {unit}", "service": unit})
 

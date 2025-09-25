@@ -232,42 +232,7 @@ case "$1" in
         # Reload systemd
         systemctl daemon-reload
 
-        # Configure ActiveMQ
-        if command -v activemq &>/dev/null || [ -f /usr/share/activemq/bin/activemq ]; then
-            echo "Configuring ActiveMQ for PiTrac..."
-            
-            if [ -x /usr/lib/pitrac/activemq-service-install.sh ]; then
-                echo "Installing ActiveMQ configuration from templates..."
-                export ACTIVEMQ_BROKER_NAME="localhost"
-                export ACTIVEMQ_BIND_ADDRESS="0.0.0.0"
-                export ACTIVEMQ_PORT="61616"
-                export ACTIVEMQ_LOG_LEVEL="INFO"
-                export PITRAC_TEMPLATE_DIR="/usr/share/pitrac/templates"
-                
-                if /usr/lib/pitrac/activemq-service-install.sh install activemq; then
-                    echo "ActiveMQ configuration installed successfully"
-                else
-                    echo "Warning: ActiveMQ configuration failed, falling back to basic setup"
-                    mkdir -p /etc/activemq/instances-available/main
-                    mkdir -p /etc/activemq/instances-enabled
-                    if [ ! -e /etc/activemq/instances-enabled/main ]; then
-                        ln -sf /etc/activemq/instances-available/main /etc/activemq/instances-enabled/main
-                    fi
-                fi
-            else
-                echo "Warning: ActiveMQ configuration script not found, using basic setup"
-                if [ -d /etc/activemq/instances-available ] && [ ! -e /etc/activemq/instances-enabled/main ]; then
-                    mkdir -p /etc/activemq/instances-enabled
-                    ln -sf /etc/activemq/instances-available/main /etc/activemq/instances-enabled/main
-                fi
-            fi
-            
-            if getent passwd activemq >/dev/null; then
-                chown -R activemq:activemq /var/lib/activemq/ 2>/dev/null || true
-            fi
-            
-            # Don't start it here - let the user or pitrac CLI handle it
-        fi
+        # ZeroMQ is now the primary IPC system - no broker configuration needed
 
         if [ -x /usr/lib/pitrac/pitrac-service-install.sh ]; then
             if [ -n "$ACTUAL_USER" ]; then
@@ -289,7 +254,7 @@ case "$1" in
         echo "  pitrac test     - Check your cameras"
         echo "  pitrac run      - Start tracking shots"
         echo ""
-        echo "The broker and web server start automatically when you run PiTrac."
+        echo "The web server starts automatically when you run PiTrac."
         echo ""
         echo "Need help? Try 'pitrac help' or 'pitrac status'"
         echo ""

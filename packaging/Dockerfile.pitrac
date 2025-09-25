@@ -31,8 +31,10 @@ RUN apt-get install -y \
     libaprutil1 \
     libapr1-dev \
     libaprutil1-dev \
-    libyaml-cpp-dev \
     libssl3 \
+    # ZeroMQ libraries
+    libzmq3-dev \
+    cppzmq-dev \
     # OpenCV runtime deps
     libgtk-3-0 \
     libavcodec59 \
@@ -69,17 +71,14 @@ RUN sed -i '/namespace boost {/i #include <utility>' /usr/include/boost/asio/awa
 
 # Copy pre-built artifacts (only for packages not in repos)
 COPY deps-artifacts/opencv-4.11.0-arm64.tar.gz /tmp/
-COPY deps-artifacts/activemq-cpp-3.9.5-arm64.tar.gz /tmp/
 
 # Extract pre-built dependencies
 RUN echo "Extracting pre-built dependencies..." && \
     tar xzf /tmp/opencv-4.11.0-arm64.tar.gz -C /opt/ && \
-    tar xzf /tmp/activemq-cpp-3.9.5-arm64.tar.gz -C /opt/ && \
     rm /tmp/*.tar.gz
 
 # Setup library paths
 RUN echo "/opt/opencv/lib" > /etc/ld.so.conf.d/opencv.conf && \
-    echo "/opt/activemq-cpp/lib" > /etc/ld.so.conf.d/activemq.conf && \
     ldconfig
 
 # Create pkg-config files for libraries that don't include them
@@ -106,10 +105,10 @@ RUN mkdir -p /usr/lib/pkgconfig && \
     echo 'Cflags: -I${includedir}' >> /usr/lib/pkgconfig/msgpack-cxx.pc
 
 # Set build environment
-ENV PKG_CONFIG_PATH="/opt/opencv/lib/pkgconfig:/opt/activemq-cpp/lib/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig"
-ENV LD_LIBRARY_PATH="/opt/opencv/lib:/opt/activemq-cpp/lib"
-ENV CMAKE_PREFIX_PATH="/opt/opencv:/opt/activemq-cpp"
-ENV CPLUS_INCLUDE_PATH="/opt/opencv/include/opencv4:/opt/activemq-cpp/include/activemq-cpp-3.9.5"
+ENV PKG_CONFIG_PATH="/opt/opencv/lib/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig"
+ENV LD_LIBRARY_PATH="/opt/opencv/lib"
+ENV CMAKE_PREFIX_PATH="/opt/opencv"
+ENV CPLUS_INCLUDE_PATH="/opt/opencv/include/opencv4"
 
 # Create build user matching host
 ARG UID=1000
