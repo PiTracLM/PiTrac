@@ -70,14 +70,15 @@ boost_dep = dependency('boost', method: 'pkg-config', version : '>=1.74.0', modu
 
 msgpack_dep = dependency('msgpack-cxx', required : true)
 yamlcpp_dep = dependency('yaml-cpp', required : true)
+onnxruntime_dep = dependency('onnxruntime', required : true)
 
 rpicam_app_src = []
 rpicam_app_dep = [libcamera_dep, lgpio_dep]
 
 
 pitrac_lm_module_deps = [
-	libcamera_dep, thread_dep, opencv_dep, lgpio_dep, rpicam_app_dep, 
-	fmt_dep, boost_dep, activemq_dep, ssl_dep, apr_dep, msgpack_dep, yamlcpp_dep,]
+	libcamera_dep, thread_dep, opencv_dep, lgpio_dep, rpicam_app_dep,
+	fmt_dep, boost_dep, activemq_dep, ssl_dep, apr_dep, msgpack_dep, yamlcpp_dep, onnxruntime_dep,]
 
 
 
@@ -170,6 +171,7 @@ pitrac_lm_sources += ([
 			'ball_watcher_image_buffer.cpp',
 			'libcamera_jpeg.cpp',
 			'ball_image_proc.cpp',
+			'onnx_runtime_detector.cpp',
 			'pulse_strobe.cpp',
 			'colorsys.cpp',
 			'cv_utils.cpp',

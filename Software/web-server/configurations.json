@@ -971,6 +971,71 @@
       "passedVia": "json",
       "passedTo": "both"
     },
+    "gs_config.ball_identification.kInferenceBackend": {
+      "category": "AI Detection",
+      "subcategory": "advanced",
+      "displayName": "Inference Backend",
+      "description": "Neural network inference backend for YOLO model",
+      "type": "select",
+      "options": {
+        "onnxruntime": "ONNX Runtime (Faster)",
+        "opencv_dnn": "OpenCV DNN (Fallback)"
+      },
+      "default": "onnxruntime",
+      "requiresRestart": true,
+      "passedVia": "json",
+      "passedTo": "both"
+    },
+    "gs_config.ball_identification.kONNXRuntimeAutoFallback": {
+      "category": "AI Detection",
+      "subcategory": "advanced",
+      "displayName": "Auto Fallback to OpenCV",
+      "description": "Automatically fallback to OpenCV DNN if ONNX Runtime fails",
+      "type": "boolean",
+      "default": true,
+      "requiresRestart": false,
+      "passedVia": "json",
+      "passedTo": "both"
+    },
+    "gs_config.ball_identification.kONNXRuntimeThreads": {
+      "category": "AI Detection",
+      "subcategory": "advanced",
+      "displayName": "ONNX Runtime Threads",
+      "description": "Number of threads for ONNX Runtime inference (0 = auto)",
+      "type": "number",
+      "min": 0,
+      "max": 8,
+      "step": 1,
+      "default": 4,
+      "requiresRestart": true,
+      "passedVia": "json",
+      "passedTo": "both"
+    },
+    "gs_config.ball_identification.kONNXRuntimeMemoryPoolMB": {
+      "category": "AI Detection",
+      "subcategory": "advanced",
+      "displayName": "ONNX Memory Pool (MB)",
+      "description": "Memory pool size for ONNX Runtime (reduces allocation overhead)",
+      "type": "number",
+      "min": 32,
+      "max": 256,
+      "step": 32,
+      "default": 64,
+      "requiresRestart": true,
+      "passedVia": "json",
+      "passedTo": "both"
+    },
+    "gs_config.ball_identification.kONNXRuntimeUseNEON": {
+      "category": "AI Detection",
+      "subcategory": "advanced",
+      "displayName": "Use NEON Optimization",
+      "description": "Enable ARM NEON SIMD optimizations for preprocessing",
+      "type": "boolean",
+      "default": true,
+      "requiresRestart": true,
+      "passedVia": "json",
+      "passedTo": "both"
+    },
     "gs_config.ball_identification.kONNXDeviceType": {
       "category": "AI Detection",
       "subcategory": "advanced",
