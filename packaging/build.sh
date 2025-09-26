@@ -78,6 +78,9 @@ check_artifacts() {
                 missing+=("msgpack")
             fi
         fi
+        if [ ! -f "$ARTIFACT_DIR/libonnxruntime1.23.0_1.23.0-1_arm64.deb" ] && [ ! -f "$ARTIFACT_DIR/libonnxruntime-dev_1.23.0-1_arm64.deb" ]; then
+            missing+=("onnxruntime")
+        fi
     else
         # Check for tar.gz packages
         if [ ! -f "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" ]; then
