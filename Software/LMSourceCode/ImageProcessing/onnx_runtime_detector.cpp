@@ -11,6 +11,7 @@
 #include <pthread.h>
 #include <sched.h>
 #include <stdexcept>
+#include <filesystem>
 
 #ifdef USE_ACL
 #include <onnxruntime_providers.h>
@@ -29,19 +30,31 @@ ONNXRuntimeDetector::~ONNXRuntimeDetector() {
 }
 
 bool ONNXRuntimeDetector::Initialize() {
+    GS_LOG_MSG(info, "Starting ONNX Runtime initialization with model: " + config_.model_path);
+
+    // Check if model file exists
+    if (!std::filesystem::exists(config_.model_path)) {
+        GS_LOG_MSG(error, "ONNX model file not found: " + config_.model_path);
+        return false;
+    }
+
     try {
+        GS_LOG_MSG(info, "Creating ONNX Runtime environment...");
         env_ = std::make_unique<Ort::Env>(
             ORT_LOGGING_LEVEL_WARNING,
             "PiTracONNX"
         );
 
+        GS_LOG_MSG(info, "Configuring session options...");
         ConfigureSessionOptions();
 
+        GS_LOG_MSG(info, "Creating ONNX Runtime session with model...");
         session_ = std::make_unique<Ort::Session>(
             *env_,
             config_.model_path.c_str(),
             *session_options_
         );
+        GS_LOG_MSG(info, "ONNX Runtime session created successfully");
 
         allocator_ = std::make_unique<Ort::AllocatorWithDefaultOptions>();
         memory_info_ = std::make_unique<Ort::MemoryInfo>(
@@ -62,7 +75,13 @@ bool ONNXRuntimeDetector::Initialize() {
         return true;
 
     } catch (const Ort::Exception& e) {
-        GS_LOG_MSG(error, "ONNX Runtime initialization failed: " + std::string(e.what()));
+        GS_LOG_MSG(error, "ONNX Runtime Exception: " + std::string(e.what()) + " (Code: " + std::to_string(e.GetOrtErrorCode()) + ")");
+        return false;
+    } catch (const std::exception& e) {
+        GS_LOG_MSG(error, "Standard exception during ONNX initialization: " + std::string(e.what()));
+        return false;
+    } catch (...) {
+        GS_LOG_MSG(error, "Unknown exception during ONNX initialization");
         return false;
     }
 }

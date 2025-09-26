@@ -4336,10 +4336,12 @@ namespace golf_sim {
                     config.use_neon_preprocessing = true;
                     config.use_zero_copy = true;
 
+                    GS_LOG_MSG(info, "Attempting to initialize ONNX Runtime detector with model: " + config.model_path);
                     onnx_detector_ = std::make_unique<ONNXRuntimeDetector>(config);
 
                     if (!onnx_detector_->Initialize()) {
-                        GS_LOG_MSG(error, "Failed to initialize ONNX Runtime detector");
+                        GS_LOG_MSG(error, "Failed to initialize ONNX Runtime detector with model: " + config.model_path);
+                        onnx_detector_.reset();  // Clean up failed detector
                         return false;
                     }
 
