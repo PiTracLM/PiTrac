@@ -382,11 +382,11 @@ build_dev() {
     apply_boost_cxx20_fix
 
     # Set build environment
-    # DEB packages install to standard locations
-    export PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
-    export LD_LIBRARY_PATH="/usr/lib/aarch64-linux-gnu:/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
-    export CMAKE_PREFIX_PATH="/usr"
-    export CPLUS_INCLUDE_PATH="/usr/include/opencv4:/usr/include/activemq-cpp-3.9.5"
+    # DEB packages now install to /opt locations
+    export PKG_CONFIG_PATH="/opt/opencv/lib/pkgconfig:/opt/activemq-cpp/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
+    export LD_LIBRARY_PATH="/opt/opencv/lib:/opt/activemq-cpp/lib:/usr/lib/aarch64-linux-gnu:/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
+    export CMAKE_PREFIX_PATH="/opt/opencv:/opt/activemq-cpp:/usr"
+    export CPLUS_INCLUDE_PATH="/opt/opencv/include/opencv4:/opt/activemq-cpp/include/activemq-cpp-3.9.5"
     export PITRAC_ROOT="$REPO_ROOT/Software/LMSourceCode"
     export CXXFLAGS="-I/usr/include/opencv4"
 
