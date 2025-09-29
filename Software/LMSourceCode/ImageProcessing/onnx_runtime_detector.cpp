@@ -103,6 +103,12 @@ void ONNXRuntimeDetector::ConfigureSessionOptions() {
     session_options_->AddConfigEntry("session.use_env_allocators", "1");
     session_options_->AddConfigEntry("session.enable_quant_qdq_cleanup", "1");
 
+    // XNNPACK-specific optimizations
+    session_options_->AddConfigEntry("session.disable_prepacking", "0");  // Enable prepacking for XNNPACK
+    session_options_->AddConfigEntry("session.disable_quant_qdq", "0");   // Enable quantization support
+    session_options_->AddConfigEntry("session.force_spinning_stop", "1"); // Better for real-time
+    session_options_->AddConfigEntry("session.inter_op_thread_affinity", "1"); // Pin threads
+
     session_options_->SetExecutionMode(ExecutionMode::ORT_PARALLEL);
 
     SetupExecutionProviders();
@@ -110,30 +116,16 @@ void ONNXRuntimeDetector::ConfigureSessionOptions() {
 
 void ONNXRuntimeDetector::SetupExecutionProviders() {
 #ifdef __ARM_NEON
-    // ARM Compute Library provider (highest priority)
-    if (config_.use_arm_compute_library) {
-#ifdef USE_ACL
-        try {
-            uint32_t acl_options = 0;
-            if (config_.use_fp16) {
-                acl_options |= 1; // Enable FP16 mode
-            }
-            OrtSessionOptionsAppendExecutionProvider_ACL(
-                *session_options_, acl_options
-            );
-            GS_LOG_MSG(info, "ARM Compute Library execution provider enabled");
-        } catch (...) {
-            GS_LOG_MSG(warning, "Failed to enable ACL provider, falling back to CPU");
-        }
-#endif
-    }
-
-    // XNNPACK provider (good for mobile/embedded)
     if (config_.use_xnnpack) {
 #ifdef USE_XNNPACK
         try {
-            session_options_->AppendExecutionProvider("XNNPACK");
-            GS_LOG_MSG(info, "XNNPACK execution provider enabled");
+            // XNNPACK-specific optimizations
+            std::unordered_map<std::string, std::string> xnnpack_options;
+            xnnpack_options["intra_op_num_threads"] = std::to_string(config_.num_threads);
+
+            session_options_->AppendExecutionProvider("XNNPACK", xnnpack_options);
+            GS_LOG_MSG(info, "XNNPACK execution provider enabled with " +
+                       std::to_string(config_.num_threads) + " threads");
         } catch (...) {
             GS_LOG_MSG(warning, "Failed to enable XNNPACK provider");
         }

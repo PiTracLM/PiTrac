@@ -51,7 +51,12 @@ if cpu == 'aarch64' or neon == 'arm64'
         '-falign-functions=16',
         '-falign-loops=16',
         '-fomit-frame-pointer',
-        '-ffast-math'  # Includes funsafe-math-optimizations, fno-signed-zeros, fno-trapping-math
+        '-ffast-math',  # Includes funsafe-math-optimizations, fno-signed-zeros, fno-trapping-math
+        # XNNPACK-specific optimizations
+        '-funroll-loops',           # Better for XNNPACK's compute kernels
+        '-fprefetch-loop-arrays',   # Improve cache utilization
+        '-falign-jumps=16',         # Better branch prediction
+        '-moutline-atomics'         # Better for Pi4/5 atomic operations
     ]
 elif neon == 'armv8-neon'
     cpp_arguments += ['-mfpu=neon-fp-armv8', '-ftree-vectorize']

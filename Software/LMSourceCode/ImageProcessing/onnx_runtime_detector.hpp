@@ -47,14 +47,14 @@ public:
         int input_width = 640;
         int input_height = 640;
 
-        bool use_arm_compute_library = true;
-        bool use_xnnpack = false;
+        bool use_arm_compute_library = false; // ACL doesn't build properly
+        bool use_xnnpack = true;  // XNNPACK is our primary provider
         bool use_fp16 = false;
         bool use_int8_quantization = false;
 
-        int num_threads = 4;
+        int num_threads = 3;  // Leave 1 core for system/camera on Pi
         bool use_thread_affinity = true;
-        std::vector<int> cpu_cores = {0, 1, 2, 3}; // Pi4/5 cores
+        std::vector<int> cpu_cores = {1, 2, 3}; // Avoid core 0 (handles interrupts)
 
         bool use_memory_pool = true;
         size_t memory_pool_size_mb = 64;
