@@ -784,9 +784,10 @@ void PreprocessPipelineNEON(const cv::Mat& input, float* output,
                     bgr_f32_high = vmulq_f32(bgr_f32_high, scale);
 
                     if (i < pixels) {
-                        output[0 * pixels + i] = vgetq_lane_f32(bgr_f32_low, 0);  // B
+                        // Swap BGR to RGB (Ultralytics YOLOv8 ONNX expects RGB)
+                        output[0 * pixels + i] = vgetq_lane_f32(bgr_f32_low, 2);  // R
                         output[1 * pixels + i] = vgetq_lane_f32(bgr_f32_low, 1);  // G
-                        output[2 * pixels + i] = vgetq_lane_f32(bgr_f32_low, 2);  // R
+                        output[2 * pixels + i] = vgetq_lane_f32(bgr_f32_low, 0);  // B
                     }
                 }
             } else {
@@ -796,9 +797,10 @@ void PreprocessPipelineNEON(const cv::Mat& input, float* output,
                     float g = pixel[1] / 255.0f;
                     float r = pixel[2] / 255.0f;
 
-                    output[0 * pixels + i + j] = b;
+                    // Swap BGR to RGB (Ultralytics YOLOv8 ONNX expects RGB)
+                    output[0 * pixels + i + j] = r;
                     output[1 * pixels + i + j] = g;
-                    output[2 * pixels + i + j] = r;
+                    output[2 * pixels + i + j] = b;
                 }
             }
         }
