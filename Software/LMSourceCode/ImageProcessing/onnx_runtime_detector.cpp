@@ -407,25 +407,27 @@ std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::PostprocessYOLO
         GS_LOG_MSG(warning, "Processing " + std::to_string(safe_predictions) + " predictions instead");
     }
 
-    int processed_detections = 0;
-    for (int i = 0; i < num_predictions && i * data_width < output_size; i++) {
-        const float* row = output_tensor + i * data_width;
+    // YOLOv8 outputs transposed: [1, 5, 44436] means data is channel-first:
+    // All cx values, then all cy values, then w, then h, then confidence
+    // We need to index: output[channel * num_predictions + prediction_idx]
 
-        float cx = row[0];
-        float cy = row[1];
-        float w = row[2];
-        float h = row[3];
+    int processed_detections = 0;
+    for (int i = 0; i < num_predictions; i++) {
+        float cx = output_tensor[0 * num_predictions + i];
+        float cy = output_tensor[1 * num_predictions + i];
+        float w = output_tensor[2 * num_predictions + i];
+        float h = output_tensor[3 * num_predictions + i];
 
         float confidence;
         int class_id = 0;
 
         if (config_.is_single_class_model) {
-            confidence = row[4];
+            confidence = output_tensor[4 * num_predictions + i];
             class_id = 0;  // Always golf ball
         } else {
             float max_score = 0;
             for (int c = 0; c < num_classes; c++) {
-                float score = row[4 + c];
+                float score = output_tensor[(4 + c) * num_predictions + i];
                 if (score > max_score) {
                     max_score = score;
                     class_id = c;
