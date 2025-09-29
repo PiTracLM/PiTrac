@@ -32,6 +32,12 @@ public:
         int class_id;
     };
 
+    struct LetterboxParams {
+        float scale;        // Scale factor applied to image
+        int x_offset;       // Horizontal padding offset in pixels
+        int y_offset;       // Vertical padding offset in pixels
+    };
+
     struct PerformanceMetrics {
         float preprocessing_ms = 0;
         float inference_ms = 0;
@@ -85,6 +91,7 @@ public:
 
 private:
     Config config_;
+    LetterboxParams letterbox_params_;  // Store letterbox parameters for coordinate conversion
 
     std::unique_ptr<Ort::Env> env_;
     std::unique_ptr<Ort::SessionOptions> session_options_;
@@ -157,8 +164,7 @@ private:
 
     std::vector<Detection> PostprocessYOLO(const float* output_tensor,
                                            int output_size,
-                                           float img_scale_x,
-                                           float img_scale_y);
+                                           const LetterboxParams& letterbox);
 
     std::vector<Detection> NonMaxSuppression(std::vector<Detection>& detections);
 

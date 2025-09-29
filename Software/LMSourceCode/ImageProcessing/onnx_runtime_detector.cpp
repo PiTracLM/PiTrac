@@ -314,10 +314,7 @@ std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::Detect(
         return {};
     }
 
-    float scale_x = static_cast<float>(image.cols) / config_.input_width;
-    float scale_y = static_cast<float>(image.rows) / config_.input_height;
-
-    auto detections = PostprocessYOLO(output_data, output_size, scale_x, scale_y);
+    auto detections = PostprocessYOLO(output_data, output_size, letterbox_params_);
 
     auto end_postproc = std::chrono::high_resolution_clock::now();
 
@@ -352,12 +349,30 @@ void ONNXRuntimeDetector::PreprocessImage(const cv::Mat& image, float* output_te
 }
 
 void ONNXRuntimeDetector::PreprocessImageStandard(const cv::Mat& image, float* output_tensor) {
+    float scale = std::min(
+        static_cast<float>(config_.input_width) / image.cols,
+        static_cast<float>(config_.input_height) / image.rows
+    );
+
+    int new_width = static_cast<int>(image.cols * scale);
+    int new_height = static_cast<int>(image.rows * scale);
+
     cv::Mat resized;
-    cv::resize(image, resized, cv::Size(config_.input_width, config_.input_height),
-               0, 0, cv::INTER_LINEAR);
+    cv::resize(image, resized, cv::Size(new_width, new_height), 0, 0, cv::INTER_LINEAR);
+
+    cv::Mat letterbox(config_.input_height, config_.input_width, CV_8UC3, cv::Scalar(114, 114, 114));
+
+    int x_offset = (config_.input_width - new_width) / 2;
+    int y_offset = (config_.input_height - new_height) / 2;
+
+    letterbox_params_.scale = scale;
+    letterbox_params_.x_offset = x_offset;
+    letterbox_params_.y_offset = y_offset;
+
+    resized.copyTo(letterbox(cv::Rect(x_offset, y_offset, new_width, new_height)));
 
     cv::Mat float_img;
-    resized.convertTo(float_img, CV_32F, 1.0f/255.0f);
+    letterbox.convertTo(float_img, CV_32F, 1.0f/255.0f);
 
     const float* src_ptr = float_img.ptr<float>();
     for (int c = 0; c < 3; c++) {
@@ -384,8 +399,7 @@ void ONNXRuntimeDetector::PreprocessImageNEON(const cv::Mat& image, float* outpu
 std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::PostprocessYOLO(
     const float* output_tensor,
     int output_size,
-    float img_scale_x,
-    float img_scale_y) {
+    const LetterboxParams& letterbox) {
 
     std::vector<Detection> detections;
 
@@ -439,10 +453,15 @@ std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::PostprocessYOLO
         if (confidence >= config_.confidence_threshold) {
             Detection det;
 
-            det.bbox.x = (cx - w/2) * img_scale_x;
-            det.bbox.y = (cy - h/2) * img_scale_y;
-            det.bbox.width = w * img_scale_x;
-            det.bbox.height = h * img_scale_y;
+            float cx_orig = (cx - letterbox.x_offset) / letterbox.scale;
+            float cy_orig = (cy - letterbox.y_offset) / letterbox.scale;
+            float w_orig = w / letterbox.scale;
+            float h_orig = h / letterbox.scale;
+
+            det.bbox.x = cx_orig - w_orig / 2.0f;
+            det.bbox.y = cy_orig - h_orig / 2.0f;
+            det.bbox.width = w_orig;
+            det.bbox.height = h_orig;
             det.confidence = confidence;
             det.class_id = class_id;
 
