@@ -409,6 +409,11 @@ void ONNXRuntimeDetector::PreprocessImageNEON(const cv::Mat& image, float* outpu
     letterbox_params_.x_offset = x_offset;
     letterbox_params_.y_offset = y_offset;
 
+    GS_LOG_TRACE_MSG(trace, "NEON Letterbox: " + std::to_string(image.cols) + "x" + std::to_string(image.rows) +
+                     " -> " + std::to_string(new_width) + "x" + std::to_string(new_height) +
+                     ", scale=" + std::to_string(scale) +
+                     ", offsets=(" + std::to_string(x_offset) + "," + std::to_string(y_offset) + ")");
+
     resized.copyTo(letterbox(cv::Rect(x_offset, y_offset, new_width, new_height)));
 
     neon::PreprocessPipelineNEON(letterbox, output_tensor,
@@ -492,9 +497,23 @@ std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::PostprocessYOLO
         }
     }
 
+    // Debug: Log top 5 confidence values to diagnose detection issues
+    std::vector<float> all_conf;
+    for (int i = 0; i < std::min(num_predictions, 10000); i++) {
+        all_conf.push_back(config_.is_single_class_model ? output_tensor[4 * num_predictions + i] : 0.0f);
+    }
+    std::sort(all_conf.begin(), all_conf.end(), std::greater<float>());
+    std::string top5 = "Top5 conf: ";
+    for (int i = 0; i < std::min(5, (int)all_conf.size()); i++) {
+        top5 += std::to_string(all_conf[i]) + " ";
+    }
+    GS_LOG_TRACE_MSG(trace, top5);
+
     GS_LOG_TRACE_MSG(trace, "PostprocessYOLO: Found " + std::to_string(processed_detections) +
                      " detections above confidence threshold " +
-                     std::to_string(config_.confidence_threshold));
+                     std::to_string(config_.confidence_threshold) +
+                     ", letterbox: scale=" + std::to_string(letterbox.scale) +
+                     " offsets=(" + std::to_string(letterbox.x_offset) + "," + std::to_string(letterbox.y_offset) + ")");
 
     auto suppressed = NonMaxSuppression(detections);
     GS_LOG_TRACE_MSG(trace, "PostprocessYOLO: After NMS: " + std::to_string(suppressed.size()) + " detections");
