@@ -341,6 +341,9 @@ public:
     static bool PreloadONNXRuntimeModel();
     static void CleanupONNXRuntime();
 
+    // Load configuration values from JSON after config is initialized
+    static void LoadConfigurationValues();
+
     // Custom single-class NMS optimized for golf balls (faster than generic multi-class NMS)
     static std::vector<int> SingleClassNMS(const std::vector<cv::Rect>& boxes,
                                           const std::vector<float>& confidences,

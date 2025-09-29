@@ -412,7 +412,7 @@ bool GolfSimConfiguration::ReadValues() {
 
 		// Fall back to original JSON behavior
 		 try {
-			 constant_value = configuration_root_.get<std::string>(tag_name, "");
+			 constant_value = configuration_root_.get<std::string>(tag_name, constant_value);
 		 }
 		 catch (std::exception const& e)
 		 {

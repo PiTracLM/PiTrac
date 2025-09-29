@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <vector>
 #include <chrono>
+#include <fstream>
 #include "gs_format_lib.h"
 
 #include <boost/timer/timer.hpp>
@@ -206,9 +207,9 @@ namespace golf_sim {
     std::string BallImageProc::kBallPlacementDetectionMethod = "legacy";
     // Default ONNX model path - can be overridden by config file or (more likely) the PITRAC_ROOT environment variable
     #ifdef _WIN32
-    std::string BallImageProc::kONNXModelPath = "../../Software/GroundTruthAnnotator/experiments/high_performance_300e2/weights/best.onnx";
+    std::string BallImageProc::kONNXModelPath = "../../Software/LMSourceCode/ml_models/pitrac-ball-detection-09-25-25/weights/best.onnx";
     #else
-    std::string BallImageProc::kONNXModelPath = "../GroundTruthAnnotator/experiments/maximum_performance_v3/weights/best.onnx";
+    std::string BallImageProc::kONNXModelPath = "../ml_models/pitrac-ball-detection-09-25-25/weights/best.onnx";
     #endif
     float BallImageProc::kONNXConfidenceThreshold = 0.5f;
     float BallImageProc::kONNXNMSThreshold = 0.4f;
@@ -376,35 +377,8 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingStartingParam2", kPlacedNarrowingStartingParam2);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingRadiiDpParam", kPlacedNarrowingRadiiDpParam);
 
-        // ONNX Detection Configuration
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kDetectionMethod", kDetectionMethod);
-        
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXModelPath", kONNXModelPath);
-        
-        if (!kONNXModelPath.empty() && kONNXModelPath[0] != '/' && kONNXModelPath[0] != '~') {
-            std::string root_path = GolfSimConfiguration::GetPiTracRootPath();
-            if (!root_path.empty()) {
-                kONNXModelPath = root_path + "/" + kONNXModelPath;
-                GS_LOG_MSG(info, "Using PITRAC_ROOT environment variable to set ONNX model path to: " + kONNXModelPath);
-            }
-        }
-        else {
-            GS_LOG_MSG(info, "Using absolute or home-relative ONNX model path from config: " + kONNXModelPath);
-        }
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBallPlacementDetectionMethod", kBallPlacementDetectionMethod);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXConfidenceThreshold", kONNXConfidenceThreshold);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXNMSThreshold", kONNXNMSThreshold);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXInputSize", kONNXInputSize);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kSAHISliceHeight", kSAHISliceHeight);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kSAHISliceWidth", kSAHISliceWidth);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kSAHIOverlapRatio", kSAHIOverlapRatio);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXDeviceType", kONNXDeviceType);
-
-        // Dual-Backend Configuration
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXBackend", kONNXBackend);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXRuntimeAutoFallback", kONNXRuntimeAutoFallback);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXRuntimeThreads", kONNXRuntimeThreads);
+        // ONNX Detection Configuration values will be loaded later via LoadConfigurationValues()
+        // which is called after the JSON config file has been loaded in main()
 
         GolfSimConfiguration::SetConstant("gs_config.logging.kLogIntermediateSpinImagesToFile", kLogIntermediateSpinImagesToFile);
         
@@ -4234,20 +4208,20 @@ namespace golf_sim {
     }
     
     bool BallImageProc::PreloadYOLOModel() {
-        GS_LOG_MSG(info, "Preloading YOLO model at startup for detection method: " + kDetectionMethod);
-        
         if (yolo_model_loaded_) {
-            GS_LOG_MSG(trace, "YOLO model already loaded");
+            GS_LOG_MSG(trace, "YOLO model already loaded, skipping preload");
             return true;
         }
-        
+
         try {
             std::lock_guard<std::mutex> lock(yolo_model_mutex_);
-            
+
             if (yolo_model_loaded_) {
+                GS_LOG_MSG(trace, "YOLO model already loaded by another thread");
                 return true;
             }
-            
+
+            GS_LOG_MSG(info, "Preloading YOLO model at startup for detection method: " + kDetectionMethod);
             GS_LOG_MSG(trace, "Loading YOLO model from: " + kONNXModelPath);
             auto start_time = std::chrono::high_resolution_clock::now();
             
@@ -4606,13 +4580,18 @@ namespace golf_sim {
     }
 
     bool BallImageProc::PreloadONNXRuntimeModel() {
-        GS_LOG_MSG(info, "Preloading ONNX Runtime detector for ARM64 optimization...");
+        if (onnx_detector_initialized_.load(std::memory_order_relaxed)) {
+            GS_LOG_MSG(trace, "ONNX Runtime detector already preloaded, skipping");
+            return true;
+        }
 
         std::lock_guard<std::mutex> lock(onnx_detector_mutex_);
         if (onnx_detector_initialized_.load(std::memory_order_relaxed)) {
-            GS_LOG_MSG(trace, "ONNX Runtime detector already preloaded");
+            GS_LOG_MSG(trace, "ONNX Runtime detector already preloaded by another thread");
             return true;
         }
+
+        GS_LOG_MSG(info, "Preloading ONNX Runtime detector for ARM64 optimization...");
 
         try {
             auto start_time = std::chrono::high_resolution_clock::now();
@@ -4664,6 +4643,38 @@ namespace golf_sim {
             onnx_detector_initialized_.store(false, std::memory_order_release);
 
             GS_LOG_MSG(info, "ONNX Runtime detector cleanup completed");
+        }
+    }
+
+    void BallImageProc::LoadConfigurationValues() {
+        // This function should be called AFTER GolfSimConfiguration::Initialize() has loaded the JSON config
+        // It reads the ONNX configuration values FROM the JSON and updates the static variables
+
+        GS_LOG_MSG(info, "Loading BallImageProc configuration values from JSON...");
+
+        // Read ONNX/AI Detection configuration values
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXModelPath", kONNXModelPath);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kDetectionMethod", kDetectionMethod);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBallPlacementDetectionMethod", kBallPlacementDetectionMethod);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXConfidenceThreshold", kONNXConfidenceThreshold);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXNMSThreshold", kONNXNMSThreshold);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXInputSize", kONNXInputSize);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXBackend", kONNXBackend);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXRuntimeAutoFallback", kONNXRuntimeAutoFallback);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXRuntimeThreads", kONNXRuntimeThreads);
+
+        GS_LOG_MSG(info, "Loaded ONNX Model Path: " + kONNXModelPath);
+        GS_LOG_MSG(info, "Loaded Detection Method: " + kDetectionMethod);
+        GS_LOG_MSG(info, "Loaded Backend: " + kONNXBackend);
+
+        if (!kONNXModelPath.empty()) {
+            std::ifstream model_file(kONNXModelPath);
+            if (model_file.good()) {
+                GS_LOG_MSG(info, "ONNX model file verified to exist at: " + kONNXModelPath);
+                model_file.close();
+            } else {
+                GS_LOG_MSG(error, "ONNX model file NOT FOUND at: " + kONNXModelPath);
+            }
         }
     }
 

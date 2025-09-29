@@ -1593,6 +1593,9 @@ int main(int argc, char *argv[])
         // TBD - consider if there is a better place for this?
         GolfSimGlobals::golf_sim_running_ = true;
 
+        // Load BallImageProc configuration values after JSON config is loaded
+        BallImageProc::LoadConfigurationValues();
+
         run_main(argc, argv);
         
         GS_LOG_MSG(info, "PiTrac Launch Monitor shutting down normally...");
