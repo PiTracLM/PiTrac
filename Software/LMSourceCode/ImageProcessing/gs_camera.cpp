@@ -2968,7 +2968,14 @@ namespace golf_sim {
                     GsBallAndTimingElement be;
                     be.ball = b;
                     if (i > 0) {
-                        be.time_interval_before_ball_us = 1000 * pulse_intervals[best_final_offset_of_distance_ratios + i - 1];
+                        size_t interval_index = best_final_offset_of_distance_ratios + i - 1;
+                        if (interval_index < pulse_intervals.size()) {
+                            be.time_interval_before_ball_us = 1000 * pulse_intervals[interval_index];
+                        } else {
+                            GS_LOG_MSG(warning, "Pulse interval index " + std::to_string(interval_index) +
+                                     " out of bounds (size: " + std::to_string(pulse_intervals.size()) + ")");
+                            be.time_interval_before_ball_us = 0;
+                        }
                     }
                     return_balls_and_timing.push_back(be);
                 }
@@ -2981,12 +2988,26 @@ namespace golf_sim {
                 if (second_ball_index > most_centered_ball_index) {
                     // The correct interval is the right one, as ball2 is to the right
                     // of the middle ball.  Because of the sort we just did, this will also
-                    // be correct for left-handed playing, where the  
-                    time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[most_centered_ball_index + best_final_offset_of_distance_ratios]);
+                    // be correct for left-handed playing, where the
+                    size_t interval_index = most_centered_ball_index + best_final_offset_of_distance_ratios;
+                    if (interval_index < pulse_intervals.size()) {
+                        time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[interval_index]);
+                    } else {
+                        GS_LOG_MSG(warning, "Time interval index " + std::to_string(interval_index) +
+                                 " out of bounds (size: " + std::to_string(pulse_intervals.size()) + ")");
+                        time_between_ball_images_uS = 0;
+                    }
                 }
                 else {
                     // Ball2 is to the left of the middle ball.
-                    time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[most_centered_ball_index + best_final_offset_of_distance_ratios - 1]);
+                    size_t interval_index = most_centered_ball_index + best_final_offset_of_distance_ratios - 1;
+                    if (interval_index < pulse_intervals.size()) {
+                        time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[interval_index]);
+                    } else {
+                        GS_LOG_MSG(warning, "Time interval index " + std::to_string(interval_index) +
+                                 " out of bounds (size: " + std::to_string(pulse_intervals.size()) + ")");
+                        time_between_ball_images_uS = 0;
+                    }
                 }
 
             }

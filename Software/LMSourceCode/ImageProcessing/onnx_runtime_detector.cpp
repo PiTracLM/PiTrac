@@ -409,11 +409,6 @@ void ONNXRuntimeDetector::PreprocessImageNEON(const cv::Mat& image, float* outpu
     letterbox_params_.x_offset = x_offset;
     letterbox_params_.y_offset = y_offset;
 
-    GS_LOG_TRACE_MSG(trace, "NEON Letterbox: " + std::to_string(image.cols) + "x" + std::to_string(image.rows) +
-                     " -> " + std::to_string(new_width) + "x" + std::to_string(new_height) +
-                     ", scale=" + std::to_string(scale) +
-                     ", offsets=(" + std::to_string(x_offset) + "," + std::to_string(y_offset) + ")");
-
     resized.copyTo(letterbox(cv::Rect(x_offset, y_offset, new_width, new_height)));
 
     neon::PreprocessPipelineNEON(letterbox, output_tensor,
@@ -433,11 +428,6 @@ std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::PostprocessYOLO
     const int num_predictions = CalculatePredictionCount(config_.input_width, config_.input_height);
     const int num_classes = config_.num_classes;
     const int data_width = 4 + num_classes;  // 4 bbox coords + class scores
-
-    GS_LOG_TRACE_MSG(trace, "PostprocessYOLO: num_predictions=" + std::to_string(num_predictions) +
-                     ", num_classes=" + std::to_string(num_classes) +
-                     ", data_width=" + std::to_string(data_width) +
-                     ", output_size=" + std::to_string(output_size));
 
     int expected_size = num_predictions * data_width;
     if (output_size != expected_size) {
@@ -497,26 +487,7 @@ std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::PostprocessYOLO
         }
     }
 
-    // Debug: Log top 5 confidence values to diagnose detection issues
-    std::vector<float> all_conf;
-    for (int i = 0; i < std::min(num_predictions, 10000); i++) {
-        all_conf.push_back(config_.is_single_class_model ? output_tensor[4 * num_predictions + i] : 0.0f);
-    }
-    std::sort(all_conf.begin(), all_conf.end(), std::greater<float>());
-    std::string top5 = "Top5 conf: ";
-    for (int i = 0; i < std::min(5, (int)all_conf.size()); i++) {
-        top5 += std::to_string(all_conf[i]) + " ";
-    }
-    GS_LOG_TRACE_MSG(trace, top5);
-
-    GS_LOG_TRACE_MSG(trace, "PostprocessYOLO: Found " + std::to_string(processed_detections) +
-                     " detections above confidence threshold " +
-                     std::to_string(config_.confidence_threshold) +
-                     ", letterbox: scale=" + std::to_string(letterbox.scale) +
-                     " offsets=(" + std::to_string(letterbox.x_offset) + "," + std::to_string(letterbox.y_offset) + ")");
-
     auto suppressed = NonMaxSuppression(detections);
-    GS_LOG_TRACE_MSG(trace, "PostprocessYOLO: After NMS: " + std::to_string(suppressed.size()) + " detections");
 
     return suppressed;
 }
@@ -526,14 +497,7 @@ int ONNXRuntimeDetector::CalculatePredictionCount(int width, int height) const {
     int stride_16_preds = (width / 16) * (height / 16);
     int stride_32_preds = (width / 32) * (height / 32);
 
-    int total = stride_8_preds + stride_16_preds + stride_32_preds;
-
-    GS_LOG_TRACE_MSG(trace, "CalculatePredictionCount: " + std::to_string(width) + "x" + std::to_string(height) +
-                     " -> " + std::to_string(stride_8_preds) + " + " +
-                     std::to_string(stride_16_preds) + " + " +
-                     std::to_string(stride_32_preds) + " = " + std::to_string(total) + " predictions");
-
-    return total;
+    return stride_8_preds + stride_16_preds + stride_32_preds;
 }
 
 std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::NonMaxSuppression(

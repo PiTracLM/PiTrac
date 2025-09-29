@@ -588,12 +588,8 @@ namespace golf_sim {
 
         // *** ONNX DETECTION INTEGRATION - Process through full trajectory analysis pipeline ***
         if (kDetectionMethod == "experimental" || kDetectionMethod == "experimental_sahi") {
-            GS_LOG_TRACE_MSG(trace, "ONNX Detection Mode - Using ONNX detection, will process through full trajectory analysis");
-            
             std::vector<GsCircle> onnx_circles;
             if (DetectBallsONNX(rgbImg, search_mode, onnx_circles)) {
-                GS_LOG_TRACE_MSG(trace, "ONNX detected " + std::to_string(onnx_circles.size()) + " circles - converting to GolfBall objects");
-                
                 // Convert GsCircle results to GolfBall objects for trajectory analysis
                 return_balls.clear();
                 for (size_t i = 0; i < onnx_circles.size(); ++i) {
@@ -603,17 +599,14 @@ namespace golf_sim {
                     ball.ball_color_ = GolfBall::BallColor::kONNXDetected; // Mark as ONNX-detected
                     ball.measured_radius_pixels_ = onnx_circles[i][2];
                     ball.radius_at_calibration_pixels_ = baseBallWithSearchParams.radius_at_calibration_pixels_;
-                    
+
                     // Set color info - ONNX doesn't analyze color but we need placeholders
                     ball.average_color_ = baseBallWithSearchParams.average_color_;
                     ball.median_color_ = baseBallWithSearchParams.average_color_;
                     ball.std_color_ = GsColorTriplet(0, 0, 0); // Zero std indicates no color analysis
-                    
+
                     return_balls.push_back(ball);
                 }
-                
-                GS_LOG_TRACE_MSG(trace, "ONNX detection complete - returning " + 
-                               std::to_string(return_balls.size()) + " balls for trajectory analysis");
                 return !return_balls.empty();
             } else {
                 GS_LOG_MSG(warning, "ONNX detection failed - no balls found");
@@ -1126,28 +1119,25 @@ namespace golf_sim {
                 
                 if (!test_circles.empty()) {
                     circles.assign(test_circles.begin(), test_circles.end());
-                    
-                    // ⚠️  WARNING: This old ONNX coordinate offset logic should NEVER execute 
+
+                    // ⚠️  WARNING: This old ONNX coordinate offset logic should NEVER execute
                     // with the new early bypass. If you see this, the early bypass failed!
                     GS_LOG_MSG(error, "OLD ONNX path executed - this indicates early bypass failure!");
-                    
+
                     // Apply coordinate transformation if using sub-image
                     for (auto& c : circles) {
                         c[0] += offset_sub_to_full.x;
                         c[1] += offset_sub_to_full.y;
                     }
-                    
+
                     finalNumberOfFoundCircles = (int)circles.size();
-                    GS_LOG_TRACE_MSG(trace, "ONNX detected " + std::to_string(finalNumberOfFoundCircles) + " circles");
                 } else {
-                    GS_LOG_TRACE_MSG(trace, "ONNX found circles but all filtered out by radius constraints");
                     if (report_find_failures) {
                         GS_LOG_MSG(warning, "ONNX detection found no balls within radius constraints");
                     }
                     return false;
                 }
             } else {
-                GS_LOG_TRACE_MSG(trace, "ONNX detection found no balls");
                 if (report_find_failures) {
                     GS_LOG_MSG(warning, "ONNX detection failed to find any balls");
                 }
@@ -4286,7 +4276,7 @@ namespace golf_sim {
 
     bool BallImageProc::DetectBallsONNXRuntime(const cv::Mat& preprocessed_img, BallSearchMode search_mode,
                                               std::vector<GsCircle>& detected_circles) {
-        GS_LOG_TRACE_MSG(trace, "BallImageProc::DetectBallsONNXRuntime - Using optimized detector");
+        auto detection_start = std::chrono::high_resolution_clock::now();
 
         try {
             // Initialize detector only once with double-checked locking pattern (optimized for Pi)
@@ -4387,7 +4377,11 @@ namespace golf_sim {
                 }
             }
 
-            GS_LOG_TRACE_MSG(trace, "ONNX Runtime detected " + std::to_string(detected_circles.size()) + " balls");
+            auto detection_end = std::chrono::high_resolution_clock::now();
+            auto detection_duration = std::chrono::duration_cast<std::chrono::milliseconds>(detection_end - detection_start);
+
+            GS_LOG_TRACE_MSG(trace, "ONNX Runtime detected " + std::to_string(detected_circles.size()) +
+                           " balls in " + std::to_string(detection_duration.count()) + "ms");
             return !detected_circles.empty();
 
         } catch (const std::exception& e) {
