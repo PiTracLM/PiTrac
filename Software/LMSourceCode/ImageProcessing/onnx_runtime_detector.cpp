@@ -765,43 +765,41 @@ void PreprocessPipelineNEON(const cv::Mat& input, float* output,
 
     const int block_size = 64; // Tune for L1 cache
 
-    for (int block = 0; block < pixels; block += block_size) {
-        int end = std::min(block + block_size, pixels);
+    for (int i = 0; i < pixels; i += 4) {
+        int remaining_pixels = std::min(4, pixels - i);
 
-        for (int i = block; i < end; i += 4) {
-            int remaining_pixels = std::min(4, end - i);
+        if (remaining_pixels == 4 && (i + 3) * 3 + 2 < static_cast<int>(resized.total() * resized.elemSize())) {
+            const uint8_t* src = resized.ptr<uint8_t>() + i * 3;
 
-            if (remaining_pixels == 4 && (i + 3) < pixels) {
-                const uint8_t* src = resized.ptr<uint8_t>() + i * 3;
+            // Load 12 bytes using vld3_u8 for automatic BGR deinterleaving
+            uint8x8x3_t bgr_pixels = vld3_u8(src);
 
-                if ((i + 3) * 3 < static_cast<int>(resized.total() * resized.elemSize())) {
-                    uint8x8_t bgr_u8 = vld1_u8(src);
-                    uint16x8_t bgr_u16 = vmovl_u8(bgr_u8);
-                    float32x4_t bgr_f32_low = vcvtq_f32_u32(vmovl_u16(vget_low_u16(bgr_u16)));
-                    float32x4_t bgr_f32_high = vcvtq_f32_u32(vmovl_u16(vget_high_u16(bgr_u16)));
+            uint16x8_t b_u16 = vmovl_u8(bgr_pixels.val[0]);
+            uint16x8_t g_u16 = vmovl_u8(bgr_pixels.val[1]);
+            uint16x8_t r_u16 = vmovl_u8(bgr_pixels.val[2]);
 
-                    bgr_f32_low = vmulq_f32(bgr_f32_low, scale);
-                    bgr_f32_high = vmulq_f32(bgr_f32_high, scale);
+            float32x4_t b_f32 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(b_u16)));
+            float32x4_t g_f32 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(g_u16)));
+            float32x4_t r_f32 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(r_u16)));
 
-                    if (i < pixels) {
-                        // Swap BGR to RGB (Ultralytics YOLOv8 ONNX expects RGB)
-                        output[0 * pixels + i] = vgetq_lane_f32(bgr_f32_low, 2);  // R
-                        output[1 * pixels + i] = vgetq_lane_f32(bgr_f32_low, 1);  // G
-                        output[2 * pixels + i] = vgetq_lane_f32(bgr_f32_low, 0);  // B
-                    }
-                }
-            } else {
-                for (int j = 0; j < remaining_pixels && (i + j) < pixels; j++) {
-                    const uint8_t* pixel = resized.ptr<uint8_t>() + (i + j) * 3;
-                    float b = pixel[0] / 255.0f;
-                    float g = pixel[1] / 255.0f;
-                    float r = pixel[2] / 255.0f;
+            b_f32 = vmulq_f32(b_f32, scale);
+            g_f32 = vmulq_f32(g_f32, scale);
+            r_f32 = vmulq_f32(r_f32, scale);
 
-                    // Swap BGR to RGB (Ultralytics YOLOv8 ONNX expects RGB)
-                    output[0 * pixels + i + j] = r;
-                    output[1 * pixels + i + j] = g;
-                    output[2 * pixels + i + j] = b;
-                }
+            vst1q_f32(&output[0 * pixels + i], b_f32);
+            vst1q_f32(&output[1 * pixels + i], g_f32);
+            vst1q_f32(&output[2 * pixels + i], r_f32);
+        } else {
+            for (int j = 0; j < remaining_pixels; j++) {
+                const uint8_t* pixel = resized.ptr<uint8_t>() + (i + j) * 3;
+                float b = pixel[0] / 255.0f;
+                float g = pixel[1] / 255.0f;
+                float r = pixel[2] / 255.0f;
+
+                // Keep BGR order (matches OpenCV DNN swapRB=false)
+                output[0 * pixels + i + j] = b;
+                output[1 * pixels + i + j] = g;
+                output[2 * pixels + i + j] = r;
             }
         }
     }
