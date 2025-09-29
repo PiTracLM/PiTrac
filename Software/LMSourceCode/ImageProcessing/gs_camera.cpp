@@ -2642,7 +2642,7 @@ namespace golf_sim {
                 return -1;
             }
 
-            for (int distance_pattern_offset = 0; distance_pattern_offset < (int)(pulse_ratios.size() - distance_ratios.size()); distance_pattern_offset++) {
+            for (int distance_pattern_offset = 0; distance_pattern_offset <= (int)(pulse_ratios.size() - distance_ratios.size()); distance_pattern_offset++) {
 
                 double difference_in_ratios = ComputeRatioDistance(distance_ratios, pulse_ratios, distance_pattern_offset);
 
