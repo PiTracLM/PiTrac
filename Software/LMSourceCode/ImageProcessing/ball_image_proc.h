@@ -20,7 +20,7 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/dnn.hpp>
 
-#include <onnxruntime_cxx_api.h>
+#include <onnxruntime/core/session/onnxruntime_cxx_api.h>
 
 #include "logging_tools.h"
 #include "gs_camera.h"
