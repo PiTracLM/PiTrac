@@ -23,6 +23,8 @@ add_global_arguments('-D_FILE_OFFSET_BITS=64', language : 'cpp')
 add_global_arguments('-DLIBCXX_ENABLE_INCOMPLETE_FEATURES=ON', language : 'cpp')
 add_global_arguments('-DBOOST_LOG_DYN_LINK', language : 'cpp')
 add_global_arguments('-DBOOST_BIND_GLOBAL_PLACEHOLDERS', language : 'cpp')
+# Enable XNNPACK execution provider for ONNX Runtime
+add_global_arguments('-DUSE_XNNPACK', language : 'cpp')
 
 
 fs = import('fs')

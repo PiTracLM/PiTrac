@@ -544,12 +544,11 @@ extract_all_dependencies() {
             install_deb_dependency "$artifacts_dir/liblgpio1_0.2.2-1_arm64.deb" "liblgpio1" "true"
             install_deb_dependency "$artifacts_dir/libactivemq-cpp_3.9.5-1_arm64.deb" "libactivemq-cpp"
             install_deb_dependency "$artifacts_dir/libopencv4.11_4.11.0-1_arm64.deb" "libopencv4.11"
-            install_deb_dependency "$artifacts_dir/libonnxruntime1.23.0_1.23.0-1_arm64.deb" "libonnxruntime1.23.0"
+            install_deb_dependency "$artifacts_dir/libonnxruntime1.17.3_1.17.3-xnnpack-verified_arm64.deb" "libonnxruntime1.17.3"
 
             # Install development packages (these depend on runtime packages)
             install_deb_dependency "$artifacts_dir/libactivemq-cpp-dev_3.9.5-1_arm64.deb" "libactivemq-cpp-dev"
             install_deb_dependency "$artifacts_dir/libopencv-dev_4.11.0-1_arm64.deb" "libopencv-dev"
-            install_deb_dependency "$artifacts_dir/libonnxruntime-dev_1.23.0-1_arm64.deb" "libonnxruntime-dev"
 
             # msgpack is header-only, check if not already installed
             if ! dpkg -l | grep -qE "^ii\s+libmsgpack-cxx-dev"; then
