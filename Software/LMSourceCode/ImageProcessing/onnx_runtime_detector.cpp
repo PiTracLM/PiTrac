@@ -552,7 +552,11 @@ void ResizeImageNEON(const uint8_t* src, int src_width, int src_height,
         float dy = src_y - y1;
 
         for (int x = 0; x < dst_width; x += 4) { // Process 4 pixels at once
-            float32x4_t src_x = vmulq_n_f32(vcvtq_f32_s32(vld1q_s32((int32_t*)&x)), x_ratio);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+            int32_t x_vals[4] = {x, x+1, x+2, x+3};
+            float32x4_t src_x = vmulq_n_f32(vcvtq_f32_s32(vld1q_s32(x_vals)), x_ratio);
+#pragma GCC diagnostic pop
             int32x4_t x1 = vcvtq_s32_f32(src_x);
             int32x4_t x2 = vminq_s32(vaddq_s32(x1, vdupq_n_s32(1)), vdupq_n_s32(src_width - 1));
             float32x4_t dx = vsubq_f32(src_x, vcvtq_f32_s32(x1));
@@ -632,7 +636,7 @@ void PreprocessPipelineNEON(const cv::Mat& input, float* output,
             if (remaining_pixels == 4 && (i + 3) < pixels) {
                 const uint8_t* src = resized.ptr<uint8_t>() + i * 3;
 
-                if ((i + 3) * 3 < resized.total() * resized.elemSize()) {
+                if ((i + 3) * 3 < static_cast<int>(resized.total() * resized.elemSize())) {
                     uint8x8_t bgr_u8 = vld1_u8(src);
                     uint16x8_t bgr_u16 = vmovl_u8(bgr_u8);
                     float32x4_t bgr_f32_low = vcvtq_f32_u32(vmovl_u16(vget_low_u16(bgr_u16)));
