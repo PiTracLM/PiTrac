@@ -154,23 +154,25 @@ class TestingToolsManager:
 
                 # Modify the generated config to add test image path
                 import json
-                with open(config_path, 'r') as f:
+
+                with open(config_path, "r") as f:
                     config_json = json.load(f)
 
                 # Add test configuration section for SystemMode::kTest
-                if 'gs_config' not in config_json:
-                    config_json['gs_config'] = {}
-                if 'testing' not in config_json['gs_config']:
-                    config_json['gs_config']['testing'] = {}
+                if "gs_config" not in config_json:
+                    config_json["gs_config"] = {}
+                if "testing" not in config_json["gs_config"]:
+                    config_json["gs_config"]["testing"] = {}
 
-                # Use the uploaded image as both tee and strobed image
-                # This allows testing with just a single flight camera image
-                image_path = str(latest_image)
-                config_json['gs_config']['testing']['kTwoImageTestTeedBallImage'] = image_path
-                config_json['gs_config']['testing']['kTwoImageTestStrobedImage'] = image_path
-                config_json['gs_config']['testing']['kTwoImageTestPreImage'] = ""  # Optional
+                image_filename = latest_image.name
 
-                with open(config_path, 'w') as f:
+                # Set the base directory to where our test images are
+                config_json["gs_config"]["testing"]["kBaseTestImageDir"] = str(self.test_images_dir) + "/"
+                config_json["gs_config"]["testing"]["kTwoImageTestTeedBallImage"] = image_filename
+                config_json["gs_config"]["testing"]["kTwoImageTestStrobedImage"] = image_filename
+                config_json["gs_config"]["testing"]["kTwoImageTestPreImage"] = ""  # Optional
+
+                with open(config_path, "w") as f:
                     json.dump(config_json, f, indent=2)
 
             cmd = [self.pitrac_binary]
