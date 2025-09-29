@@ -1,245 +1,245 @@
 name: Bug Report
 description: Report a bug in PiTrac launch monitor software or hardware integration
 title: "[Bug]: "
-labels: ["bug", "needs-triage"]
+labels: [ "bug", "needs-triage" ]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        ## Thanks for helping improve PiTrac! 🏌️
-        
-        Before submitting, please:
-        - Check our [Troubleshooting Guide](https://jamespilgrim.github.io/PiTrac/troubleshooting/troubleshooting.html)
-        - Search [existing issues](https://github.com/jamespilgrim/PiTrac/issues)
-        - Join our [Discord](https://discord.gg/vGuyAAxXJH) for community help
+- type: markdown
+  attributes:
+    value: |
+      ## Thanks for helping improve PiTrac! 🏌️
 
-  - type: dropdown
-    id: bug-type
-    attributes:
-      label: Bug Category
-      description: What type of issue are you experiencing?
-      options:
-        - Camera Detection/Capture
-        - Ball Tracking/Detection
-        - Simulator Integration (E6/GSPro/TruGolf)
-        - Build/Installation
-        - Web Interface
-        - Hardware/GPIO/Strobe
-        - Performance/Latency
-        - Configuration
-        - Other
-    validations:
-      required: true
+      Before submitting, please:
+      - Check our [Troubleshooting Guide](https://pitraclm.github.io/PiTrac/troubleshooting/troubleshooting.html)
+      - Search [existing issues](https://github.com/pitraclm/pitrac/issues)
+      - Join our [Discord](https://discord.gg/vGuyAAxXJH) for community help
 
-  - type: textarea
-    id: description
-    attributes:
-      label: Bug Description
-      description: Clear and concise description of what's happening
-      placeholder: |
-        Example: The launch monitor fails to detect shots when the ball is hit with a driver. 
-        The strobe fires but ball is not in frame.
-    validations:
-      required: true
+- type: dropdown
+  id: bug-type
+  attributes:
+    label: Bug Category
+    description: What type of issue are you experiencing?
+    options:
+    - Camera Detection/Capture
+    - Ball Tracking/Detection
+    - Simulator Integration (E6/GSPro/TruGolf)
+    - Build/Installation
+    - Web Interface
+    - Hardware/GPIO/Strobe
+    - Performance/Latency
+    - Configuration
+    - Other
+  validations:
+    required: true
 
-  - type: textarea
-    id: expected
-    attributes:
-      label: Expected Behavior
-      description: What should happen instead?
-      placeholder: Ball data should be detected and appear multiple times in the photo.
-    validations:
-      required: true
+- type: textarea
+  id: description
+  attributes:
+    label: Bug Description
+    description: Clear and concise description of what's happening
+    placeholder: |
+      Example: The launch monitor fails to detect shots when the ball is hit with a driver. 
+      The strobe fires but ball is not in frame.
+  validations:
+    required: true
 
-  - type: textarea
-    id: reproduction
-    attributes:
-      label: Steps to Reproduce
-      description: How can we reproduce this issue?
-      placeholder: |
-        1. Start PiTrac with `sudo pitrac start`
-        2. Hit a ball with driver
-        3. Observe shot detection, with no ball in output photo 
-    validations:
-      required: true
+- type: textarea
+  id: expected
+  attributes:
+    label: Expected Behavior
+    description: What should happen instead?
+    placeholder: Ball data should be detected and appear multiple times in the photo.
+  validations:
+    required: true
 
-  - type: dropdown
-    id: pi-model
-    attributes:
-      label: Raspberry Pi Model
-      description: Which Pi are you using?
-      options:
-        - Raspberry Pi 5 (8GB)
-        - Raspberry Pi 5 (4GB)
-        - Raspberry Pi 4 Model B (8GB)
-        - Raspberry Pi 4 Model B (4GB)
-        - Raspberry Pi 4 Model B (2GB)
-        - Other/Unknown
-    validations:
-      required: true
+- type: textarea
+  id: reproduction
+  attributes:
+    label: Steps to Reproduce
+    description: How can we reproduce this issue?
+    placeholder: |
+      1. Start PiTrac with `sudo pitrac start`
+      2. Hit a ball with driver
+      3. Observe shot detection, with no ball in output photo 
+  validations:
+    required: true
 
-  - type: dropdown
-    id: pi-count
-    attributes:
-      label: Raspberry Pi Count
-      description: How many Raspberry Pis are you using?
-      options:
-        - Single Pi
-        - Dual Pi
-    validations:
-      required: true
+- type: dropdown
+  id: pi-model
+  attributes:
+    label: Raspberry Pi Model
+    description: Which Pi are you using?
+    options:
+    - Raspberry Pi 5 (8GB)
+    - Raspberry Pi 5 (4GB)
+    - Raspberry Pi 4 Model B (8GB)
+    - Raspberry Pi 4 Model B (4GB)
+    - Raspberry Pi 4 Model B (2GB)
+    - Other/Unknown
+  validations:
+    required: true
 
-  - type: dropdown
-    id: camera-type
-    attributes:
-      label: Camera Configuration
-      description: What cameras are you using?
-      multiple: true
-      options:
-        - Pi Global Shutter Camera (IMX296)
-        - Innomaker CAM-MIPI327RAW
-        - ArduCam Global Shutter
-        - Other Global Shutter Camera
-        - Standard Pi Camera
-    validations:
-      required: true
+- type: dropdown
+  id: pi-count
+  attributes:
+    label: Raspberry Pi Count
+    description: How many Raspberry Pis are you using?
+    options:
+    - Single Pi
+    - Dual Pi
+  validations:
+    required: true
 
-  - type: dropdown
-    id: os-version
-    attributes:
-      label: Operating System
-      description: Which OS version?
-      options:
-        - Raspberry Pi OS Bookworm 64-bit (recommended)
-        - Raspberry Pi OS Bookworm 32-bit
-        - Raspberry Pi OS Bullseye 64-bit
-        - Raspberry Pi OS Bullseye 32-bit
-        - Ubuntu for Raspberry Pi
-        - Other Linux
-    validations:
-      required: true
+- type: dropdown
+  id: camera-type
+  attributes:
+    label: Camera Configuration
+    description: What cameras are you using?
+    multiple: true
+    options:
+    - Pi Global Shutter Camera (IMX296)
+    - Innomaker CAM-MIPI327RAW
+    - ArduCam Global Shutter
+    - Other Global Shutter Camera
+    - Standard Pi Camera
+  validations:
+    required: true
 
-  - type: dropdown
-    id: installation-method
-    attributes:
-      label: Installation Method
-      description: How did you install PiTrac?
-      options:
-        - APT Package (sudo apt install pitrac)
-        - Built from source (install.sh)
-        - Manual build
-    validations:
-      required: true
+- type: dropdown
+  id: os-version
+  attributes:
+    label: Operating System
+    description: Which OS version?
+    options:
+    - Raspberry Pi OS Bookworm 64-bit (recommended)
+    - Raspberry Pi OS Bookworm 32-bit
+    - Raspberry Pi OS Bullseye 64-bit
+    - Raspberry Pi OS Bullseye 32-bit
+    - Ubuntu for Raspberry Pi
+    - Other Linux
+  validations:
+    required: true
 
-  - type: input
-    id: pitrac-version
-    attributes:
-      label: PiTrac Version
-      description: Run `pitrac version` to get this
-      placeholder: "v1.0.0-beta.2"
-    validations:
-      required: true
+- type: dropdown
+  id: installation-method
+  attributes:
+    label: Installation Method
+    description: How did you install PiTrac?
+    options:
+    - APT Package (sudo apt install pitrac)
+    - Built from source (install.sh)
+    - Manual build
+  validations:
+    required: true
 
-  - type: textarea
-    id: hardware-test
-    attributes:
-      label: Hardware Test Output
-      description: Please run `pitrac test hardware` and paste the output
-      render: shell
-      placeholder: |
-        Paste the complete output of:
-        pitrac test hardware
+- type: input
+  id: pitrac-version
+  attributes:
+    label: PiTrac Version
+    description: Run `pitrac version` to get this
+    placeholder: "v1.0.0-beta.2"
+  validations:
+    required: true
 
-  - type: textarea
-    id: camera-test
-    attributes:
-      label: Camera Test Output
-      description: Please run `pitrac test camera` and paste the output (if cameras involved)
-      render: shell
-      placeholder: |
-        Paste the complete output of:
-        pitrac test camera
+- type: textarea
+  id: hardware-test
+  attributes:
+    label: Hardware Test Output
+    description: Please run `pitrac test hardware` and paste the output
+    render: shell
+    placeholder: |
+      Paste the complete output of:
+      pitrac test hardware
 
-  - type: textarea
-    id: logs
-    attributes:
-      label: Relevant Logs
-      description: |
-        Include any relevant logs from:
-        - `journalctl -u pitrac -n 100`
-        - `~/LM_Shares/Images/` directory listings
-        - Error messages from the console
-      render: shell
+- type: textarea
+  id: camera-test
+  attributes:
+    label: Camera Test Output
+    description: Please run `pitrac test camera` and paste the output (if cameras involved)
+    render: shell
+    placeholder: |
+      Paste the complete output of:
+      pitrac test camera
 
-  - type: dropdown
-    id: simulator
-    attributes:
-      label: Golf Simulator Software
-      description: Which simulator are you connecting to?
-      options:
-        - GSPro
-        - E6 Connect
-        - TruGolf E6
-        - TGC 2019
-        - Not using simulator
-        - Other
+- type: textarea
+  id: logs
+  attributes:
+    label: Relevant Logs
+    description: |
+      Include any relevant logs from:
+      - `journalctl -u pitrac -n 100`
+      - `~/LM_Shares/Images/` directory listings
+      - Error messages from the console
+    render: shell
 
-  - type: textarea
-    id: additional-context
-    attributes:
-      label: Additional Context
-      description: |
-        Add any other context, screenshots, or files that might help.
-        - Photos of your hardware setup
-        - Sample images from `~/LM_Shares/Images/`
-        - Configuration files
-        - Performance metrics
-      placeholder: You can drag and drop images here
+- type: dropdown
+  id: simulator
+  attributes:
+    label: Golf Simulator Software
+    description: Which simulator are you connecting to?
+    options:
+    - GSPro
+    - E6 Connect
+    - TruGolf E6
+    - TGC 2019
+    - Not using simulator
+    - Other
 
-  - type: dropdown
-    id: shot-conditions
-    attributes:
-      label: Shot Conditions (if tracking issue)
-      description: When does the issue occur?
-      multiple: true
-      options:
-        - Driver/Wood shots
-        - Iron shots
-        - Wedge/short shots
-        - Putting
-        - Left-handed shots
-        - High launch angles (>30°)
-        - Low launch angles (<10°)
-        - Extreme side spin
-        - Indoor lighting
-        - All shots
+- type: textarea
+  id: additional-context
+  attributes:
+    label: Additional Context
+    description: |
+      Add any other context, screenshots, or files that might help.
+      - Photos of your hardware setup
+      - Sample images from `~/LM_Shares/Images/`
+      - Configuration files
+      - Performance metrics
+    placeholder: You can drag and drop images here
 
-  - type: checkboxes
-    id: debugging-steps
-    attributes:
-      label: Debugging Steps Attempted
-      description: What have you already tried?
-      options:
-        - label: Checked camera detection with `rpicam-hello --list-cameras` (Pi5) or `libcamera-hello --list-cameras` (Pi4)
-        - label: Verified `camera_auto_detect=1` in `/boot/firmware/config.txt` (Pi5) or `/boot/config.txt` (Pi4)
-        - label: Tested strobe firing with `pitrac test pulse`
-        - label: Checked GPIO chip (0 for Pi4, 4 for Pi5)
-        - label: Tried with different club/ball combinations
+- type: dropdown
+  id: shot-conditions
+  attributes:
+    label: Shot Conditions (if tracking issue)
+    description: When does the issue occur?
+    multiple: true
+    options:
+    - Driver/Wood shots
+    - Iron shots
+    - Wedge/short shots
+    - Putting
+    - Left-handed shots
+    - High launch angles (>30°)
+    - Low launch angles (<10°)
+    - Extreme side spin
+    - Indoor lighting
+    - All shots
 
-  - type: dropdown
-    id: discord-contact
-    attributes:
-      label: Discord Contact
-      description: Can we reach out to you on Discord about this issue?
-      options:
-        - "Yes, I'm active on the PiTrac Discord"
-        - "No, please contact me through GitHub only"
-    validations:
-      required: true
+- type: checkboxes
+  id: debugging-steps
+  attributes:
+    label: Debugging Steps Attempted
+    description: What have you already tried?
+    options:
+    - label: Checked camera detection with `rpicam-hello --list-cameras` (Pi5) or `libcamera-hello --list-cameras` (Pi4)
+    - label: Verified `camera_auto_detect=1` in `/boot/firmware/config.txt` (Pi5) or `/boot/config.txt` (Pi4)
+    - label: Tested strobe firing with `pitrac test pulse`
+    - label: Checked GPIO chip (0 for Pi4, 4 for Pi5)
+    - label: Tried with different club/ball combinations
 
-  - type: input
-    id: discord-username
-    attributes:
-      label: Discord Username
-      description: What's your username on the PiTrac Discord server? (Leave blank if you prefer GitHub contact)
-      placeholder: "username#1234 or @username"
+- type: dropdown
+  id: discord-contact
+  attributes:
+    label: Discord Contact
+    description: Can we reach out to you on Discord about this issue?
+    options:
+    - "Yes, I'm active on the PiTrac Discord"
+    - "No, please contact me through GitHub only"
+  validations:
+    required: true
+
+- type: input
+  id: discord-username
+  attributes:
+    label: Discord Username
+    description: What's your username on the PiTrac Discord server? (Leave blank if you prefer GitHub contact)
+    placeholder: "username#1234 or @username"

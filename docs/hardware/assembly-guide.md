@@ -207,11 +207,11 @@ The Middle Layer has two wall halves and two floors on the Pi side: lower floor 
 
 ### 1. Build Strobe Assembly
 
-See [LED Strobe Mount instructions](https://github.com/jamespilgrim/PiTrac/tree/main/3D%20Printed%20Parts/Enclosure%20Models/LED-Array-Strobe-Light-Mount).
+See [LED Strobe Mount instructions](https://github.com/pitraclm/pitrac/tree/main/3D%20Printed%20Parts/Enclosure%20Models/LED-Array-Strobe-Light-Mount).
 
 ### 2. Build Connector Board
 
-See [Connector Board instructions](https://github.com/jamespilgrim/PiTrac/tree/main/Hardware/Connector%20Board).
+See [Connector Board instructions](https://github.com/pitraclm/pitrac/tree/main/Hardware/Connector%20Board).
 
 {: .important }
 **Critical:** Attach 12V IN/OUT wiring pairs and 4-wire harness to Connector Board screw terminals *before* mounting the floor. Access becomes difficult after upper floor installation.

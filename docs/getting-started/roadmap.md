@@ -43,7 +43,7 @@ But here too, there's a decision to make.  The Version 2 enclosure will someday 
 
 But the Version 2 enclosure can also support builds using *OTS parts* instead of the Compute Board.  As such, part of the decision of which road to take right now is whether to wait for the above-pictured vision of PiTrac to emerge, or instead use the Version 2 enclosure with the currently-available off-the-shelf system.  Most folks are opting for that option now.
 
-This second Version 2 option typically houses the large LED driver in the base of the system, with several AC power adapters kept externally with wires running to the tower.  To go that way, you'll need an enclosure "tower" variant that is fitted for the separate Pi 5 SBCs.  See [here](https://github.com/jamespilgrim/PiTrac/tree/main/3D%20Printed%20Parts/Enclosure%20Version%202/Tower-Connector-Board-Variant).
+This second Version 2 option typically houses the large LED driver in the base of the system, with several AC power adapters kept externally with wires running to the tower.  To go that way, you'll need an enclosure "tower" variant that is fitted for the separate Pi 5 SBCs.  See [here](https://github.com/pitraclm/pitrac/tree/main/3D%20Printed%20Parts/Enclosure%20Version%202/Tower-Connector-Board-Variant).
 
 ![Tower Variant](https://github.com/user-attachments/assets/d040da0a-5363-475d-8114-5715e5935a62)
 

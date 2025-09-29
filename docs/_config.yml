@@ -2,14 +2,14 @@ title: PiTrac - DIY Golf Launch Monitor
 description: Complete documentation for PiTrac, the open-source DIY golf launch monitor built with Raspberry Pi. Get ball speed, launch angles, spin rates, and golf simulator integration.
 theme: just-the-docs
 
-url: https://jamespilgrim.github.io
+url: https://pitraclm.github.io
 baseurl: /PiTrac
 
 # Logo
 logo: "/assets/images/logos/PiTrac.svg"
 
 aux_links:
-  Edit Me: https://github.com/jamespilgrim/PiTrac/tree/main/docs
+  Edit Me: https://github.com/pitraclm/pitrac/tree/main/docs
 
 search_enabled: true
 

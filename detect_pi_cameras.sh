@@ -627,7 +627,7 @@ print_help_footer() {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo
     echo "For more information:"
-    echo "  - PiTrac Documentation: https://jamespilgrim.github.io/PiTrac/"
+    echo "  - PiTrac Documentation: https://pitraclm.github.io/PiTrac/"
     echo "  - Discord Community: https://discord.gg/j9YWCMFVHN"
 }
 

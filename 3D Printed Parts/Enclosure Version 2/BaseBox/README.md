@@ -17,4 +17,4 @@ Note that a beginning of a sketch for an x-shaped leveling support base has been
 Note also that the "shank shield" is not designed for 3D printing.  The hope is that the .dxf file can be used to laser cut or mill that part out of acrylic or (better) polycarbonite.
 **Assembly Notes:**
 
-See the [main assembly instructions](https://github.com/jamespilgrim/PiTrac/blob/main/Documentation/PiTrac%20Version%202%20Assembly.md).
+See the [main assembly instructions](https://github.com/pitraclm/pitrac/blob/main/Documentation/PiTrac%20Version%202%20Assembly.md).

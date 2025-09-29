@@ -15,7 +15,7 @@ All 3D printable parts can be found in the main PiTrac GitHub repository under:
 - `3D Printed Parts/` directory
 
 {: .highlight }
-📥 **[Download 3D Parts](https://github.com/jamespilgrim/PiTrac/tree/main/3D%20Printed%20Parts)** - Access all STL files and 3D models on GitHub
+📥 **[Download 3D Parts](https://github.com/pitraclm/pitrac/tree/main/3D%20Printed%20Parts)** - Access all STL files and 3D models on GitHub
 
 ## Printing Requirements
 

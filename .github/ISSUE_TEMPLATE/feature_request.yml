@@ -1,231 +1,231 @@
 name: Feature Request
 description: Suggest a new feature or enhancement for PiTrac
 title: "[Feature]: "
-labels: ["enhancement", "needs-triage"]
+labels: [ "enhancement", "needs-triage" ]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        ## Feature Request
-        
-        Help us make PiTrac better! Consider:
-        - Checking our [Roadmap](https://jamespilgrim.github.io/PiTrac/getting-started/roadmap.html)
-  - type: dropdown
-    id: feature-area
-    attributes:
-      label: Feature Area
-      description: Which part of PiTrac would this improve?
-      options:
-        - Ball Detection/Tracking Algorithm
-        - Club Data (face angle, path, etc.)
-        - Simulator Integration
-        - Web Interface/GUI
-        - Installation/Setup Process
-        - Hardware Support
-        - Performance/Optimization
-        - Data Export/Analytics
-        - Multi-player Support
-        - Mobile App
-        - Cloud Integration
-        - Other
-    validations:
-      required: true
+- type: markdown
+  attributes:
+    value: |
+      ## Feature Request
 
-  - type: textarea
-    id: problem-statement
-    attributes:
-      label: Problem Statement
-      description: What problem does this feature solve?
-      placeholder: |
-        Currently, PiTrac doesn't support left-handed golfers. The camera positioning 
-        assumes a right-handed setup, making it impossible for lefties to use the system.
-    validations:
-      required: true
+      Help us make PiTrac better! Consider:
+      - Checking our [Roadmap](https://pitraclm.github.io/PiTrac/getting-started/roadmap.html)
+- type: dropdown
+  id: feature-area
+  attributes:
+    label: Feature Area
+    description: Which part of PiTrac would this improve?
+    options:
+    - Ball Detection/Tracking Algorithm
+    - Club Data (face angle, path, etc.)
+    - Simulator Integration
+    - Web Interface/GUI
+    - Installation/Setup Process
+    - Hardware Support
+    - Performance/Optimization
+    - Data Export/Analytics
+    - Multi-player Support
+    - Mobile App
+    - Cloud Integration
+    - Other
+  validations:
+    required: true
 
-  - type: textarea
-    id: proposed-solution
-    attributes:
-      label: Proposed Solution
-      description: How would you like to see this implemented?
-      placeholder: |
-        Add a configuration option for handedness that:
-        1. Flips the camera processing logic
-        2. Mirrors the ball flight data
-        3. Adjusts the GUI display appropriately
-        4. Updates calibration routines for left-handed setup
-    validations:
-      required: true
+- type: textarea
+  id: problem-statement
+  attributes:
+    label: Problem Statement
+    description: What problem does this feature solve?
+    placeholder: |
+      Currently, PiTrac doesn't support left-handed golfers. The camera positioning 
+      assumes a right-handed setup, making it impossible for lefties to use the system.
+  validations:
+    required: true
 
-  - type: textarea
-    id: alternatives
-    attributes:
-      label: Alternative Solutions
-      description: Have you considered any alternatives?
-      placeholder: |
-        Alternatives considered:
-        - Physically rotating the entire unit
-        - Using separate configuration files
-        - Manual coordinate transformation
+- type: textarea
+  id: proposed-solution
+  attributes:
+    label: Proposed Solution
+    description: How would you like to see this implemented?
+    placeholder: |
+      Add a configuration option for handedness that:
+      1. Flips the camera processing logic
+      2. Mirrors the ball flight data
+      3. Adjusts the GUI display appropriately
+      4. Updates calibration routines for left-handed setup
+  validations:
+    required: true
 
-  - type: dropdown
-    id: priority
-    attributes:
-      label: Priority/Impact
-      description: How important is this feature to you?
-      options:
-        - Critical - Blocking my use of PiTrac
-        - High - Significantly improves usability
-        - Medium - Nice to have
-        - Low - Minor improvement
-    validations:
-      required: true
+- type: textarea
+  id: alternatives
+  attributes:
+    label: Alternative Solutions
+    description: Have you considered any alternatives?
+    placeholder: |
+      Alternatives considered:
+      - Physically rotating the entire unit
+      - Using separate configuration files
+      - Manual coordinate transformation
 
-  - type: dropdown
-    id: user-type
-    attributes:
-      label: User Type
-      description: How do you use PiTrac?
-      options:
-        - Home simulator enthusiast
-        - Golf instructor/coach
-        - Club fitter
-        - Developer/Contributor
-        - Commercial facility
-        - Researcher/Academic
-        - Other
+- type: dropdown
+  id: priority
+  attributes:
+    label: Priority/Impact
+    description: How important is this feature to you?
+    options:
+    - Critical - Blocking my use of PiTrac
+    - High - Significantly improves usability
+    - Medium - Nice to have
+    - Low - Minor improvement
+  validations:
+    required: true
 
-  - type: dropdown
-    id: implementation-complexity
-    attributes:
-      label: Estimated Complexity
-      description: How complex do you think this would be?
-      options:
-        - Simple - Configuration change only
-        - Moderate - Minor code changes
-        - Complex - Significant development needed
-        - Very Complex - Major architectural changes
-        - Unknown
+- type: dropdown
+  id: user-type
+  attributes:
+    label: User Type
+    description: How do you use PiTrac?
+    options:
+    - Home simulator enthusiast
+    - Golf instructor/coach
+    - Club fitter
+    - Developer/Contributor
+    - Commercial facility
+    - Researcher/Academic
+    - Other
 
-  - type: textarea
-    id: use-cases
-    attributes:
-      label: Use Cases
-      description: Describe specific scenarios where this would be useful
-      placeholder: |
-        1. Teaching pro needs to analyze student swings from both sides
-        2. Left-handed player wants to practice at home
-        3. Facility wants to support all players
+- type: dropdown
+  id: implementation-complexity
+  attributes:
+    label: Estimated Complexity
+    description: How complex do you think this would be?
+    options:
+    - Simple - Configuration change only
+    - Moderate - Minor code changes
+    - Complex - Significant development needed
+    - Very Complex - Major architectural changes
+    - Unknown
 
-  - type: dropdown
-    id: simulator-relevance
-    attributes:
-      label: Simulator Compatibility
-      description: Which simulators would benefit from this?
-      multiple: true
-      options:
-        - GSPro
-        - E6 Connect
-        - TruGolf E6
-        - TGC 2019
-        - All simulators
-        - Not simulator-related
-        - Other/Custom
+- type: textarea
+  id: use-cases
+  attributes:
+    label: Use Cases
+    description: Describe specific scenarios where this would be useful
+    placeholder: |
+      1. Teaching pro needs to analyze student swings from both sides
+      2. Left-handed player wants to practice at home
+      3. Facility wants to support all players
 
-  - type: textarea
-    id: technical-details
-    attributes:
-      label: Technical Details
-      description: If you have technical knowledge, provide implementation ideas
-      placeholder: |
-        - Might require changes to ImageProcessing/BallImageProc.cpp
-        - Could add PITRAC_HANDEDNESS environment variable
-        - Web interface would need new configuration option
-        - Database schema might need player profile support
+- type: dropdown
+  id: simulator-relevance
+  attributes:
+    label: Simulator Compatibility
+    description: Which simulators would benefit from this?
+    multiple: true
+    options:
+    - GSPro
+    - E6 Connect
+    - TruGolf E6
+    - TGC 2019
+    - All simulators
+    - Not simulator-related
+    - Other/Custom
 
-  - type: dropdown
-    id: data-requirements
-    attributes:
-      label: New Data Requirements
-      description: Would this require capturing new data?
-      multiple: true
-      options:
-        - Club face angle
-        - Club path
-        - Impact location
-        - Spin axis
-        - Ball compression
-        - Environmental data
-        - Player biometrics
-        - No new data needed
+- type: textarea
+  id: technical-details
+  attributes:
+    label: Technical Details
+    description: If you have technical knowledge, provide implementation ideas
+    placeholder: |
+      - Might require changes to ImageProcessing/BallImageProc.cpp
+      - Could add PITRAC_HANDEDNESS environment variable
+      - Web interface would need new configuration option
+      - Database schema might need player profile support
 
-  - type: dropdown
-    id: hardware-requirements
-    attributes:
-      label: Hardware Requirements
-      description: Would this need hardware changes?
-      options:
-        - No hardware changes needed
-        - Additional sensors required
-        - Different camera configuration
-        - Modified PCB design
-        - New 3D printed parts
-        - External hardware integration
-        - Unknown
+- type: dropdown
+  id: data-requirements
+  attributes:
+    label: New Data Requirements
+    description: Would this require capturing new data?
+    multiple: true
+    options:
+    - Club face angle
+    - Club path
+    - Impact location
+    - Spin axis
+    - Ball compression
+    - Environmental data
+    - Player biometrics
+    - No new data needed
 
-  - type: textarea
-    id: mockups
-    attributes:
-      label: UI/UX Mockups
-      description: If UI-related, provide mockups or sketches (drag & drop images)
-      placeholder: Attach any visual representations of your feature idea
+- type: dropdown
+  id: hardware-requirements
+  attributes:
+    label: Hardware Requirements
+    description: Would this need hardware changes?
+    options:
+    - No hardware changes needed
+    - Additional sensors required
+    - Different camera configuration
+    - Modified PCB design
+    - New 3D printed parts
+    - External hardware integration
+    - Unknown
 
-  - type: textarea
-    id: acceptance-criteria
-    attributes:
-      label: Success Criteria
-      description: How would we know this feature is working correctly?
-      placeholder: |
-        - Left-handed shots detected with same accuracy as right-handed
-        - Configuration persists between sessions
-        - No performance degradation
-        - Works with all supported simulators
+- type: textarea
+  id: mockups
+  attributes:
+    label: UI/UX Mockups
+    description: If UI-related, provide mockups or sketches (drag & drop images)
+    placeholder: Attach any visual representations of your feature idea
 
-  - type: dropdown
-    id: contribution
-    attributes:
-      label: Contribution Interest
-      description: Would you help implement this?
-      options:
-        - I can implement this myself
-        - I can help with implementation
-        - I can help with testing
-        - I can provide feedback/requirements
-        - I can only suggest the idea
+- type: textarea
+  id: acceptance-criteria
+  attributes:
+    label: Success Criteria
+    description: How would we know this feature is working correctly?
+    placeholder: |
+      - Left-handed shots detected with same accuracy as right-handed
+      - Configuration persists between sessions
+      - No performance degradation
+      - Works with all supported simulators
 
-  - type: textarea
-    id: references
-    attributes:
-      label: References
-      description: Links to similar features in other products, research papers, etc.
-      placeholder: |
-        - TrackMan has similar feature: [link]
-        - Research paper on ball flight physics: [link]
-        - Forum discussion about this need: [link]
+- type: dropdown
+  id: contribution
+  attributes:
+    label: Contribution Interest
+    description: Would you help implement this?
+    options:
+    - I can implement this myself
+    - I can help with implementation
+    - I can help with testing
+    - I can provide feedback/requirements
+    - I can only suggest the idea
 
-  - type: dropdown
-    id: discord-contact
-    attributes:
-      label: Discord Contact
-      description: Can we reach out to you on Discord about this feature request?
-      options:
-        - "Yes, I'm active on the PiTrac Discord"
-        - "No, please contact me through GitHub only"
-    validations:
-      required: true
+- type: textarea
+  id: references
+  attributes:
+    label: References
+    description: Links to similar features in other products, research papers, etc.
+    placeholder: |
+      - TrackMan has similar feature: [link]
+      - Research paper on ball flight physics: [link]
+      - Forum discussion about this need: [link]
 
-  - type: input
-    id: discord-username
-    attributes:
-      label: Discord Username
-      description: What's your username on the PiTrac Discord server? (Leave blank if you prefer GitHub contact)
-      placeholder: "username#1234 or @username"
+- type: dropdown
+  id: discord-contact
+  attributes:
+    label: Discord Contact
+    description: Can we reach out to you on Discord about this feature request?
+    options:
+    - "Yes, I'm active on the PiTrac Discord"
+    - "No, please contact me through GitHub only"
+  validations:
+    required: true
+
+- type: input
+  id: discord-username
+  attributes:
+    label: Discord Username
+    description: What's your username on the PiTrac Discord server? (Leave blank if you prefer GitHub contact)
+    placeholder: "username#1234 or @username"

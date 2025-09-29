@@ -49,7 +49,7 @@ We are also thankful for individual contributors who—even if we haven't used t
 11. The many supportive folks on the Hackaday site, including @Ometry and @melaby
 12. Phillip Mayhew
 13. Mark Harman (@Speci on Discord)
-14. @[broschb](https://github.com/jamespilgrim/PiTrac/commits?author=broschb) and others on GitHub
+14. @[broschb](https://github.com/pitraclm/pitrac/commits?author=broschb) and others on GitHub
 15. Merrygrin, Scuzzy On Discord
 16. Ron Heywood
 17. Connor Gallopo (@gallapagos on Discord)

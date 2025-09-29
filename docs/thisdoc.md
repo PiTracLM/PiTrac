@@ -7,7 +7,7 @@ nav_order: 1.1
 
 ### About this Document
 
-To contribute to this documentation, please visit [Github Pitrac](https://github.com/jamespilgrim/PiTrac)
+To contribute to this documentation, please visit [Github Pitrac](https://github.com/pitraclm/pitrac)
 
 To quickly test your documentation locally, please take the following steps: 
 

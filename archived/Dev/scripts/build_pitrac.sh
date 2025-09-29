@@ -9,7 +9,7 @@ source "${SCRIPT_DIR}/common.sh"
 load_defaults "pitrac-build" "$@"
 
 # Configuration from defaults
-PITRAC_REPO="${PITRAC_REPO:-https://github.com/jamespilgrim/PiTrac.git}"
+PITRAC_REPO="${PITRAC_REPO:-https://github.com/pitraclm/pitrac.git}"
 PITRAC_BRANCH="${PITRAC_BRANCH:-main}"
 PITRAC_PR="${PITRAC_PR:-0}"
 BUILD_DIR="${BUILD_DIR:-$HOME/Dev}"

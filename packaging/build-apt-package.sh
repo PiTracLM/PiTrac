@@ -293,7 +293,7 @@ Depends: libc6 (>= 2.36), libstdc++6 (>= 12), libgcc-s1 (>= 12), libcamera0.0.3,
 Recommends: maven
 Section: misc
 Priority: optional
-Homepage: https://github.com/jamespilgrim/PiTrac
+Homepage: https://github.com/pitraclm/pitrac
 Description: $DESCRIPTION
  PiTrac uses Raspberry Pi cameras to track golf ball
  launch parameters. Includes pre-built binaries with

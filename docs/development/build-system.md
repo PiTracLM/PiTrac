@@ -186,7 +186,7 @@ CMake files exist in the project but have different structure than shown. Multip
 #### Initial Setup
 
 ```bash
-git clone https://github.com/jamespilgrim/PiTrac.git
+git clone https://github.com/pitraclm/pitrac.git
 cd PiTrac/packaging
 
 # Get pre-built artifacts
