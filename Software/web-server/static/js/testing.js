@@ -348,7 +348,7 @@ async function runImageTest() {
     }
 
     appendOutput('[INFO] Starting full pipeline test...', 'info');
-    appendOutput('[INFO] This will process the image through: Ball Detection → Spin Analysis → Shot Calculation', 'info');
+    appendOutput('[INFO] Processing strobed ball image through: Ball Detection → Spin Analysis → Shot Calculation', 'info');
 
     // Run the test_uploaded_image tool
     await runTool('test_uploaded_image');

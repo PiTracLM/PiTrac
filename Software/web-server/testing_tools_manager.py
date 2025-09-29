@@ -33,7 +33,7 @@ class TestingToolsManager:
                 "name": "Test Uploaded Image",
                 "description": "Run full pipeline on uploaded flight camera image",
                 "category": "testing",
-                "args": ["--system_mode", "automated_testing"],
+                "args": ["--system_mode", "test", "--send_test_results", "--skip_wait_armed"],
                 "requires_sudo": False,
                 "timeout": 60,
                 "uses_uploaded_image": True,
@@ -157,14 +157,18 @@ class TestingToolsManager:
                 with open(config_path, 'r') as f:
                     config_json = json.load(f)
 
-                # Add test configuration section
+                # Add test configuration section for SystemMode::kTest
                 if 'gs_config' not in config_json:
                     config_json['gs_config'] = {}
                 if 'testing' not in config_json['gs_config']:
                     config_json['gs_config']['testing'] = {}
 
-                config_json['gs_config']['testing']['test_image_path'] = str(latest_image)
-                config_json['gs_config']['testing']['automated_test_dir'] = str(self.test_images_dir)
+                # Use the uploaded image as both tee and strobed image
+                # This allows testing with just a single flight camera image
+                image_path = str(latest_image)
+                config_json['gs_config']['testing']['kTwoImageTestTeedBallImage'] = image_path
+                config_json['gs_config']['testing']['kTwoImageTestStrobedImage'] = image_path
+                config_json['gs_config']['testing']['kTwoImageTestPreImage'] = ""  # Optional
 
                 with open(config_path, 'w') as f:
                     json.dump(config_json, f, indent=2)
