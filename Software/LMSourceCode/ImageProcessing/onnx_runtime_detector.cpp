@@ -369,12 +369,6 @@ void ONNXRuntimeDetector::PreprocessImageStandard(const cv::Mat& image, float* o
     letterbox_params_.x_offset = x_offset;
     letterbox_params_.y_offset = y_offset;
 
-    GS_LOG_TRACE_MSG(trace, "Letterbox preprocessing: scale=" + std::to_string(scale) +
-                     ", x_offset=" + std::to_string(x_offset) +
-                     ", y_offset=" + std::to_string(y_offset) +
-                     ", original=" + std::to_string(image.cols) + "x" + std::to_string(image.rows) +
-                     ", resized=" + std::to_string(new_width) + "x" + std::to_string(new_height));
-
     resized.copyTo(letterbox(cv::Rect(x_offset, y_offset, new_width, new_height)));
 
     cv::Mat float_img;
@@ -395,7 +389,29 @@ void ONNXRuntimeDetector::PreprocessImageStandard(const cv::Mat& image, float* o
 
 void ONNXRuntimeDetector::PreprocessImageNEON(const cv::Mat& image, float* output_tensor) {
 #ifdef __ARM_NEON
-    neon::PreprocessPipelineNEON(image, output_tensor,
+    float scale = std::min(
+        static_cast<float>(config_.input_width) / image.cols,
+        static_cast<float>(config_.input_height) / image.rows
+    );
+
+    int new_width = static_cast<int>(image.cols * scale);
+    int new_height = static_cast<int>(image.rows * scale);
+
+    cv::Mat resized;
+    cv::resize(image, resized, cv::Size(new_width, new_height), 0, 0, cv::INTER_LINEAR);
+
+    cv::Mat letterbox(config_.input_height, config_.input_width, CV_8UC3, cv::Scalar(114, 114, 114));
+
+    int x_offset = (config_.input_width - new_width) / 2;
+    int y_offset = (config_.input_height - new_height) / 2;
+
+    letterbox_params_.scale = scale;
+    letterbox_params_.x_offset = x_offset;
+    letterbox_params_.y_offset = y_offset;
+
+    resized.copyTo(letterbox(cv::Rect(x_offset, y_offset, new_width, new_height)));
+
+    neon::PreprocessPipelineNEON(letterbox, output_tensor,
                                  config_.input_width, config_.input_height);
 #else
     PreprocessImageStandard(image, output_tensor);
@@ -476,26 +492,9 @@ std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::PostprocessYOLO
         }
     }
 
-    // Log top 10 confidence values for debugging
-    std::vector<float> all_confidences;
-    for (int i = 0; i < num_predictions; i++) {
-        float conf = config_.is_single_class_model ? output_tensor[4 * num_predictions + i] : 0.0f;
-        all_confidences.push_back(conf);
-    }
-    std::sort(all_confidences.begin(), all_confidences.end(), std::greater<float>());
-
-    std::string top10 = "Top 10 confidences: ";
-    for (int i = 0; i < std::min(10, static_cast<int>(all_confidences.size())); i++) {
-        top10 += std::to_string(all_confidences[i]) + " ";
-    }
-    GS_LOG_TRACE_MSG(trace, top10);
-
     GS_LOG_TRACE_MSG(trace, "PostprocessYOLO: Found " + std::to_string(processed_detections) +
                      " detections above confidence threshold " +
-                     std::to_string(config_.confidence_threshold) +
-                     ", letterbox params: scale=" + std::to_string(letterbox.scale) +
-                     ", x_offset=" + std::to_string(letterbox.x_offset) +
-                     ", y_offset=" + std::to_string(letterbox.y_offset));
+                     std::to_string(config_.confidence_threshold));
 
     auto suppressed = NonMaxSuppression(detections);
     GS_LOG_TRACE_MSG(trace, "PostprocessYOLO: After NMS: " + std::to_string(suppressed.size()) + " detections");
