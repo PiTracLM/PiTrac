@@ -24,7 +24,19 @@ class TestingToolsManager:
         self.running_processes = {}
         self.completed_results = {}
 
+        # Create TestImages directory if it doesn't exist
+        self.test_images_dir = Path.home() / "LM_Shares/TestImages"
+        self.test_images_dir.mkdir(parents=True, exist_ok=True)
+
         self.tools = {
+            "test_uploaded_image": {
+                "name": "Test Uploaded Image",
+                "description": "Run full pipeline on uploaded flight camera image",
+                "category": "testing",
+                "args": ["--system_mode", "test", "--send_test_results"],
+                "requires_sudo": False,
+                "timeout": 30,
+            },
             "pulse_test": {
                 "name": "Strobe Pulse Test",
                 "description": "Test IR strobe pulse functionality",

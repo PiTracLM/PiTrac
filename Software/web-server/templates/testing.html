@@ -11,6 +11,37 @@
 <!-- Main Content -->
 <div class="main-content">
     <div class="testing-container">
+
+    <!-- Image Upload Section -->
+    <div class="tool-category">
+        <h2 class="category-title">
+            <svg fill="currentColor" viewBox="0 0 20 20" width="20" height="20">
+                <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
+            </svg>
+            Image Pipeline Testing
+        </h2>
+        <div class="image-upload-container">
+            <div class="upload-area" id="uploadArea">
+                <svg fill="currentColor" viewBox="0 0 20 20" width="48" height="48">
+                    <path d="M5.5 13a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.977A4.5 4.5 0 1113.5 13H11V9.413l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13H5.5z"/>
+                </svg>
+                <p>Drag and drop flight camera image here</p>
+                <p class="upload-hint">or click to browse</p>
+                <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+            </div>
+            <div id="imagePreview" style="display: none;">
+                <img id="previewImg" alt="Preview">
+                <div class="image-info">
+                    <span id="imageName"></span>
+                    <button class="btn btn-danger btn-sm" onclick="clearImage()">Remove</button>
+                </div>
+            </div>
+            <button id="runPipelineBtn" class="btn btn-primary btn-lg" style="display: none;" onclick="runImageTest()">
+                Run Full Pipeline Test
+            </button>
+        </div>
+    </div>
+
     <!-- Tool Categories -->
     <div class="tool-categories">
         <!-- Hardware Tests -->

@@ -8,8 +8,8 @@ from typing import Any, Dict, List, Optional, Union
 
 import stomp
 import yaml
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, File, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -386,6 +386,40 @@ class PiTracServer:
                 self.testing_manager.completed_results = {}
 
             return {"running": running, "results": results}
+
+        @self.app.post("/api/testing/upload-image")
+        async def upload_test_image(file: UploadFile = File(...)) -> Dict[str, Any]:
+            """Upload a test image for pipeline testing"""
+            try:
+                # Validate file type
+                if not file.content_type or not file.content_type.startswith("image/"):
+                    return {"status": "error", "message": "File must be an image"}
+
+                # Save to TestImages directory
+                test_images_dir = Path.home() / "LM_Shares/TestImages"
+                test_images_dir.mkdir(parents=True, exist_ok=True)
+
+                # Use original filename or generate one
+                filename = file.filename or f"test_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                file_path = test_images_dir / filename
+
+                # Save uploaded file
+                content = await file.read()
+                with open(file_path, "wb") as f:
+                    f.write(content)
+
+                logger.info(f"Test image uploaded: {file_path}")
+
+                return {
+                    "status": "success",
+                    "message": f"Image uploaded successfully",
+                    "filename": filename,
+                    "path": str(file_path)
+                }
+
+            except Exception as e:
+                logger.error(f"Error uploading test image: {e}")
+                return {"status": "error", "message": str(e)}
 
         @self.app.get("/api/cameras/detect")
         async def detect_cameras() -> Dict[str, Any]:
