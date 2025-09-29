@@ -738,9 +738,8 @@ void HWCtoCHWNEON(const float* hwc_data, float* chw_data,
 
 void PreprocessPipelineNEON(const cv::Mat& input, float* output,
                            int target_width, int target_height) {
-    cv::Mat resized;
-    cv::resize(input, resized, cv::Size(target_width, target_height),
-               0, 0, cv::INTER_LINEAR);
+    // Input is already letterboxed from PreprocessImageNEON - do NOT resize again
+    const cv::Mat& resized = input;
 
     const int pixels = target_width * target_height;
     const float32x4_t scale = vdupq_n_f32(1.0f / 255.0f);
@@ -766,9 +765,9 @@ void PreprocessPipelineNEON(const cv::Mat& input, float* output,
                     bgr_f32_high = vmulq_f32(bgr_f32_high, scale);
 
                     if (i < pixels) {
-                        output[0 * pixels + i] = vgetq_lane_f32(bgr_f32_low, 2);
-                        output[1 * pixels + i] = vgetq_lane_f32(bgr_f32_low, 1);
-                        output[2 * pixels + i] = vgetq_lane_f32(bgr_f32_low, 0);
+                        output[0 * pixels + i] = vgetq_lane_f32(bgr_f32_low, 0);  // B
+                        output[1 * pixels + i] = vgetq_lane_f32(bgr_f32_low, 1);  // G
+                        output[2 * pixels + i] = vgetq_lane_f32(bgr_f32_low, 2);  // R
                     }
                 }
             } else {
@@ -778,9 +777,9 @@ void PreprocessPipelineNEON(const cv::Mat& input, float* output,
                     float g = pixel[1] / 255.0f;
                     float r = pixel[2] / 255.0f;
 
-                    output[0 * pixels + i + j] = r;
+                    output[0 * pixels + i + j] = b;
                     output[1 * pixels + i + j] = g;
-                    output[2 * pixels + i + j] = b;
+                    output[2 * pixels + i + j] = r;
                 }
             }
         }
