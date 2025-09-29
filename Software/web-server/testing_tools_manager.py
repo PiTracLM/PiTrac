@@ -33,9 +33,10 @@ class TestingToolsManager:
                 "name": "Test Uploaded Image",
                 "description": "Run full pipeline on uploaded flight camera image",
                 "category": "testing",
-                "args": ["--system_mode", "test", "--send_test_results"],
+                "args": ["--system_mode", "automated_testing"],
                 "requires_sudo": False,
-                "timeout": 30,
+                "timeout": 60,
+                "uses_uploaded_image": True,
             },
             "pulse_test": {
                 "name": "Strobe Pulse Test",
@@ -140,6 +141,33 @@ class TestingToolsManager:
 
         try:
             config_path = self.config_manager.generate_golf_sim_config()
+
+            # For image test tool, update config with uploaded image
+            if tool_info.get("uses_uploaded_image"):
+                test_images = list(self.test_images_dir.glob("*"))
+                if not test_images:
+                    return {"status": "error", "message": "No test images found. Please upload an image first."}
+
+                # Use the most recent image
+                latest_image = max(test_images, key=lambda p: p.stat().st_mtime)
+                logger.info(f"Using test image: {latest_image}")
+
+                # Modify the generated config to add test image path
+                import json
+                with open(config_path, 'r') as f:
+                    config_json = json.load(f)
+
+                # Add test configuration section
+                if 'gs_config' not in config_json:
+                    config_json['gs_config'] = {}
+                if 'testing' not in config_json['gs_config']:
+                    config_json['gs_config']['testing'] = {}
+
+                config_json['gs_config']['testing']['test_image_path'] = str(latest_image)
+                config_json['gs_config']['testing']['automated_test_dir'] = str(self.test_images_dir)
+
+                with open(config_path, 'w') as f:
+                    json.dump(config_json, f, indent=2)
 
             cmd = [self.pitrac_binary]
 
