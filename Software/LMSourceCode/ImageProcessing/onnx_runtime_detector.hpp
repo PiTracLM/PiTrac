@@ -61,6 +61,9 @@ public:
 
         bool use_neon_preprocessing = true;
         bool use_zero_copy = true;
+
+        bool is_single_class_model = true;
+        int num_classes = 1;
     };
 
     explicit ONNXRuntimeDetector(const Config& config);
@@ -160,6 +163,8 @@ private:
     std::vector<Detection> NonMaxSuppression(std::vector<Detection>& detections);
 
     void PinThreadToCore(int core_id);
+
+    int CalculatePredictionCount(int width, int height) const;
 
     float* GetInputBuffer(size_t size);
     float* GetOutputBuffer(size_t size);

@@ -89,7 +89,11 @@ bool ONNXRuntimeDetector::Initialize() {
 void ONNXRuntimeDetector::ConfigureSessionOptions() {
     session_options_ = std::make_unique<Ort::SessionOptions>();
 
-    session_options_->SetIntraOpNumThreads(config_.num_threads);
+    if (config_.use_xnnpack) {
+        session_options_->SetIntraOpNumThreads(1);  // Let XNNPACK handle threading
+    } else {
+        session_options_->SetIntraOpNumThreads(config_.num_threads);
+    }
     session_options_->SetInterOpNumThreads(1); // Single thread for inter-op is optimal on ARM
 
     session_options_->SetGraphOptimizationLevel(
@@ -103,11 +107,11 @@ void ONNXRuntimeDetector::ConfigureSessionOptions() {
     session_options_->AddConfigEntry("session.use_env_allocators", "1");
     session_options_->AddConfigEntry("session.enable_quant_qdq_cleanup", "1");
 
+    session_options_->AddConfigEntry("session.intra_op.allow_spinning", "0");
+
     // XNNPACK-specific optimizations
     session_options_->AddConfigEntry("session.disable_prepacking", "0");  // Enable prepacking for XNNPACK
     session_options_->AddConfigEntry("session.disable_quant_qdq", "0");   // Enable quantization support
-    session_options_->AddConfigEntry("session.force_spinning_stop", "1"); // Better for real-time
-    session_options_->AddConfigEntry("session.inter_op_thread_affinity", "1"); // Pin threads
 
     session_options_->SetExecutionMode(ExecutionMode::ORT_PARALLEL);
 
@@ -175,6 +179,33 @@ void ONNXRuntimeDetector::CacheModelInfo() {
         auto type_info = session_->GetOutputTypeInfo(i);
         auto tensor_info = type_info.GetTensorTypeAndShapeInfo();
         output_shapes_.push_back(tensor_info.GetShape());
+    }
+
+    if (!output_shapes_.empty() && output_shapes_[0].size() >= 2) {
+        int64_t dim1 = output_shapes_[0][1];
+        int64_t dim2 = output_shapes_[0].size() >= 3 ? output_shapes_[0][2] : 0;
+
+        std::string shape_str = "[" + std::to_string(output_shapes_[0][0]);
+        for (size_t i = 1; i < output_shapes_[0].size(); i++) {
+            shape_str += ", " + std::to_string(output_shapes_[0][i]);
+        }
+        shape_str += "]";
+
+
+        if (dim1 == 5 || dim2 == 5) {
+            GS_LOG_MSG(info, "Detected SINGLE-CLASS model (golf ball detector)");
+            if (!config_.is_single_class_model) {
+                GS_LOG_MSG(warning, "Config has is_single_class_model=false but model appears to be single-class. Using single-class logic.");
+            }
+        } else if (dim1 == 84 || dim2 == 84) {
+            GS_LOG_MSG(warning, "Detected MULTI-CLASS COCO model (84 = 4 bbox + 80 classes)");
+            if (config_.is_single_class_model) {
+                GS_LOG_MSG(warning, "Config has is_single_class_model=true but model appears to be multi-class COCO. Results may be incorrect.");
+            }
+        } else {
+            GS_LOG_MSG(warning, "Unknown model format. Expected dimension of 5 (single-class) or 84 (COCO). Got: " +
+                       std::to_string(dim1) + " and " + std::to_string(dim2));
+        }
     }
 }
 
@@ -358,11 +389,26 @@ std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::PostprocessYOLO
 
     std::vector<Detection> detections;
 
-    const int num_predictions = 8400;
-    const int num_classes = 80;
-    const int data_width = 84;
+    const int num_predictions = CalculatePredictionCount(config_.input_width, config_.input_height);
+    const int num_classes = config_.num_classes;
+    const int data_width = 4 + num_classes;  // 4 bbox coords + class scores
 
-    for (int i = 0; i < num_predictions; i++) {
+    GS_LOG_TRACE_MSG(trace, "PostprocessYOLO: num_predictions=" + std::to_string(num_predictions) +
+                     ", num_classes=" + std::to_string(num_classes) +
+                     ", data_width=" + std::to_string(data_width) +
+                     ", output_size=" + std::to_string(output_size));
+
+    int expected_size = num_predictions * data_width;
+    if (output_size != expected_size) {
+        GS_LOG_MSG(warning, "Output size mismatch: expected " + std::to_string(expected_size) +
+                   ", got " + std::to_string(output_size) +
+                   ". Using minimum to avoid buffer overflow.");
+        int safe_predictions = std::min(num_predictions, output_size / data_width);
+        GS_LOG_MSG(warning, "Processing " + std::to_string(safe_predictions) + " predictions instead");
+    }
+
+    int processed_detections = 0;
+    for (int i = 0; i < num_predictions && i * data_width < output_size; i++) {
         const float* row = output_tensor + i * data_width;
 
         float cx = row[0];
@@ -370,31 +416,62 @@ std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::PostprocessYOLO
         float w = row[2];
         float h = row[3];
 
-        float max_score = 0;
+        float confidence;
         int class_id = 0;
-        for (int c = 0; c < num_classes; c++) {
-            float score = row[4 + c];
-            if (score > max_score) {
-                max_score = score;
-                class_id = c;
+
+        if (config_.is_single_class_model) {
+            confidence = row[4];
+            class_id = 0;  // Always golf ball
+        } else {
+            float max_score = 0;
+            for (int c = 0; c < num_classes; c++) {
+                float score = row[4 + c];
+                if (score > max_score) {
+                    max_score = score;
+                    class_id = c;
+                }
             }
+            confidence = max_score;
         }
 
-        if (max_score >= config_.confidence_threshold) {
+        if (confidence >= config_.confidence_threshold) {
             Detection det;
 
             det.bbox.x = (cx - w/2) * img_scale_x;
             det.bbox.y = (cy - h/2) * img_scale_y;
             det.bbox.width = w * img_scale_x;
             det.bbox.height = h * img_scale_y;
-            det.confidence = max_score;
+            det.confidence = confidence;
             det.class_id = class_id;
 
             detections.push_back(det);
+            processed_detections++;
         }
     }
 
-    return NonMaxSuppression(detections);
+    GS_LOG_TRACE_MSG(trace, "PostprocessYOLO: Found " + std::to_string(processed_detections) +
+                     " detections above confidence threshold " +
+                     std::to_string(config_.confidence_threshold));
+
+    auto suppressed = NonMaxSuppression(detections);
+    GS_LOG_TRACE_MSG(trace, "PostprocessYOLO: After NMS: " + std::to_string(suppressed.size()) + " detections");
+
+    return suppressed;
+}
+
+int ONNXRuntimeDetector::CalculatePredictionCount(int width, int height) const {
+    int stride_8_preds = (width / 8) * (height / 8);
+    int stride_16_preds = (width / 16) * (height / 16);
+    int stride_32_preds = (width / 32) * (height / 32);
+
+    int total = stride_8_preds + stride_16_preds + stride_32_preds;
+
+    GS_LOG_TRACE_MSG(trace, "CalculatePredictionCount: " + std::to_string(width) + "x" + std::to_string(height) +
+                     " -> " + std::to_string(stride_8_preds) + " + " +
+                     std::to_string(stride_16_preds) + " + " +
+                     std::to_string(stride_32_preds) + " = " + std::to_string(total) + " predictions");
+
+    return total;
 }
 
 std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::NonMaxSuppression(
