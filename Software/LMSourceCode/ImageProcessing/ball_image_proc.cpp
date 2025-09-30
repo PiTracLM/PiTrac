@@ -570,15 +570,16 @@ namespace golf_sim {
     // Should be much more successful if called with a calibrated golf ball so that the code has
     // some hints about where to look.
     // Returns a new GolfBall object iff success. 
-    bool BallImageProc::GetBall(const cv::Mat& rgbImg, 
-                                const GolfBall& baseBallWithSearchParams, 
-                                std::vector<GolfBall> &return_balls, 
-                                cv::Rect& expectedBallArea, 
+    bool BallImageProc::GetBall(const cv::Mat& rgbImg,
+                                const GolfBall& baseBallWithSearchParams,
+                                std::vector<GolfBall> &return_balls,
+                                cv::Rect& expectedBallArea,
                                 BallSearchMode search_mode,
                                 bool chooseLargestFinalBall,
                                 bool report_find_failures) {
 
-        GS_LOG_TRACE_MSG(trace, "GetBall called with PREBLUR_IMAGE = " + std::to_string(PREBLUR_IMAGE) + " IS_COLOR_MASKING = " + 
+        auto getball_start = std::chrono::high_resolution_clock::now();
+        GS_LOG_TRACE_MSG(trace, "GetBall called with PREBLUR_IMAGE = " + std::to_string(PREBLUR_IMAGE) + " IS_COLOR_MASKING = " +
                     std::to_string(IS_COLOR_MASKING) + " FINAL_BLUR = " + std::to_string(FINAL_BLUR) + " search_mode = " + std::to_string(search_mode));
 
         if (rgbImg.empty()) {
@@ -1588,6 +1589,10 @@ namespace golf_sim {
         best_ball.ball_color_ = GolfBall::BallColor::kCalibrated;
         best_ball.average_color_ = stats[0];  // Average RGB
         best_ball.radius_at_calibration_pixels_ = baseBallWithSearchParams.radius_at_calibration_pixels_;
+
+        auto getball_end = std::chrono::high_resolution_clock::now();
+        auto getball_duration = std::chrono::duration_cast<std::chrono::milliseconds>(getball_end - getball_start);
+        GS_LOG_MSG(info, "GetBall (ball detection) completed in " + std::to_string(getball_duration.count()) + "ms");
 
         return true;
     }
@@ -2823,17 +2828,18 @@ namespace golf_sim {
     }
 
 
-    cv::Vec3d BallImageProc::GetBallRotation(const cv::Mat& full_gray_image1, 
-                                             const GolfBall& ball1, 
-                                             const cv::Mat& full_gray_image2, 
+    cv::Vec3d BallImageProc::GetBallRotation(const cv::Mat& full_gray_image1,
+                                             const GolfBall& ball1,
+                                             const cv::Mat& full_gray_image2,
                                              const GolfBall& ball2) {
         // NOTE - This function (and downstream functions) assumes that ball1 is the earlier-in-time ball
         // for a right-handed shot.  So, for example, the expected spin will be largely counter-clockwise
         // from ball 1 to ball 2.
         // Make sure that for left-handed shots this is correct - we will assume that for
         // left-handed shots, ball1 is still to the LEFT of ball 2
-        
+
         BOOST_LOG_FUNCTION();
+        auto spin_detection_start = std::chrono::high_resolution_clock::now();
 
         GS_LOG_TRACE_MSG(trace, "GetBallRotation called with ball1 = " + ball1.Format() + ",\nball2 = " + ball2.Format());
         LoggingTools::DebugShowImage("full_gray_image1", full_gray_image1);
@@ -3186,6 +3192,10 @@ namespace golf_sim {
         // Looks like golf folks consider the X (side) spin to be positive if the surface is
         // going from right to left.  So we negate it here.
         rotationResult[0] = -rotationResult[0];
+
+        auto spin_detection_end = std::chrono::high_resolution_clock::now();
+        auto spin_duration = std::chrono::duration_cast<std::chrono::milliseconds>(spin_detection_end - spin_detection_start);
+        GS_LOG_MSG(info, "Spin detection completed in " + std::to_string(spin_duration.count()) + "ms");
 
         // Note that we return angles, not angular velocities.  The velocities will
         // be determined later based on the derived ball speed.

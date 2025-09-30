@@ -2510,7 +2510,7 @@ namespace golf_sim {
                                     time_between_ball_images_uS,
                                     return_balls_and_timings);
 
-            GS_LOG_TRACE_MSG(trace, "The time between the center-most two images is: " + std::to_string((double)time_between_ball_images_uS/1000.0) + "ms.");
+            GS_LOG_MSG(info, "Time between center-most images: " + std::to_string((double)time_between_ball_images_uS/1000.0) + "ms");
 
             // This is a "final" image, so we want to store it
             ShowAndLogBalls("AnalyzeStrobedBall_Final_Candidate_Balls", strobed_balls_color_image, return_balls, true, most_centered_ball_index, second_ball_index);
@@ -2714,7 +2714,7 @@ namespace golf_sim {
 
                 // Square to highlight/emphasize larger errors
                 single_ratio_difference = pow(single_ratio_difference, 2);
-                GS_LOG_TRACE_MSG(trace, "   single_ratio_difference: " + std::to_string(single_ratio_difference));
+                // Removed excessive per-element logging
 
                 difference_in_ratios += single_ratio_difference;
             }
@@ -3196,9 +3196,7 @@ namespace golf_sim {
                 }
             }
 
-            GS_LOG_TRACE_MSG(trace, "About to log collapsed pulse vector, size: " + std::to_string(working_pulse_intervals.size()));
-            LoggingTools::Trace("Collapsed pulse vector is: ", working_pulse_intervals);
-            GS_LOG_TRACE_MSG(trace, "Logged collapsed pulse vector successfully");
+            // Collapsed pulse vector logging removed - was too verbose even for trace level
 
             pulse_pause_intervals = working_pulse_intervals;
 
@@ -3320,7 +3318,11 @@ namespace golf_sim {
 
             cv::Mat strobed_balls_gray_image;
 
+            auto grayscale_start = std::chrono::high_resolution_clock::now();
             cv::cvtColor(strobed_balls_color_image, strobed_balls_gray_image, cv::COLOR_BGR2GRAY);
+            auto grayscale_end = std::chrono::high_resolution_clock::now();
+            auto grayscale_duration = std::chrono::duration_cast<std::chrono::microseconds>(grayscale_end - grayscale_start);
+            GS_LOG_MSG(info, "Grayscale conversion completed in " + std::to_string(grayscale_duration.count()) + "us");
 
             const CameraHardware::CameraModel  camera_1_model = GolfSimCamera::kSystemSlot1CameraType;
             const CameraHardware::LensType  camera_lens_type = GolfSimCamera::kSystemSlot1LensType;
