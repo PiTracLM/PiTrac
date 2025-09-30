@@ -316,9 +316,13 @@ class CalibrationManager:
 
         slot1_type = config.get("gs_config", {}).get("cameras", {}).get("kSystemSlot1CameraType", 4)
         slot2_type = config.get("gs_config", {}).get("cameras", {}).get("kSystemSlot2CameraType", 4)
-
         env["PITRAC_SLOT1_CAMERA_TYPE"] = str(slot1_type)
         env["PITRAC_SLOT2_CAMERA_TYPE"] = str(slot2_type)
+
+        slot1_lens = config.get("cameras", {}).get("slot1", {}).get("lens", 1)
+        slot2_lens = config.get("cameras", {}).get("slot2", {}).get("lens", 1)
+        env["PITRAC_SLOT1_LENS_TYPE"] = str(slot1_lens)
+        env["PITRAC_SLOT2_LENS_TYPE"] = str(slot2_lens)
 
         base_dir = config.get("gs_config", {}).get("logging", {}).get("kPCBaseImageLoggingDir", "~/LM_Shares/Images/")
         env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = str(base_dir).replace("~", str(Path.home()))
