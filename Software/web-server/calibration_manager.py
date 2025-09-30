@@ -378,11 +378,13 @@ class CalibrationManager:
         if "PITRAC_ROOT" not in env:
             env["PITRAC_ROOT"] = "/usr/lib/pitrac"
 
-        slot1_type = config.get("gs_config", {}).get("cameras", {}).get("kSystemSlot1CameraType", 4)
-        slot2_type = config.get("gs_config", {}).get("cameras", {}).get("kSystemSlot2CameraType", 4)
+        # Camera types come from cameras.slot1.type and cameras.slot2.type (default 5 = InnoMaker IMX296)
+        slot1_type = config.get("cameras", {}).get("slot1", {}).get("type", 5)
+        slot2_type = config.get("cameras", {}).get("slot2", {}).get("type", 5)
         env["PITRAC_SLOT1_CAMERA_TYPE"] = str(slot1_type)
         env["PITRAC_SLOT2_CAMERA_TYPE"] = str(slot2_type)
 
+        # Lens types come from cameras.slot1.lens and cameras.slot2.lens (default 1 = 6mm)
         slot1_lens = config.get("cameras", {}).get("slot1", {}).get("lens", 1)
         slot2_lens = config.get("cameras", {}).get("slot2", {}).get("lens", 1)
         env["PITRAC_SLOT1_LENS_TYPE"] = str(slot1_lens)
