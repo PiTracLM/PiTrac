@@ -254,9 +254,9 @@ class CalibrationManager:
         cmd = [self.pitrac_binary]
 
         if system_mode == "single":
-            cmd.extend(["--run_single_pi", f"--system_mode={camera}_still", "--cam_still_mode"])
+            cmd.extend(["--run_single_pi", f"--system_mode={camera}", "--cam_still_mode"])
         else:
-            cmd.extend([f"--system_mode={camera}_still", "--cam_still_mode"])
+            cmd.extend([f"--system_mode={camera}", "--cam_still_mode"])
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_file = f"calibration_{camera}_{timestamp}.png"
