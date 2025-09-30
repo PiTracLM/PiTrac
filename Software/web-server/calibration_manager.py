@@ -373,6 +373,10 @@ class CalibrationManager:
         env = os.environ.copy()
         config = self.config_manager.get_config()
 
+        # Set PITRAC_ROOT if not already set (required by camera discovery)
+        if "PITRAC_ROOT" not in env:
+            env["PITRAC_ROOT"] = "/usr/lib/pitrac"
+
         slot1_type = config.get("gs_config", {}).get("cameras", {}).get("kSystemSlot1CameraType", 4)
         slot2_type = config.get("gs_config", {}).get("cameras", {}).get("kSystemSlot2CameraType", 4)
         env["PITRAC_SLOT1_CAMERA_TYPE"] = str(slot1_type)
