@@ -72,12 +72,13 @@ class CalibrationManager:
 
         search_x = config.get("calibration", {}).get(f"{camera}_search_center_x", 700)
         search_y = config.get("calibration", {}).get(f"{camera}_search_center_y", 500)
+        logging_level = config.get("gs_config", {}).get("logging", {}).get("kLoggingLevel", "info")
 
         cmd.extend(
             [
                 f"--search_center_x={search_x}",
                 f"--search_center_y={search_y}",
-                "--logging_level=info",
+                f"--logging_level={logging_level}",
                 "--artifact_save_level=all",
                 f"--config_file={self.config_manager.generated_config_path}",
             ]
@@ -136,12 +137,13 @@ class CalibrationManager:
 
         search_x = config.get("calibration", {}).get(f"{camera}_search_center_x", 750)
         search_y = config.get("calibration", {}).get(f"{camera}_search_center_y", 500)
+        logging_level = config.get("gs_config", {}).get("logging", {}).get("kLoggingLevel", "info")
 
         cmd.extend(
             [
                 f"--search_center_x={search_x}",
                 f"--search_center_y={search_y}",
-                "--logging_level=trace",
+                f"--logging_level={logging_level}",
                 "--artifact_save_level=all",
                 f"--config_file={self.config_manager.generated_config_path}",
             ]
@@ -201,12 +203,13 @@ class CalibrationManager:
 
         search_x = config.get("calibration", {}).get(f"{camera}_search_center_x", 700)
         search_y = config.get("calibration", {}).get(f"{camera}_search_center_y", 500)
+        logging_level = config.get("gs_config", {}).get("logging", {}).get("kLoggingLevel", "info")
 
         cmd.extend(
             [
                 f"--search_center_x={search_x}",
                 f"--search_center_y={search_y}",
-                "--logging_level=info",
+                f"--logging_level={logging_level}",
                 "--artifact_save_level=all",
                 f"--config_file={self.config_manager.generated_config_path}",
             ]

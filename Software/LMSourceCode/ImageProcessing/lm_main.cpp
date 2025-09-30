@@ -1585,7 +1585,7 @@ int main(int argc, char *argv[])
 #endif
         }
         // If the configuration file forgot to add a "/" at the end of the logging directory, we should add it here ourselves
-        if (kBaseTestDir.back() != '/') {
+        if (!kBaseTestDir.empty() && kBaseTestDir.back() != '/') {
             kBaseTestDir += '/';
         }
 

@@ -207,7 +207,7 @@ bool GolfSimConfiguration::ReadValues() {
 	}
 
 	// If the configuration file forgot to add a "/" at the end of the logging directory, we should add it here ourselves
-	if (GsUISystem::kWebServerShareDirectory.back() != '/') {
+	if (!GsUISystem::kWebServerShareDirectory.empty() && GsUISystem::kWebServerShareDirectory.back() != '/') {
 		GsUISystem::kWebServerShareDirectory += '/';
 	}
 
