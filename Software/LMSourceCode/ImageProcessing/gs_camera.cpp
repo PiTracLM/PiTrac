@@ -2802,8 +2802,12 @@ namespace golf_sim {
             std::vector<double>test_pulse_ratios;
             std::vector<float>test_pulse_intervals;
             
-            bool result = GetPulseIntervalsAndRatios(PulseStrobe::GetPulseIntervals(), test_pulse_intervals, test_pulse_ratios);
+            std::vector<float> pulse_intervals_from_strobe = PulseStrobe::GetPulseIntervals();
+            GS_LOG_TRACE_MSG(trace, "About to call GetPulseIntervalsAndRatios with " + std::to_string(pulse_intervals_from_strobe.size()) + " pulse intervals");
 
+            bool result = GetPulseIntervalsAndRatios(pulse_intervals_from_strobe, test_pulse_intervals, test_pulse_ratios);
+
+            GS_LOG_TRACE_MSG(trace, "GetPulseIntervalsAndRatios returned: " + std::to_string(result));
             LoggingTools::Trace( "The pulse_interval ratios were: ", test_pulse_ratios);
 
             // Look at each pulse interval ratio that we have and see which is closest to the ratio(s) that 
@@ -3176,6 +3180,14 @@ namespace golf_sim {
 
                 // Collapse
                 for (int i = 0; i < number_pulses_to_collapse; i++) {
+                    // After each erase(), the vector shrinks, so we must recheck bounds
+                    if (collapse_offset + 1 >= (int)working_pulse_intervals.size()) {
+                        GS_LOG_MSG(warning, "GetPulseIntervalsAndRatios: Cannot collapse more intervals - " +
+                                 std::to_string(i) + " of " + std::to_string(number_pulses_to_collapse) +
+                                 " completed, vector size now " + std::to_string(working_pulse_intervals.size()));
+                        break;
+                    }
+
                     working_pulse_intervals[collapse_offset] += working_pulse_intervals[collapse_offset + 1];
 
                     // The erase() will both remove the collapsed element and also move the remaining element(s)
@@ -3184,7 +3196,9 @@ namespace golf_sim {
                 }
             }
 
+            GS_LOG_TRACE_MSG(trace, "About to log collapsed pulse vector, size: " + std::to_string(working_pulse_intervals.size()));
             LoggingTools::Trace("Collapsed pulse vector is: ", working_pulse_intervals);
+            GS_LOG_TRACE_MSG(trace, "Logged collapsed pulse vector successfully");
 
             pulse_pause_intervals = working_pulse_intervals;
 
