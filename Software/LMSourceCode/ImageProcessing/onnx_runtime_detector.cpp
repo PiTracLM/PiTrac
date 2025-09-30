@@ -30,8 +30,6 @@ ONNXRuntimeDetector::~ONNXRuntimeDetector() {
 }
 
 bool ONNXRuntimeDetector::Initialize() {
-    GS_LOG_MSG(info, "Starting ONNX Runtime initialization with model: " + config_.model_path);
-
     // Check if model file exists
     if (!std::filesystem::exists(config_.model_path)) {
         GS_LOG_MSG(error, "ONNX model file not found: " + config_.model_path);
@@ -39,22 +37,18 @@ bool ONNXRuntimeDetector::Initialize() {
     }
 
     try {
-        GS_LOG_MSG(info, "Creating ONNX Runtime environment...");
         env_ = std::make_unique<Ort::Env>(
             ORT_LOGGING_LEVEL_WARNING,
             "PiTracONNX"
         );
 
-        GS_LOG_MSG(info, "Configuring session options...");
         ConfigureSessionOptions();
 
-        GS_LOG_MSG(info, "Creating ONNX Runtime session with model...");
         session_ = std::make_unique<Ort::Session>(
             *env_,
             config_.model_path.c_str(),
             *session_options_
         );
-        GS_LOG_MSG(info, "ONNX Runtime session created successfully");
 
         allocator_ = std::make_unique<Ort::AllocatorWithDefaultOptions>();
         memory_info_ = std::make_unique<Ort::MemoryInfo>(
@@ -128,8 +122,6 @@ void ONNXRuntimeDetector::SetupExecutionProviders() {
             xnnpack_options["intra_op_num_threads"] = std::to_string(config_.num_threads);
 
             session_options_->AppendExecutionProvider("XNNPACK", xnnpack_options);
-            GS_LOG_MSG(info, "XNNPACK execution provider enabled with " +
-                       std::to_string(config_.num_threads) + " threads");
         } catch (...) {
             GS_LOG_MSG(warning, "Failed to enable XNNPACK provider");
         }
@@ -193,17 +185,15 @@ void ONNXRuntimeDetector::CacheModelInfo() {
 
 
         if (dim1 == 5 || dim2 == 5) {
-            GS_LOG_MSG(info, "Detected SINGLE-CLASS model (golf ball detector)");
             if (!config_.is_single_class_model) {
                 GS_LOG_MSG(warning, "Config has is_single_class_model=false but model appears to be single-class. Using single-class logic.");
             }
         } else if (dim1 == 84 || dim2 == 84) {
-            GS_LOG_MSG(warning, "Detected MULTI-CLASS COCO model (84 = 4 bbox + 80 classes)");
             if (config_.is_single_class_model) {
                 GS_LOG_MSG(warning, "Config has is_single_class_model=true but model appears to be multi-class COCO. Results may be incorrect.");
             }
         } else {
-            GS_LOG_MSG(warning, "Unknown model format. Expected dimension of 5 (single-class) or 84 (COCO). Got: " +
+            GS_LOG_MSG(error, "Unknown model format. Expected dimension of 5 (single-class) or 84 (COCO). Got: " +
                        std::to_string(dim1) + " and " + std::to_string(dim2));
         }
     }
@@ -219,10 +209,6 @@ void ONNXRuntimeDetector::InitializeMemoryPool() {
     size_t preproc_size = config_.input_width * config_.input_height * 3;
 
     memory_pool_->Reserve(input_size, output_size, preproc_size);
-
-    GS_LOG_MSG(info, "Memory pool initialized: " +
-               std::to_string((input_size + output_size + preproc_size) * 4 / 1024 / 1024) +
-               " MB reserved");
 }
 
 std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::Detect(
@@ -547,12 +533,7 @@ void ONNXRuntimeDetector::SetThreadAffinity() {
         CPU_SET(core, &cpuset);
     }
 
-    int result = pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
-    if (result == 0) {
-        GS_LOG_MSG(info, "Thread affinity set to cores: " +
-                   std::to_string(config_.cpu_cores[0]) + "-" +
-                   std::to_string(config_.cpu_cores.back()));
-    }
+    pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
 #endif
 }
 
@@ -568,16 +549,9 @@ void ONNXRuntimeDetector::PinThreadToCore(int core_id) {
 void ONNXRuntimeDetector::WarmUp(int iterations) {
     cv::Mat dummy = cv::Mat::zeros(config_.input_height, config_.input_width, CV_8UC3);
 
-    GS_LOG_MSG(info, "Warming up ONNX Runtime with " + std::to_string(iterations) + " iterations");
-
     for (int i = 0; i < iterations; i++) {
         PerformanceMetrics metrics;
         Detect(dummy, &metrics);
-
-        if (i == iterations - 1) {
-            GS_LOG_MSG(info, "Warmup complete. Final inference time: " +
-                       std::to_string(metrics.inference_ms) + " ms");
-        }
     }
 }
 
@@ -585,8 +559,8 @@ float* ONNXRuntimeDetector::GetInputBuffer(size_t size) {
     if (memory_pool_) {
         try {
             return memory_pool_->GetInputBuffer(size);
-        } catch (const std::runtime_error& e) {
-            GS_LOG_MSG(warning, "Memory pool input buffer busy, falling back to dynamic allocation: " + std::string(e.what()));
+        } catch (const std::runtime_error&) {
+            // Fall through to dynamic allocation
         }
     }
 
@@ -599,8 +573,8 @@ float* ONNXRuntimeDetector::GetOutputBuffer(size_t size) {
     if (memory_pool_) {
         try {
             return memory_pool_->GetOutputBuffer(size);
-        } catch (const std::runtime_error& e) {
-            GS_LOG_MSG(warning, "Memory pool output buffer busy, falling back to dynamic allocation: " + std::string(e.what()));
+        } catch (const std::runtime_error&) {
+            // Fall through to dynamic allocation
         }
     }
 

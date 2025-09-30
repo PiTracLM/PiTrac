@@ -92,7 +92,6 @@ namespace golf_sim {
         // even for higher-level logging that libcamera might otherwise want to emit.
 
         if (GolfSimOptions::GetCommandLineOptions().logging_level_ != kTrace) {
-            GS_LOG_TRACE_MSG(trace, "SetLibCameraLoggingOff");
             libcamera::logSetTarget(libcamera::LoggingTargetNone);
 
             /* TBD - Not working, so avoid the extra log message for now
@@ -116,8 +115,6 @@ namespace golf_sim {
      * \return True iff no error occurred.
      */
     bool WatchForHitAndTrigger(const GolfBall& ball, cv::Mat& image, bool& motion_detected) {
-
-        GS_LOG_TRACE_MSG(trace, "WatchForHitAndTrigger");
 
         const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot1CameraType;
         const CameraHardware::LensType camera_lens_type = GolfSimCamera::kSystemSlot1LensType;
@@ -167,8 +164,6 @@ namespace golf_sim {
 
 
     bool WatchForBallMovement(GolfSimCamera& camera, const GolfBall& ball, bool& motion_detected) {
-
-        GS_LOG_TRACE_MSG(trace, "WatchForBallMovement");
 
         if (!GolfSimClubData::Configure()) {
             GS_LOG_TRACE_MSG(warning, "Failed to GolfSimClubData::Configure()");
@@ -236,11 +231,6 @@ namespace golf_sim {
             }
 
             average_frame_rate /= RecentFrames.size();
-
-            GS_LOG_TRACE_MSG(trace, frame_information);
-            GS_LOG_TRACE_MSG(trace, "Average framerate = " + std::to_string(average_frame_rate) + "\n");
-            GS_LOG_TRACE_MSG(trace, "Slowest framerate = " + std::to_string(slowest_frame_rate) + "\n");
-            GS_LOG_TRACE_MSG(trace, "Fastest framerate = " + std::to_string(fastest_frame_rate) + "\n");
         }
 
         return true;
@@ -249,9 +239,6 @@ namespace golf_sim {
 
 
     bool ConfigCameraForCropping(GolfBall ball, GolfSimCamera& camera, RPiCamEncoder& app) {
-
-        GS_LOG_TRACE_MSG(trace, "ConfigCameraForCropping");
-        GS_LOG_TRACE_MSG(trace, "   ball: " + ball.Format());
 
         // First, determine the cropping window size
 
@@ -266,7 +253,6 @@ namespace golf_sim {
         if (GolfSimClubData::kGatherClubData) {
             watching_crop_width = GolfSimClubData::kClubImageWidthPixels;
             watching_crop_height = GolfSimClubData::kClubImageHeightPixels;
-            GS_LOG_TRACE_MSG(trace, "Setting initial crop width/height for club data to: " + std::to_string(watching_crop_width) + "/" + std::to_string(watching_crop_height) + ".");
         }
         else {
             // If we're not trying to gather club-strike image data, use the largest
@@ -285,7 +271,6 @@ namespace golf_sim {
 
         // Reduce the size of the inscribed square a little bit to ensure the motion detection ROI will be within the ball
         largest_inscribed_square_side_length_of_ball *= 0.9;
-        GS_LOG_TRACE_MSG(trace, "largest_inscribed_square_side_length_of_ball is: " + std::to_string(largest_inscribed_square_side_length_of_ball));
 
 #ifdef NOT_DOING_THIS_NOW
 
@@ -313,12 +298,8 @@ namespace golf_sim {
         watching_crop_height += ((int)watching_crop_height % 2);
 
         // TBD - After all that, and just for the current GS camera, we'll just set the cropping size to the smalllest possible size (for FPS)
-        // and either center the ball within that area, or put the ball in the bottom-right of the 
+        // and either center the ball within that area, or put the ball in the bottom-right of the
         // viewport if we want to see the club data.
-
-
-        GS_LOG_TRACE_MSG(trace, "Final crop width/height is: " + std::to_string(watching_crop_width) + "/" + std::to_string(watching_crop_height) + ".");
-
 
         // Now determine the cropping window's offset within the full camera resolution image
         // This offset will be based on the position of the ball
@@ -327,8 +308,6 @@ namespace golf_sim {
 
         float ball_x = CvUtils::CircleX(ball.ball_circle_);
         float ball_y = CvUtils::CircleY(ball.ball_circle_);
-
-        GS_LOG_TRACE_MSG(trace, "Ball location (x,y) is: " + std::to_string(ball_x) + "/" + std::to_string(ball_y) + ".");
 
         // Assume first is that the ball will be centered in the cropping window, then tweak
         // it next if we're in club strike mode. Club strike imaging may require an offset.
@@ -348,8 +327,6 @@ namespace golf_sim {
         const float crop_offset_adjustment_x = kCroppedImagePixelOffsetLeft; // pixels
         const float crop_offset_adjustment_y = kCroppedImagePixelOffsetUp; // pixels
 
-        GS_LOG_TRACE_MSG(trace, "crop_offset_adjustment (x,y) is: (" + std::to_string(crop_offset_adjustment_x) + ",/" + std::to_string(crop_offset_adjustment_y) + ").");
-
         // The video resolution is a little different than the still-photo resolution.
         // So scale the center of the ball accordingly.
         float x_scale = crop_offset_scale_adjustment_x; // NOT IMPLEMENTED YET   ((float)camera.camera_hardware_.video_resolution_x_ / (float)camera.camera_hardware_.resolution_x_);
@@ -357,10 +334,6 @@ namespace golf_sim {
 
         float y_scale = crop_offset_scale_adjustment_y; // NOT IMPLEMENTED YET  ((float)camera.camera_hardware_.video_resolution_y_ / (float)camera.camera_hardware_.resolution_y_);
         crop_offset_y = crop_offset_adjustment_y + (y_scale * (camera.camera_hardware_.resolution_y_ - (ball_y + watching_crop_height / 2.0)));
-
-        GS_LOG_TRACE_MSG(trace, "Video--to-still scaling factor (x,y) is: " + std::to_string(x_scale) + "/" + std::to_string(y_scale) + ".");
-        GS_LOG_TRACE_MSG(trace, "Video resolution (x,y) is: " + std::to_string(camera.camera_hardware_.video_resolution_x_) + "/" + std::to_string(camera.camera_hardware_.video_resolution_y_) + ".");
-        GS_LOG_TRACE_MSG(trace, "Initial crop offset (x,y) is: " + std::to_string(crop_offset_x) + "/" + std::to_string(crop_offset_y) + ".");
 
         // If we're trying to get club images, then skew the cropping so that the ball ends up near the
         // bottom-right such that the the golf ball "watch" ROI will eventually also be 
@@ -370,22 +343,16 @@ namespace golf_sim {
             crop_offset_y += (0.5 * watching_crop_height - 0.5 * largest_inscribed_square_side_length_of_ball);
         }
 
-        GS_LOG_TRACE_MSG(trace, "Post-Club-Data crop offset (x,y) is: " + std::to_string(crop_offset_x) + "/" + std::to_string(crop_offset_y) + ".");
-
         // Check for and correct if the resulting crop window would be outside the full resolution image
         // If we need to correct something, preserve the crop width and correct the offset.
         // NOTE - Camera resolutions are 1 greater than the greatest pixel position
         if ((((camera.camera_hardware_.resolution_x_ - 1) - crop_offset_x) + watching_crop_width) >= camera.camera_hardware_.resolution_x_) {
-            GS_LOG_TRACE_MSG(trace, "Correcting X crop offset to avoid going outside the screen.");
             crop_offset_x = (camera.camera_hardware_.video_resolution_x_ - crop_offset_x) - 1;
         }
 
         if ((((camera.camera_hardware_.resolution_y_ - 1) - crop_offset_y) + watching_crop_height) >= camera.camera_hardware_.resolution_y_) {
-            GS_LOG_TRACE_MSG(trace, "Correcting Y crop offset to avoid going outside the screen.");
             crop_offset_y = (camera.camera_hardware_.video_resolution_y_ - crop_offset_y) - 1;
         }
-
-        GS_LOG_TRACE_MSG(trace, "Final (adjusted) crop offset x/y is: " + std::to_string(crop_offset_x) + "/" + std::to_string(crop_offset_y) + ".");
 
         cv::Vec2i watching_crop_size = cv::Vec2i((uint)watching_crop_width, (uint)watching_crop_height);
         cv::Vec2i watching_crop_offset = cv::Vec2i((uint)crop_offset_x, (uint)crop_offset_y);
@@ -395,7 +362,6 @@ namespace golf_sim {
             LibCameraInterface::current_watch_resolution_ == watching_crop_size &&
             LibCameraInterface::current_watch_offset_ == watching_crop_offset
             ) {
-            GS_LOG_TRACE_MSG(trace, "Skipping cropping setup because already cropped.");
             // Don't reset the crop if we don't need to.  It takes time, especially the kernel-based cropping command lines
             return true;
         }
@@ -413,11 +379,8 @@ namespace golf_sim {
         cv::Vec2i cropped_resolution;
         uint cropped_frame_rate_fps;
         if (!RetrieveCameraInfo(camera.camera_hardware_.camera_number_, cropped_resolution, cropped_frame_rate_fps, true)) {
-            GS_LOG_TRACE_MSG(trace, "Failed to RetrieveCameraInfo.");
             return false;
         }
-
-        GS_LOG_TRACE_MSG(trace, "Camera FPS = " + std::to_string(cropped_frame_rate_fps) + ".");
 
         if (!ConfigureLibCameraOptions(app, watching_crop_size, cropped_frame_rate_fps)) {
             GS_LOG_TRACE_MSG(error, "Failed to ConfigureLibCameraOptions.");
@@ -439,8 +402,6 @@ namespace golf_sim {
 
         float size_difference_x = largest_inscribed_square_side_length_of_ball - watching_crop_width;
         float size_difference_y = largest_inscribed_square_side_length_of_ball - watching_crop_height;
-
-        GS_LOG_TRACE_MSG(trace, "x/y differences between the inscribed aquare and the watching crop are: " + std::to_string(size_difference_x) + "/" + std::to_string(size_difference_y) + ".");
 
         if (size_difference_x >= 0.0) {
             // The cropped area is already fully inside the ball (assuming we're not dealing with club strike data
@@ -483,12 +444,6 @@ namespace golf_sim {
         roi_offset_x = std::min(roi_offset_x, (float)camera.camera_hardware_.video_resolution_x_);
         roi_offset_y = std::min(roi_offset_y, (float)camera.camera_hardware_.video_resolution_y_);
 
-        GS_LOG_TRACE_MSG(trace, "Final roi x/y offset is: " + std::to_string(roi_offset_x) + "/" + std::to_string(roi_offset_y) + ".");
-        GS_LOG_TRACE_MSG(trace, "Final roi x/y size is: " + std::to_string(roi_size_x) + "/" + std::to_string(roi_size_y) + ".");
-
-
-        GS_LOG_TRACE_MSG(trace, "Final roi width/height is: " + std::to_string(roi_size_x) + "/" + std::to_string(roi_size_y) + ".");
-
         cv::Vec2i roi_offset = cv::Vec2i((int)roi_offset_x, (int)roi_offset_y);
         cv::Vec2i roi_size = cv::Vec2i((uint)roi_size_x, (uint)roi_size_y);
 
@@ -513,8 +468,6 @@ namespace golf_sim {
 
 
 bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_number, int& device_number) {
-
-    GS_LOG_TRACE_MSG(trace, "DiscoverCameraLocation called for camera_number: " + to_string((int)camera_number));
 
     // The camera location won't change during the course of a single exceution, so 
     // no need to figure this out more than once - re-use the earlier values if we can
@@ -554,8 +507,6 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
 
     const std::string script_name = "/tmp/pi_cam_location.sh";
 
-    GS_LOG_TRACE_MSG(trace, "DiscoverCameraLocation script string is:\n" + s);
-
     // Write the script out to file to run.  
     // Otherwise, system() would try to run the script as a sh script,
     // not a bash script
@@ -575,8 +526,6 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
     system(script_command.c_str());
 
     script_command = script_name;
-
-    GS_LOG_TRACE_MSG(trace, "Executing command: " + script_command);
 
     int cmdResult = system(script_command.c_str());
 
@@ -608,8 +557,6 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
         
     file.close();
 
-    GS_LOG_TRACE_MSG(trace, "DiscoverCameraLocation - result in output file was:\n" + line);
-
     // The format of the output file should be
     // <media number> <space> <device number>
     try {
@@ -619,8 +566,6 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
         int new_line_position = line.find('\n');
 
         if (new_line_position == (int)string::npos) {
-
-            GS_LOG_TRACE_MSG(trace, "Detected only one camera connected to the Pi.");
 
             // There is only one line of discovered information
 
@@ -633,9 +578,6 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
             }
         }
         else {
-            GS_LOG_TRACE_MSG(trace, "Detected two cameras connected to the Pi.");
-
-
             // Assume (TBD - Confirm with Pi people) that the camera on camera unit 0
             // (the port nearest the LAN port) will correspond to the first line of the
             // returned media-ctl output
@@ -650,8 +592,6 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
                 std::string first_line_str = line.substr(new_line_position + 1);
                 line = first_line_str;
             }
-
-            GS_LOG_TRACE_MSG(trace, "DiscoverCameraLocation - relevant line of output file for selected camera was: " + line);
         }
 
         // Parse out the media and device numbers from what should be the first line of the media-ctl location report
@@ -685,8 +625,6 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
             return false;
         }
 
-        GS_LOG_TRACE_MSG(trace, "media_number_str = " + media_number_str + ", device_number_str = " + device_number_str);
-
         media_number = std::stoi(media_number_str);
         device_number = std::stoi(device_number_str);
     }
@@ -707,12 +645,7 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
 
 bool SendCameraCroppingCommand(const GolfSimCamera& camera, cv::Vec2i& cropping_window_size, cv::Vec2i& cropping_window_offset) {
 
-    GS_LOG_TRACE_MSG(trace, "SendCameraCroppingCommand.");
-    GS_LOG_TRACE_MSG(trace, "   cropping_window_size: (width, height) = " + std::to_string(cropping_window_size[0]) + ", " + std::to_string(cropping_window_size[1]) + ".");
-    GS_LOG_TRACE_MSG(trace, "   cropping_window_offset: (X, Y) = " + std::to_string(cropping_window_offset[0]) + ", " + std::to_string(cropping_window_offset[1]) + ".");
-
     std::string mediaCtlCmd = GetCmdLineForMediaCtlCropping(camera, cropping_window_size, cropping_window_offset);
-    GS_LOG_TRACE_MSG(trace, "mediaCtlCmd = " + mediaCtlCmd);
     int cmdResult = system(mediaCtlCmd.c_str());
 
     if (cmdResult != 0) {
@@ -724,10 +657,6 @@ bool SendCameraCroppingCommand(const GolfSimCamera& camera, cv::Vec2i& cropping_
 
 
 bool ConfigurePostProcessing(const cv::Vec2i& roi_size, const cv::Vec2i& roi_offset ) {
-
-    GS_LOG_TRACE_MSG(trace, "ConfigurePostProcessing.");
-    GS_LOG_TRACE_MSG(trace, "   roi_size: (width, height) = " + std::to_string(roi_size[0]) + ", " + std::to_string(roi_size[1]) + ".");
-    GS_LOG_TRACE_MSG(trace, "   roi_offset: (X, Y) = " + std::to_string(roi_offset[0]) + ", " + std::to_string(roi_offset[1]) + ".");
 
     float kDifferenceM = 0.;
     float kDifferenceC = 0.;
@@ -776,8 +705,6 @@ bool ConfigurePostProcessing(const cv::Vec2i& roi_size, const cv::Vec2i& roi_off
 
 bool ConfigureLibCameraOptions(RPiCamEncoder& app, const cv::Vec2i& cropping_window_size, uint cropped_frame_rate_fps) {
 
-    GS_LOG_TRACE_MSG(trace, "ConfigureLibCameraOptions.  cropping_window_size: (width, height) = " + std::to_string(cropping_window_size[0]) + ", " + std::to_string(cropping_window_size[1]) + ".");
-
     VideoOptions* options = app.GetOptions();
 
     char dummy_arguments[] = "DummyExecutableName";
@@ -806,9 +733,6 @@ bool ConfigureLibCameraOptions(RPiCamEncoder& app, const cv::Vec2i& cropping_win
         shutter_speed_string = std::to_string((int)(1. / cropped_frame_rate_fps * 1000000.)) + "us";   // TBD - should be 1,000,000 for uS setting
     }
 
-    GS_LOG_TRACE_MSG(trace, "Camera gain is: " + std::to_string(camera_gain));
-    GS_LOG_TRACE_MSG(trace, "Shutter speed string is: " + shutter_speed_string);
-
     options->gain = camera_gain;
     options->shutter.set(shutter_speed_string);   // TBD - should be 1,000,000 for uS setting
 
@@ -828,24 +752,17 @@ bool ConfigureLibCameraOptions(RPiCamEncoder& app, const cv::Vec2i& cropping_win
     options->codec = "yuv420";    // was h.264, but that no longer works on Pi5
 
     if (GolfSimConfiguration::GetPiModel() == GolfSimConfiguration::PiModel::kRPi5) {
-        GS_LOG_TRACE_MSG(trace, "Detected PiModel::kRPi5 and camera 1.");
         options->tuning_file = "/usr/share/libcamera/ipa/rpi/pisp/imx296.json";
     }
     else {
-        GS_LOG_TRACE_MSG(trace, "Detected PiModel::kRPi4 and camera 1.");
         options->tuning_file = "/usr/share/libcamera/ipa/rpi/vc4/imx296.json";
     }
     setenv("LIBCAMERA_RPI_TUNING_FILE", options->tuning_file.c_str(), 1);
-    GS_LOG_TRACE_MSG(trace, "LIBCAMERA_RPI_TUNING_FILE set to: " + options->tuning_file);
 
     // TBD - We are switching away from having the post_process_file trigger the
     // dynamic loading of the motion_detection module.  Instead, hop[efully for speed,
     // we will use a statically-bound motion_detection module.  See ball_watcher.cpp
     // options->post_process_file = LibCameraInterface::kCameraMotionDetectSettings;
-
-    if (!GolfSimClubData::kGatherClubData) {
-    	GS_LOG_TRACE_MSG(trace, "ball_watcher_event_loop will use post-process file (unless overridden in golf_sim_config.json): " + options->post_process_file);
-    }
 
     if (cropping_window_size[0] > 0 && cropping_window_size[1] > 0) {
         options->width = cropping_window_size[0];
@@ -886,8 +803,6 @@ std::string GetCmdLineForMediaCtlCropping(const GolfSimCamera &camera, cv::Vec2i
 
 bool RetrieveCameraInfo(const GsCameraNumber camera_number, cv::Vec2i& resolution, uint& frameRate, bool restartCamera) {
 
-    GS_LOG_TRACE_MSG(trace, "RetrieveCameraInfo.");
-
     LibcameraJpegApp app;
 
     if (restartCamera) {
@@ -910,8 +825,6 @@ bool RetrieveCameraInfo(const GsCameraNumber camera_number, cv::Vec2i& resolutio
 
                 // Set the camera number (0 or 1, likely) when we have more than one camera
                 options->camera = (camera_number == GsCameraNumber::kGsCamera1 || !GolfSimOptions::GetCommandLineOptions().run_single_pi_) ? 0 : 1;
-                GS_LOG_TRACE_MSG(trace, "  Camera options->camera set to camera slot: " + std::to_string(options->camera));
-
 
                 // Get the camera open for a moment so that we can read its settings
                 app.OpenCamera();
@@ -930,7 +843,6 @@ bool RetrieveCameraInfo(const GsCameraNumber camera_number, cv::Vec2i& resolutio
         }
     }
 
-    GS_LOG_TRACE_MSG(trace, "Getting cameras.");
     std::vector<std::shared_ptr<libcamera::Camera>> cameras = app.GetCameras();
 
     if (cameras.size() == 0)
@@ -977,8 +889,6 @@ cv::Mat LibCameraInterface::undistort_camera_image(const cv::Mat& img, const Gol
     GsCameraNumber camera_number = camera.camera_hardware_.camera_number_;
     CameraHardware::CameraModel camera_model = camera.camera_hardware_.camera_model_;
 
-    GS_LOG_MSG(trace, "undistort_camera_image called with camera_number = " + std::to_string(camera_number) + ", camera_model = " + std::to_string(camera_model));
-    
     // Get the calibration values from the camera
 
     cv::Mat cameracalibrationMatrix_ = camera.camera_hardware_.calibrationMatrix_;
@@ -988,11 +898,9 @@ cv::Mat LibCameraInterface::undistort_camera_image(const cv::Mat& img, const Gol
     cv::Mat m_undistMap1, m_undistMap2;
 
     if (camera.camera_hardware_.camera_is_mono()) {
-        GS_LOG_MSG(trace, "undistort_camera_image using image format CV_8UC1"); 
         cv::initUndistortRectifyMap(cameracalibrationMatrix_, cameraDistortionVector_, cv::Mat(), cameracalibrationMatrix_, cv::Size(img.cols, img.rows), CV_8UC1, m_undistMap1, m_undistMap2);
     }
     else {
-        GS_LOG_MSG(trace, "undistort_camera_image using image format CV_32FC1");
         cv::initUndistortRectifyMap(cameracalibrationMatrix_, cameraDistortionVector_, cv::Mat(), cameracalibrationMatrix_, cv::Size(img.cols, img.rows), CV_32FC1, m_undistMap1, m_undistMap2);
     }
 
@@ -1019,9 +927,8 @@ bool ConfigCameraForFullScreenWatching(const GolfSimCamera& c) {
         return false;
     }
 
-    // Ensure no cropping and full resolution on the camera 
+    // Ensure no cropping and full resolution on the camera
     std::string mediaCtlCmd = GetCmdLineForMediaCtlCropping(c, cv::Vec2i(width, height), cv::Vec2i(0, 0));
-    GS_LOG_TRACE_MSG(trace, "mediaCtlCmd = " + mediaCtlCmd);
     int cmdResult = system(mediaCtlCmd.c_str());
 
     if (cmdResult != 0) {
@@ -1047,40 +954,32 @@ bool SetLibcameraTuningFileEnvVariable(const GolfSimCamera& camera) {
         // the camera is camera 1 or camera 2
 
         if (pi_model == GolfSimConfiguration::PiModel::kRPi5) {
-            GS_LOG_TRACE_MSG(trace, "Detected PiModel::kRPi5 mono camera.");
-            // tuning_file = "/usr/share/libcamera/ipa/rpi/pisp/imx296_mono.json";
             tuning_file = "/usr/share/libcamera/ipa/rpi/pisp/imx296_mono.json";
         }
         else {
-            GS_LOG_TRACE_MSG(trace, "Detected PiModel::kRPi4 mono camera.");
             tuning_file = "/usr/share/libcamera/ipa/rpi/vc4/imx296_mono.json";
         }
     }
     else if (GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera1) {
 
         if (pi_model == GolfSimConfiguration::PiModel::kRPi5) {
-            GS_LOG_TRACE_MSG(trace, "Detected PiModel::kRPi5 and color camera 1.");
             tuning_file = "/usr/share/libcamera/ipa/rpi/pisp/imx296.json";
         }
         else {
-            GS_LOG_TRACE_MSG(trace, "Detected PiModel::kRPi4 and color camera 1.");
             tuning_file = "/usr/share/libcamera/ipa/rpi/vc4/imx296.json";
         }
     }
     else {
         // Use the infrared (noir) tuning file
         if (pi_model == GolfSimConfiguration::PiModel::kRPi5) {
-            GS_LOG_TRACE_MSG(trace, "Detected PiModel::kRPi5 and color camera 2.");
             tuning_file = "/usr/share/libcamera/ipa/rpi/pisp/imx296_noir.json";
         }
         else {
-            GS_LOG_TRACE_MSG(trace, "Detected PiModel::kRPi4 and color camera 2.");
             tuning_file = "/usr/share/libcamera/ipa/rpi/vc4/imx296_noir.json";
         }
     }
 
     setenv("LIBCAMERA_RPI_TUNING_FILE", tuning_file.c_str(), 1);
-    GS_LOG_TRACE_MSG(trace, "LIBCAMERA_RPI_TUNING_FILE set to: " + tuning_file);
 
     return true;
 }
@@ -1091,21 +990,17 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
     const GsCameraNumber camera_number = camera.camera_hardware_.camera_number_;
     int hardware_camera_index = camera_number;
 
-    GS_LOG_TRACE_MSG(trace, "ConfigureForLibcameraStill called for camera " + std::to_string((int)camera_number));
-
     // Check first if we are already setup and can skip this
 
     LibcameraJpegApp* app = lci::libcamera_app_[hardware_camera_index];
 
     if (app != nullptr || lci::libcamera_configuration_[hardware_camera_index] == lci::CameraConfiguration::kStillPicture) {
-        GS_LOG_TRACE_MSG(trace, "ConfigureForLibcameraStill - already configured.");
         return lci::libcamera_app_[camera_number];
     }
 
     if (app != nullptr) {
         // The camera is configured, but just not for the right purposes
         // Deconfigure and then re-configure
-        GS_LOG_TRACE_MSG(trace, "ConfigureForLibcameraStill - re-configuring.");
 
         if (!DeConfigureForLibcameraStill(camera_number)) {
             GS_LOG_TRACE_MSG(error, "failed to DeConfigureForLibcameraStill.");
@@ -1148,8 +1043,6 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
             camera_gain = LibCameraInterface::kCamera1Gain;
             camera_contrast = LibCameraInterface::kCamera1Contrast;
             still_shutter_time_uS = LibCameraInterface::kCamera1StillShutterTimeuS;
-
-            GS_LOG_TRACE_MSG(trace, "Setting camera gain, contrast and shutter time to: " + std::to_string(camera_gain) + ", " + std::to_string(camera_contrast) + ", " + std::to_string(still_shutter_time_uS) + ".");
         }
         else {
             // We're working with camera 2, which doesn't normally take still pictures.  
@@ -1177,8 +1070,6 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
                 still_shutter_time_uS = LibCameraInterface::kCamera2StillShutterTimeuS;
             }
             else {
-                GS_LOG_TRACE_MSG(trace, "In SystemMode::kCamera2Calibrate (or similar).  Using DEFAULT gain/contrast for Camera2.");
-                GS_LOG_TRACE_MSG(trace, "Setting longer still_shutter_time_uS for Camera2.");
                 still_shutter_time_uS = 6 * LibCameraInterface::kCamera2StillShutterTimeuS;
             }
         }
@@ -1186,15 +1077,11 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
         // Assume camera 1 will be at slot 0 in all cases.  Camera 2 will be at slot 1
         // only in a single Pi system.
         options->camera = (camera_number == GsCameraNumber::kGsCamera1 || !GolfSimOptions::GetCommandLineOptions().run_single_pi_) ? 0 : 1;
-        GS_LOG_TRACE_MSG(trace, "Camera options->camera set to camera slot: " + std::to_string(options->camera));
-
 
         // Shouldn't need gain to take a "normal" picture.   Default will be 1.0
         // from the command line options.
         options->gain = camera_gain;
-        GS_LOG_TRACE_MSG(trace, "Camera Gain set to: " + std::to_string(options->gain));
         options->contrast = camera_contrast;
-        GS_LOG_TRACE_MSG(trace, "Camera Contrast set to: " + std::to_string(options->contrast));
         options->timeout.set("5s");
         options->denoise = "cdn_off";
         options->immediate = true;  // TBD - Trying this for now.  May have to work on white balance too
@@ -1207,8 +1094,6 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
             options->shutter.set("12000us"); // uS
         }
         options->info_text = "";
-
-        GS_LOG_TRACE_MSG(trace, "Camera options->shutter = " + options->shutter.get());
 
         if (!SetLibcameraTuningFileEnvVariable(camera) ) {
             GS_LOG_TRACE_MSG(error, "failed to SetLibcameraTuningFileEnvVariable");
@@ -1240,8 +1125,6 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
 
 bool DeConfigureForLibcameraStill(const GsCameraNumber camera_number) {
 
-    GS_LOG_TRACE_MSG(trace, "DeConfigureForLibcameraStill called for hardware_camera_index: " + std::to_string(camera_number));
-
     if (lci::libcamera_app_[camera_number] == nullptr) {
         GS_LOG_TRACE_MSG(error, "DeConfigureForLibcameraStill called, but camera_app was null.  Doing nothing.");
         return false;
@@ -1253,7 +1136,6 @@ bool DeConfigureForLibcameraStill(const GsCameraNumber camera_number) {
 
     try
     {
-        GS_LOG_TRACE_MSG(trace, "Tearing down initial camera.");
         lci::libcamera_app_[camera_number]->StopCamera();
         lci::libcamera_app_[camera_number]->Teardown();  // TBD - Need?
         delete lci::libcamera_app_[camera_number];
@@ -1307,8 +1189,6 @@ bool TakeRawPicture(const GolfSimCamera& camera, cv::Mat& img) {
 
     const GsCameraNumber camera_number = camera.camera_hardware_.camera_number_;
 
-    GS_LOG_TRACE_MSG(trace, "TakeRawPicture called for camera_number: " + std::to_string(camera_number));
-    
     const CameraHardware::CameraModel  camera_model = (camera_number == GsCameraNumber::kGsCamera1) ? GolfSimCamera::kSystemSlot1CameraType : GolfSimCamera::kSystemSlot2CameraType;
 
     // Ensure we have full resolution
@@ -1350,8 +1230,6 @@ bool CheckForBallEnhanced(GolfBall& ball, cv::Mat& img) {
     cv::Vec2i search_center = camera.GetExpectedBallCenter();
     
     if (use_yolo) {
-        GS_LOG_TRACE_MSG(trace, "Using YOLO for ball placement detection");
-        
         if (!golf_sim::BallImageProc::PreloadYOLOModel()) {
             GS_LOG_MSG(warning, "YOLO model not available, using legacy detection");
         } else {
@@ -1380,16 +1258,13 @@ bool CheckForBallEnhanced(GolfBall& ball, cv::Mat& img) {
                     ball.measured_radius_pixels_ = best_circle[2];
                     ball.search_area_center_ = search_center;
                     ball.search_area_radius_ = 200;
-                    
-                    GS_LOG_TRACE_MSG(trace, "YOLO ball placement detection successful");
+
                     return true;
                 }
             }
-            GS_LOG_TRACE_MSG(trace, "YOLO found no suitable balls near expected position");
         }
     }
-    
-    GS_LOG_TRACE_MSG(trace, "Using traditional GetCalibratedBall detection");
+
     bool expectBall = false;
     return camera.GetCalibratedBall(camera, img, ball, search_center, expectBall);
 }
@@ -1402,7 +1277,6 @@ bool CheckForBall(GolfBall& ball, cv::Mat& img) {
 bool CheckForBallLegacy(GolfBall& ball, cv::Mat& img) {
 
 	GsCameraNumber camera_number = GolfSimOptions::GetCommandLineOptions().GetCameraNumber();
-    GS_LOG_TRACE_MSG(trace, "CheckForBallLegacy called for camera number " + std::to_string(camera_number));
 
     // Figure out where the ball is
     // TBD - This repeats the camera initialization that we just did
@@ -1426,11 +1300,8 @@ bool CheckForBallLegacy(GolfBall& ball, cv::Mat& img) {
     bool success = camera.GetCalibratedBall(camera, img, ball, search_area_center, expectBall);
 
     if (!success) {
-        GS_LOG_TRACE_MSG(trace, "Failed to GetCalibratedBall.");
         return false;
     }
-
-    GS_LOG_TRACE_MSG(trace, "kCalibrated BALL -------> " + ball.Format());
 
     return true;
 }
@@ -1457,7 +1328,6 @@ bool WaitForCam2Trigger(cv::Mat& return_image) {
 
         if (!options->Parse(1, argv))
         {
-            GS_LOG_TRACE_MSG(trace, "failed to parse dummy command line.");;
             return -1;
         }
 
@@ -1467,11 +1337,9 @@ bool WaitForCam2Trigger(cv::Mat& return_image) {
         // On a single-pi system the one Pi 5 has both cameras.  And Camera 2 will be in slot 1
         // because Camera 1 is in slot 0.
         if (GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
-            GS_LOG_TRACE_MSG(trace, "Running in single-pi mode, so assuming Camera 2 will be at slot 1.");
             options->camera = 1;
         }
         else {
-            GS_LOG_TRACE_MSG(trace, "Not running in single-pi mode, so assuming Camera 2 will be at slot 0.");
             options->camera = 0;
         }
 
@@ -1495,8 +1363,6 @@ bool WaitForCam2Trigger(cv::Mat& return_image) {
 
             options->contrast = LibCameraInterface::kCamera2Contrast;
         }
-
-        GS_LOG_TRACE_MSG(trace, "Camera2 Gain set to: " + std::to_string(options->gain));
 
         options->immediate = true;
         options->timeout.set("0ms");  // Wait forever for external trigger
@@ -1542,7 +1408,6 @@ bool WaitForCam2Trigger(cv::Mat& return_image) {
         std::string output_fname = GolfSimOptions::GetCommandLineOptions().output_filename_;
         if (output_fname.empty()) {
             output_fname = LoggingTools::kDefaultSaveFileName;
-            GS_LOG_TRACE_MSG(trace, "No output output_filename specified.  Will save picture as: " + output_fname);
         }
 
         LoggingTools::LogImage("", return_image, std::vector < cv::Point >{}, true, output_fname);
@@ -1558,10 +1423,7 @@ bool PerformCameraSystemStartup() {
 
     // Setup the Pi Camera to be internally or externally triggered as appropriate
 
-    GS_LOG_TRACE_MSG(trace, "PerformCameraSystemStartup: System Mode: " + std::to_string(GolfSimOptions::GetCommandLineOptions().system_mode_));
-
     SystemMode mode = GolfSimOptions::GetCommandLineOptions().system_mode_;
-    GS_LOG_TRACE_MSG(trace, "PerformCameraSystemStartup called with mode = " + std::to_string(mode));
 
     switch (mode) {
 
@@ -1572,7 +1434,6 @@ bool PerformCameraSystemStartup() {
             if (!GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
                 std::string trigger_mode_command = "sudo $PITRAC_ROOT/ImageProcessing/CameraTools/setCameraTriggerInternal.sh";
 
-                GS_LOG_TRACE_MSG(trace, "Camera 1 trigger_mode_command = " + trigger_mode_command);
                 int command_result = system(trigger_mode_command.c_str());
 
                 if (command_result != 0) {
@@ -1598,7 +1459,6 @@ bool PerformCameraSystemStartup() {
                     GS_LOG_TRACE_MSG(trace, "Running in single-pi mode, so not setting camera triggering (internal or external) programmatically.  Instead, please see the following discussion on how to setup the boot/firmware.config.txt dtoverlays for triggering:  https://forums.raspberrypi.com/viewtopic.php?p=2315464#p2315464.");
                 }
                     ****/
-                GS_LOG_TRACE_MSG(trace, "Running in single-pi mode, so not setting camera 1 triggering (internal or external) programmatically.  Instead, please see the following discussion on how to setup the boot/firmware.config.txt dtoverlays for triggering:  https://forums.raspberrypi.com/viewtopic.php?p=2315464#p2315464.");
             }
         }
         break;
@@ -1610,7 +1470,6 @@ bool PerformCameraSystemStartup() {
             if (!GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
                 std::string trigger_mode_command = "sudo $PITRAC_ROOT/ImageProcessing/CameraTools/setCameraTriggerExternal.sh";
 
-                GS_LOG_TRACE_MSG(trace, "Camera 2 trigger_mode_command = " + trigger_mode_command);
                 int command_result = system(trigger_mode_command.c_str());
 
                 if (command_result != 0) {
@@ -1624,16 +1483,12 @@ bool PerformCameraSystemStartup() {
                 if (camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
                     std::string trigger_mode_command = "$PITRAC_ROOT/ImageProcessing/CameraTools/imx296_trigger 4 1";
 
-                    GS_LOG_TRACE_MSG(trace, "Camera 2 trigger_mode_command = " + trigger_mode_command);
                     int command_result = system(trigger_mode_command.c_str());
 
                     if (command_result != 0) {
                         GS_LOG_TRACE_MSG(trace, "system(trigger_mode_command) failed.");
                         return false;
                     }
-                }
-                else {
-                    GS_LOG_TRACE_MSG(trace, "Running in single-pi mode, so not setting camera 2 triggering (internal or external) programmatically.  Instead, please see the following discussion on how to setup the boot/firmware.config.txt dtoverlays for triggering:  https://forums.raspberrypi.com/viewtopic.php?p=2315464#p2315464.");
                 }
             }
 
