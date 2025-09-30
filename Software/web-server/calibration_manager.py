@@ -267,7 +267,11 @@ class CalibrationManager:
         images_dir.mkdir(parents=True, exist_ok=True)
         output_path = images_dir / output_file
 
-        cmd.extend([f"--output_filename={output_path}", f"--config_file={self.config_manager.generated_config_path}"])
+        cmd.extend([
+            f"--output_filename={output_path}",
+            "--artifact_save_level=final_results_only",
+            f"--config_file={self.config_manager.generated_config_path}"
+        ])
 
         try:
             await self._run_calibration_command(cmd, camera, timeout=10)
