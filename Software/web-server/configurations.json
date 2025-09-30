@@ -845,7 +845,7 @@
       "type": "text",
       "default": "tcp://127.0.0.1:61616",
       "requiresRestart": true,
-      "passedVia": "json",
+      "passedVia": "cli",
       "passedTo": "both",
       "cliArgument": "--msg_broker_address"
     },

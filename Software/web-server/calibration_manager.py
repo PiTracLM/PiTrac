@@ -82,7 +82,7 @@ class CalibrationManager:
                 "--artifact_save_level=all",
             ]
         )
-        cmd.extend(self._get_common_cli_args())
+        cmd.extend(self._build_cli_args_from_metadata(camera))
 
         try:
             result = await self._run_calibration_command(cmd, camera, timeout=30)
@@ -147,7 +147,7 @@ class CalibrationManager:
                 "--artifact_save_level=all",
             ]
         )
-        cmd.extend(self._get_common_cli_args())
+        cmd.extend(self._build_cli_args_from_metadata(camera))
 
         try:
             result = await self._run_calibration_command(cmd, camera, timeout=120)
@@ -213,7 +213,7 @@ class CalibrationManager:
                 "--artifact_save_level=all",
             ]
         )
-        cmd.extend(self._get_common_cli_args())
+        cmd.extend(self._build_cli_args_from_metadata(camera))
 
         try:
             result = await self._run_calibration_command(cmd, camera, timeout=180)
@@ -306,17 +306,54 @@ class CalibrationManager:
             },
         }
 
-    def _get_common_cli_args(self) -> list:
-        """Get common CLI arguments used by all calibration commands"""
-        config = self.config_manager.get_config()
+    def _build_cli_args_from_metadata(self, camera: str = "camera1") -> list:
+        """Build CLI arguments using metadata from configurations.json
+
+        This method uses the passedVia and passedTo metadata to automatically
+        build CLI arguments, similar to pitrac_manager.py
+        """
         args = []
+        merged_config = self.config_manager.get_config()
 
-        broker_address = (
-            config.get("gs_config", {}).get("ipc_interface", {}).get("kWebActiveMQHostAddress", "tcp://127.0.0.1:61616")
-        )
-        args.append(f"--msg_broker_address={broker_address}")
+        target = camera  # "camera1" or "camera2"
 
-        args.append(f"--config_file={self.config_manager.generated_config_path}")
+        cli_params = self.config_manager.get_cli_parameters(target)
+
+        # Skip args that we handle separately
+        skip_args = {"--system_mode", "--run_single_pi", "--search_center_x", "--search_center_y",
+                     "--logging_level", "--artifact_save_level", "--cam_still_mode", "--output_filename"}
+
+        for param in cli_params:
+            key = param["key"]
+            cli_arg = param["cliArgument"]
+            param_type = param["type"]
+
+            if cli_arg in skip_args:
+                continue
+
+            value = merged_config
+            for part in key.split("."):
+                if isinstance(value, dict):
+                    value = value.get(part)
+                else:
+                    value = None
+                    break
+
+            if value is None:
+                continue
+
+            # Skip empty string values for non-boolean parameters
+            if param_type != "boolean" and value == "":
+                continue
+
+            if param_type == "boolean":
+                if value:
+                    args.append(cli_arg)
+            else:
+                if param_type == "path" and value:
+                    value = str(value).replace("~", str(Path.home()))
+                # Use --key=value format for consistency
+                args.append(f"{cli_arg}={value}")
 
         return args
 
