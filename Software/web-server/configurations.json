@@ -338,7 +338,7 @@
         "4": "Pi Global Shutter - IMX296 Color",
         "5": "InnoMaker IMX296 - Mono sensor (RECOMMENDED)"
       },
-      "default": "4",
+      "default": "5",
       "requiresRestart": true,
       "passedVia": "environment",
       "passedTo": "camera1",
@@ -377,7 +377,7 @@
         "4": "Pi Global Shutter - IMX296 Color (RECOMMENDED)",
         "5": "InnoMaker IMX296 - Mono sensor"
       },
-      "default": "4",
+      "default": "5",
       "requiresRestart": true,
       "passedVia": "environment",
       "passedTo": "camera2",
