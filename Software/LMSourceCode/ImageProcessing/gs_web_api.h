@@ -25,9 +25,11 @@ private:
     static std::string GetWebServerUrl();
     
     // Execute curl command and return response
-    static bool ExecuteCurl(const std::string& url, const std::string& method, 
+    static bool ExecuteCurl(const std::string& url, const std::string& method,
                            const std::string& payload, std::string& response);
-    
+
+    static std::string ShellEscape(const std::string& input);
+
     // Format value as JSON
     static std::string FormatAsJson(double value);
     static std::string FormatAsJson(const std::vector<double>& values);

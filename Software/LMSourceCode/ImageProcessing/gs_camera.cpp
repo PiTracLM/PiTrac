@@ -4167,7 +4167,10 @@ namespace golf_sim {
             sleep(6);
 
             // Get the image that the IPC system should have saved
-            color_image = GolfSimIpcSystem::last_received_image_;
+            {
+                std::lock_guard<std::mutex> lock(GolfSimIpcSystem::last_received_image_mutex_);
+                color_image = GolfSimIpcSystem::last_received_image_.clone();
+            }
 
             if (color_image.empty()) {
                 GS_LOG_MSG(error, "FAILED to find an image from the IPC system.");
@@ -4360,6 +4363,15 @@ namespace golf_sim {
             camera_angles[0] = x_angle_degrees_of_ball_lm_perspective - x_angle_degrees_of_ball_camera_perspective;
             camera_angles[1] = y_angle_degrees_of_ball_lm_perspective - y_angle_degrees_of_ball_camera_perspective;
 
+            const double kMaxReasonableAngle = 45.0;
+            if (std::abs(camera_angles[0]) > kMaxReasonableAngle || std::abs(camera_angles[1]) > kMaxReasonableAngle) {
+                GS_LOG_MSG(error, "GolfSimCamera::DetermineCameraAngles computed invalid camera angles: " +
+                    std::to_string(camera_angles[0]) + ", " + std::to_string(camera_angles[1]) +
+                    " degrees. Angles must be within +/- " + std::to_string(kMaxReasonableAngle) +
+                    " degrees. Rejecting calibration.");
+                return false;
+            }
+
             GS_LOG_TRACE_MSG(trace, "GolfSimCamera::DetermineCameraAngles computed angles to the camera of: " +
                 std::to_string(camera_angles[0]) + ", " +
                 std::to_string(camera_angles[1]));
@@ -4431,10 +4443,24 @@ namespace golf_sim {
             // should be pretty tight
             double expectedRadius = getExpectedBallRadiusPixels(camera.camera_hardware_, camera.camera_hardware_.resolution_x_, distance_direct_to_ball);
 
-            // The problem with calculating the min/max ball radii using a multiplicative ratio, 
+            const double kMaxReasonableRadius = 10000.0;
+            if (expectedRadius <= 0.0 || expectedRadius > kMaxReasonableRadius) {
+                GS_LOG_MSG(error, "GolfSimCamera::AutoCalibrateCamera computed invalid expected ball radius: " +
+                    std::to_string(expectedRadius) + " pixels. Must be positive and less than " +
+                    std::to_string(kMaxReasonableRadius) + " pixels. Rejecting calibration.");
+                return false;
+            }
+
+            // The problem with calculating the min/max ball radii using a multiplicative ratio,
             // is that for smaller expected radii, the range ended up too small.
             ip->min_ball_radius_ = std::max(0, (int)expectedRadius - kMinRadiusOffset);
             ip->max_ball_radius_ = (int)expectedRadius + kMaxRadiusOffset;
+
+            if (ip->max_ball_radius_ <= 0 || ip->max_ball_radius_ > static_cast<int>(kMaxReasonableRadius)) {
+                GS_LOG_MSG(error, "GolfSimCamera::AutoCalibrateCamera computed invalid max_ball_radius: " +
+                    std::to_string(ip->max_ball_radius_) + " pixels. This would cause detection failures. Rejecting calibration.");
+                return false;
+            }
 
             GS_LOG_TRACE_MSG(trace, "Min/Max expected ball radii are: " + std::to_string(ip->min_ball_radius_) + " / " + std::to_string(ip->max_ball_radius_));
 
@@ -4473,8 +4499,23 @@ namespace golf_sim {
                 GS_LOG_MSG(info, calibration_results_message);
             }
 
+            if (number_samples == 0) {
+                GS_LOG_MSG(error, "GolfSimCamera::AutoCalibrateCamera failed: All focal length samples failed. Unable to determine focal length.");
+                return false;
+            }
+
             average_focal_length /= number_samples;
             GS_LOG_MSG(info, "====>  Average Focal Length = " + std::to_string(average_focal_length) + ". Will set this value into the gs_config.json file.");
+
+            const double kMinFocalLength = 2.0;
+            const double kMaxFocalLength = 50.0;
+            if (average_focal_length < kMinFocalLength || average_focal_length > kMaxFocalLength) {
+                GS_LOG_MSG(error, "GolfSimCamera::AutoCalibrateCamera computed invalid focal length: " +
+                    std::to_string(average_focal_length) + " mm. Valid range is " +
+                    std::to_string(kMinFocalLength) + " to " + std::to_string(kMaxFocalLength) +
+                    " mm for typical camera lenses. Rejecting calibration.");
+                return false;
+            }
 
             // Re-set the camera_hardware object's focal length to reflect the real-world focal length we just determined.
             camera.camera_hardware_.focal_length_ = (float)average_focal_length;

@@ -13,6 +13,7 @@
 #include <activemq/library/ActiveMQCPP.h>
 #include <cms/BytesMessage.h>
 #include <cms/BytesMessage.h>
+#include <mutex>
 
 
 #include "gs_events.h"
@@ -38,6 +39,7 @@ namespace golf_sim {
 		static const std::string kGolfSimIPCMessageTypeTag;
 
 		static cv::Mat last_received_image_;
+		static std::mutex last_received_image_mutex_;
 
 		static bool DispatchReceivedIpcMessage(const BytesMessage& message);
 		static bool SendIpcMessage(const GolfSimIPCMessage& ipc_message);

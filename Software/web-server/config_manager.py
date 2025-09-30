@@ -35,6 +35,7 @@ class ConfigurationManager:
             sys_paths.get("userSettingsPath", {}).get("default", "~/.pitrac/config/user_settings.json")
         )
         self.calibration_data_path = expand_path("~/.pitrac/config/calibration_data.json")
+        self.generated_config_path = self.user_settings_path.parent / "generated_golf_sim_config.json"
 
         self.user_settings: Dict[str, Any] = {}
         self.calibration_data: Dict[str, Any] = {}

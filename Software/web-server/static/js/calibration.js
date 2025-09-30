@@ -9,22 +9,52 @@ class CalibrationManager {
         this.calibrationMethod = null;
         this.calibrationInProgress = false;
         this.statusPollInterval = null;
+        this.cameraPollIntervals = new Map();
         this.ballVerified = {
             camera1: false,
             camera2: false
         };
-        
+
         this.init();
+        this.setupPageCleanup();
     }
     
     async init() {
         await this.loadSystemStatus();
-        
+
         await this.loadCalibrationData();
-        
+
         this.setupEventListeners();
-        
+
         this.startStatusPolling();
+    }
+
+    /**
+     * Setup cleanup handlers for page unload
+     */
+    setupPageCleanup() {
+        window.addEventListener('beforeunload', () => {
+            this.cleanup();
+        });
+
+        window.addEventListener('pagehide', () => {
+            this.cleanup();
+        });
+    }
+
+    /**
+     * Cleanup all intervals and resources
+     */
+    cleanup() {
+        if (this.statusPollInterval) {
+            clearInterval(this.statusPollInterval);
+            this.statusPollInterval = null;
+        }
+
+        this.cameraPollIntervals.forEach((intervalId, camera) => {
+            clearInterval(intervalId);
+        });
+        this.cameraPollIntervals.clear();
     }
     
     setupEventListeners() {
@@ -166,28 +196,40 @@ class CalibrationManager {
         this.currentStep = stepNumber;
     }
     
-    async captureImage(camera) {
+    /**
+     * Capture an image from the specified camera
+     * @param {Event} event - The click event from the button
+     * @param {string} camera - Camera identifier (camera1 or camera2)
+     */
+    async captureImage(event, camera) {
+        if (!this.validateCameraName(camera)) {
+            this.showMessage(`Invalid camera name: ${camera}`, 'error');
+            return;
+        }
+
+        const button = event.target;
+        const originalText = button.textContent;
+
         try {
-            const button = event.target;
             button.disabled = true;
             button.textContent = '⏳ Capturing...';
-            
+
             const response = await fetch(`/api/calibration/capture/${camera}`, {
                 method: 'POST'
             });
-            
+
             if (response.ok) {
                 const result = await response.json();
                 if (result.status === 'success') {
                     const img = document.getElementById(`${camera}-image`);
                     img.src = result.image_url;
                     img.style.display = 'block';
-                    
+
                     const placeholder = img.parentElement.querySelector('.camera-placeholder');
                     if (placeholder) {
                         placeholder.style.display = 'none';
                     }
-                    
+
                     this.showMessage(`Image captured for ${camera}`, 'success');
                 } else {
                     this.showMessage(`Failed to capture image: ${result.message}`, 'error');
@@ -199,36 +241,47 @@ class CalibrationManager {
             console.error('Error capturing image:', error);
             this.showMessage('Error capturing image', 'error');
         } finally {
-            const button = event.target;
             button.disabled = false;
-            button.textContent = 'Capture Image';
+            button.textContent = originalText;
         }
     }
     
-    async checkBallLocation(camera) {
+    /**
+     * Check ball location in the camera view
+     * @param {Event} event - The click event from the button
+     * @param {string} camera - Camera identifier (camera1 or camera2)
+     */
+    async checkBallLocation(event, camera) {
+        if (!this.validateCameraName(camera)) {
+            this.showMessage(`Invalid camera name: ${camera}`, 'error');
+            return;
+        }
+
+        const button = event.target;
+        const originalText = button.textContent;
+
         try {
-            const button = event.target;
             button.disabled = true;
             button.textContent = 'Checking...';
-            
+
             const response = await fetch(`/api/calibration/ball-location/${camera}`, {
                 method: 'POST'
             });
-            
+
             if (response.ok) {
                 const result = await response.json();
                 const statusDiv = document.getElementById(`${camera}-ball-status`);
-                
+
                 if (result.ball_found) {
                     statusDiv.className = 'ball-status success';
                     statusDiv.textContent = `Ball detected at position (${result.ball_info?.x || 0}, ${result.ball_info?.y || 0})`;
                     this.ballVerified[camera] = true;
-                    
+
                     const allVerified = this.selectedCameras.every(cam => this.ballVerified[cam]);
                     if (allVerified) {
                         document.getElementById('verify-next').disabled = false;
                         document.getElementById('verification-message').className = 'alert alert-success';
-                        document.getElementById('verification-message').textContent = 
+                        document.getElementById('verification-message').textContent =
                             '✅ Ball placement verified! Ready to proceed with calibration.';
                     }
                 } else {
@@ -243,9 +296,8 @@ class CalibrationManager {
             console.error('Error checking ball location:', error);
             this.showMessage('Error checking ball location', 'error');
         } finally {
-            const button = event.target;
             button.disabled = false;
-            button.textContent = 'Check Ball Location';
+            button.textContent = originalText;
         }
     }
     
@@ -290,11 +342,16 @@ class CalibrationManager {
             
             if (response.ok) {
                 const result = await response.json();
-                
-                this.pollCalibrationProgress(camera);
-                
-                await this.waitForCalibrationCompletion(camera);
-                
+
+                // Only use waitForCalibrationCompletion - it handles polling internally
+                // pollCalibrationProgress is redundant and causes duplicate requests
+                try {
+                    await this.waitForCalibrationCompletion(camera);
+                } catch (timeoutError) {
+                    this.addLogEntry(`${camera} calibration timed out: ${timeoutError.message}`);
+                    throw timeoutError;
+                }
+
                 if (result.status === 'success') {
                     this.addLogEntry(`${camera} calibration completed successfully`);
                     progressBar.style.width = '100%';
@@ -470,6 +527,16 @@ class CalibrationManager {
         entry.textContent = `[${timestamp}] ${message}`;
         logContent.appendChild(entry);
         logContent.scrollTop = logContent.scrollHeight;
+    }
+
+    /**
+     * Validate camera name is valid
+     * @param {string} camera - Camera identifier to validate
+     * @returns {boolean} True if valid camera name
+     */
+    validateCameraName(camera) {
+        const validCameras = ['camera1', 'camera2'];
+        return validCameras.includes(camera);
     }
     
     showMessage(message, type = 'info') {
