@@ -80,9 +80,9 @@ class CalibrationManager:
                 f"--search_center_y={search_y}",
                 f"--logging_level={logging_level}",
                 "--artifact_save_level=all",
-                f"--config_file={self.config_manager.generated_config_path}",
             ]
         )
+        cmd.extend(self._get_common_cli_args())
 
         try:
             result = await self._run_calibration_command(cmd, camera, timeout=30)
@@ -145,9 +145,9 @@ class CalibrationManager:
                 f"--search_center_y={search_y}",
                 f"--logging_level={logging_level}",
                 "--artifact_save_level=all",
-                f"--config_file={self.config_manager.generated_config_path}",
             ]
         )
+        cmd.extend(self._get_common_cli_args())
 
         try:
             result = await self._run_calibration_command(cmd, camera, timeout=120)
@@ -211,9 +211,9 @@ class CalibrationManager:
                 f"--search_center_y={search_y}",
                 f"--logging_level={logging_level}",
                 "--artifact_save_level=all",
-                f"--config_file={self.config_manager.generated_config_path}",
             ]
         )
+        cmd.extend(self._get_common_cli_args())
 
         try:
             result = await self._run_calibration_command(cmd, camera, timeout=180)
@@ -301,6 +301,20 @@ class CalibrationManager:
                 "y_offset": config.get("gs_config", {}).get("cameras", {}).get("kCamera2YOffsetForTilt"),
             },
         }
+
+    def _get_common_cli_args(self) -> list:
+        """Get common CLI arguments used by all calibration commands"""
+        config = self.config_manager.get_config()
+        args = []
+
+        broker_address = (
+            config.get("gs_config", {}).get("ipc_interface", {}).get("kWebActiveMQHostAddress", "tcp://127.0.0.1:61616")
+        )
+        args.append(f"--msg_broker_address={broker_address}")
+
+        args.append(f"--config_file={self.config_manager.generated_config_path}")
+
+        return args
 
     def _build_environment(self, camera: str = "camera1") -> dict:
         """Build environment variables from config
