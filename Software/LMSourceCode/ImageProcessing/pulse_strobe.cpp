@@ -741,6 +741,11 @@ namespace golf_sim {
 			intervals = pulse_intervals_fast_ms_;
 		}
 
+		if (intervals.empty()) {
+			GS_LOG_TRACE_MSG(error, "GetPulseIntervals: pulse intervals vector is empty. Check JSON configuration or InitGPIOSystem() call.");
+			return intervals;
+		}
+
 		if (intervals[intervals.size()-1] > 0.0001) {
 			GS_LOG_TRACE_MSG(warning, "Expected last pulse interval to be 0.  Check .json file.");
 		}
