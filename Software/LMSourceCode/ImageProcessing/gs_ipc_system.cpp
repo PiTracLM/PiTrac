@@ -513,6 +513,7 @@ namespace golf_sim {
 
         GS_LOG_TRACE_MSG(trace, "BuildIpcMessageFromBytesMessage called.");
         GolfSimIPCMessage* ipc_message = nullptr;
+        std::unique_ptr<GolfSimIPCMessage> ipc_message_ptr;
 
         try {
             std::string main_message_type = active_mq_message.getStringProperty(kGolfSimMessageTypeTag);
@@ -532,7 +533,7 @@ namespace golf_sim {
             GS_LOG_TRACE_MSG(trace, "BuildIpcMessageFromBytesMessage converting Active-MQ message of type " + main_message_type +
                                         " and message-type " + std::to_string((int)ipc_message_type) + " to GolfSimIpcMessage");
 
-            std::unique_ptr<GolfSimIPCMessage> ipc_message_ptr(new GolfSimIPCMessage(ipc_message_type));
+            ipc_message_ptr.reset(new GolfSimIPCMessage(ipc_message_type));
             ipc_message = ipc_message_ptr.get();
 
             if (ipc_message == nullptr) {
