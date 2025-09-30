@@ -878,10 +878,8 @@ namespace golf_sim {
         // This may have already been set false, but do so here just in case to
         // ensure that any running loops drop out
         GolfSimGlobals::golf_sim_running_ = false;
-
-        GS_LOG_TRACE_MSG(trace, "Waiting for threads to detect shutdown flag...");
-        std::this_thread::sleep_for(std::chrono::milliseconds(2500));
-        GS_LOG_TRACE_MSG(trace, "Proceeding with thread cleanup...");
+        // Allow other things that might be checking the running flag to do so
+        std::this_thread::yield();
 
         // Clean up any threads that still exist
         // TBD - This is not thread-safe - move to a central function with a lock

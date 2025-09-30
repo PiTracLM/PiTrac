@@ -153,13 +153,27 @@ namespace golf_sim {
 
         GS_LOG_TRACE_MSG(trace, "Active-MQ broker_URI is: " + broker_URI);
 
-        // Initialization order probably doesn't matter, but we will initialize the consumer first to
-        // clear out any messages before the producer starts.
-        consumer_ = GolfSimMessageConsumer::Initialize(broker_URI);
+        // Test modes only need producer (send results), not consumer (receive messages)
+        // Test modes run single-process with static images, so no IPC messages to receive
+        SystemMode mode = GolfSimOptions::GetCommandLineOptions().system_mode_;
+        bool skip_consumer = (mode == SystemMode::kTest ||
+                             mode == SystemMode::kTestSpin ||
+                             mode == SystemMode::kTestExternalSimMessage ||
+                             mode == SystemMode::kTestGSProServer ||
+                             mode == SystemMode::kAutomatedTesting);
 
-        if (!consumer_) {
-            GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem could not Initialize consumer");
-            return false;
+        if (!skip_consumer) {
+            // Initialization order probably doesn't matter, but we will initialize the consumer first to
+            // clear out any messages before the producer starts.
+            consumer_ = GolfSimMessageConsumer::Initialize(broker_URI);
+
+            if (!consumer_) {
+                GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem could not Initialize consumer");
+                return false;
+            }
+        } else {
+            GS_LOG_MSG(info, "Skipping IPC consumer initialization for test mode - only producer needed for sending results");
+            consumer_ = nullptr;
         }
 
         producer_ = GolfSimMessageProducer::Initialize(broker_URI);
@@ -178,13 +192,19 @@ namespace golf_sim {
     bool GolfSimIpcSystem::ShutdownIPCSystem() {
         GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem::ShutdownIPC");
 
-        consumer_->Shutdown();
+        // Consumer may be null if test mode skipped initialization
+        if (consumer_ != nullptr) {
+            consumer_->Shutdown();
+        }
+
         producer_->Shutdown();
 
         // TBD - Give other threads a moment to shut down
         sleep(4);
 
-        delete consumer_;
+        if (consumer_ != nullptr) {
+            delete consumer_;
+        }
         delete producer_;
 
         activemq::library::ActiveMQCPP::shutdownLibrary();
