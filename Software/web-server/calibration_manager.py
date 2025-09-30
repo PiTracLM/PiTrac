@@ -269,9 +269,9 @@ class CalibrationManager:
 
         cmd.extend([
             f"--output_filename={output_path}",
-            "--artifact_save_level=final_results_only",
-            f"--config_file={self.config_manager.generated_config_path}"
+            "--artifact_save_level=final_results_only"
         ])
+        cmd.extend(self._build_cli_args_from_metadata(camera))
 
         try:
             await self._run_calibration_command(cmd, camera, timeout=10)
