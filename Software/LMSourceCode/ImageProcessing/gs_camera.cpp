@@ -2642,7 +2642,7 @@ namespace golf_sim {
                 return -1;
             }
 
-            for (int distance_pattern_offset = 0; distance_pattern_offset <= (int)(pulse_ratios.size() - distance_ratios.size()); distance_pattern_offset++) {
+            for (int distance_pattern_offset = 0; distance_pattern_offset < (int)(pulse_ratios.size() - distance_ratios.size()); distance_pattern_offset++) {
 
                 double difference_in_ratios = ComputeRatioDistance(distance_ratios, pulse_ratios, distance_pattern_offset);
 
@@ -3205,13 +3205,6 @@ namespace golf_sim {
             //
             // The "- 2" deals with having a 0 at the end of the sequence.
             pulse_pause_ratios.clear();
-
-            // Safety check: need at least 2 intervals to compute a ratio
-            if (pulse_pause_intervals.size() < 2) {
-                GS_LOG_MSG(warning, "GetPulseIntervalsAndRatios: Not enough pulse intervals (" +
-                         std::to_string(pulse_pause_intervals.size()) + ") to compute ratios");
-                return false;
-            }
 
             for (size_t i = 0; i < pulse_pause_intervals.size() - 1; i++) {
 
