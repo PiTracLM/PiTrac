@@ -198,21 +198,23 @@ class CalibrationManager {
     
     /**
      * Capture an image from the specified camera
-     * @param {Event} event - The click event from the button
      * @param {string} camera - Camera identifier (camera1 or camera2)
+     * @param {Event} event - The click event from the button (optional)
      */
-    async captureImage(event, camera) {
+    async captureImage(camera, event) {
         if (!this.validateCameraName(camera)) {
             this.showMessage(`Invalid camera name: ${camera}`, 'error');
             return;
         }
 
-        const button = event.target;
-        const originalText = button.textContent;
+        const button = event?.target || event?.currentTarget;
+        const originalText = button?.textContent || 'Capture Image';
 
         try {
-            button.disabled = true;
-            button.textContent = '⏳ Capturing...';
+            if (button) {
+                button.disabled = true;
+                button.textContent = '⏳ Capturing...';
+            }
 
             const response = await fetch(`/api/calibration/capture/${camera}`, {
                 method: 'POST'
@@ -241,28 +243,32 @@ class CalibrationManager {
             console.error('Error capturing image:', error);
             this.showMessage('Error capturing image', 'error');
         } finally {
-            button.disabled = false;
-            button.textContent = originalText;
+            if (button) {
+                button.disabled = false;
+                button.textContent = originalText;
+            }
         }
     }
     
     /**
      * Check ball location in the camera view
-     * @param {Event} event - The click event from the button
      * @param {string} camera - Camera identifier (camera1 or camera2)
+     * @param {Event} event - The click event from the button (optional)
      */
-    async checkBallLocation(event, camera) {
+    async checkBallLocation(camera, event) {
         if (!this.validateCameraName(camera)) {
             this.showMessage(`Invalid camera name: ${camera}`, 'error');
             return;
         }
 
-        const button = event.target;
-        const originalText = button.textContent;
+        const button = event?.target || event?.currentTarget;
+        const originalText = button?.textContent || 'Check Ball Location';
 
         try {
-            button.disabled = true;
-            button.textContent = 'Checking...';
+            if (button) {
+                button.disabled = true;
+                button.textContent = 'Checking...';
+            }
 
             const response = await fetch(`/api/calibration/ball-location/${camera}`, {
                 method: 'POST'
@@ -296,11 +302,13 @@ class CalibrationManager {
             console.error('Error checking ball location:', error);
             this.showMessage('Error checking ball location', 'error');
         } finally {
-            button.disabled = false;
-            button.textContent = originalText;
+            if (button) {
+                button.disabled = false;
+                button.textContent = originalText;
+            }
         }
     }
-    
+
     selectMethod(method) {
         this.calibrationMethod = method;
         
