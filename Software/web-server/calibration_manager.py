@@ -319,9 +319,10 @@ class CalibrationManager:
 
         cli_params = self.config_manager.get_cli_parameters(target)
 
-        # Skip args that we handle separately
+        # Skip args that we handle separately or need special handling
         skip_args = {"--system_mode", "--run_single_pi", "--search_center_x", "--search_center_y",
-                     "--logging_level", "--artifact_save_level", "--cam_still_mode", "--output_filename"}
+                     "--logging_level", "--artifact_save_level", "--cam_still_mode", "--output_filename",
+                     "--config_file"}  # We handle config_file specially below
 
         for param in cli_params:
             key = param["key"]
@@ -354,6 +355,9 @@ class CalibrationManager:
                     value = str(value).replace("~", str(Path.home()))
                 # Use --key=value format for consistency
                 args.append(f"{cli_arg}={value}")
+
+        # Always add the generated config file path
+        args.append(f"--config_file={self.config_manager.generated_config_path}")
 
         return args
 
