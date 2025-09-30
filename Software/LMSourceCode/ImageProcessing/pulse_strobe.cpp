@@ -449,6 +449,7 @@ namespace golf_sim {
                 // camera1 process would already have done so
                 if (GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kCamera1 &&
                     GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kCamera1TestStandalone &&
+                    GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kTest &&
                     !GolfSimOptions::GetCommandLineOptions().camera_still_mode_ &&
                     GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kCamera1AutoCalibrate &&
                     GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kCamera2AutoCalibrate &&
@@ -458,9 +459,16 @@ namespace golf_sim {
 			return true;
 
 		}
-	
+
 
 #ifdef __unix__  // Ignore in Windows environment
+
+		// Skip GPIO hardware initialization in test mode - we only need pulse timing data
+		if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kTest) {
+			GS_LOG_MSG(trace, "PulseStrobe::InitGPIOSystem - Test mode: skipping GPIO hardware init, loading pulse timing only");
+			// Jump to loading pulse intervals from config (after GPIO init section)
+			goto load_pulse_config;
+		}
 
 		if (GolfSimConfiguration::GetPiModel() == GolfSimConfiguration::PiModel::kRPi5) {
 			lggpio_chip_handle_ = lgGpiochipOpen(kRPi5GpioChipNumber);
@@ -511,6 +519,7 @@ namespace golf_sim {
 
 #endif // #ifdef __unix__  // Ignore in Windows environment
 
+	load_pulse_config:
 		// Pull the pulse intervals and strobe-on times from the JSON file each time to allow changes on the fly
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kStrobePulseVectorDriver", pulse_intervals_fast_ms_);
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kStrobePulseVectorPutter", pulse_intervals_slow_ms_);
