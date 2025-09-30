@@ -302,6 +302,36 @@ class CalibrationManager:
             },
         }
 
+    def _build_environment(self, camera: str = "camera1") -> dict:
+        """Build environment variables from config
+
+        Args:
+            camera: Which camera is being calibrated
+
+        Returns:
+            Environment dictionary with required variables
+        """
+        env = os.environ.copy()
+        config = self.config_manager.get_config()
+
+        slot1_type = config.get("gs_config", {}).get("cameras", {}).get("kSystemSlot1CameraType", 4)
+        slot2_type = config.get("gs_config", {}).get("cameras", {}).get("kSystemSlot2CameraType", 4)
+
+        env["PITRAC_SLOT1_CAMERA_TYPE"] = str(slot1_type)
+        env["PITRAC_SLOT2_CAMERA_TYPE"] = str(slot2_type)
+
+        base_dir = config.get("gs_config", {}).get("logging", {}).get("kPCBaseImageLoggingDir", "~/LM_Shares/Images/")
+        env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = str(base_dir).replace("~", str(Path.home()))
+
+        web_share_dir = (
+            config.get("gs_config", {})
+            .get("ipc_interface", {})
+            .get("kWebServerShareDirectory", "~/LM_Shares/WebShare/")
+        )
+        env["PITRAC_WEBSERVER_SHARE_DIR"] = str(web_share_dir).replace("~", str(Path.home()))
+
+        return env
+
     async def _run_calibration_command(self, cmd: List[str], camera: str, timeout: int = 60) -> Dict[str, Any]:
         """
         Run a calibration command with timeout and progress updates
@@ -319,13 +349,16 @@ class CalibrationManager:
         logger.info(f"Running command: {' '.join(cmd)}")
         logger.info(f"Log file: {log_file}")
 
+        # Build environment with required variables from config
+        env = self._build_environment(camera)
+
         async with self._process_lock:
             if camera in self.current_processes:
                 raise Exception(f"A calibration process is already running for {camera}")
 
             try:
                 process = await asyncio.create_subprocess_exec(
-                    *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env={**os.environ}
+                    *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env=env
                 )
 
                 self.current_processes[camera] = process
