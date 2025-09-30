@@ -145,6 +145,7 @@ class CalibrationManager:
                 f"--search_center_y={search_y}",
                 f"--logging_level={logging_level}",
                 "--artifact_save_level=all",
+                "--show_images=0",
             ]
         )
         cmd.extend(self._build_cli_args_from_metadata(camera))
@@ -322,7 +323,7 @@ class CalibrationManager:
         # Skip args that we handle separately or need special handling
         skip_args = {"--system_mode", "--run_single_pi", "--search_center_x", "--search_center_y",
                      "--logging_level", "--artifact_save_level", "--cam_still_mode", "--output_filename",
-                     "--config_file"}  # We handle config_file specially below
+                     "--show_images", "--config_file"}  # We handle config_file specially below
 
         for param in cli_params:
             key = param["key"]
@@ -418,6 +419,10 @@ class CalibrationManager:
 
         # Build environment with required variables from config
         env = self._build_environment(camera)
+
+        # Prepend sudo -E to preserve environment variables and run with elevated privileges
+        # This is required for camera access in single-pi mode
+        cmd = ["sudo", "-E"] + cmd
 
         async with self._process_lock:
             if camera in self.current_processes:

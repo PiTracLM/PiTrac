@@ -197,51 +197,56 @@ class CalibrationManager {
     }
     
     /**
-     * Capture an image from the specified camera
+     * Run auto calibration for the specified camera
      * @param {string} camera - Camera identifier (camera1 or camera2)
      * @param {Event} event - The click event from the button (optional)
      */
-    async captureImage(camera, event) {
+    async runAutoCalibration(camera, event) {
         if (!this.validateCameraName(camera)) {
             this.showMessage(`Invalid camera name: ${camera}`, 'error');
             return;
         }
 
         const button = event?.target || event?.currentTarget;
-        const originalText = button?.textContent || 'Capture Image';
+        const originalText = button?.textContent || 'Calibrate';
 
         try {
             if (button) {
                 button.disabled = true;
-                button.textContent = '⏳ Capturing...';
+                button.textContent = '⏳ Calibrating...';
             }
 
-            const response = await fetch(`/api/calibration/capture/${camera}`, {
+            const response = await fetch(`/api/calibration/auto/${camera}`, {
                 method: 'POST'
             });
 
             if (response.ok) {
                 const result = await response.json();
                 if (result.status === 'success') {
-                    const img = document.getElementById(`${camera}-image`);
-                    img.src = result.image_url;
-                    img.style.display = 'block';
+                    // Display the calibration image if available
+                    if (result.calibration_data && result.calibration_data.image_path) {
+                        const img = document.getElementById(`${camera}-image`);
+                        // Convert the full path to a web-accessible URL
+                        const imageName = result.calibration_data.image_path.split('/').pop();
+                        img.src = `/api/images/${imageName}`;
+                        img.style.display = 'block';
 
-                    const placeholder = img.parentElement.querySelector('.camera-placeholder');
-                    if (placeholder) {
-                        placeholder.style.display = 'none';
+                        const placeholder = img.parentElement.querySelector('.camera-placeholder');
+                        if (placeholder) {
+                            placeholder.style.display = 'none';
+                        }
                     }
 
-                    this.showMessage(`Image captured for ${camera}`, 'success');
+                    this.showMessage(`Calibration successful for ${camera}`, 'success');
                 } else {
-                    this.showMessage(`Failed to capture image: ${result.message}`, 'error');
+                    this.showMessage(`Calibration failed: ${result.message}`, 'error');
                 }
             } else {
-                this.showMessage('Failed to capture image', 'error');
+                this.showMessage('Calibration request failed', 'error');
             }
         } catch (error) {
-            console.error('Error capturing image:', error);
-            this.showMessage('Error capturing image', 'error');
+            console.error('Error running calibration:', error);
+            this.showMessage('Error running calibration', 'error');
         } finally {
             if (button) {
                 button.disabled = false;
