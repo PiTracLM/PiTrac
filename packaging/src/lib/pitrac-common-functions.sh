@@ -501,12 +501,14 @@ install_deb_dependency() {
     log_info "  Installing $package_name from deb package..."
 
     # Use dpkg to install the package, force overwrite if needed for our packages
-    if dpkg -i "$deb_file" 2>/dev/null; then
+    # Set INITRD=No to prevent initramfs-tools from running during package installation
+    # This avoids "failed to determine device for /" errors on Raspberry Pi
+    if INITRD=No dpkg -i "$deb_file" 2>/dev/null; then
         log_success "  $package_name installed successfully"
     else
         # Try to fix dependencies if installation fails
         log_warn "  Attempting to fix dependencies for $package_name..."
-        apt-get -f install -y
+        INITRD=No apt-get -f install -y
 
         # For lgpio conflicts, skip if system version exists
         if [[ "$package_name" == "liblgpio1" ]] && dpkg -l | grep -qE "^ii\s+(liblgpio1|liblgpio-dev)"; then
@@ -515,7 +517,7 @@ install_deb_dependency() {
         fi
 
         # Try again with force for other packages
-        dpkg -i "$deb_file" || {
+        INITRD=No dpkg -i "$deb_file" || {
             log_error "  Failed to install $package_name"
             return 1
         }
