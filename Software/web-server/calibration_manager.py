@@ -315,9 +315,27 @@ class CalibrationManager:
         else:
             cmd.append(f"--system_mode={camera}_ball_location")
 
-        search_x = config.get("calibration", {}).get(f"{camera}_search_center_x", 700)
-        search_y = config.get("calibration", {}).get(f"{camera}_search_center_y", 500)
+        # Get search centers from config using proper dot-notation lookup
+        # Note: Only Camera1 has SearchCenter configs defined in configurations.json
+        if camera == "camera1":
+            search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
+            if search_x is None:
+                search_x = 850  # Default from configurations.json
+            search_y = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterY")
+            if search_y is None:
+                search_y = 500  # Default from configurations.json
+        else:
+            # Camera2 doesn't have SearchCenter in config, use hardcoded defaults
+            search_x = 700
+            search_y = 500
+
         logging_level = config.get("gs_config", {}).get("logging", {}).get("kLoggingLevel", "info")
+
+        # Get camera gain from config using proper dot-notation lookup
+        camera_gain_key = "kCamera1Gain" if camera == "camera1" else "kCamera2Gain"
+        camera_gain = self.config_manager.get_config(f"gs_config.cameras.{camera_gain_key}")
+        if camera_gain is None:
+            camera_gain = "2.0"
 
         cmd.extend(
             [
@@ -325,6 +343,7 @@ class CalibrationManager:
                 f"--search_center_y={search_y}",
                 f"--logging_level={logging_level}",
                 "--artifact_save_level=all",
+                f"--camera_gain={camera_gain}",
             ]
         )
         cmd.extend(self._build_cli_args_from_metadata(camera))
@@ -398,10 +417,21 @@ class CalibrationManager:
         else:
             cmd.append("--system_mode=camera1AutoCalibrate")
 
-        search_x = config.get("calibration", {}).get("camera1_search_center_x", 750)
-        search_y = config.get("calibration", {}).get("camera1_search_center_y", 500)
+        # Get search centers from config using proper dot-notation lookup
+        search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
+        if search_x is None:
+            search_x = 850  # Default from configurations.json
+
+        search_y = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterY")
+        if search_y is None:
+            search_y = 500  # Default from configurations.json
+
         logging_level = config.get("gs_config", {}).get("logging", {}).get("kLoggingLevel", "info")
-        camera_gain = config.get("gs_config", {}).get("cameras", {}).get("kCamera1Gain", "2.0")
+
+        # Get camera gain from config using proper dot-notation lookup
+        camera_gain = self.config_manager.get_config("gs_config.cameras.kCamera1Gain")
+        if camera_gain is None:
+            camera_gain = "2.0"
 
         cmd.extend(
             [
@@ -746,11 +776,27 @@ class CalibrationManager:
         config = self.config_manager.get_config()
         cmd = [self.pitrac_binary, f"--system_mode={camera}AutoCalibrate"]
 
-        search_x = config.get("calibration", {}).get(f"{camera}_search_center_x", 700)
-        search_y = config.get("calibration", {}).get(f"{camera}_search_center_y", 500)
+        # Get search centers from config using proper dot-notation lookup
+        # Note: Only Camera1 has SearchCenter configs defined in configurations.json
+        if camera == "camera1":
+            search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
+            if search_x is None:
+                search_x = 850  # Default from configurations.json
+            search_y = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterY")
+            if search_y is None:
+                search_y = 500  # Default from configurations.json
+        else:
+            # Camera2 doesn't have SearchCenter in config, use hardcoded defaults
+            search_x = 700
+            search_y = 500
+
         logging_level = config.get("gs_config", {}).get("logging", {}).get("kLoggingLevel", "info")
+
+        # Get camera gain from config using proper dot-notation lookup
         camera_gain_key = "kCamera1Gain" if camera == "camera1" else "kCamera2Gain"
-        camera_gain = config.get("gs_config", {}).get("cameras", {}).get(camera_gain_key, "2.0")
+        camera_gain = self.config_manager.get_config(f"gs_config.cameras.{camera_gain_key}")
+        if camera_gain is None:
+            camera_gain = "2.0"
 
         cmd.extend(
             [
@@ -815,11 +861,27 @@ class CalibrationManager:
         else:
             cmd.append(f"--system_mode={camera}Calibrate")
 
-        search_x = config.get("calibration", {}).get(f"{camera}_search_center_x", 700)
-        search_y = config.get("calibration", {}).get(f"{camera}_search_center_y", 500)
+        # Get search centers from config using proper dot-notation lookup
+        # Note: Only Camera1 has SearchCenter configs defined in configurations.json
+        if camera == "camera1":
+            search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
+            if search_x is None:
+                search_x = 850  # Default from configurations.json
+            search_y = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterY")
+            if search_y is None:
+                search_y = 500  # Default from configurations.json
+        else:
+            # Camera2 doesn't have SearchCenter in config, use hardcoded defaults
+            search_x = 700
+            search_y = 500
+
         logging_level = config.get("gs_config", {}).get("logging", {}).get("kLoggingLevel", "info")
+
+        # Get camera gain from config using proper dot-notation lookup
         camera_gain_key = "kCamera1Gain" if camera == "camera1" else "kCamera2Gain"
-        camera_gain = config.get("gs_config", {}).get("cameras", {}).get(camera_gain_key, "2.0")
+        camera_gain = self.config_manager.get_config(f"gs_config.cameras.{camera_gain_key}")
+        if camera_gain is None:
+            camera_gain = "2.0"
 
         cmd.extend(
             [
