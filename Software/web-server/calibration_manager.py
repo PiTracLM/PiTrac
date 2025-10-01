@@ -315,8 +315,6 @@ class CalibrationManager:
         else:
             cmd.append(f"--system_mode={camera}_ball_location")
 
-        # Get search centers from config using proper dot-notation lookup
-        # Note: Only Camera1 has SearchCenter configs defined in configurations.json
         if camera == "camera1":
             search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
             if search_x is None:
@@ -325,13 +323,11 @@ class CalibrationManager:
             if search_y is None:
                 search_y = 500  # Default from configurations.json
         else:
-            # Camera2 doesn't have SearchCenter in config, use hardcoded defaults
             search_x = 700
             search_y = 500
 
         logging_level = config.get("gs_config", {}).get("logging", {}).get("kLoggingLevel", "info")
 
-        # Get camera gain from config using proper dot-notation lookup
         camera_gain_key = "kCamera1Gain" if camera == "camera1" else "kCamera2Gain"
         camera_gain = self.config_manager.get_config(f"gs_config.cameras.{camera_gain_key}")
         if camera_gain is None:
@@ -417,7 +413,6 @@ class CalibrationManager:
         else:
             cmd.append("--system_mode=camera1AutoCalibrate")
 
-        # Get search centers from config using proper dot-notation lookup
         search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
         if search_x is None:
             search_x = 850  # Default from configurations.json
@@ -428,7 +423,6 @@ class CalibrationManager:
 
         logging_level = config.get("gs_config", {}).get("logging", {}).get("kLoggingLevel", "info")
 
-        # Get camera gain from config using proper dot-notation lookup
         camera_gain = self.config_manager.get_config("gs_config.cameras.kCamera1Gain")
         if camera_gain is None:
             camera_gain = "2.0"
@@ -487,7 +481,9 @@ class CalibrationManager:
 
             # Check if output contains failure messages even if exit code was 0
             if output and self._check_calibration_failed(output):
-                logger.warning(f"{camera}: Detected calibration failure in output despite exit code {process.returncode}")
+                logger.warning(
+                    f"{camera}: Detected calibration failure in output despite exit code {process.returncode}"
+                )
                 completion_result["completed"] = False
                 completion_result["method"] = "output_parse"
 
@@ -776,8 +772,6 @@ class CalibrationManager:
         config = self.config_manager.get_config()
         cmd = [self.pitrac_binary, f"--system_mode={camera}AutoCalibrate"]
 
-        # Get search centers from config using proper dot-notation lookup
-        # Note: Only Camera1 has SearchCenter configs defined in configurations.json
         if camera == "camera1":
             search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
             if search_x is None:
@@ -792,7 +786,6 @@ class CalibrationManager:
 
         logging_level = config.get("gs_config", {}).get("logging", {}).get("kLoggingLevel", "info")
 
-        # Get camera gain from config using proper dot-notation lookup
         camera_gain_key = "kCamera1Gain" if camera == "camera1" else "kCamera2Gain"
         camera_gain = self.config_manager.get_config(f"gs_config.cameras.{camera_gain_key}")
         if camera_gain is None:
@@ -861,8 +854,6 @@ class CalibrationManager:
         else:
             cmd.append(f"--system_mode={camera}Calibrate")
 
-        # Get search centers from config using proper dot-notation lookup
-        # Note: Only Camera1 has SearchCenter configs defined in configurations.json
         if camera == "camera1":
             search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
             if search_x is None:
@@ -871,13 +862,11 @@ class CalibrationManager:
             if search_y is None:
                 search_y = 500  # Default from configurations.json
         else:
-            # Camera2 doesn't have SearchCenter in config, use hardcoded defaults
             search_x = 700
             search_y = 500
 
         logging_level = config.get("gs_config", {}).get("logging", {}).get("kLoggingLevel", "info")
 
-        # Get camera gain from config using proper dot-notation lookup
         camera_gain_key = "kCamera1Gain" if camera == "camera1" else "kCamera2Gain"
         camera_gain = self.config_manager.get_config(f"gs_config.cameras.{camera_gain_key}")
         if camera_gain is None:
