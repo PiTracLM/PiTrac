@@ -131,7 +131,7 @@ class CalibrationManager {
 
             if (data.camera1.angles && Array.isArray(data.camera1.angles)) {
                 this.addCalibrationDataItem(container, 'Camera 1 Angles',
-                    `[${data.camera1.angles.map(a => a.toFixed(2)).join(', ')}]`);
+                    `[${data.camera1.angles.map(a => parseFloat(a).toFixed(2)).join(', ')}]`);
             } else {
                 this.addCalibrationDataItem(container, 'Camera 1 Angles', 'Not set');
             }
@@ -143,7 +143,7 @@ class CalibrationManager {
 
             if (data.camera2.angles && Array.isArray(data.camera2.angles)) {
                 this.addCalibrationDataItem(container, 'Camera 2 Angles',
-                    `[${data.camera2.angles.map(a => a.toFixed(2)).join(', ')}]`);
+                    `[${data.camera2.angles.map(a => parseFloat(a).toFixed(2)).join(', ')}]`);
             } else {
                 this.addCalibrationDataItem(container, 'Camera 2 Angles', 'Not set');
             }
@@ -499,7 +499,7 @@ class CalibrationManager {
 
                     if (data.camera1.angles && Array.isArray(data.camera1.angles)) {
                         document.getElementById('camera1-angles').textContent =
-                            `[${data.camera1.angles.map(a => a.toFixed(2)).join(', ')}]`;
+                            `[${data.camera1.angles.map(a => parseFloat(a).toFixed(2)).join(', ')}]`;
                     } else {
                         document.getElementById('camera1-angles').textContent = '--';
                     }
@@ -527,7 +527,7 @@ class CalibrationManager {
 
                     if (data.camera2.angles && Array.isArray(data.camera2.angles)) {
                         document.getElementById('camera2-angles').textContent =
-                            `[${data.camera2.angles.map(a => a.toFixed(2)).join(', ')}]`;
+                            `[${data.camera2.angles.map(a => parseFloat(a).toFixed(2)).join(', ')}]`;
                     } else {
                         document.getElementById('camera2-angles').textContent = '--';
                     }
