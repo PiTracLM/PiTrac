@@ -1,136 +1,107 @@
 #!/bin/bash
-# Script to uninstall tar.gz-based dependencies from previous installations
-# This prepares the system for the new deb-based installation
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Copyright (C) 2022-2025, Verdant Consultants, LLC.
+#
+# Uninstall Tarball-Based Dependencies
+#
+# This script removes old tarball-based installations from /opt/
+# that conflict with the new DEB package installations in /usr/
 
-set -euo pipefail
+set -e
 
-# Color output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh"
 
-log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
-log_success() { echo -e "${GREEN}[✓]${NC} $*"; }
+echo "========================================="
+echo "PiTrac Tarball Dependency Removal"
+echo "========================================="
+echo
 
-# Check if running with sudo
+# Check if running as root
 if [[ $EUID -ne 0 ]]; then
-    log_error "This script must be run with sudo privileges"
-    log_info "Please run: sudo $0"
-    exit 1
+   log_error "This script must be run as root (use sudo)"
+   exit 1
 fi
 
-log_info "Uninstalling tar.gz-based dependencies from previous PiTrac installations"
-echo ""
+# Track if anything was removed
+REMOVED_ANYTHING=false
 
-# Remove libraries from /usr/lib/pitrac
-if [[ -d /usr/lib/pitrac ]]; then
-    log_info "Cleaning /usr/lib/pitrac libraries..."
+# Check for old tarball installations
+if [[ -d "/opt/opencv" ]]; then
+    log_warn "Found tarball-based OpenCV installation in /opt/opencv"
+    log_warn "This conflicts with DEB package installation in /usr/"
+    read -p "Remove /opt/opencv? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        log_info "Removing /opt/opencv..."
+        rm -rf /opt/opencv
+        REMOVED_ANYTHING=true
+        log_success "Removed /opt/opencv"
+    else
+        log_info "Skipped /opt/opencv removal"
+    fi
+fi
 
-    # Remove OpenCV libraries
-    rm -f /usr/lib/pitrac/libopencv*.so* 2>/dev/null || true
+if [[ -d "/opt/activemq-cpp" ]]; then
+    log_warn "Found tarball-based ActiveMQ-CPP installation in /opt/activemq-cpp"
+    log_warn "This conflicts with DEB package installation in /usr/"
+    read -p "Remove /opt/activemq-cpp? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        log_info "Removing /opt/activemq-cpp..."
+        rm -rf /opt/activemq-cpp
+        REMOVED_ANYTHING=true
+        log_success "Removed /opt/activemq-cpp"
+    else
+        log_info "Skipped /opt/activemq-cpp removal"
+    fi
+fi
 
-    # Remove ActiveMQ-CPP libraries
-    rm -f /usr/lib/pitrac/libactivemq*.so* 2>/dev/null || true
+if [[ -d "/opt/lgpio" ]]; then
+    log_warn "Found tarball-based lgpio installation in /opt/lgpio"
+    log_warn "This conflicts with DEB package installation in /usr/"
+    read -p "Remove /opt/lgpio? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        log_info "Removing /opt/lgpio..."
+        rm -rf /opt/lgpio
+        REMOVED_ANYTHING=true
+        log_success "Removed /opt/lgpio"
+    else
+        log_info "Skipped /opt/lgpio removal"
+    fi
+fi
 
-    # Remove lgpio libraries
-    rm -f /usr/lib/pitrac/liblgpio*.so* 2>/dev/null || true
+if [[ -d "/opt/msgpack" ]]; then
+    log_warn "Found tarball-based msgpack installation in /opt/msgpack"
+    log_warn "This conflicts with DEB package installation in /usr/"
+    read -p "Remove /opt/msgpack? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        log_info "Removing /opt/msgpack..."
+        rm -rf /opt/msgpack
+        REMOVED_ANYTHING=true
+        log_success "Removed /opt/msgpack"
+    else
+        log_info "Skipped /opt/msgpack removal"
+    fi
+fi
 
-    log_success "Cleaned /usr/lib/pitrac"
+# Update library cache if anything was removed
+if [[ "$REMOVED_ANYTHING" == "true" ]]; then
+    log_info "Updating library cache..."
+    ldconfig
+    log_success "Library cache updated"
+
+    echo
+    log_success "Tarball dependencies removed"
+    log_info "Next steps:"
+    log_info "  1. Clean build directory: cd ~/PiTrac/Software/LMSourceCode/ImageProcessing && rm -rf build"
+    log_info "  2. Rebuild: cd ~/PiTrac/packaging && sudo ./build.sh dev"
 else
-    log_info "/usr/lib/pitrac not found - skipping"
+    log_info "No tarball installations found in /opt/"
 fi
 
-# Remove lgpio files installed by tar.gz extraction
-log_info "Removing lgpio files from system locations..."
-# Headers
-rm -f /usr/include/lgpio.h /usr/include/rgpio.h 2>/dev/null || true
-rm -f /usr/local/include/lgpio.h /usr/local/include/rgpio.h 2>/dev/null || true
-# Libraries
-rm -f /usr/lib/liblgpio.so* /usr/lib/librgpio.so* 2>/dev/null || true
-rm -f /usr/local/lib/liblgpio.so* /usr/local/lib/librgpio.so* 2>/dev/null || true
-# Binaries
-rm -f /usr/bin/rgpiod /usr/bin/rgs 2>/dev/null || true
-rm -f /usr/local/bin/rgpiod /usr/local/bin/rgs 2>/dev/null || true
-# Man pages
-rm -rf /usr/share/man/man1/rgs.1* 2>/dev/null || true
-rm -rf /usr/share/man/man3/lgpio.3* /usr/share/man/man3/rgpio.3* 2>/dev/null || true
-rm -rf /usr/local/share/man/man1/rgs.1* 2>/dev/null || true
-rm -rf /usr/local/share/man/man3/lgpio.3* /usr/local/share/man/man3/rgpio.3* 2>/dev/null || true
-log_success "Removed lgpio files"
-
-# Remove msgpack headers (header-only library)
-log_info "Removing msgpack-cxx headers..."
-rm -rf /usr/include/msgpack* 2>/dev/null || true
-rm -rf /usr/local/include/msgpack* 2>/dev/null || true
-rm -rf /usr/include/msgpack.hpp 2>/dev/null || true
-rm -rf /usr/local/include/msgpack.hpp 2>/dev/null || true
-log_success "Removed msgpack headers"
-
-# Remove ActiveMQ-CPP headers and libraries
-log_info "Removing ActiveMQ-CPP files from system locations..."
-rm -rf /usr/include/activemq-cpp* 2>/dev/null || true
-rm -rf /usr/local/include/activemq-cpp* 2>/dev/null || true
-rm -f /usr/lib/libactivemq-cpp.so* 2>/dev/null || true
-rm -f /usr/local/lib/libactivemq-cpp.so* 2>/dev/null || true
-log_success "Removed ActiveMQ-CPP files"
-
-# Remove OpenCV files if installed from tar.gz (be careful not to remove system opencv)
-log_info "Removing custom OpenCV 4.11 installation..."
-# Only remove if it's our custom version (4.11)
-if [[ -d /usr/include/opencv4 ]] && grep -q "4.11" /usr/include/opencv4/opencv2/core/version.hpp 2>/dev/null; then
-    rm -rf /usr/include/opencv4 2>/dev/null || true
-    log_success "Removed OpenCV 4.11 headers"
-fi
-if [[ -d /usr/local/include/opencv4 ]] && grep -q "4.11" /usr/local/include/opencv4/opencv2/core/version.hpp 2>/dev/null; then
-    rm -rf /usr/local/include/opencv4 2>/dev/null || true
-fi
-# Remove OpenCV libraries with version 4.11
-rm -f /usr/lib/libopencv*4.11*.so* 2>/dev/null || true
-rm -f /usr/local/lib/libopencv*4.11*.so* 2>/dev/null || true
-
-# Remove extracted headers from /opt
-if [[ -d /opt/opencv ]]; then
-    log_info "Removing /opt/opencv..."
-    rm -rf /opt/opencv
-    log_success "Removed /opt/opencv"
-else
-    log_info "/opt/opencv not found - skipping"
-fi
-
-if [[ -d /opt/activemq-cpp ]]; then
-    log_info "Removing /opt/activemq-cpp..."
-    rm -rf /opt/activemq-cpp
-    log_success "Removed /opt/activemq-cpp"
-else
-    log_info "/opt/activemq-cpp not found - skipping"
-fi
-
-# Remove any custom pkg-config files that may have been created
-if [[ -d /usr/lib/pkgconfig ]]; then
-    log_info "Cleaning custom pkg-config files..."
-    rm -f /usr/lib/pkgconfig/opencv4.pc 2>/dev/null || true
-    rm -f /usr/lib/pkgconfig/activemq-cpp.pc 2>/dev/null || true
-    rm -f /usr/lib/pkgconfig/lgpio.pc 2>/dev/null || true
-fi
-
-if [[ -d /usr/local/lib/pkgconfig ]]; then
-    rm -f /usr/local/lib/pkgconfig/opencv4.pc 2>/dev/null || true
-    rm -f /usr/local/lib/pkgconfig/activemq-cpp.pc 2>/dev/null || true
-    rm -f /usr/local/lib/pkgconfig/lgpio.pc 2>/dev/null || true
-fi
-
-# Update library cache
-log_info "Updating library cache..."
-ldconfig
-
-log_success "Tar.gz-based dependencies uninstalled"
-echo ""
-echo "The system is now ready for deb package installation."
-echo "You can now run: sudo ./build.sh dev"
-echo ""
-echo "Note: This script only removes the old dependency installations."
-echo "      PiTrac binaries and configuration files were not touched."
+echo
+echo "Done!"

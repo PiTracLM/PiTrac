@@ -451,6 +451,43 @@ build_dev() {
     mkdir -p ClosedSourceObjectFiles
     touch ClosedSourceObjectFiles/gs_e6_response.cpp.o
 
+    # ========================================================================
+    # Detect stale build directory from tarball/Docker installation
+    # ========================================================================
+    # Issue: If build directory was created when using tarball extraction to /opt/,
+    # Meson caches those paths. When switching to DEB packages (which install to
+    # /usr/lib/aarch64-linux-gnu/), the cached paths cause linker failures.
+    #
+    # Solution: Detect /opt/ paths in build.ninja and force rebuild if DEB packages
+    # are installed (which use /usr/ paths instead).
+    # ========================================================================
+    if [[ -f "build/build.ninja" ]]; then
+        if grep -q "/opt/opencv\|/opt/activemq" build/build.ninja 2>/dev/null; then
+            # Check if DEB packages are installed (they use /usr/, not /opt/)
+            if dpkg -l 2>/dev/null | grep -qE "^ii\s+(libopencv4\.11|libactivemq-cpp)\s"; then
+                log_warn "Detected build directory with /opt/ paths but DEB packages use /usr/"
+                log_warn "This causes linker failures - cached paths are stale"
+                log_info "Automatically cleaning build directory for compatibility..."
+                rm -rf build
+                FORCE_REBUILD="true"
+
+                # Warn if old /opt/ installations still exist alongside DEB packages
+                if [[ -d "/opt/opencv" ]] || [[ -d "/opt/activemq-cpp" ]]; then
+                    echo
+                    log_warn "Old tarball installations detected in /opt/ alongside DEB packages"
+                    log_warn "This may cause runtime library conflicts"
+                    log_info "Recommended: Run 'sudo ./uninstall-tar-deps.sh' to remove old installations"
+                    echo
+                fi
+            elif [[ ! -d "/opt/opencv" ]] && [[ ! -d "/opt/activemq-cpp" ]]; then
+                log_warn "Detected build directory expects /opt/ libraries but they don't exist"
+                log_info "Cleaning build directory - will reconfigure for system paths..."
+                rm -rf build
+                FORCE_REBUILD="true"
+            fi
+        fi
+    fi
+
     # Determine if we need a clean build
     if [[ "$FORCE_REBUILD" == "true" ]]; then
         log_info "Force rebuild requested - cleaning build directory..."
