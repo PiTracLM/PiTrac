@@ -363,11 +363,65 @@ build_dev() {
         missing_deps+=("activemq")
     fi
 
+    # ========================================================================
+    # Fix initramfs-tools configuration issues on Raspberry Pi
+    # ========================================================================
+    # Issue: Recent Pi OS images (2024-11-13+) changed MODULES=dep which causes
+    # "failed to determine device for /" errors during initramfs generation
+    # Reference: https://github.com/RPi-Distro/repo/issues/382
+    #
+    # Solution: Change back to MODULES=most for proper Pi support (including NVMe boot)
+    # ========================================================================
+
+    local initramfs_conf="/etc/initramfs-tools/initramfs.conf"
+    if [[ -f "$initramfs_conf" ]]; then
+        if grep -q "^MODULES=dep" "$initramfs_conf"; then
+            log_warn "Detected problematic MODULES=dep in initramfs configuration"
+            log_info "Fixing initramfs.conf for Raspberry Pi compatibility..."
+            sed -i.bak 's/^MODULES=dep/MODULES=most/' "$initramfs_conf"
+            log_success "Changed MODULES=dep to MODULES=most"
+
+            # If initramfs-tools is in a broken state, try to fix it now
+            if dpkg -l | grep -E "^[a-z]F\s+initramfs-tools"; then
+                log_info "Attempting to repair initramfs-tools package..."
+                if dpkg --configure initramfs-tools 2>&1 | tee /tmp/initramfs-fix.log; then
+                    log_success "initramfs-tools repaired successfully"
+                else
+                    log_warn "initramfs-tools still has issues, will use INITRD=No fallback"
+                fi
+            fi
+        elif grep -q "^MODULES=most" "$initramfs_conf"; then
+            log_info "initramfs.conf already correctly configured (MODULES=most)"
+        else
+            log_warn "initramfs.conf has non-standard MODULES setting"
+            log_info "Adding MODULES=most to initramfs.conf..."
+            sed -i.bak '/^#.*MODULES/a MODULES=most' "$initramfs_conf"
+            log_success "Set MODULES=most in initramfs.conf"
+        fi
+    else
+        log_warn "initramfs.conf not found, will use INITRD=No for package operations"
+    fi
+
+    # Fix any remaining broken packages
+    log_info "Checking for broken package states..."
+    if dpkg -l | grep -qE "^[a-z][^i]"; then
+        log_warn "Found packages in broken state, attempting repair..."
+        # Try normal configure first (now that initramfs.conf is fixed)
+        if ! dpkg --configure -a 2>&1; then
+            log_warn "Normal repair failed, using INITRD=No fallback..."
+            INITRD=No dpkg --configure -a 2>&1 || true
+        fi
+        log_success "Package state cleanup complete"
+    else
+        log_info "No broken packages detected"
+    fi
+
     if [ ${#missing_deps[@]} -gt 0 ]; then
         log_warn "Missing build dependencies: ${missing_deps[*]}"
         log_info "Installing missing dependencies..."
         apt-get update
-        apt-get install -y "${missing_deps[@]}"
+        # Use INITRD=No as safety measure - these are just libraries, not kernel modules
+        INITRD=No apt-get install -y "${missing_deps[@]}"
     fi
 
     log_info "Installing pre-built dependencies..."

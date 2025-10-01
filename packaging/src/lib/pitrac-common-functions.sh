@@ -501,8 +501,9 @@ install_deb_dependency() {
     log_info "  Installing $package_name from deb package..."
 
     # Use dpkg to install the package, force overwrite if needed for our packages
-    # Set INITRD=No to prevent initramfs-tools from running during package installation
-    # This avoids "failed to determine device for /" errors on Raspberry Pi
+    # INITRD=No prevents initramfs regeneration during library package installation
+    # This is safe because libraries (OpenCV, ActiveMQ, lgpio, etc.) don't require initramfs
+    # and it avoids triggering Pi OS initramfs.conf bugs (MODULES=dep issue)
     if INITRD=No dpkg -i "$deb_file" 2>/dev/null; then
         log_success "  $package_name installed successfully"
     else
