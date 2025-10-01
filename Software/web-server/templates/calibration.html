@@ -96,14 +96,14 @@
                         <div class="camera-preview">
                             <img id="camera1-image" src="" alt="Camera 1 preview" style="display: none;">
                             <div class="camera-placeholder">
-                                <p>Click "Capture Image" to verify setup</p>
+                                <p>Click "Calibrate Camera 1" to verify setup</p>
                             </div>
                         </div>
                         <div class="camera-controls">
-                            <button class="btn btn-primary" onclick="calibration.runAutoCalibration('camera1')">
+                            <button class="btn btn-primary" onclick="calibration.runAutoCalibration('camera1', event)">
                                 Calibrate Camera 1
                             </button>
-                            <button class="btn btn-secondary" onclick="calibration.checkBallLocation('camera1')">
+                            <button class="btn btn-secondary" onclick="calibration.checkBallLocation('camera1', event)">
                                 Check Ball Location
                             </button>
                         </div>
@@ -115,14 +115,14 @@
                         <div class="camera-preview">
                             <img id="camera2-image" src="" alt="Camera 2 preview" style="display: none;">
                             <div class="camera-placeholder">
-                                <p>Click "Capture Image" to verify setup</p>
+                                <p>Click "Calibrate Camera 2" to verify setup</p>
                             </div>
                         </div>
                         <div class="camera-controls">
-                            <button class="btn btn-primary" onclick="calibration.runAutoCalibration('camera2')">
+                            <button class="btn btn-primary" onclick="calibration.runAutoCalibration('camera2', event)">
                                 Calibrate Camera 2
                             </button>
-                            <button class="btn btn-secondary" onclick="calibration.checkBallLocation('camera2')">
+                            <button class="btn btn-secondary" onclick="calibration.checkBallLocation('camera2', event)">
                                 Check Ball Location
                             </button>
                         </div>

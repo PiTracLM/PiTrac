@@ -220,7 +220,7 @@ class CalibrationManager {
         try {
             if (button) {
                 button.disabled = true;
-                button.textContent = '⏳ Calibrating...';
+                button.textContent = 'Calibrating...';
             }
 
             const response = await fetch(`/api/calibration/auto/${camera}`, {

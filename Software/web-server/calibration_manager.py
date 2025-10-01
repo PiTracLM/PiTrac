@@ -401,6 +401,7 @@ class CalibrationManager:
         search_x = config.get("calibration", {}).get("camera1_search_center_x", 750)
         search_y = config.get("calibration", {}).get("camera1_search_center_y", 500)
         logging_level = config.get("gs_config", {}).get("logging", {}).get("kLoggingLevel", "info")
+        camera_gain = config.get("gs_config", {}).get("cameras", {}).get("kCamera1Gain", "2.0")
 
         cmd.extend(
             [
@@ -409,6 +410,7 @@ class CalibrationManager:
                 f"--logging_level={logging_level}",
                 "--artifact_save_level=all",
                 "--show_images=0",
+                f"--camera_gain={camera_gain}",
             ]
         )
         cmd.extend(self._build_cli_args_from_metadata(camera))
@@ -452,6 +454,12 @@ class CalibrationManager:
                     output = remaining_output.decode() if remaining_output else ""
             except Exception as e:
                 logger.debug(f"Could not read remaining output: {e}")
+
+            # Check if output contains failure messages even if exit code was 0
+            if output and self._check_calibration_failed(output):
+                logger.warning(f"{camera}: Detected calibration failure in output despite exit code {process.returncode}")
+                completion_result["completed"] = False
+                completion_result["method"] = "output_parse"
 
             with open(log_file, "w") as f:
                 f.write(f"Completion method: {completion_result['method']}\n")
@@ -641,6 +649,14 @@ class CalibrationManager:
             except Exception as e:
                 logger.debug(f"Could not read background output: {e}")
 
+            # Check if output contains failure messages even if exit code was 0
+            if fg_output and self._check_calibration_failed(fg_output):
+                logger.warning(
+                    f"{camera}: Detected calibration failure in output despite exit code {foreground_process.returncode}"
+                )
+                completion_result["completed"] = False
+                completion_result["method"] = "output_parse"
+
             with open(log_file_fg, "w") as f:
                 f.write(f"Completion method: {completion_result['method']}\n")
                 f.write(f"API success: {completion_result['api_success']}\n")
@@ -733,6 +749,8 @@ class CalibrationManager:
         search_x = config.get("calibration", {}).get(f"{camera}_search_center_x", 700)
         search_y = config.get("calibration", {}).get(f"{camera}_search_center_y", 500)
         logging_level = config.get("gs_config", {}).get("logging", {}).get("kLoggingLevel", "info")
+        camera_gain_key = "kCamera1Gain" if camera == "camera1" else "kCamera2Gain"
+        camera_gain = config.get("gs_config", {}).get("cameras", {}).get(camera_gain_key, "2.0")
 
         cmd.extend(
             [
@@ -741,23 +759,32 @@ class CalibrationManager:
                 f"--logging_level={logging_level}",
                 "--artifact_save_level=all",
                 "--show_images=0",
+                f"--camera_gain={camera_gain}",
             ]
         )
         cmd.extend(self._build_cli_args_from_metadata(camera))
 
         result = await self._run_calibration_command(cmd, camera, timeout=int(timeout))
-        calibration_data = self._parse_calibration_results(result.get("output", ""))
+        output = result.get("output", "")
+
+        # Check for failure messages in output
+        if self._check_calibration_failed(output):
+            self.calibration_status[camera]["status"] = "failed"
+            self.calibration_status[camera]["message"] = "Calibration failed - no ball detected"
+            return {"status": "failed", "message": "Calibration failed - no ball detected", "output": output}
+
+        calibration_data = self._parse_calibration_results(output)
 
         if calibration_data:
             self.calibration_status[camera]["status"] = "completed"
             self.calibration_status[camera]["message"] = "Calibration successful"
             self.calibration_status[camera]["progress"] = 100
             self.config_manager.reload()
-            return {"status": "success", "calibration_data": calibration_data, "output": result.get("output", "")}
+            return {"status": "success", "calibration_data": calibration_data, "output": output}
         else:
             self.calibration_status[camera]["status"] = "failed"
             self.calibration_status[camera]["message"] = "Calibration failed - check logs"
-            return {"status": "failed", "message": "Calibration failed", "output": result.get("output", "")}
+            return {"status": "failed", "message": "Calibration failed", "output": output}
 
     async def run_manual_calibration(self, camera: str = "camera1") -> Dict[str, Any]:
         """
@@ -791,6 +818,8 @@ class CalibrationManager:
         search_x = config.get("calibration", {}).get(f"{camera}_search_center_x", 700)
         search_y = config.get("calibration", {}).get(f"{camera}_search_center_y", 500)
         logging_level = config.get("gs_config", {}).get("logging", {}).get("kLoggingLevel", "info")
+        camera_gain_key = "kCamera1Gain" if camera == "camera1" else "kCamera2Gain"
+        camera_gain = config.get("gs_config", {}).get("cameras", {}).get(camera_gain_key, "2.0")
 
         cmd.extend(
             [
@@ -798,14 +827,22 @@ class CalibrationManager:
                 f"--search_center_y={search_y}",
                 f"--logging_level={logging_level}",
                 "--artifact_save_level=all",
+                f"--camera_gain={camera_gain}",
             ]
         )
         cmd.extend(self._build_cli_args_from_metadata(camera))
 
         try:
             result = await self._run_calibration_command(cmd, camera, timeout=180)
+            output = result.get("output", "")
 
-            calibration_data = self._parse_calibration_results(result.get("output", ""))
+            # Check for failure messages in output
+            if self._check_calibration_failed(output):
+                self.calibration_status[camera]["status"] = "failed"
+                self.calibration_status[camera]["message"] = "Manual calibration failed - no ball detected"
+                return {"status": "failed", "message": "Manual calibration failed - no ball detected", "output": output}
+
+            calibration_data = self._parse_calibration_results(output)
 
             if calibration_data:
                 self.calibration_status[camera]["status"] = "completed"
@@ -814,11 +851,11 @@ class CalibrationManager:
 
                 self.config_manager.reload()
 
-                return {"status": "success", "calibration_data": calibration_data, "output": result.get("output", "")}
+                return {"status": "success", "calibration_data": calibration_data, "output": output}
             else:
                 self.calibration_status[camera]["status"] = "failed"
                 self.calibration_status[camera]["message"] = "Manual calibration failed"
-                return {"status": "failed", "message": "Manual calibration failed", "output": result.get("output", "")}
+                return {"status": "failed", "message": "Manual calibration failed", "output": output}
 
         except Exception as e:
             logger.error(f"Manual calibration failed: {e}")
@@ -1102,6 +1139,28 @@ class CalibrationManager:
                 results["complete"] = True
 
         return results if results else None
+
+    def _check_calibration_failed(self, output: str) -> bool:
+        """Check if output contains calibration failure messages
+
+        Args:
+            output: Command output to check
+
+        Returns:
+            True if calibration failed
+        """
+        failure_indicators = [
+            "Failed to AutoCalibrateCamera",
+            "ONNX detection failed - no balls found",
+            "GetBall() failed to get a ball",
+            "Could not DetermineFocalLengthForAutoCalibration",
+        ]
+
+        for indicator in failure_indicators:
+            if indicator in output:
+                return True
+
+        return False
 
     async def stop_calibration(self, camera: Optional[str] = None) -> Dict[str, Any]:
         """Stop running calibration process(es)
