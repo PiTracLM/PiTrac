@@ -19,12 +19,15 @@ class TestCalibrationManagerInitialization:
     def test_init_with_defaults(self):
         """Test CalibrationManager initialization with default parameters"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
 
         manager = CalibrationManager(mock_config_manager)
 
         assert manager.config_manager == mock_config_manager
         assert manager.pitrac_binary == "/usr/lib/pitrac/pitrac_lm"
-        assert manager.current_process is None
+        assert isinstance(manager.current_processes, dict)
+        assert len(manager.current_processes) == 0
         assert isinstance(manager.calibration_status, dict)
         assert "camera1" in manager.calibration_status
         assert "camera2" in manager.calibration_status
@@ -33,6 +36,8 @@ class TestCalibrationManagerInitialization:
     def test_init_with_custom_binary(self):
         """Test initialization with custom binary path"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         custom_binary = "/custom/path/pitrac_lm"
 
         manager = CalibrationManager(mock_config_manager, custom_binary)
@@ -42,6 +47,8 @@ class TestCalibrationManagerInitialization:
     def test_initial_calibration_status(self):
         """Test that initial calibration status is properly set"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         manager = CalibrationManager(mock_config_manager)
 
         for camera in ["camera1", "camera2"]:
@@ -54,6 +61,8 @@ class TestCalibrationManagerInitialization:
     def test_log_directory_creation(self):
         """Test that log directory is created correctly"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         manager = CalibrationManager(mock_config_manager)
 
         expected_log_dir = Path.home() / ".pitrac" / "logs"
@@ -67,6 +76,8 @@ class TestCalibrationManagerStatus:
     def test_get_status(self):
         """Test getting calibration status"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         manager = CalibrationManager(mock_config_manager)
 
         status = manager.get_status()
@@ -84,6 +95,8 @@ class TestCalibrationManagerStatus:
     def test_status_updates_during_operation(self):
         """Test that status is updated during operations"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
 
         manager = CalibrationManager(mock_config_manager)
@@ -106,15 +119,15 @@ class TestCalibrationDataRetrieval:
     def test_get_calibration_data_basic(self):
         """Test getting calibration data from config"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {
             "gs_config": {
                 "cameras": {
                     "kCamera1FocalLength": 1000.0,
-                    "kCamera1XOffsetForTilt": 10.5,
-                    "kCamera1YOffsetForTilt": -5.2,
+                    "kCamera1Angles": [10.5, -5.2],
                     "kCamera2FocalLength": 1050.0,
-                    "kCamera2XOffsetForTilt": 8.7,
-                    "kCamera2YOffsetForTilt": -3.1,
+                    "kCamera2Angles": [8.7, -3.1],
                 }
             }
         }
@@ -126,21 +139,21 @@ class TestCalibrationDataRetrieval:
         assert "camera2" in data
 
         assert data["camera1"]["focal_length"] == 1000.0
-        assert data["camera1"]["x_offset"] == 10.5
-        assert data["camera1"]["y_offset"] == -5.2
+        assert data["camera1"]["angles"] == [10.5, -5.2]
 
         assert data["camera2"]["focal_length"] == 1050.0
-        assert data["camera2"]["x_offset"] == 8.7
-        assert data["camera2"]["y_offset"] == -3.1
+        assert data["camera2"]["angles"] == [8.7, -3.1]
 
     def test_get_calibration_data_missing_values(self):
         """Test getting calibration data when some values are missing"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {
             "gs_config": {
                 "cameras": {
                     "kCamera1FocalLength": 1000.0,
-                    "kCamera2XOffsetForTilt": 8.7,
+                    "kCamera2Angles": [8.7, -3.1],
                 }
             }
         }
@@ -149,16 +162,16 @@ class TestCalibrationDataRetrieval:
         data = manager.get_calibration_data()
 
         assert data["camera1"]["focal_length"] == 1000.0
-        assert data["camera1"]["x_offset"] is None
-        assert data["camera1"]["y_offset"] is None
+        assert data["camera1"]["angles"] is None
 
         assert data["camera2"]["focal_length"] is None
-        assert data["camera2"]["x_offset"] == 8.7
-        assert data["camera2"]["y_offset"] is None
+        assert data["camera2"]["angles"] == [8.7, -3.1]
 
     def test_get_calibration_data_empty_config(self):
         """Test getting calibration data when config is empty"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {}
 
         manager = CalibrationManager(mock_config_manager)
@@ -167,8 +180,7 @@ class TestCalibrationDataRetrieval:
         for camera in ["camera1", "camera2"]:
             assert camera in data
             assert data[camera]["focal_length"] is None
-            assert data[camera]["x_offset"] is None
-            assert data[camera]["y_offset"] is None
+            assert data[camera]["angles"] is None
 
 
 class TestCommandBuilding:
@@ -188,6 +200,8 @@ class TestCommandBuilding:
             },
         }
         mock.generated_config_path = "/tmp/test_config.yaml"
+        mock.get_cli_parameters.return_value = []  # Return empty list for CLI params
+        mock.register_callback = Mock()  # Mock callback registration
         return mock
 
     def test_ball_location_command_single_mode(self, mock_config_manager):
@@ -208,6 +222,8 @@ class TestCommandBuilding:
     def test_ball_location_command_dual_mode(self):
         """Test command building for ball location in dual mode"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {
             "system": {"mode": "dual"},
             "calibration": {
@@ -233,6 +249,8 @@ class TestCommandBuilding:
     def test_calibration_search_defaults(self):
         """Test that default search values are used when not in config"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
 
         manager = CalibrationManager(mock_config_manager)
@@ -257,6 +275,8 @@ class TestOutputParsing:
     def test_parse_ball_location_found(self):
         """Test parsing ball location when ball is found"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         manager = CalibrationManager(mock_config_manager)
 
         output_with_ball = """
@@ -277,6 +297,8 @@ class TestOutputParsing:
     def test_parse_ball_location_not_found(self):
         """Test parsing ball location when ball is not found"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         manager = CalibrationManager(mock_config_manager)
 
         output_no_ball = """
@@ -293,6 +315,8 @@ class TestOutputParsing:
     def test_parse_calibration_results_success(self):
         """Test parsing calibration results when successful"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         manager = CalibrationManager(mock_config_manager)
 
         output_success = """
@@ -311,6 +335,8 @@ class TestOutputParsing:
     def test_parse_calibration_results_failure(self):
         """Test parsing calibration results when failed"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         manager = CalibrationManager(mock_config_manager)
 
         output_failure = """
@@ -331,6 +357,8 @@ class TestStillImageCapture:
     async def test_capture_still_image_success(self):
         """Test successful still image capture"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
@@ -354,6 +382,8 @@ class TestStillImageCapture:
     async def test_capture_still_image_file_not_created(self):
         """Test still image capture when file is not created"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
@@ -375,6 +405,8 @@ class TestStillImageCapture:
     async def test_capture_still_image_process_error(self):
         """Test still image capture when process fails"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
@@ -391,6 +423,8 @@ class TestStillImageCapture:
     def test_capture_still_image_filename_generation(self):
         """Test that capture generates proper filenames with timestamps"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         manager = CalibrationManager(mock_config_manager)
 
         with patch("calibration_manager.datetime") as mock_datetime:
@@ -409,6 +443,8 @@ class TestLogFileHandling:
     async def test_log_file_creation_during_calibration(self):
         """Test that log files are created during calibration operations"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
@@ -432,6 +468,8 @@ class TestLogFileHandling:
     def test_log_directory_exists_after_init(self):
         """Test that log directory is created and accessible"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         manager = CalibrationManager(mock_config_manager)
 
         assert manager.log_dir.exists()
@@ -450,6 +488,8 @@ class TestErrorHandling:
     async def test_check_ball_location_timeout(self):
         """Test ball location check with timeout"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
@@ -472,6 +512,8 @@ class TestErrorHandling:
     async def test_calibration_process_failure(self):
         """Test calibration when process returns non-zero exit code"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
@@ -479,20 +521,36 @@ class TestErrorHandling:
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
-            mock_process.communicate.return_value = (b"Error: Camera not found", b"")
             mock_process.returncode = 1
+            mock_process.pid = 12345
+            mock_process.stdout = AsyncMock()
+            mock_process.stdout.at_eof.return_value = True
             mock_subprocess.return_value = mock_process
 
-            result = await manager.run_auto_calibration("camera1")
+            # Mock the hybrid completion detection to return failure
+            with patch.object(manager, "wait_for_calibration_completion") as mock_wait:
+                mock_wait.return_value = {
+                    "completed": False,
+                    "method": "process",
+                    "api_success": False,
+                    "process_exit_code": 1,
+                    "focal_length_received": False,
+                    "angles_received": False,
+                }
 
-        assert result["status"] == "error"
-        assert "failed with code 1" in result["message"]
-        assert manager.calibration_status["camera1"]["status"] == "error"
+                with patch("builtins.open", create=True):
+                    result = await manager.run_auto_calibration("camera1")
+
+        assert result["status"] == "failed"
+        assert "process" in result["message"]
+        assert manager.calibration_status["camera1"]["status"] == "failed"
 
     @pytest.mark.asyncio
     async def test_invalid_camera_name(self):
         """Test operations with invalid camera names"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
 
         manager = CalibrationManager(mock_config_manager)
@@ -505,9 +563,11 @@ class TestErrorHandling:
     async def test_stop_calibration_no_process(self):
         """Test stopping calibration when no process is running"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         manager = CalibrationManager(mock_config_manager)
 
-        assert manager.current_process is None
+        assert len(manager.current_processes) == 0
 
         result = await manager.stop_calibration()
 
@@ -517,16 +577,20 @@ class TestErrorHandling:
     async def test_stop_calibration_with_process(self):
         """Test stopping calibration when process is running"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         manager = CalibrationManager(mock_config_manager)
 
         mock_process = AsyncMock()
         mock_process.terminate = AsyncMock()
         mock_process.wait = AsyncMock()
-        manager.current_process = mock_process
+        mock_process.returncode = None
+        manager.current_processes["camera1"] = mock_process
 
         result = await manager.stop_calibration()
 
         assert result["status"] == "stopped"
+        assert "camera1" in result["cameras"]
         mock_process.terminate.assert_called_once()
         mock_process.wait.assert_called_once()
 
@@ -534,17 +598,21 @@ class TestErrorHandling:
     async def test_stop_calibration_terminate_fails(self):
         """Test stopping calibration when terminate fails"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         manager = CalibrationManager(mock_config_manager)
 
         mock_process = AsyncMock()
         mock_process.terminate.side_effect = Exception("Permission denied")
         mock_process.wait.side_effect = Exception("Wait failed")
-        manager.current_process = mock_process
+        mock_process.returncode = None
+        manager.current_processes["camera1"] = mock_process
 
         result = await manager.stop_calibration()
 
-        assert result["status"] == "error"
-        assert "Permission denied" in result["message"] or "Wait failed" in result["message"]
+        assert result["status"] == "partial"
+        assert len(result["errors"]) > 0
+        assert any("Permission denied" in err or "Wait failed" in err for err in result["errors"])
 
 
 class TestRealCalibrationWorkflows:
@@ -554,6 +622,8 @@ class TestRealCalibrationWorkflows:
     async def test_auto_calibration_success_workflow(self):
         """Test complete auto calibration workflow"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {
             "system": {"mode": "single"},
             "calibration": {
@@ -562,29 +632,44 @@ class TestRealCalibrationWorkflows:
             },
         }
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
-        mock_config_manager.reload_config = Mock()
+        mock_config_manager.reload = Mock()
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
-            mock_process.communicate.return_value = (b"Auto calibration complete", b"")
             mock_process.returncode = 0
+            mock_process.pid = 12345
+            mock_process.stdout = AsyncMock()
+            mock_process.stdout.at_eof.return_value = True
             mock_subprocess.return_value = mock_process
 
-            with patch("builtins.open", create=True):
-                result = await manager.run_auto_calibration("camera1")
+            # Mock the hybrid completion detection to return success
+            with patch.object(manager, "wait_for_calibration_completion") as mock_wait:
+                mock_wait.return_value = {
+                    "completed": True,
+                    "method": "api",
+                    "api_success": True,
+                    "process_exit_code": 0,
+                    "focal_length_received": True,
+                    "angles_received": True,
+                }
+
+                with patch("builtins.open", create=True):
+                    result = await manager.run_auto_calibration("camera1")
 
         assert result["status"] == "success"
-        assert "calibration_data" in result
+        assert "completion_method" in result
         assert manager.calibration_status["camera1"]["status"] == "completed"
         assert manager.calibration_status["camera1"]["progress"] == 100
-        mock_config_manager.reload_config.assert_called_once()
+        mock_config_manager.reload.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_manual_calibration_success_workflow(self):
         """Test complete manual calibration workflow"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {
             "system": {"mode": "dual"},
             "calibration": {
@@ -593,29 +678,35 @@ class TestRealCalibrationWorkflows:
             },
         }
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
-        mock_config_manager.reload_config = Mock()
+        mock_config_manager.reload = Mock()
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
-            mock_process.communicate.return_value = (b"Manual calibration complete", b"")
+            mock_process.communicate.return_value = (b"Manual calibration complete\nangles: [1.5, 2.0, 3.0]", b"")
             mock_process.returncode = 0
             mock_subprocess.return_value = mock_process
 
-            with patch("builtins.open", create=True):
-                result = await manager.run_manual_calibration("camera2")
+            # Mock _parse_calibration_results to return valid data
+            with patch.object(manager, "_parse_calibration_results") as mock_parse:
+                mock_parse.return_value = {"angles": [1.5, 2.0, 3.0]}
+
+                with patch("builtins.open", create=True):
+                    result = await manager.run_manual_calibration("camera2")
 
         assert result["status"] == "success"
         assert "calibration_data" in result
         assert manager.calibration_status["camera2"]["status"] == "completed"
         assert manager.calibration_status["camera2"]["progress"] == 100
-        mock_config_manager.reload_config.assert_called_once()
+        mock_config_manager.reload.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_calibration_failure_no_results(self):
         """Test calibration failure when no results are parsed"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
@@ -623,21 +714,36 @@ class TestRealCalibrationWorkflows:
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
-            mock_process.communicate.return_value = (b"Process completed but no calibration data", b"")
             mock_process.returncode = 0
+            mock_process.pid = 12345
+            mock_process.stdout = AsyncMock()
+            mock_process.stdout.at_eof.return_value = True
             mock_subprocess.return_value = mock_process
 
-            with patch("builtins.open", create=True):
-                result = await manager.run_auto_calibration("camera1")
+            # Mock the hybrid completion detection to return no API callbacks
+            with patch.object(manager, "wait_for_calibration_completion") as mock_wait:
+                mock_wait.return_value = {
+                    "completed": False,
+                    "method": "timeout",
+                    "api_success": False,
+                    "process_exit_code": 0,
+                    "focal_length_received": False,
+                    "angles_received": False,
+                }
+
+                with patch("builtins.open", create=True):
+                    result = await manager.run_auto_calibration("camera1")
 
         assert result["status"] == "failed"
-        assert result["message"] == "Calibration failed"
+        assert "timeout" in result["message"]
         assert manager.calibration_status["camera1"]["status"] == "failed"
 
     @pytest.mark.asyncio
     async def test_ball_location_detection_success(self):
         """Test successful ball location detection"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {
             "system": {"mode": "single"},
             "calibration": {
@@ -667,6 +773,8 @@ class TestRealCalibrationWorkflows:
     async def test_still_image_capture_with_dual_mode(self):
         """Test still image capture in dual camera mode"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"system": {"mode": "dual"}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
@@ -693,6 +801,8 @@ class TestIntegrationScenarios:
     async def test_full_calibration_workflow_success(self):
         """Test complete calibration workflow from ball check to completion"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {
             "system": {"mode": "single"},
             "calibration": {
@@ -701,7 +811,7 @@ class TestIntegrationScenarios:
             },
         }
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
-        mock_config_manager.reload_config = Mock()
+        mock_config_manager.reload = Mock()
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -715,16 +825,38 @@ class TestIntegrationScenarios:
             assert ball_result["status"] == "success"
             assert manager.calibration_status["camera1"]["status"] == "ball_found"
 
-            cal_result = await manager.run_auto_calibration("camera1")
+            # Now test auto calibration with hybrid detection
+            mock_process2 = AsyncMock()
+            mock_process2.returncode = 0
+            mock_process2.pid = 12345
+            mock_process2.stdout = AsyncMock()
+            mock_process2.stdout.at_eof.return_value = True
+            mock_subprocess.return_value = mock_process2
+
+            with patch.object(manager, "wait_for_calibration_completion") as mock_wait:
+                mock_wait.return_value = {
+                    "completed": True,
+                    "method": "api",
+                    "api_success": True,
+                    "process_exit_code": 0,
+                    "focal_length_received": True,
+                    "angles_received": True,
+                }
+
+                with patch("builtins.open", create=True):
+                    cal_result = await manager.run_auto_calibration("camera1")
+
             assert cal_result["status"] == "success"
             assert manager.calibration_status["camera1"]["status"] == "completed"
 
-            mock_config_manager.reload_config.assert_called_once()
+            mock_config_manager.reload.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_calibration_workflow_with_failures(self):
         """Test calibration workflow with various failure points"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
@@ -743,17 +875,33 @@ class TestIntegrationScenarios:
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
-            mock_process.communicate.return_value = (b"Calibration failed", b"")
-            mock_process.returncode = 0
+            mock_process.returncode = 1
+            mock_process.pid = 12345
+            mock_process.stdout = AsyncMock()
+            mock_process.stdout.at_eof.return_value = True
             mock_subprocess.return_value = mock_process
 
-            cal_result = await manager.run_auto_calibration("camera1")
+            with patch.object(manager, "wait_for_calibration_completion") as mock_wait:
+                mock_wait.return_value = {
+                    "completed": False,
+                    "method": "process",
+                    "api_success": False,
+                    "process_exit_code": 1,
+                    "focal_length_received": False,
+                    "angles_received": False,
+                }
+
+                with patch("builtins.open", create=True):
+                    cal_result = await manager.run_auto_calibration("camera1")
+
             assert cal_result["status"] == "failed"
             assert manager.calibration_status["camera1"]["status"] == "failed"
 
     def test_concurrent_camera_operations(self):
         """Test that multiple cameras can have independent status"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         manager = CalibrationManager(mock_config_manager)
 
         manager.calibration_status["camera1"]["status"] = "calibrating"
@@ -771,6 +919,8 @@ class TestIntegrationScenarios:
     def test_log_file_creation_pattern(self):
         """Test that log files are created with proper naming pattern"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         manager = CalibrationManager(mock_config_manager)
 
         with patch("calibration_manager.datetime") as mock_datetime:
@@ -788,6 +938,8 @@ class TestConfigurationHandling:
     def test_missing_config_sections(self):
         """Test handling when config sections are missing"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {}
 
         manager = CalibrationManager(mock_config_manager)
@@ -802,6 +954,8 @@ class TestConfigurationHandling:
     def test_config_with_partial_data(self):
         """Test handling when config has partial data"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {
             "system": {"mode": "dual"},
         }
@@ -818,24 +972,37 @@ class TestConfigurationHandling:
     def test_config_reload_after_calibration(self):
         """Test that config is reloaded after successful calibration"""
         mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
-        mock_config_manager.reload_config = Mock()
+        mock_config_manager.reload = Mock()
 
         manager = CalibrationManager(mock_config_manager)
 
-        with patch.object(manager, "_parse_calibration_results") as mock_parse:
-            mock_parse.return_value = {"complete": True}
+        with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
+            mock_process = AsyncMock()
+            mock_process.returncode = 0
+            mock_process.pid = 12345
+            mock_process.stdout = AsyncMock()
+            mock_process.stdout.at_eof.return_value = True
+            mock_subprocess.return_value = mock_process
 
-            with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
-                mock_process = AsyncMock()
-                mock_process.communicate.return_value = (b"Calibration complete", b"")
-                mock_process.returncode = 0
-                mock_subprocess.return_value = mock_process
+            async def run_test():
+                with patch.object(manager, "wait_for_calibration_completion") as mock_wait:
+                    mock_wait.return_value = {
+                        "completed": True,
+                        "method": "api",
+                        "api_success": True,
+                        "process_exit_code": 0,
+                        "focal_length_received": True,
+                        "angles_received": True,
+                    }
 
-                async def run_test():
-                    result = await manager.run_auto_calibration("camera1")
-                    assert result["status"] == "success"
-                    mock_config_manager.reload_config.assert_called_once()
+                    with patch("builtins.open", create=True):
+                        result = await manager.run_auto_calibration("camera1")
 
-                asyncio.run(run_test())
+                assert result["status"] == "success"
+                mock_config_manager.reload.assert_called_once()
+
+            asyncio.run(run_test())

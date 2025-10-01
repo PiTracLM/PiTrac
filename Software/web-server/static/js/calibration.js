@@ -14,11 +14,12 @@ class CalibrationManager {
             camera1: false,
             camera2: false
         };
+        this.calibrationResults = {};  // Store results from calibration API
 
         this.init();
         this.setupPageCleanup();
     }
-    
+
     async init() {
         await this.loadSystemStatus();
 
@@ -51,22 +52,22 @@ class CalibrationManager {
             this.statusPollInterval = null;
         }
 
-        this.cameraPollIntervals.forEach((intervalId, camera) => {
+        this.cameraPollIntervals.forEach((intervalId) => {
             clearInterval(intervalId);
         });
         this.cameraPollIntervals.clear();
     }
-    
+
     setupEventListeners() {
         document.querySelectorAll('input[name="camera"]').forEach(input => {
             input.addEventListener('change', (e) => {
                 this.updateSelectedCameras(e.target.value);
             });
         });
-        
+
         this.updateSelectedCameras('camera1');
     }
-    
+
     updateSelectedCameras(value) {
         if (value === 'both') {
             this.selectedCameras = ['camera1', 'camera2'];
@@ -74,23 +75,23 @@ class CalibrationManager {
             document.getElementById('camera2-view').style.display = 'block';
         } else {
             this.selectedCameras = [value];
-            document.getElementById('camera1-view').style.display = 
+            document.getElementById('camera1-view').style.display =
                 value === 'camera1' ? 'block' : 'none';
-            document.getElementById('camera2-view').style.display = 
+            document.getElementById('camera2-view').style.display =
                 value === 'camera2' ? 'block' : 'none';
         }
     }
-    
+
     async loadSystemStatus() {
         try {
             const configResponse = await fetch('/api/config');
             if (configResponse.ok) {
                 const config = await configResponse.json();
                 const systemMode = config.system?.mode || 'single';
-                document.getElementById('system-mode').textContent = 
+                document.getElementById('system-mode').textContent =
                     systemMode === 'single' ? 'Single Pi' : 'Dual Pi';
             }
-            
+
             const statusResponse = await fetch('/api/pitrac/status');
             if (statusResponse.ok) {
                 const status = await statusResponse.json();
@@ -107,7 +108,7 @@ class CalibrationManager {
             console.error('Error loading system status:', error);
         }
     }
-    
+
     async loadCalibrationData() {
         try {
             const response = await fetch('/api/calibration/data');
@@ -119,30 +120,36 @@ class CalibrationManager {
             console.error('Error loading calibration data:', error);
         }
     }
-    
+
     displayCurrentCalibration(data) {
         const container = document.getElementById('current-calibration-data');
         container.innerHTML = '';
-        
+
         if (data.camera1) {
-            this.addCalibrationDataItem(container, 'Camera 1 Focal Length', 
+            this.addCalibrationDataItem(container, 'Camera 1 Focal Length',
                 data.camera1.focal_length?.toFixed(3) || 'Not set');
-            this.addCalibrationDataItem(container, 'Camera 1 X Offset', 
-                data.camera1.x_offset?.toFixed(1) || '0');
-            this.addCalibrationDataItem(container, 'Camera 1 Y Offset', 
-                data.camera1.y_offset?.toFixed(1) || '0');
+
+            if (data.camera1.angles && Array.isArray(data.camera1.angles)) {
+                this.addCalibrationDataItem(container, 'Camera 1 Angles',
+                    `[${data.camera1.angles.map(a => a.toFixed(2)).join(', ')}]`);
+            } else {
+                this.addCalibrationDataItem(container, 'Camera 1 Angles', 'Not set');
+            }
         }
-        
+
         if (data.camera2) {
-            this.addCalibrationDataItem(container, 'Camera 2 Focal Length', 
+            this.addCalibrationDataItem(container, 'Camera 2 Focal Length',
                 data.camera2.focal_length?.toFixed(3) || 'Not set');
-            this.addCalibrationDataItem(container, 'Camera 2 X Offset', 
-                data.camera2.x_offset?.toFixed(1) || '0');
-            this.addCalibrationDataItem(container, 'Camera 2 Y Offset', 
-                data.camera2.y_offset?.toFixed(1) || '0');
+
+            if (data.camera2.angles && Array.isArray(data.camera2.angles)) {
+                this.addCalibrationDataItem(container, 'Camera 2 Angles',
+                    `[${data.camera2.angles.map(a => a.toFixed(2)).join(', ')}]`);
+            } else {
+                this.addCalibrationDataItem(container, 'Camera 2 Angles', 'Not set');
+            }
         }
     }
-    
+
     addCalibrationDataItem(container, label, value) {
         const item = document.createElement('div');
         item.className = 'calibration-data-item';
@@ -152,7 +159,7 @@ class CalibrationManager {
         `;
         container.appendChild(item);
     }
-    
+
     nextStep() {
         if (this.currentStep === 1) {
             this.showStep(2);
@@ -166,20 +173,20 @@ class CalibrationManager {
         } else if (this.currentStep === 3) {
         }
     }
-    
+
     prevStep() {
         if (this.currentStep > 1) {
             this.showStep(this.currentStep - 1);
         }
     }
-    
+
     showStep(stepNumber) {
         document.querySelectorAll('.wizard-content').forEach(content => {
             content.style.display = 'none';
         });
-        
+
         document.getElementById(`step${stepNumber}`).style.display = 'block';
-        
+
         document.querySelectorAll('.step').forEach(step => {
             const stepNum = parseInt(step.dataset.step);
             if (stepNum < stepNumber) {
@@ -192,10 +199,10 @@ class CalibrationManager {
                 step.classList.remove('active', 'completed');
             }
         });
-        
+
         this.currentStep = stepNumber;
     }
-    
+
     /**
      * Run auto calibration for the specified camera
      * @param {string} camera - Camera identifier (camera1 or camera2)
@@ -254,7 +261,7 @@ class CalibrationManager {
             }
         }
     }
-    
+
     /**
      * Check ball location in the camera view
      * @param {string} camera - Camera identifier (camera1 or camera2)
@@ -316,70 +323,105 @@ class CalibrationManager {
 
     selectMethod(method) {
         this.calibrationMethod = method;
-        
+
         document.querySelector('.calibration-options').style.display = 'none';
-        
+
         document.getElementById('calibration-progress').style.display = 'block';
-        
+
         this.startCalibration(method);
     }
-    
+
     async startCalibration(method) {
         this.calibrationInProgress = true;
-        
+
         document.getElementById('calibration-log-content').innerHTML = '';
         this.addLogEntry('Starting calibration process...');
-        
+
         for (const camera of this.selectedCameras) {
             await this.calibrateCamera(camera, method);
         }
     }
-    
+
     async calibrateCamera(camera, method) {
         try {
             this.addLogEntry(`Starting ${method} calibration for ${camera}...`);
-            
+
             const progressBar = document.getElementById(`${camera}-progress`);
             const statusText = document.getElementById(`${camera}-status`);
-            
+            const detailsDiv = document.getElementById(`${camera}-details`);
+
             progressBar.style.width = '10%';
             statusText.textContent = 'Initializing...';
-            
-            const endpoint = method === 'auto' 
+            detailsDiv.innerHTML = '';
+
+            const endpoint = method === 'auto'
                 ? `/api/calibration/auto/${camera}`
                 : `/api/calibration/manual/${camera}`;
-            
+
             const response = await fetch(endpoint, {
                 method: 'POST'
             });
-            
+
             if (response.ok) {
                 const result = await response.json();
 
-                // Only use waitForCalibrationCompletion - it handles polling internally
-                // pollCalibrationProgress is redundant and causes duplicate requests
-                try {
-                    await this.waitForCalibrationCompletion(camera);
-                } catch (timeoutError) {
-                    this.addLogEntry(`${camera} calibration timed out: ${timeoutError.message}`);
-                    throw timeoutError;
-                }
+                progressBar.style.width = '50%';
+                statusText.textContent = 'Calibrating...';
 
-                if (result.status === 'success') {
+                const finalResult = await this.pollForCompletion(camera);
+
+                if (finalResult && finalResult.status === 'success') {
                     this.addLogEntry(`${camera} calibration completed successfully`);
+                    this.addLogEntry(`  Completion method: ${finalResult.completion_method || 'unknown'}`);
+
+                    const details = [];
+                    if (finalResult.api_success) {
+                        details.push('API Callbacks Received');
+                    }
+                    if (finalResult.focal_length_received) {
+                        details.push('Focal Length');
+                    }
+                    if (finalResult.angles_received) {
+                        details.push('Camera Angles');
+                    }
+
+                    detailsDiv.innerHTML = `<small>${details.join(' | ')}</small>`;
+
                     progressBar.style.width = '100%';
                     statusText.textContent = 'Completed';
-                    
+
+                    if (!this.calibrationResults) {
+                        this.calibrationResults = {};
+                    }
+                    this.calibrationResults[camera] = finalResult;
+
                     const allDone = this.selectedCameras.every(cam => {
                         const status = document.getElementById(`${cam}-status`).textContent;
                         return status === 'Completed' || status === 'Failed';
                     });
-                    
+
                     if (allDone) {
                         await this.showCalibrationResults();
                     }
                 } else {
-                    this.addLogEntry(`${camera} calibration failed: ${result.message}`);
+                    const message = result.message || finalResult?.message || 'Unknown error';
+                    this.addLogEntry(`${camera} calibration failed: ${message}`);
+
+                    const details = [];
+                    if (finalResult?.completion_method) {
+                        details.push(`Method: ${finalResult.completion_method}`);
+                    }
+                    if (finalResult?.focal_length_received) {
+                        details.push('Focal length received');
+                    }
+                    if (finalResult?.angles_received) {
+                        details.push('Angles received');
+                    }
+
+                    if (details.length > 0) {
+                        detailsDiv.innerHTML = `<small style="color: #ff9800;">${details.join(' | ')}</small>`;
+                    }
+
                     progressBar.style.width = '100%';
                     progressBar.style.background = '#f44336';
                     statusText.textContent = 'Failed';
@@ -390,109 +432,134 @@ class CalibrationManager {
         } catch (error) {
             console.error(`Error calibrating ${camera}:`, error);
             this.addLogEntry(`Error calibrating ${camera}: ${error.message}`);
+
+            const progressBar = document.getElementById(`${camera}-progress`);
+            const statusText = document.getElementById(`${camera}-status`);
+            progressBar.style.width = '100%';
+            progressBar.style.background = '#f44336';
+            statusText.textContent = 'Error';
         }
     }
-    
-    async pollCalibrationProgress(camera) {
-        const pollInterval = setInterval(async () => {
-            try {
-                const response = await fetch('/api/calibration/status');
-                if (response.ok) {
-                    const status = await response.json();
-                    const cameraStatus = status[camera];
-                    
-                    if (cameraStatus) {
-                        const progressBar = document.getElementById(`${camera}-progress`);
-                        const statusText = document.getElementById(`${camera}-status`);
-                        
-                        progressBar.style.width = `${cameraStatus.progress}%`;
-                        statusText.textContent = cameraStatus.message;
-                        
-                        if (cameraStatus.status === 'completed' || 
-                            cameraStatus.status === 'failed' || 
-                            cameraStatus.status === 'error') {
-                            clearInterval(pollInterval);
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Error polling calibration status:', error);
-            }
-        }, 1000);
-        
-        this[`${camera}PollInterval`] = pollInterval;
-    }
-    
-    async waitForCalibrationCompletion(camera, timeout = 180000) {
+
+    async pollForCompletion(camera, timeout = 180000) {
         const startTime = Date.now();
-        
+
         while (Date.now() - startTime < timeout) {
             const response = await fetch('/api/calibration/status');
             if (response.ok) {
                 const status = await response.json();
                 const cameraStatus = status[camera];
-                
-                if (cameraStatus && 
-                    (cameraStatus.status === 'completed' || 
-                     cameraStatus.status === 'failed' || 
+
+                const progressBar = document.getElementById(`${camera}-progress`);
+                const statusText = document.getElementById(`${camera}-status`);
+
+                if (cameraStatus && cameraStatus.progress) {
+                    progressBar.style.width = `${cameraStatus.progress}%`;
+                }
+
+                if (cameraStatus && cameraStatus.message) {
+                    statusText.textContent = cameraStatus.message;
+                }
+
+                if (cameraStatus &&
+                    (cameraStatus.status === 'completed' ||
+                     cameraStatus.status === 'failed' ||
                      cameraStatus.status === 'error')) {
                     return cameraStatus;
                 }
             }
-            
+
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
-        
+
         throw new Error('Calibration timeout');
     }
-    
+
     async showCalibrationResults() {
         const response = await fetch('/api/calibration/data');
         if (response.ok) {
             const data = await response.json();
-            
-            if (data.camera1) {
-                document.getElementById('camera1-focal').textContent = 
-                    data.camera1.focal_length?.toFixed(3) || '--';
-                document.getElementById('camera1-x').textContent = 
-                    data.camera1.x_offset?.toFixed(1) || '--';
-                document.getElementById('camera1-y').textContent = 
-                    data.camera1.y_offset?.toFixed(1) || '--';
+
+            if (this.selectedCameras.includes('camera1')) {
+                const result = this.calibrationResults?.camera1;
+                const card = document.getElementById('camera1-result-card');
+                card.style.display = 'block';
+
+                document.getElementById('camera1-result-status').textContent =
+                    result?.status === 'success' ? 'Success' : 'Failed';
+
+                document.getElementById('camera1-completion-method').textContent =
+                    result?.completion_method
+                        ? `${result.completion_method} ${result.api_success ? '(API callbacks ✓)' : ''}`
+                        : '--';
+
+                if (data.camera1) {
+                    document.getElementById('camera1-focal').textContent =
+                        data.camera1.focal_length?.toFixed(3) || '--';
+
+                    if (data.camera1.angles && Array.isArray(data.camera1.angles)) {
+                        document.getElementById('camera1-angles').textContent =
+                            `[${data.camera1.angles.map(a => a.toFixed(2)).join(', ')}]`;
+                    } else {
+                        document.getElementById('camera1-angles').textContent = '--';
+                    }
+                }
+            } else {
+                document.getElementById('camera1-result-card').style.display = 'none';
             }
-            
-            if (data.camera2) {
-                document.getElementById('camera2-focal').textContent = 
-                    data.camera2.focal_length?.toFixed(3) || '--';
-                document.getElementById('camera2-x').textContent = 
-                    data.camera2.x_offset?.toFixed(1) || '--';
-                document.getElementById('camera2-y').textContent = 
-                    data.camera2.y_offset?.toFixed(1) || '--';
+
+            if (this.selectedCameras.includes('camera2')) {
+                const result = this.calibrationResults?.camera2;
+                const card = document.getElementById('camera2-result-card');
+                card.style.display = 'block';
+
+                document.getElementById('camera2-result-status').textContent =
+                    result?.status === 'success' ? 'Success' : 'Failed';
+
+                document.getElementById('camera2-completion-method').textContent =
+                    result?.completion_method
+                        ? `${result.completion_method} ${result.api_success ? '(API callbacks ✓)' : ''}`
+                        : '--';
+
+                if (data.camera2) {
+                    document.getElementById('camera2-focal').textContent =
+                        data.camera2.focal_length?.toFixed(3) || '--';
+
+                    if (data.camera2.angles && Array.isArray(data.camera2.angles)) {
+                        document.getElementById('camera2-angles').textContent =
+                            `[${data.camera2.angles.map(a => a.toFixed(2)).join(', ')}]`;
+                    } else {
+                        document.getElementById('camera2-angles').textContent = '--';
+                    }
+                }
+            } else {
+                document.getElementById('camera2-result-card').style.display = 'none';
             }
-            
+
             this.displayCurrentCalibration(data);
         }
-        
+
         this.showStep(4);
         this.calibrationInProgress = false;
     }
-    
+
     async stopCalibration() {
         if (confirm('Are you sure you want to stop the calibration process?')) {
             try {
                 const response = await fetch('/api/calibration/stop', {
                     method: 'POST'
                 });
-                
+
                 if (response.ok) {
                     this.addLogEntry('Calibration stopped by user');
                     this.calibrationInProgress = false;
-                    
+
                     this.selectedCameras.forEach(camera => {
                         if (this[`${camera}PollInterval`]) {
                             clearInterval(this[`${camera}PollInterval`]);
                         }
                     });
-                    
+
                     this.restart();
                 }
             } catch (error) {
@@ -500,7 +567,7 @@ class CalibrationManager {
             }
         }
     }
-    
+
     restart() {
         this.currentStep = 1;
         this.calibrationMethod = null;
@@ -509,30 +576,30 @@ class CalibrationManager {
             camera1: false,
             camera2: false
         };
-        
+
         this.showStep(1);
         document.querySelector('.calibration-options').style.display = 'block';
         document.getElementById('calibration-progress').style.display = 'none';
         document.getElementById('verify-next').disabled = true;
-        
+
         document.querySelectorAll('.camera-preview img').forEach(img => {
             img.style.display = 'none';
         });
         document.querySelectorAll('.camera-placeholder').forEach(placeholder => {
             placeholder.style.display = 'flex';
         });
-        
+
         document.querySelectorAll('.ball-status').forEach(status => {
             status.textContent = '';
             status.className = 'ball-status';
         });
-        
+
         document.querySelectorAll('.progress-fill').forEach(bar => {
             bar.style.width = '0%';
             bar.style.background = '';
         });
     }
-    
+
     addLogEntry(message) {
         const logContent = document.getElementById('calibration-log-content');
         const timestamp = new Date().toLocaleTimeString();
@@ -551,7 +618,7 @@ class CalibrationManager {
         const validCameras = ['camera1', 'camera2'];
         return validCameras.includes(camera);
     }
-    
+
     showMessage(message, type = 'info') {
         const messageDiv = document.getElementById('verification-message');
         if (messageDiv) {
@@ -559,7 +626,7 @@ class CalibrationManager {
             messageDiv.textContent = message;
         }
     }
-    
+
     startStatusPolling() {
         this.statusPollInterval = setInterval(() => {
             if (!this.calibrationInProgress) {

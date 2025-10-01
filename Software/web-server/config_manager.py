@@ -6,14 +6,14 @@ Handles reading and writing JSON configuration files with a three-tier system:
 3. User overrides: ~/.pitrac/config/user_settings.json (read-write, sparse)
 """
 
+import copy
+import fcntl
 import json
 import logging
 import os
-import fcntl
-import copy
 from pathlib import Path
 from threading import RLock
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,8 @@ class ConfigurationManager:
         self.merged_config: Dict[str, Any] = {}
 
         self.restart_required_params = self._load_restart_required_params()
+
+        self._config_callbacks: Dict[str, List[Callable[[str, Any], None]]] = {}
 
         self.reload()
 
@@ -161,6 +163,57 @@ class ConfigurationManager:
         # Then apply user overrides (highest priority)
         return deep_merge(config, self.user_settings)
 
+    def register_callback(self, key_pattern: str, callback: Callable[[str, Any], None]) -> None:
+        """Register callback for configuration updates matching pattern
+
+        Args:
+            key_pattern: Pattern to match (e.g., 'gs_config.cameras' matches all camera configs)
+            callback: Function to call with (key, value) when config updates
+        """
+        with self._lock:
+            if key_pattern not in self._config_callbacks:
+                self._config_callbacks[key_pattern] = []
+            self._config_callbacks[key_pattern].append(callback)
+            logger.debug(f"Registered callback for pattern: {key_pattern}")
+
+    def unregister_callback(self, key_pattern: str, callback: Callable[[str, Any], None]) -> None:
+        """Unregister a specific callback
+
+        Args:
+            key_pattern: Pattern the callback was registered with
+            callback: The callback function to remove
+        """
+        with self._lock:
+            if key_pattern in self._config_callbacks:
+                try:
+                    self._config_callbacks[key_pattern].remove(callback)
+                    if not self._config_callbacks[key_pattern]:
+                        del self._config_callbacks[key_pattern]
+                    logger.debug(f"Unregistered callback for pattern: {key_pattern}")
+                except ValueError:
+                    pass
+
+    def _notify_callbacks(self, key: str, value: Any) -> None:
+        """Notify registered callbacks of configuration change
+
+        This is called after successful config save, OUTSIDE the config lock,
+        to prevent deadlock if callbacks call back into ConfigurationManager.
+
+        Args:
+            key: The configuration key that was updated
+            value: The new value
+        """
+        with self._lock:
+            callbacks_snapshot = [(pattern, list(cbs)) for pattern, cbs in self._config_callbacks.items()]
+
+        for pattern, callbacks in callbacks_snapshot:
+            if key.startswith(pattern) or pattern == "*":
+                for callback in callbacks:
+                    try:
+                        callback(key, value)
+                    except Exception as e:
+                        logger.error(f"Callback error for {key}: {e}", exc_info=True)
+
     def get_config(self, key: Optional[str] = None) -> Any:
         """Get configuration value or entire config
 
@@ -239,6 +292,10 @@ class ConfigurationManager:
         Returns:
             Tuple of (success, message, requires_restart)
         """
+        notify_key = None
+        notify_value = None
+        result = None
+
         with self._lock:
             default_value = self.get_default(key)
             is_calibration = self._is_calibration_field(key)
@@ -250,7 +307,9 @@ class ConfigurationManager:
                         if self._save_json(self.calibration_data_path, calibration_copy):
                             self.calibration_data = calibration_copy
                             self._rebuild_merged_config()
-                            return (
+                            notify_key = key
+                            notify_value = default_value
+                            result = (
                                 True,
                                 f"Reset calibration {key} to default value",
                                 key in self.restart_required_params,
@@ -261,33 +320,48 @@ class ConfigurationManager:
                         if self._save_json(self.user_settings_path, settings_copy):
                             self.user_settings = settings_copy
                             self._rebuild_merged_config()
-                            return (
+                            notify_key = key
+                            notify_value = default_value
+                            result = (
                                 True,
                                 f"Reset {key} to default value",
                                 key in self.restart_required_params,
                             )
-                return True, "Value already at default", False
+                if result is None:
+                    result = (True, "Value already at default", False)
 
-            if is_calibration:
+            elif is_calibration:
                 calibration_copy = copy.deepcopy(self.calibration_data)
                 if self._set_in_dict(calibration_copy, key, value):
                     if self._save_json(self.calibration_data_path, calibration_copy):
                         self.calibration_data = calibration_copy
                         self._rebuild_merged_config()
+                        notify_key = key
+                        notify_value = value
                         requires_restart = key in self.restart_required_params
-                        return True, f"Set calibration {key} = {value}", requires_restart
-                    return False, "Failed to save calibration data", False
+                        result = (True, f"Set calibration {key} = {value}", requires_restart)
+                    else:
+                        result = (False, "Failed to save calibration data", False)
             else:
                 settings_copy = copy.deepcopy(self.user_settings)
                 if self._set_in_dict(settings_copy, key, value):
                     if self._save_json(self.user_settings_path, settings_copy):
                         self.user_settings = settings_copy
                         self._rebuild_merged_config()
+                        notify_key = key
+                        notify_value = value
                         requires_restart = key in self.restart_required_params
-                        return True, f"Set {key} = {value}", requires_restart
-                    return False, "Failed to save configuration", False
+                        result = (True, f"Set {key} = {value}", requires_restart)
+                    else:
+                        result = (False, "Failed to save configuration", False)
 
-            return False, "Failed to set value", False
+            if result is None:
+                result = (False, "Failed to set value", False)
+
+        if notify_key is not None:
+            self._notify_callbacks(notify_key, notify_value)
+
+        return result
 
     def _set_in_dict(self, d: Dict[str, Any], key: str, value: Any) -> bool:
         """Set value in nested dictionary using dot notation"""

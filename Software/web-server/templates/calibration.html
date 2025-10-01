@@ -176,14 +176,16 @@
                             <div class="progress-fill" id="camera1-progress"></div>
                         </div>
                         <div class="progress-status" id="camera1-status">Waiting...</div>
+                        <div class="completion-details" id="camera1-details"></div>
                     </div>
-                    
+
                     <div class="progress-camera" id="progress-camera2">
                         <h4>Camera 2</h4>
                         <div class="progress-bar">
                             <div class="progress-fill" id="camera2-progress"></div>
                         </div>
                         <div class="progress-status" id="camera2-status">Waiting...</div>
+                        <div class="completion-details" id="camera2-details"></div>
                     </div>
                 </div>
 
@@ -216,38 +218,46 @@
                     <h3>Calibration Results:</h3>
                     
                     <div class="result-cards">
-                        <div class="result-card">
+                        <div class="result-card" id="camera1-result-card">
                             <h4>Camera 1 - Tee Camera</h4>
                             <div class="result-data" id="camera1-results">
+                                <div class="result-item">
+                                    <span class="result-label">Status:</span>
+                                    <span class="result-value" id="camera1-result-status">--</span>
+                                </div>
+                                <div class="result-item">
+                                    <span class="result-label">Completion Method:</span>
+                                    <span class="result-value" id="camera1-completion-method">--</span>
+                                </div>
                                 <div class="result-item">
                                     <span class="result-label">Focal Length:</span>
                                     <span class="result-value" id="camera1-focal">--</span>
                                 </div>
                                 <div class="result-item">
-                                    <span class="result-label">X Offset:</span>
-                                    <span class="result-value" id="camera1-x">--</span>
-                                </div>
-                                <div class="result-item">
-                                    <span class="result-label">Y Offset:</span>
-                                    <span class="result-value" id="camera1-y">--</span>
+                                    <span class="result-label">Camera Angles:</span>
+                                    <span class="result-value" id="camera1-angles">--</span>
                                 </div>
                             </div>
                         </div>
-                        
-                        <div class="result-card">
+
+                        <div class="result-card" id="camera2-result-card">
                             <h4>Camera 2 - Flight Camera</h4>
                             <div class="result-data" id="camera2-results">
+                                <div class="result-item">
+                                    <span class="result-label">Status:</span>
+                                    <span class="result-value" id="camera2-result-status">--</span>
+                                </div>
+                                <div class="result-item">
+                                    <span class="result-label">Completion Method:</span>
+                                    <span class="result-value" id="camera2-completion-method">--</span>
+                                </div>
                                 <div class="result-item">
                                     <span class="result-label">Focal Length:</span>
                                     <span class="result-value" id="camera2-focal">--</span>
                                 </div>
                                 <div class="result-item">
-                                    <span class="result-label">X Offset:</span>
-                                    <span class="result-value" id="camera2-x">--</span>
-                                </div>
-                                <div class="result-item">
-                                    <span class="result-label">Y Offset:</span>
-                                    <span class="result-value" id="camera2-y">--</span>
+                                    <span class="result-label">Camera Angles:</span>
+                                    <span class="result-value" id="camera2-angles">--</span>
                                 </div>
                             </div>
                         </div>
