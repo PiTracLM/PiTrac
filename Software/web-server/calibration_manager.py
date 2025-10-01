@@ -331,7 +331,7 @@ class CalibrationManager:
         camera_gain_key = "kCamera1Gain" if camera == "camera1" else "kCamera2Gain"
         camera_gain = self.config_manager.get_config(f"gs_config.cameras.{camera_gain_key}")
         if camera_gain is None:
-            camera_gain = "2.0"
+            camera_gain = 6.0
 
         cmd.extend(
             [
@@ -425,7 +425,7 @@ class CalibrationManager:
 
         camera_gain = self.config_manager.get_config("gs_config.cameras.kCamera1Gain")
         if camera_gain is None:
-            camera_gain = "2.0"
+            camera_gain = 6.0
 
         cmd.extend(
             [
@@ -588,13 +588,16 @@ class CalibrationManager:
         env = self._build_environment(camera)
         logging_level = config.get("gs_config", {}).get("logging", {}).get("kLoggingLevel", "info")
 
+        camera2_gain = self.config_manager.get_config("gs_config.cameras.kCamera2Gain")
+        if camera2_gain is None:
+            camera2_gain = 6.0
+
         bg_cmd = [
             self.pitrac_binary,
             "--run_single_pi",
             "--system_mode",
             "runCam2ProcessForPi1Processing",
-            "--camera_gain",
-            "3.6",
+            f"--camera_gain={camera2_gain}",
             "--logging_level=info",
             "--artifact_save_level=final_results_only",
         ]
@@ -624,7 +627,7 @@ class CalibrationManager:
             self.calibration_status[camera]["message"] = "Running camera2 calibration..."
             self.calibration_status[camera]["progress"] = 30
 
-            search_x = config.get("calibration", {}).get("camera2_search_center_x", 720)
+            search_x = config.get("calibration", {}).get("camera2_search_center_x", 700)
             search_y = config.get("calibration", {}).get("camera2_search_center_y", 500)
 
             fg_cmd = [
@@ -789,7 +792,7 @@ class CalibrationManager:
         camera_gain_key = "kCamera1Gain" if camera == "camera1" else "kCamera2Gain"
         camera_gain = self.config_manager.get_config(f"gs_config.cameras.{camera_gain_key}")
         if camera_gain is None:
-            camera_gain = "2.0"
+            camera_gain = 6.0
 
         cmd.extend(
             [
@@ -870,7 +873,7 @@ class CalibrationManager:
         camera_gain_key = "kCamera1Gain" if camera == "camera1" else "kCamera2Gain"
         camera_gain = self.config_manager.get_config(f"gs_config.cameras.{camera_gain_key}")
         if camera_gain is None:
-            camera_gain = "2.0"
+            camera_gain = 6.0
 
         cmd.extend(
             [
