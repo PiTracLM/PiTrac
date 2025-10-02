@@ -302,9 +302,26 @@ build_dev() {
         fi
     done
 
-    # Check for lgpio separately - we use our custom version
-    if ! dpkg -l | grep -q "^ii  liblgpio1"; then
-        log_warn "Custom liblgpio1 package not installed - will install from deps-artifacts"
+    # ========================================================================
+    # lgpio Library Strategy
+    # ========================================================================
+    # lgpio is available in both custom debs (deps-artifacts/) and system repos
+    #
+    # Problem: Version mismatch causes conflicts:
+    #   - Custom: liblgpio1 (0.2.2-1)
+    #   - System: liblgpio1 (0.2.2-1~rpt1) + liblgpio-dev (0.2.2-1~rpt1)
+    #   - Custom package declares "Conflicts: liblgpio-dev"
+    #   - System packages like libcamera-dev depend on liblgpio-dev
+    #
+    # Solution: Prefer system packages when available
+    #   1. Remove custom lgpio before apt-get install (line ~426)
+    #   2. Let apt install system lgpio packages
+    #   3. extract_all_dependencies() will skip custom lgpio if system exists
+    # ========================================================================
+    if ! dpkg -l | grep -qE "^ii\s+(liblgpio1|liblgpio-dev)"; then
+        log_info "lgpio not installed - will use custom package from deps-artifacts"
+    else
+        log_info "System lgpio packages detected - will use those instead of custom"
     fi
     
     if ! command -v rpicam-hello &> /dev/null && ! command -v libcamera-hello &> /dev/null; then
@@ -419,6 +436,16 @@ build_dev() {
     if [ ${#missing_deps[@]} -gt 0 ]; then
         log_warn "Missing build dependencies: ${missing_deps[*]}"
         log_info "Installing missing dependencies..."
+
+        # Remove custom lgpio package if it exists to avoid conflicts with system packages
+        # System packages (libcamera-dev, etc.) may pull in liblgpio-dev from repos
+        # Our custom package has version 0.2.2-1 but system has 0.2.2-1~rpt1
+        if dpkg -l | grep -qE "^ii\s+liblgpio1\s+0\.2\.2-1\s"; then
+            log_warn "Removing custom liblgpio1 package to avoid apt conflicts..."
+            log_info "System lgpio packages will be used instead (from repos)"
+            dpkg --remove --force-depends liblgpio1 2>/dev/null || true
+        fi
+
         apt-get update
         # Use INITRD=No as safety measure - these are just libraries, not kernel modules
         INITRD=No apt-get install -y "${missing_deps[@]}"
