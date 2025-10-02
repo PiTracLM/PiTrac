@@ -1597,9 +1597,12 @@ int main(int argc, char *argv[])
         BallImageProc::LoadConfigurationValues();
 
         run_main(argc, argv);
-        
+
         GS_LOG_MSG(info, "PiTrac Launch Monitor shutting down normally...");
-        
+
+        // Signal all background threads to stop (required for IPC consumer thread to exit)
+        GolfSimGlobals::golf_sim_running_ = false;
+
         try {
             golf_sim::PulseStrobe::DeinitGPIOSystem();
             GS_LOG_MSG(info, "GPIO system cleaned up successfully");
