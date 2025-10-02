@@ -557,7 +557,7 @@ Follow semantic versioning:
 
 ```bash
 # Clone with submodules
-git clone --recursive https://github.com/jamespilgrim/PiTrac
+git clone --recursive https://github.com/pitraclm/pitrac
 cd PiTrac/packaging
 
 # Install development tools
@@ -584,7 +584,7 @@ sudo usermod -aG docker $USER
 ## Support
 
 For packaging-specific issues:
-- GitHub Issues: https://github.com/jamespilgrim/PiTrac/issues
+- GitHub Issues: https://github.com/pitraclm/pitrac/issues
 - Discord: #packaging channel
 - Documentation: docs/development/packaging.md
 

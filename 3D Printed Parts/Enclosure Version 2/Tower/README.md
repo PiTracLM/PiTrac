@@ -17,7 +17,7 @@ Recommended print settings: 2 perimeter layers, 15% infill, grid or rectilinear 
 
 **Assembly Notes:**
 
-See the [main assembly instructions](https://github.com/jamespilgrim/PiTrac/blob/main/Documentation/PiTrac%20Version%202%20Assembly.md).
+See the [main assembly instructions](https://github.com/pitraclm/pitrac/blob/main/Documentation/PiTrac%20Version%202%20Assembly.md).
 Ultimately, the four parts will be glued together with something like thick, slower-drying super-glue such as Starbond Gap Filler Thick High Performance Super Glue and then screwed together with 
 12 M2 x 6 self-tapping screws.
 

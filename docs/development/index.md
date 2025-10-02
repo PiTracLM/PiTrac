@@ -82,7 +82,7 @@ The following documentation pages are available:
 
 1. **Clone the repository:**
    ```bash
-   git clone --recursive https://github.com/jamespilgrim/PiTrac.git
+   git clone --recursive https://github.com/pitraclm/pitrac.git
    cd PiTrac
    ```
 
@@ -120,7 +120,7 @@ The following documentation pages are available:
   ```
 - Add upstream remote:
   ```bash
-  git remote add upstream https://github.com/jamespilgrim/PiTrac.git
+  git remote add upstream https://github.com/pitraclm/pitrac.git
   ```
 
 ### 2. Development
@@ -177,7 +177,7 @@ PiTrac/
 
 ## Getting Help
 
-- **GitHub Issues**: https://github.com/jamespilgrim/PiTrac/issues
+- **GitHub Issues**: https://github.com/pitraclm/pitrac/issues
 - **Discord Community**: https://discord.gg/j9YWCMFVHN
 - **Documentation**: This guide and source code
 

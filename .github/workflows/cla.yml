@@ -42,7 +42,7 @@ jobs:
           path-to-document: "https://gist.github.com/jamespilgrim/e6996a438adc0919ebbe70561efbb600#file-verdant-contributor-license-agreement-md"
           path-to-signatures: "signatures/version1/cla.json"
 
-          remote-organization-name: "jamespilgrim"
+          remote-organization-name: "PiTracLM"
           remote-repository-name: "PitracCLASignatures"
 
           branch: "main"

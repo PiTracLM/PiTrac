@@ -35,7 +35,7 @@ Finally, the current calibration rig assumes that the tee-off camera that watche
 
 First thing to do is to get your calibration rig printed.  The rig provides an easy way to precisely position two golf balls in front of the launch monitor.  Of course, you could make your own rig – you would just need to make measurements of where the ball(s) are relative to the cameras and inform PiTrac of that through the configuration file. 
 
-1. Print the rig using the [files here](https://github.com/jamespilgrim/PiTrac/tree/main/3D%20Printed%20Parts/Enclosure%20Version%202/Calibration%20Rig) in the github repo.  The rig is in the version 2 enclosure file area, but can be used with either version of the enclosure.  The main difference in using the rig for the Version 1 and 2 enclosures is just the measurement values that describe the distances from where the cameras are to the golf balls positioned on the rig.  The rig looks like the following on the print bed:
+1. Print the rig using the [files here](https://github.com/pitraclm/pitrac/tree/main/3D%20Printed%20Parts/Enclosure%20Version%202/Calibration%20Rig) in the github repo.  The rig is in the version 2 enclosure file area, but can be used with either version of the enclosure.  The main difference in using the rig for the Version 1 and 2 enclosures is just the measurement values that describe the distances from where the cameras are to the golf balls positioned on the rig.  The rig looks like the following on the print bed:
 
    ![Picture 1_0 - AutoCalibration Instuctions](https://github.com/user-attachments/assets/5d97b701-f18b-42c8-89fc-3654e0de1781)
 (Picture 1\_0)

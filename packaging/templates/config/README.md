@@ -341,7 +341,7 @@ For configuration help:
 1. Check this documentation
 2. Run `pitrac config validate` for specific errors
 3. Visit the [PiTrac Discord](https://discord.gg/j9YWCMFVHN)
-4. File issues at [GitHub](https://github.com/jamespilgrim/PiTrac)
+4. File issues at [GitHub](https://github.com/pitraclm/pitrac)
 
 ## Version History
 

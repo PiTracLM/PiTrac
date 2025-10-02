@@ -1,224 +1,224 @@
 name: Hardware Issue
 description: Report problems with PiTrac hardware, assembly, or physical components
 title: "[Hardware]: "
-labels: ["hardware", "needs-triage"]
+labels: [ "hardware", "needs-triage" ]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        ## Hardware Issue Report 🔧
-        
-        For hardware help, also check:
-        - [Hardware Assembly Guide](https://jamespilgrim.github.io/PiTrac/hardware/assembly-guide.html)
-        - [Parts List](https://jamespilgrim.github.io/PiTrac/hardware/parts-list.html)
+- type: markdown
+  attributes:
+    value: |
+      ## Hardware Issue Report 🔧
 
-  - type: dropdown
-    id: hardware-category
-    attributes:
-      label: Hardware Component
-      description: Which component is having issues?
-      options:
-        - PCB/Connector Board
-        - Camera Hardware/Mounting
-        - IR LED Array/Strobe
-        - 3D Printed Enclosure
-        - Power Supply
-        - Cables/Connectors
-        - Raspberry Pi Hardware
-        - Other
-    validations:
-      required: true
+      For hardware help, also check:
+      - [Hardware Assembly Guide](https://pitraclm.github.io/PiTrac/hardware/assembly-guide.html)
+      - [Parts List](https://pitraclm.github.io/PiTrac/hardware/parts-list.html)
 
-  - type: textarea
-    id: issue-description
-    attributes:
-      label: Issue Description
-      description: Describe the hardware problem in detail
-      placeholder: |
-        Example: The IR LED array only illuminates on one side. The left bank of LEDs 
-        doesn't light up when the strobe fires, even though the connections appear correct.
-    validations:
-      required: true
+- type: dropdown
+  id: hardware-category
+  attributes:
+    label: Hardware Component
+    description: Which component is having issues?
+    options:
+    - PCB/Connector Board
+    - Camera Hardware/Mounting
+    - IR LED Array/Strobe
+    - 3D Printed Enclosure
+    - Power Supply
+    - Cables/Connectors
+    - Raspberry Pi Hardware
+    - Other
+  validations:
+    required: true
 
-  - type: dropdown
-    id: build-stage
-    attributes:
-      label: Build Stage
-      description: Where in the build process are you?
-      options:
-        - Planning/Sourcing Parts
-        - PCB Assembly
-        - 3D Printing
-        - Camera Installation
-        - IR LED Setup
-        - Initial Testing
-        - Calibration
-        - Fully Built - Was Working
-        - Fully Built - Never Worked
-    validations:
-      required: true
+- type: textarea
+  id: issue-description
+  attributes:
+    label: Issue Description
+    description: Describe the hardware problem in detail
+    placeholder: |
+      Example: The IR LED array only illuminates on one side. The left bank of LEDs 
+      doesn't light up when the strobe fires, even though the connections appear correct.
+  validations:
+    required: true
 
-  - type: textarea
-    id: parts-list
-    attributes:
-      label: Parts Used
-      description: List the specific parts you're using (with links if possible)
-      placeholder: |
-        - Pi 5 8GB from [supplier]
-        - Pi Global Shutter Camera x2 from [supplier]
-        - 730nm IR LEDs (60 LED/m strip) from [supplier]
-        - 24V LED driver from [supplier]
-        - Custom PCB from JLCPCB
-        - 3D printed enclosure (PETG)
+- type: dropdown
+  id: build-stage
+  attributes:
+    label: Build Stage
+    description: Where in the build process are you?
+    options:
+    - Planning/Sourcing Parts
+    - PCB Assembly
+    - 3D Printing
+    - Camera Installation
+    - IR LED Setup
+    - Initial Testing
+    - Calibration
+    - Fully Built - Was Working
+    - Fully Built - Never Worked
+  validations:
+    required: true
 
-  - type: dropdown
-    id: pcb-version
-    attributes:
-      label: PCB Version
-      description: Which connector board version?
-      options:
-        - v1.0 (Original)
-        - v1.1 (Current)
-        - Custom/Modified
-        - Not using PCB
-        - Unknown
+- type: textarea
+  id: parts-list
+  attributes:
+    label: Parts Used
+    description: List the specific parts you're using (with links if possible)
+    placeholder: |
+      - Pi 5 8GB from [supplier]
+      - Pi Global Shutter Camera x2 from [supplier]
+      - 730nm IR LEDs (60 LED/m strip) from [supplier]
+      - 24V LED driver from [supplier]
+      - Custom PCB from JLCPCB
+      - 3D printed enclosure (PETG)
 
-  - type: dropdown
-    id: enclosure-type
-    attributes:
-      label: Enclosure Type
-      description: What enclosure are you using?
-      options:
-        - Official 3D printed design (latest)
-        - Modified 3D printed design
-        - Custom enclosure
-        - No enclosure (open build)
+- type: dropdown
+  id: pcb-version
+  attributes:
+    label: PCB Version
+    description: Which connector board version?
+    options:
+    - v1.0 (Original)
+    - v1.1 (Current)
+    - Custom/Modified
+    - Not using PCB
+    - Unknown
 
-  - type: textarea
-    id: measurements
-    attributes:
-      label: Electrical Measurements
-      description: If relevant, provide voltage/current measurements
-      placeholder: |
-        - Power supply output: 24V measured
-        - LED driver output: 23.8V, 2.1A
-        - GPIO pin 17 voltage during strobe: 3.3V
-      render: shell
+- type: dropdown
+  id: enclosure-type
+  attributes:
+    label: Enclosure Type
+    description: What enclosure are you using?
+    options:
+    - Official 3D printed design (latest)
+    - Modified 3D printed design
+    - Custom enclosure
+    - No enclosure (open build)
 
-  - type: textarea
-    id: gpio-test
-    attributes:
-      label: GPIO Test Results
-      description: Run `pitrac test pulse` and paste output
-      render: shell
-      placeholder: Output of pitrac test pulse
+- type: textarea
+  id: measurements
+  attributes:
+    label: Electrical Measurements
+    description: If relevant, provide voltage/current measurements
+    placeholder: |
+      - Power supply output: 24V measured
+      - LED driver output: 23.8V, 2.1A
+      - GPIO pin 17 voltage during strobe: 3.3V
+    render: shell
 
-  - type: textarea
-    id: photos
-    attributes:
-      label: Photos/Diagrams
-      description: |
-        Please attach photos of:
-        - Your hardware setup
-        - Problem area close-ups
-        - Wiring/connections
-        - PCB assembly
-        
-        Drag and drop images here or paste links
+- type: textarea
+  id: gpio-test
+  attributes:
+    label: GPIO Test Results
+    description: Run `pitrac test pulse` and paste output
+    render: shell
+    placeholder: Output of pitrac test pulse
 
-  - type: dropdown
-    id: ir-setup
-    attributes:
-      label: IR LED Configuration
-      description: Describe your IR illumination setup
-      multiple: true
-      options:
-        - Using recommended 730nm LEDs
-        - Using 850nm LEDs (incorrect)
-        - LED strip configuration
-        - Individual LED array
-        - Custom LED driver circuit
-        - Using provided driver schematic
-        - Modified power configuration
+- type: textarea
+  id: photos
+  attributes:
+    label: Photos/Diagrams
+    description: |
+      Please attach photos of:
+      - Your hardware setup
+      - Problem area close-ups
+      - Wiring/connections
+      - PCB assembly
 
-  - type: textarea
-    id: camera-mounting
-    attributes:
-      label: Camera Setup Details
-      description: Describe your camera mounting
-      placeholder: |
-        - Distance between cameras: [cm]
-        - Height above hitting surface: [cm]
-        - Angle to target: [degrees]
-        - Lens type: [6mm/8mm/12mm]
-        - Focus setting: [near/far/infinity]
+      Drag and drop images here or paste links
 
-  - type: dropdown
-    id: power-config
-    attributes:
-      label: Power Configuration
-      description: How is your system powered?
-      options:
-        - Official Raspberry Pi PSU
-        - Third-party USB-C PD supply
-        - ATX/PC power supply
-        - Multiple power supplies
-        - Battery powered
-        - Other
+- type: dropdown
+  id: ir-setup
+  attributes:
+    label: IR LED Configuration
+    description: Describe your IR illumination setup
+    multiple: true
+    options:
+    - Using recommended 730nm LEDs
+    - Using 850nm LEDs (incorrect)
+    - LED strip configuration
+    - Individual LED array
+    - Custom LED driver circuit
+    - Using provided driver schematic
+    - Modified power configuration
 
-  - type: textarea
-    id: troubleshooting-tried
-    attributes:
-      label: Troubleshooting Attempted
-      description: What have you already tried?
-      placeholder: |
-        - Checked all connections with multimeter
-        - Replaced camera cable
-        - Tested with single camera
-        - Verified GPIO assignments
-        - Measured strobe timing with oscilloscope
+- type: textarea
+  id: camera-mounting
+  attributes:
+    label: Camera Setup Details
+    description: Describe your camera mounting
+    placeholder: |
+      - Distance between cameras: [cm]
+      - Height above hitting surface: [cm]
+      - Angle to target: [degrees]
+      - Lens type: [6mm/8mm/12mm]
+      - Focus setting: [near/far/infinity]
 
-  - type: dropdown
-    id: tools-available
-    attributes:
-      label: Available Test Equipment
-      description: What tools do you have for debugging?
-      multiple: true
-      options:
-        - Multimeter
-        - Oscilloscope
-        - Logic analyzer
-        - USB power meter
-        - IR camera/phone camera
-        - Spare components
-        - None
+- type: dropdown
+  id: power-config
+  attributes:
+    label: Power Configuration
+    description: How is your system powered?
+    options:
+    - Official Raspberry Pi PSU
+    - Third-party USB-C PD supply
+    - ATX/PC power supply
+    - Multiple power supplies
+    - Battery powered
+    - Other
 
-  - type: textarea
-    id: build-deviations
-    attributes:
-      label: Deviations from Standard Build
-      description: Any modifications or substitutions from the official design?
-      placeholder: |
-        List any changes like:
-        - Using different LED strips
-        - Modified PCB design
-        - Alternative mounting solution
-        - Different camera models
+- type: textarea
+  id: troubleshooting-tried
+  attributes:
+    label: Troubleshooting Attempted
+    description: What have you already tried?
+    placeholder: |
+      - Checked all connections with multimeter
+      - Replaced camera cable
+      - Tested with single camera
+      - Verified GPIO assignments
+      - Measured strobe timing with oscilloscope
 
-  - type: dropdown
-    id: discord-contact
-    attributes:
-      label: Discord Contact
-      description: Can we reach out to you on Discord about this hardware issue?
-      options:
-        - "Yes, I'm active on the PiTrac Discord"
-        - "No, please contact me through GitHub only"
-    validations:
-      required: true
+- type: dropdown
+  id: tools-available
+  attributes:
+    label: Available Test Equipment
+    description: What tools do you have for debugging?
+    multiple: true
+    options:
+    - Multimeter
+    - Oscilloscope
+    - Logic analyzer
+    - USB power meter
+    - IR camera/phone camera
+    - Spare components
+    - None
 
-  - type: input
-    id: discord-username
-    attributes:
-      label: Discord Username
-      description: What's your username on the PiTrac Discord server? (Leave blank if you prefer GitHub contact)
-      placeholder: "username#1234 or @username"
+- type: textarea
+  id: build-deviations
+  attributes:
+    label: Deviations from Standard Build
+    description: Any modifications or substitutions from the official design?
+    placeholder: |
+      List any changes like:
+      - Using different LED strips
+      - Modified PCB design
+      - Alternative mounting solution
+      - Different camera models
+
+- type: dropdown
+  id: discord-contact
+  attributes:
+    label: Discord Contact
+    description: Can we reach out to you on Discord about this hardware issue?
+    options:
+    - "Yes, I'm active on the PiTrac Discord"
+    - "No, please contact me through GitHub only"
+  validations:
+    required: true
+
+- type: input
+  id: discord-username
+  attributes:
+    label: Discord Username
+    description: What's your username on the PiTrac Discord server? (Leave blank if you prefer GitHub contact)
+    placeholder: "username#1234 or @username"

@@ -737,7 +737,16 @@ bool ConfigureLibCameraOptions(RPiCamEncoder& app, const cv::Vec2i& cropping_win
     options->shutter.set(shutter_speed_string);   // TBD - should be 1,000,000 for uS setting
 
     options->timeout.set("0ms");
-    options->denoise = "cdn_off";
+
+    const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot1CameraType;
+    if (camera_model != CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+        options->denoise = "cdn_off";
+    }
+    else {
+        options->denoise = "auto";
+    }
+
+        GS_LOG_TRACE_MSG(trace, "Camera denoise option set to: " + options->denoise);
     options->framerate = cropped_frame_rate_fps;
     options->nopreview = true;
     options->lores_width = 0;
@@ -1083,7 +1092,15 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
         options->gain = camera_gain;
         options->contrast = camera_contrast;
         options->timeout.set("5s");
-        options->denoise = "cdn_off";
+        const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot1CameraType;
+        if (camera_model != CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+            options->denoise = "cdn_off";
+        }
+        else {
+            options->denoise = "auto";
+        }
+
+        GS_LOG_TRACE_MSG(trace, "Camera denoise option set to: " + options->denoise);
         options->immediate = true;  // TBD - Trying this for now.  May have to work on white balance too
         options->awb = "indoor"; // TBD - Trying this for now.  May have to work on white balance too
         options->nopreview = true;
@@ -1366,7 +1383,15 @@ bool WaitForCam2Trigger(cv::Mat& return_image) {
 
         options->immediate = true;
         options->timeout.set("0ms");  // Wait forever for external trigger
-        options->denoise = "cdn_off";
+        const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot1CameraType;
+        if (camera_model != CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+            options->denoise = "cdn_off";
+        }
+        else {
+            options->denoise = "auto";
+        }
+
+        GS_LOG_TRACE_MSG(trace, "Camera denoise option set to: " + options->denoise);
         options->nopreview = true;
         // TBD - Currently, we are using the viewfinder stream to take the picture.  Should be corrected.
         options->viewfinder_width = c.camera_hardware_.resolution_x_;

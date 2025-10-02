@@ -493,7 +493,7 @@ https://github.com/digdeeproots/provable-refactorings
 #### Build Failures
 - Make many small and reversible changes
 - Test on a clean environment regularly
-- Aim to improve the [pipeline](https://github.com/jamespilgrim/PiTrac/blob/a3b3f1baad0ded3066b0c9585ce4879ef6314d18/.github/workflows/camera-tests.yml) test coverage
+- Aim to improve the [pipeline](https://github.com/pitraclm/pitrac/blob/a3b3f1baad0ded3066b0c9585ce4879ef6314d18/.github/workflows/camera-tests.yml) test coverage
 - Maintain a working baseline with frequent small pull requests and short lived branches
 
 #### Integration Issues  

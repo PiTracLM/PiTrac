@@ -23,7 +23,7 @@ This guide will walk you through getting PiTrac up and running on your Raspberry
 First, clone the PiTrac repository to your Raspberry Pi:
 
 ```bash
-git clone https://github.com/jamespilgrim/PiTrac.git
+git clone https://github.com/pitraclm/pitrac.git
 cd PiTrac
 ```
 

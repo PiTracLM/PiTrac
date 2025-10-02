@@ -12,5 +12,5 @@ You'll want to paint on supports and support-exclusions so that the only places 
 
 **Assembly Notes:**
 
-See the [main assembly instructions](https://github.com/jamespilgrim/PiTrac/blob/main/Documentation/PiTrac%20Version%202%20Assembly.md).
+See the [main assembly instructions](https://github.com/pitraclm/pitrac/blob/main/Documentation/PiTrac%20Version%202%20Assembly.md).
 Ultimately, the two parts will be glued together with something like thick, slower-drying super-glue such as Starbond Gap Filler Thick High Performance Super Glue.

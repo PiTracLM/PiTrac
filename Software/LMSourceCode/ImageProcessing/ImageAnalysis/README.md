@@ -221,7 +221,7 @@ TEST(OpenCVAnalyzerTest, DetectsTeedBall) {
 
 ### Related Documentation
 - **Camera Bounded Context**: 
-[Pull Request](https://github.com/jamespilgrim/PiTrac/pull/87) Provides camera abstractions and calibration data.
+[Pull Request](https://github.com/pitraclm/pitrac/pull/87) Provides camera abstractions and calibration data.
 
 ## Camera Bounded Context Integration
 

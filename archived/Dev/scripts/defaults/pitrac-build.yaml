@@ -1,5 +1,5 @@
 # PiTrac Build Configuration
-pitrac-repo: https://github.com/jamespilgrim/PiTrac.git
+pitrac-repo: https://github.com/pitraclm/pitrac.git
 # Branch to checkout (main, develop, feature/xxx, etc)
 pitrac-branch: main
 # Pull request number to checkout (overrides branch if set)
@@ -15,4 +15,5 @@ configure-shell: 0
 build-cores: 0
 # Set to 1 to clean build directory before building
 clean-build: 0
+
 # Note: Camera types and paths are read from environment variables set by pitrac-environment

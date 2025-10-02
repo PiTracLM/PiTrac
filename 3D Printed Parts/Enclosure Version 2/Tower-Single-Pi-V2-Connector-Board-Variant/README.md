@@ -20,7 +20,7 @@ Recommended print settings: 2 perimeter layers, 15% infill, grid or rectilinear 
 
 Please note that the default version is setup to accept 4 M2.5 and 4 M3 inner-diameter screw-in (or melt-in) inserts in which to screw the Pi and the V2 Connector Board.  If you want to instead simply use self-threading screws, change the values in the Monitor Chassis Parameters spreadsheet in rows 104 (GsPi5MountingHoleDiameter) and 110 (GSConnectorBoardMountingHoleDiameter).
 
-See the [main assembly instructions](https://jamespilgrim.github.io/PiTrac/hardware/assembly-guide.html).
+See the [main assembly instructions](https://pitraclm.github.io/PiTrac/hardware/assembly-guide.html).
 Ultimately, the four parts will be glued together with something like thick, slower-drying super-glue such as Starbond Gap Filler Thick High Performance Super Glue and then screwed together with 
 12 M2 x 6 self-tapping screws for additional strength in the lap joint (if desired).
 
