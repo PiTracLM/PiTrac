@@ -233,11 +233,26 @@ class CalibrationManager:
                 api_result = api_task.result()
                 if api_result["completed"]:
                     logger.info(f"Session {session_id}: Calibration completed via API callbacks")
+                    CLEANUP_GRACE_PERIOD = 10.0  # seconds
+                    logger.info(
+                        f"Session {session_id}: Waiting up to {CLEANUP_GRACE_PERIOD}s for process to finish cleanup"
+                    )
+
+                    try:
+                        exit_code = await asyncio.wait_for(process.wait(), timeout=CLEANUP_GRACE_PERIOD)
+                        logger.info(f"Session {session_id}: Process exited naturally with code {exit_code}")
+                    except asyncio.TimeoutError:
+                        logger.warning(
+                            f"Session {session_id}: Process did not exit within {CLEANUP_GRACE_PERIOD}s "
+                            "after API callbacks (may be hung)"
+                        )
+                        exit_code = process.returncode
+
                     return {
                         "completed": True,
                         "method": "api",
                         "api_success": True,
-                        "process_exit_code": process.returncode,
+                        "process_exit_code": exit_code,
                         "focal_length_received": api_result["focal_length_received"],
                         "angles_received": api_result["angles_received"],
                     }
@@ -538,14 +553,20 @@ class CalibrationManager:
                 if camera in self.current_processes:
                     proc = self.current_processes[camera]
                     if proc.returncode is None:
-                        logger.info(f"Terminating {camera} process")
+                        logger.info(f"{camera} process still running after completion, waiting for graceful exit...")
                         try:
-                            proc.terminate()
-                            await asyncio.wait_for(proc.wait(), timeout=5.0)
+                            await asyncio.wait_for(proc.wait(), timeout=3.0)
+                            logger.info(f"{camera} process exited gracefully")
                         except asyncio.TimeoutError:
-                            logger.warning(f"Force killing {camera} process")
-                            proc.kill()
-                            await proc.wait()
+                            logger.warning(f"Terminating {camera} process after timeout")
+                            try:
+                                proc.terminate()
+                                await asyncio.wait_for(proc.wait(), timeout=5.0)
+                                logger.info(f"{camera} process terminated")
+                            except asyncio.TimeoutError:
+                                logger.warning(f"Force killing {camera} process")
+                                proc.kill()
+                                await proc.wait()
                     del self.current_processes[camera]
 
     async def _run_camera2_auto_calibration(self) -> Dict[str, Any]:
