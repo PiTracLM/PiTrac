@@ -14,4 +14,4 @@ This section covers integrating PiTrac with third-party golf simulators and othe
 - **[TruGolf Integration]({% link integration/trugolf-integration.md %})** - Connect PiTrac to TruGolf/E6 simulators
 - **[Open Interface Specification]({% link integration/open-interface.md %})** - PiTrac's open interface specification
 
-Before setting up integrations, ensure your PiTrac system is working properly by following the [Startup Guide]({% link software/startup-guide.md %}).
+Before setting up integrations, ensure your PiTrac system is working properly by following the [Startup Guide]({% link software/pitrac-install.md %}).

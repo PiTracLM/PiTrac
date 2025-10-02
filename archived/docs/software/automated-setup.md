@@ -333,13 +333,3 @@ And all you do is pick menu options. The system handles the rest.
 
 Your choice.
 
-## Next Steps
-
-System installed? Great! Now:
-1. Head to the [Startup Guide]({% link software/startup-guide.md %}) to test everything
-2. Check [Configuration]({% link software/configuration.md %}) for fine-tuning
-3. Start the [Camera Calibration]({% link camera/camera-calibration.md %}) process
-
-Or if something's not working, check the [Troubleshooting Guide]({% link troubleshooting/troubleshooting.md %}).
-
-Welcome to PiTrac. The hard part's done.

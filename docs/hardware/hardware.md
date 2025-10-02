@@ -16,4 +16,4 @@ This section covers all the physical components you'll need to build PiTrac, fro
 - **[3D Printing]({% link hardware/3d-printing.md %})** - Guide to printing the enclosure components
 - **[PCB Assembly]({% link hardware/pcb-assembly.md %})** - Instructions for building the connector board
 
-Before ordering parts, make sure to check the [Roadmap]({% link getting-started/roadmap.md %}) to understand which version you should build.
+Before ordering parts, make sure to check the [Roadmap]({% link roadmap.md %}) to understand which version you should build.

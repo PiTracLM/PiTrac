@@ -1,8 +1,8 @@
 ---
 title: Errata and Future Hopes
 layout: default
-nav_order: 5
-parent: Getting Started
+nav_order: 1.4
+parent: Home
 ---
 
 # Errata and Future Hopes for the DIY LM

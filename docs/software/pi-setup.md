@@ -10,47 +10,50 @@ toc: true
 
 # PiTrac - Raspberry Pi Setup and Configuration
 
-- [Summary](#summary)  
-- [Necessary & Recommended Components](#necessary--recommended-components)  
-  - [Standard Setup](#standard-setup)  
-    1. [Environment](#environment)  
-    2. [Operating System](#operating-system)  
-    3. [Log Into Pi](#log-into-pi)  
-    4. [Remote Log Into Pi](#remote-log-into-pi)  
-    5. [Sudo Privileges](#sudo-privileges)  
-    6. [Install NVME Board](#install-nvme-board)  
-    7. [NAS Drive Setup and Mounting](#nas-drive-setup-and-mounting)  
-    8. [Samba Server Setup](#samba-server-setup)  
-    9. [SSH Stored Key](#ssh-stored-key)  
-    10. [Additional Setup](#additional-setup)  
-    11. [Git and Github](#git-and-github)  
-    12. [Clock Configuration](#clock-configuration)  
-    13. [Build and Install OpenCV](#build-and-install-opencv)  
-    14. [Install Boost](#install-boost)  
-    15. [Build and Install LGPIO](#build-and-install-lgpio)  
-    16. [Build and Install Libcamera](#build-and-install-libcamera)  
-    17. [Build RPICAM-Apps](#build-rpicam-apps)  
-    18. [Install Java OpenJDK](#install-java-openjdk)  
-    19. [Install MsgPack](#install-msgpack)  
-    20. [Install ActiveMQ C++ CMS](#install-activemq-c-cms)  
-    21. [Install ActiveMQ Broker](#install-activemq-broker)  
-    22. [Install Maven](#install-maven)  
-    23. [Install Tomee](#install-tomee)  
-    24. [Install Launch Monitor Dependencies](#install-launch-monitor-dependencies)  
-- [Build Launch Monitor](#build-launch-monitor)  
-  - [Setup PiTrac](#setup-pitrac)
+> **Quick Start**: This guide covers Raspberry Pi OS installation and initial system configuration. Once complete, proceed to the [Startup Guide]({% link software/pitrac-install.md %}) to install PiTrac.
+
+## Table of Contents
+
+- [Summary](#summary)
+- [Necessary & Recommended Components](#necessary--recommended-components)
+  - [Standard Setup](#standard-setup)
+    1. [Environment](#environment)
+    2. [Operating System](#operating-system)
+    3. [Log Into Pi](#log-into-pi)
+    4. [Remote Log Into Pi](#remote-log-into-pi)
+    5. [Sudo Privileges](#sudo-privileges)
+    6. [Install NVME Board](#install-nvme-board) *(Optional)*
+    7. [NAS Drive Setup and Mounting](#nas-drive-setup-and-mounting) *(Optional)*
+    8. [Samba Server Setup](#samba-server-setup) *(Optional)*
+    9. [SSH Stored Key](#ssh-stored-key) *(Optional - recommended)*
+    10. [Additional Setup](#additional-setup)
+    11. [Git and GitHub](#git-and-github)
 
 ## Summary
 
-These instructions are targeted toward folks who do not have a lot of experience building software systems in the Pi Operating System and who could benefit from more step-by-step direction. Someone who's familiar with using tools like meson and ninja to build software can likely skip over many of these steps. However, the instructions contain a number of idiosyncratic steps and configuration requirements that are particular to PiTrac.
+This guide covers the **initial Raspberry Pi setup** for PiTrac, from installing the operating system to configuring your Pi for network access and basic system administration. It's designed for users of all experience levels, from beginners to experienced developers.
 
-These instructions start with a Raspberry Pi with nothing on it, and are meant to describe all the steps to get from that point to a working, compiled version of PiTrac.  PiTrac currently requires two Raspberry Pi's, so the majority of these instructions will have to be repeated twice.  Because the 'smaller' Pi system that connects to Camera 2 is the only Pi that handles the Tomcat/Tomee web-based GUI for the system, there are a few more steps for that system.
+**What's covered in this guide:**
+- Installing Raspberry Pi OS (Desktop or Lite, 64-bit only)
+- Using Raspberry Pi Imager to configure SSH, WiFi, username, and password
+- Initial system updates and user configuration
+- Optional advanced configurations (NVMe boot, NAS mounting, multi-Pi setups)
 
-NOTE - The new "single-pi" version of PiTrac does not have its own documentation yet.  Until then, please note that these instructions can work when using only a single Pi.  You just need to do everything with what we consider here to be the "Pi 1" system even if the instructions refer to the Pi 2 system.  For example, if a step in this document says "Log into the Pi 2 computer...", you will just log into the (only) Pi 1 system.
+**What's NOT covered here:**
+- Installing PiTrac software → See the [Startup Guide]({% link software/pitrac-install.md %})
+- Camera calibration → See the [Camera Documentation]({% link camera/cameras.md %})
+- Hardware assembly → See the [Assembly Guide]({% link hardware/assembly-guide.md %})
+
+**Current System Architecture:**
+- **Single Pi setup** is now standard (legacy dual-Pi configurations are still supported but not recommended for new builds)
+- All services (launch monitor, message broker, web interface) run on one Raspberry Pi
+- Simplified installation using pre-built packages
+
+> **Note**: Modern PiTrac uses a streamlined installation process with pre-built packages. You no longer need to manually build dependencies like OpenCV, ActiveMQ, or other libraries - the installation process handles everything automatically.
 
 ## Necessary & Recommended Components
 
-- A Raspberry Pi 4 and a Pi 5 with at least 4 GB of memory (8 GB recommend for the Pi 5\)  
+- A Raspberry Pi 5 with at least 8 GB of memory  
 - A Micro SD card with at least 64Gig  
 - Especially if you are planning on using the larger Pi 5 as a development environment, an NVMe hat with an NVMe SSD drive is a great investment.  
 - Power supplies for the Pi’s  
@@ -71,30 +74,154 @@ NOTE - The new "single-pi" version of PiTrac does not have its own documentation
 
 #### Operating System
 
-2. **Raspian O/S and Pi Initialization**  
-   a. Start with the Pi powered off (unplugged). Have a Cat5/6 cable connected to your local network plugged in if possible.  
-   b. On a PC, connect a Micro SD card via USB to use to boot the Pi for the first time.  
-      1. Use a 64 GB card so we have room to expand  
-   c. Install and run the [RPi Imager utility](https://www.raspberrypi.com/software/)  
-   d. Select Pi 4 or 5 for the device depending on what you have, for Operating System choose the 64-bit OS. Make sure the “Storage” is pointing to the MicroSD card (and not something like your hard drive!), as it will be overwritten entirely. Hit NEXT.  
-   e. Answer “EDIT SETTING” when asked if you want to apply customisations  
-      1. If you are American, ignore the clearly-incorrect spelling of “customization.” ;)  
-   f. In the **GENERAL** tab:  
-      1. Select a hostname that will easily distinguish between the two Pi’s in the system, such as `rsp01`, `rsp02`, etc.  
-      2. Add a `<PiTracUsername>` username that will be used to compile and run PiTrac, and that can log into your NAS, if you’re using a server (recommended). E.g., “pitrac” as a user (or just use “pi”).  
-         - This will be the username and password necessary to log into the system for the first time, so double-check you’ve verified both.  
-         - Use the actual username whenever you see `<PiTracUsername>` below.  
-      3. Make sure the wireless LAN credentials are set up in case you can’t connect a hard line.  
-   g. In the **SERVICES** tab:  
-      1. Enable SSH and use password authentication.  
-   h. After setting up the customizations, select YES to "apply OS customisation settings" to the card setup and start the write process.  
+2. **Installing Raspberry Pi OS**
 
-      ⏱️ **Time estimate:** About 20 minutes  
+   PiTrac requires Raspberry Pi OS (formerly Raspbian) **64-bit**. You have two options: **Desktop** or **Lite**. Understanding the differences will help you choose the right version for your setup.
 
-   i. Once the SD Card is written and verified, if you have a keyboard, mouse, and monitor, hook those up first. This can all be done via a remote login, but it’s nice to have a full user setup from the beginning if there are any issues.  
-   j. Insert the Micro SD card into the Pi and start up the Pi by plugging in the power (**do not** insert or disconnect the SD card when the Pi is on).  
+   **Raspberry Pi OS Desktop (64-bit)**
+   - Full graphical desktop environment (LXDE)
+   - Includes web browser, office apps, and utilities
+   - **Recommended for**: First-time users, those with monitor/keyboard/mouse, development work
+   - Disk space: ~2.5GB base installation
+   - Use when you want an easier, more visual setup experience
 
-   k. The first bootup takes a while. Better to monitor it with an attached monitor if possible.
+   **Raspberry Pi OS Lite (64-bit)**
+   - Command-line only (no graphical interface)
+   - Minimal installation with only essential packages
+   - **Recommended for**: Headless operation, experienced users, production deployments
+   - Disk space: ~500MB base installation
+   - Use when you want maximum performance and minimal overhead
+
+   > **Note for PiTrac**: Either version works perfectly. Desktop is easier for initial setup and troubleshooting, while Lite uses fewer system resources, leaving more available for camera processing. Most users choose Desktop during setup and can switch to Lite later if desired.
+
+   **Installation Steps**
+
+   a. **Prepare your hardware**
+      - Start with the Pi powered off (unplugged)
+      - Have a Cat5/6 ethernet cable connected to your local network if possible (recommended for faster downloads)
+      - On your PC/Mac, connect a Micro SD card via USB adapter
+      - Use a 64GB card minimum (32GB may work but 64GB recommended for room to expand)
+
+   b. **Download and install Raspberry Pi Imager**
+      - Download from [raspberrypi.com/software](https://www.raspberrypi.com/software/)
+      - Install for your operating system (Windows, macOS, or Ubuntu)
+      - Launch the application
+
+   c. **Select your device**
+      - Click "CHOOSE DEVICE"
+      - Select either "Raspberry Pi 4" or "Raspberry Pi 5" depending on your hardware
+      - This optimizes the OS for your specific Pi model
+
+   d. **Choose the operating system**
+      - Click "CHOOSE OS"
+      - Navigate to "Raspberry Pi OS (other)"
+      - Select **ONE** of the following (both are 64-bit):
+        - **"Raspberry Pi OS (64-bit)"** - This is the Desktop version with GUI
+        - **"Raspberry Pi OS Lite (64-bit)"** - This is the command-line only version
+      - **Important**: Only use 64-bit versions. Do not use the 32-bit versions.
+
+   e. **Select storage**
+      - Click "CHOOSE STORAGE"
+      - Select your Micro SD card
+      - **WARNING**: Triple-check this is your SD card and NOT your computer's hard drive! Everything on this storage will be erased.
+
+   f. **Configure OS customization settings**
+      - Click "NEXT"
+      - When prompted "Would you like to apply OS customisation settings?", click **"EDIT SETTINGS"**
+      - If you're American, feel free to ignore the British spelling of "customisation" ;)
+
+      **In the GENERAL tab:**
+
+      1. **Set hostname**
+         - Choose a descriptive hostname to identify your Pi on the network
+         - Examples: `pitrac`, `pitrac-main`, `rsp01`, `rsp02`
+         - This will be how you connect to the Pi (e.g., `ssh pitrac.local`)
+
+      2. **Set username and password**
+         - **Username**: Enter a username for your Pi account
+           - Recommended: `pitrac` or your preferred username
+           - This will be `<PiTracUsername>` throughout this documentation
+         - **Password**: Choose a strong password
+           - This is what you'll use to log in via SSH or at the console
+           - Write this down securely - you'll need it for first login
+           - Make sure "Password" checkbox is enabled
+
+      3. **Configure wireless LAN (WiFi)**
+         - **SSID**: Your WiFi network name
+         - **Password**: Your WiFi password
+         - **Wireless LAN country**: Select your country (required for regulatory compliance)
+         - This allows the Pi to connect to WiFi on first boot
+         - Even if using ethernet, configuring WiFi provides a backup connection method
+
+      4. **Set locale settings**
+         - **Time zone**: Select your timezone (e.g., `America/New_York`)
+         - **Keyboard layout**: Select your keyboard layout (e.g., `us` for US English)
+
+      **In the SERVICES tab:**
+
+      1. **Enable SSH**
+         - Check the box for "Enable SSH"
+         - This allows you to remotely connect to your Pi
+         - Select "Use password authentication"
+         - SSH is required for headless operation and remote management
+         - You can set up key-based authentication later for enhanced security (see step 10)
+
+      **In the OPTIONS tab:**
+
+      1. **Eject media when finished**
+         - Enable this option to safely eject the SD card after writing
+      2. **Enable telemetry**
+         - This is optional and sends anonymous usage statistics to Raspberry Pi Foundation
+
+   g. **Start the imaging process**
+      - Review all settings carefully
+      - Click "SAVE" to save your customization settings
+      - Click "YES" to apply OS customisation settings
+      - Click "YES" again to confirm you want to erase the SD card
+      - The imaging process will begin
+
+      ⏱**Time estimate**: 15-25 minutes depending on your SD card speed and internet connection
+
+      The imager will:
+      - Download the OS image if not cached
+      - Write the image to your SD card
+      - Verify the write was successful
+      - Apply your custom settings
+      - Eject the card (if enabled)
+
+   h. **First boot**
+      - Once the SD card is written and verified, eject it from your computer
+      - Insert the Micro SD card into your Pi's card slot
+         - **Never** insert or remove the SD card while the Pi is powered on
+      - If you have a keyboard, mouse, and monitor, connect them now
+         - Even for headless setups, having a monitor for first boot helps troubleshoot any issues
+      - Connect the ethernet cable (if using wired network)
+      - Finally, connect the power supply to boot the Pi
+
+   i. **First boot process**
+      - The first boot takes 2-3 minutes as the Pi:
+        - Expands the filesystem to use the full SD card
+        - Applies your custom settings (hostname, username, WiFi, SSH)
+        - Generates SSH host keys
+        - Connects to WiFi/network
+        - Resizes partitions
+      - The Pi will automatically reboot once during this process
+      - **Desktop version**: You'll see the LXDE desktop after boot completes
+      - **Lite version**: You'll see a login prompt at the console
+      - If using headless, wait 3-4 minutes then try to SSH (see next step)
+
+   j. **Find your Pi's IP address** (for SSH connection)
+      - **Option 1**: If you have a monitor connected, log in and run:
+        ```bash
+        hostname -I
+        ```
+      - **Option 2**: Check your router's DHCP client list
+      - **Option 3**: Use hostname with mDNS (usually works on local networks):
+        ```bash
+        ssh <PiTracUsername>@<hostname>.local
+        # Example: ssh pitrac@pitrac.local
+        ```
+      - **Option 4**: Use a network scanner like `nmap` or "Angry IP Scanner"
 
 #### Log into Pi
 
@@ -261,217 +388,3 @@ NOTE - The new "single-pi" version of PiTrac does not have its own documentation
        git config --global --add safe.directory "*"
        ```  
     2. Otherwise, Git Desktop and Visual Studio often have problems.
-
-#### Clock Configuration
-
-13. **Configure the clock to not vary** (as our timing is based on it!)  
-    1. `cd /boot/firmware`  
-    2. `sudo cp config.txt config.txt.ORIGINAL`  
-    3. `sudo vi config.txt`  
-    4. For Pi 4 & 5:  
-       - Set `force_turbo=1` in `/boot/firmware/config.txt`  
-       - Example:  
-         ```
-         # PiTrac MOD - force fast clock even at low load
-         force_turbo=1
-         ```  
-    5. For Pi 5 also add:  
-       - `arm_boost=1` in `/boot/firmware/config.txt`
-
-**CONGRATULATIONS!** - At this point, you've built the PiTrac software.
-
-
-### Nice-To-Haves
-
-**Nice-to-Haves for an easier-to-use development environment**
-
-2. The following steps are only for someone who’s a little new to linux and doesn’t already have a development environment setup the way they like it.  The following are just a few tools that (for the authors of the PiTrac project) seem to make things a little more efficient.  This setup deals with things like easy command-recall, file and command completion,making vi a little more like Visual Studio (for better or worse!), etc.  
-3. Z-shell and OhMyZa  
-   1. Connect to your raspberry Pi with SSH  
-   2. Install zsh :  
-      1. sudo apt-get update && sudo apt-get install zsh  
-      2. Edit your passwd configuration file to tell which shell to use for user pi :  
-         1. sudo vi /etc/passwd and change /bin/bash to /bin/zsh for the <PiTracUserName> (usually the last line)  
-         2. **WARNING:** Double-check the line in passwd is correct - you won’t be able to ssh back in if not!  
-         3. logout  
-   2. Reconnect to your raspberry, and  
-      1. If on login Zsh asks about the .z files, select 0 to create an empty .zshrc  
-      2. check that zsh is the shell with echo $0.  
-   2. Install OhMyZsh :  
-      1. sh -c "$(wget https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh -O -)"  
-   2. Disconnect from your instance and reconnect/re-login to it.  
-   3. Turn off  any zsh processing for any large git directories (otherwise,  it will make “cd” into a git directory freeze)  
-      1. cd <whatever directory you plan to build PiTrac in>  
-      2. git config --add oh-my-zsh.hide-status 1  
-      3. git config --add oh-my-zsh.hide-dirty 1  
-      4. NOTE - you may have to do this later if you don’t have the directory picked out yet  
-2. Install neovim  
-   1. Install NeoVim:  
-      1. sudo apt-get install neovim  
-         2. sudo apt-get install python3-neovim  
-   2. Install vundle into NVIM, (and not vim, as many online instructions assume!):  
-      1. git clone https://github.com/VundleVim/Vundle.vim.git ~/.config/nvim/bundle/Vundle.vim  
-      2. Configure neovim - Vundle does not work perfectly with nvim unless you make some changes  
-         1. Vi ~/.config/nvim/bundle/Vundle.vim/autoload/vundle.vim and change  
-         2. Change $HOME/.vim/bundle (should be near the end of the file) to $HOME/.config/nvim/bundle  
-      3. Note these comments:  
-         1. https://gist.github.com/lujiacn/520e3e8abfd1c1b39c30399222766ee8  
-         2. https://superuser.com/questions/1405420/i-really-need-help-installing-vundle-for-neovim  
-      2. Create the file /home/<PiTracUserName>/.config/nvim/init.vim and add:  
-         1. set nocompatible              " be iMproved, required  
-         2. filetype off                  " required  
-         3. " set the runtime path to include Vundle and initialize  
-         4. set rtp+=~/.config/nvim/bundle/Vundle.vim  
-         5. call vundle#begin()            " required  
-         6. Plugin 'VundleVim/Vundle.vim'  " required  
-         7. " ===================  
-         8. " my plugins here  
-         9. " ===================  
-         10. Plugin 'scrooloose/nerdtree'  
-         11. Plugin 'valloric/youcompleteme'  
-         12. " Plugin 'dracula/vim'  
-         13. " ===================  
-         14. " end of plugins  
-         15. " ===================  
-         16. call vundle#end()               " required  
-         17. filetype plugin indent on       " required  
-      2. Add any other plugins you want.  The above example establishes these two  
-         1. Plugin 'scrooloose/nerdtree'  
-         2. Plugin 'valloric/youcompleteme'  
-      2. Run vim and type :PluginInstall     in order to install the plug ins.  It will take a few moments to process.  
-      3. (Ignore anything on the net that refers to .vimrc - that’s not applicable if using nvim.
-
-Example .zshrc file – The highlighted bits at the end should be the only thing you need to add:  
-
-```zsh
-# If you come from bash you might have to change your $PATH.
-export PATH=.:/$HOME/bin:/usr/local/bin:$PATH
-
-# Path to your oh-my-zsh installation.
-export ZSH="$HOME/.oh-my-zsh"
-
-# Set name of the theme to load --- if set to "random", it will
-# load a random theme each time oh-my-zsh is loaded, in which case,
-# to know which specific one was loaded, run: echo $RANDOM_THEME
-# See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
-ZSH_THEME="robbyrussell"
-
-# Set list of themes to pick from when loading at random
-# Setting this variable when ZSH_THEME=random will cause zsh to load
-# a theme from this variable instead of looking in $ZSH/themes/
-# If set to an empty array, this variable will have no effect.
-# ZSH_THEME_RANDOM_CANDIDATES=( "robbyrussell" "agnoster" )
-
-# Uncomment the following line to use case-sensitive completion.
-# CASE_SENSITIVE="true"
-
-# Uncomment the following line to use hyphen-insensitive completion.
-# Case-sensitive completion must be off. _ and - will be interchangeable.
-# HYPHEN_INSENSITIVE="true"
-
-# Uncomment one of the following lines to change the auto-update behavior
-# zstyle ':omz:update' mode disabled  # disable automatic updates
-# zstyle ':omz:update' mode auto      # update automatically without asking
-# zstyle ':omz:update' mode reminder  # just remind me to update when it's time
-
-# Uncomment the following line to change how often to auto-update (in days).
-# zstyle ':omz:update' frequency 13
-
-# Uncomment the following line if pasting URLs and other text is messed up.
-# DISABLE_MAGIC_FUNCTIONS="true"
-
-# Uncomment the following line to disable colors in ls.
-# DISABLE_LS_COLORS="true"
-
-# Uncomment the following line to disable auto-setting terminal title.
-# DISABLE_AUTO_TITLE="true"
-
-# Uncomment the following line to enable command auto-correction.
-# ENABLE_CORRECTION="true"
-
-# Uncomment the following line to display red dots whilst waiting for completion.
-# You can also set it to another string to have that shown instead of the default red dots.
-# e.g. COMPLETION_WAITING_DOTS="%F{yellow}waiting...%f"
-# Caution: this setting can cause issues with multiline prompts in zsh < 5.7.1 (see #5765)
-# COMPLETION_WAITING_DOTS="true"
-
-# Uncomment the following line if you want to disable marking untracked files
-# under VCS as dirty. This makes repository status check for large repositories
-# much, much faster.
-# DISABLE_UNTRACKED_FILES_DIRTY="true"
-
-# Uncomment the following line if you want to change the command execution time
-# stamp shown in the history command output.
-# You can set one of the optional three formats:
-# "mm/dd/yyyy"|"dd.mm.yyyy"|"yyyy-mm-dd"
-# or set a custom format using the strftime function format specifications,
-# see 'man strftime' for details.
-# HIST_STAMPS="mm/dd/yyyy"
-
-# Would you like to use another custom folder than $ZSH/custom?
-# ZSH_CUSTOM=/path/to/new-custom-folder
-
-# Which plugins would you like to load?
-# Standard plugins can be found in $ZSH/plugins/
-# Custom plugins may be added to $ZSH_CUSTOM/plugins/
-# Example format: plugins=(rails git textmate ruby lighthouse)
-# Add wisely, as too many plugins slow down shell startup.
-plugins=(git)
-
-source $ZSH/oh-my-zsh.sh
-
-# User configuration
-
-# export MANPATH="/usr/local/man:$MANPATH"
-
-# You may need to manually set your language environment
-# export LANG=en_US.UTF-8
-
-# Preferred editor for local and remote sessions
-# if [[ -n $SSH_CONNECTION ]]; then
-#   export EDITOR='vim'
-# else
-#   export EDITOR='mvim'
-# fi
-
-# Compilation flags
-# export ARCHFLAGS="-arch x86_64"
-
-# Set personal aliases, overriding those provided by oh-my-zsh libs,
-# plugins, and themes. Aliases can be placed here, though oh-my-zsh
-# users are encouraged to define aliases within the ZSH_CUSTOM folder.
-# For a full list of active aliases, run `alias`.
-#
-# Example aliases
-# alias zshconfig="mate ~/.zshrc"
-# alias ohmyzsh="mate ~/.oh-my-zsh"
-#
-
-alias cdlm='cd  /mnt/PiTracShare/GolfSim/LM/ImageProcessing'
-alias cdlml='cd  ~/Dev/LaunchMonitor/ImageProcessing'
-alias cdlc='cd  /mnt/PiTracShare/GolfSim/LibCamTest'
-alias cdserv='cd /usr/share/tomcat9-examples/examples/WEB-INF/classes/async'
-alias ll='ls -al'
-function findtext() {
-grep -rni "$1" .
-}
-
-# Some useful navigation aliases
-
-alias pushdd="pushd \$PWD > /dev/null"
-alias cd='pushdd;cd'
-alias ssh='ssh -A'
-alias soc='source ~/.bashrc'
-#below to go back to a previous directory (or more)
-alias popdd='popd >/dev/null'
-alias cd.='popdd'
-alias cd..='popdd;popdd'
-alias cd...='popdd;popdd;popdd'
-alias cd....='popdd;popdd;popdd;popdd'
-#below to remove directories from the stack only (do not 'cd' anywhere)
-alias .cd='popd -n +0'
-alias ..cd='popd -n +0;popd -n +0;popd -n +0'
-
-# Enable vi mode
-bindkey -v # Enable vi mode
-```

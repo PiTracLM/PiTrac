@@ -1,8 +1,8 @@
 ---
 title: Roadmap
 layout: default
-nav_order: 3
-parent: Getting Started
+nav_order: 1.3
+parent: Home
 ---
 
 # PiTrac Roadmap (as of June 23, 2025)

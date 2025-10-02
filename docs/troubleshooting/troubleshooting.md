@@ -14,5 +14,4 @@ This section covers debugging, troubleshooting, and development guides for PiTra
 - **[Debugging Guide]({% link troubleshooting/debugging-guide.md %})** - Code walk-throughs and debugging techniques
 - **[Testing Without Hardware]({% link troubleshooting/testing-without-hardware.md %})** - Test image processing without cameras
 
-For immediate help during setup, also refer to:
-- [Startup Guide]({% link software/startup-guide.md %}) - Hardware testing procedures
+

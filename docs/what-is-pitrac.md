@@ -1,10 +1,10 @@
 ---
 title: What is PiTrac?
 layout: default
-nav_order: 1
-parent: Getting Started
+nav_order: 1.2
 description: Learn about PiTrac, the open-source DIY golf launch monitor that measures ball speed, launch angles, and spin using affordable Raspberry Pi hardware and infrared strobe imaging.
 keywords: PiTrac introduction, golf launch monitor DIY, ball speed measurement, launch angle tracking, spin rate analysis, raspberry pi camera
+parent: Home
 ---
 
 # PiTrac - What is it? And What is it Not?
@@ -37,7 +37,7 @@ It's not cheap, even by rich-country standards.  We hope to continually push the
 
 It's not a golf simulator.  Users will likely still need to hook PiTrac up to a simulator like GsPro or E6 (both of whom do a great job with that and at price points that many people can afford).  But who knows?  Maybe an open source simulator is in the works somewhere?
 
-It's not simple to make or to use.  Making the system currently requires some decent technical chops, including working in Linux programming environments.
+It's not simple to make and may require a bit of tuning to use.  Making the system currently requires some decent technical chops, including working in Linux.
 
 ---
 *Raspberry Pi is a trademark of Raspberry Pi Ltd.  The PiTrac project is not endorsed, sponsored by or associated with Raspberry Pi or Raspberry Pi products or services.*
