@@ -35,7 +35,7 @@ module.exports = [
             'no-trailing-spaces': 'error',
             'no-unused-vars': ['error', {
                 'argsIgnorePattern': '^_|^e$',
-                'varsIgnorePattern': '^(saveChanges|resetAll|reloadConfig|showDiff|exportConfig|importConfig|filterConfig|closeModal|setTheme|openImage|resetShot|controlPiTrac|startBtn|stopBtn|restartBtn)$'
+                'varsIgnorePattern': '^(saveChanges|resetAll|reloadConfig|showDiff|exportConfig|importConfig|filterConfig|closeModal|setTheme|openImage|resetShot|controlPiTrac|startBtn|stopBtn|restartBtn|calibration)$'
             }],
             'no-console': ['warn', { 'allow': ['warn', 'error'] }],
             'comma-dangle': ['error', 'never'],

@@ -30,18 +30,16 @@ namespace golf_sim {
         };
 
         if (result_table.count(t) == 0) {
-            s = "SYSTEM ERROR:  Invalid GsIPCControlMsgType: " + std::to_string((int)t);
+            return "SYSTEM ERROR:  Invalid GsIPCControlMsgType: " + std::to_string((int)t);
         }
-        s = result_table[t];
-
-        return s;
+        return result_table[t];
     }
 
     std::string GsIPCControlMsg::Format() const {
 
         std::string control_type = FormatControlMessageType(control_type_);
 
-        std::string s = "GsIPCControlMsg:  ControlTyp9e: " +  control_type + ".";
+        std::string s = "GsIPCControlMsg:  ControlType: " +  control_type + ".";
 
         return s;
     }

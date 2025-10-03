@@ -23,6 +23,8 @@ add_global_arguments('-D_FILE_OFFSET_BITS=64', language : 'cpp')
 add_global_arguments('-DLIBCXX_ENABLE_INCOMPLETE_FEATURES=ON', language : 'cpp')
 add_global_arguments('-DBOOST_LOG_DYN_LINK', language : 'cpp')
 add_global_arguments('-DBOOST_BIND_GLOBAL_PLACEHOLDERS', language : 'cpp')
+# Enable XNNPACK execution provider for ONNX Runtime
+add_global_arguments('-DUSE_XNNPACK', language : 'cpp')
 
 
 fs = import('fs')
@@ -43,7 +45,19 @@ if cxx.get_id() == 'gcc'
 endif
 
 if cpu == 'aarch64' or neon == 'arm64'
-    cpp_arguments += '-ftree-vectorize'
+    cpp_arguments += [
+        '-mcpu=cortex-a76',
+        '-ftree-vectorize',
+        '-falign-functions=16',
+        '-falign-loops=16',
+        '-fomit-frame-pointer',
+        '-ffast-math',  # Includes funsafe-math-optimizations, fno-signed-zeros, fno-trapping-math
+        # XNNPACK-specific optimizations
+        '-funroll-loops',           # Better for XNNPACK's compute kernels
+        '-fprefetch-loop-arrays',   # Improve cache utilization
+        '-falign-jumps=16',         # Better branch prediction
+        '-moutline-atomics'         # Better for Pi4/5 atomic operations
+    ]
 elif neon == 'armv8-neon'
     cpp_arguments += ['-mfpu=neon-fp-armv8', '-ftree-vectorize']
 endif
@@ -63,14 +77,15 @@ boost_dep = dependency('boost', method: 'pkg-config', version : '>=1.74.0', modu
 
 msgpack_dep = dependency('msgpack-cxx', required : true)
 yamlcpp_dep = dependency('yaml-cpp', required : true)
+onnxruntime_dep = dependency('onnxruntime', required : true)
 
 rpicam_app_src = []
 rpicam_app_dep = [libcamera_dep, lgpio_dep]
 
 
 pitrac_lm_module_deps = [
-	libcamera_dep, thread_dep, opencv_dep, lgpio_dep, rpicam_app_dep, 
-	fmt_dep, boost_dep, activemq_dep, ssl_dep, apr_dep, msgpack_dep, yamlcpp_dep,]
+	libcamera_dep, thread_dep, opencv_dep, lgpio_dep, rpicam_app_dep,
+	fmt_dep, boost_dep, activemq_dep, ssl_dep, apr_dep, msgpack_dep, yamlcpp_dep, onnxruntime_dep,]
 
 
 
@@ -163,6 +178,7 @@ pitrac_lm_sources += ([
 			'ball_watcher_image_buffer.cpp',
 			'libcamera_jpeg.cpp',
 			'ball_image_proc.cpp',
+			'onnx_runtime_detector.cpp',
 			'pulse_strobe.cpp',
 			'colorsys.cpp',
 			'cv_utils.cpp',

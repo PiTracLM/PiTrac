@@ -378,6 +378,13 @@
     color: var(--text-secondary);
 }
 
+.completion-details {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--success);
+    line-height: 1.4;
+}
+
 .calibration-log {
     margin-top: 2rem;
 }

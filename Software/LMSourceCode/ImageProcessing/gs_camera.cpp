@@ -2510,7 +2510,7 @@ namespace golf_sim {
                                     time_between_ball_images_uS,
                                     return_balls_and_timings);
 
-            GS_LOG_TRACE_MSG(trace, "The time between the center-most two images is: " + std::to_string((double)time_between_ball_images_uS/1000.0) + "ms.");
+            GS_LOG_MSG(info, "Time between center-most images: " + std::to_string((double)time_between_ball_images_uS/1000.0) + "ms");
 
             // This is a "final" image, so we want to store it
             ShowAndLogBalls("AnalyzeStrobedBall_Final_Candidate_Balls", strobed_balls_color_image, return_balls, true, most_centered_ball_index, second_ball_index);
@@ -2714,7 +2714,7 @@ namespace golf_sim {
 
                 // Square to highlight/emphasize larger errors
                 single_ratio_difference = pow(single_ratio_difference, 2);
-                GS_LOG_TRACE_MSG(trace, "   single_ratio_difference: " + std::to_string(single_ratio_difference));
+                // Removed excessive per-element logging
 
                 difference_in_ratios += single_ratio_difference;
             }
@@ -2802,8 +2802,12 @@ namespace golf_sim {
             std::vector<double>test_pulse_ratios;
             std::vector<float>test_pulse_intervals;
             
-            bool result = GetPulseIntervalsAndRatios(PulseStrobe::GetPulseIntervals(), test_pulse_intervals, test_pulse_ratios);
+            std::vector<float> pulse_intervals_from_strobe = PulseStrobe::GetPulseIntervals();
+            GS_LOG_TRACE_MSG(trace, "About to call GetPulseIntervalsAndRatios with " + std::to_string(pulse_intervals_from_strobe.size()) + " pulse intervals");
 
+            bool result = GetPulseIntervalsAndRatios(pulse_intervals_from_strobe, test_pulse_intervals, test_pulse_ratios);
+
+            GS_LOG_TRACE_MSG(trace, "GetPulseIntervalsAndRatios returned: " + std::to_string(result));
             LoggingTools::Trace( "The pulse_interval ratios were: ", test_pulse_ratios);
 
             // Look at each pulse interval ratio that we have and see which is closest to the ratio(s) that 
@@ -2968,7 +2972,14 @@ namespace golf_sim {
                     GsBallAndTimingElement be;
                     be.ball = b;
                     if (i > 0) {
-                        be.time_interval_before_ball_us = 1000 * pulse_intervals[best_final_offset_of_distance_ratios + i - 1];
+                        size_t interval_index = best_final_offset_of_distance_ratios + i - 1;
+                        if (interval_index < pulse_intervals.size()) {
+                            be.time_interval_before_ball_us = 1000 * pulse_intervals[interval_index];
+                        } else {
+                            GS_LOG_MSG(warning, "Pulse interval index " + std::to_string(interval_index) +
+                                     " out of bounds (size: " + std::to_string(pulse_intervals.size()) + ")");
+                            be.time_interval_before_ball_us = 0;
+                        }
                     }
                     return_balls_and_timing.push_back(be);
                 }
@@ -2981,12 +2992,26 @@ namespace golf_sim {
                 if (second_ball_index > most_centered_ball_index) {
                     // The correct interval is the right one, as ball2 is to the right
                     // of the middle ball.  Because of the sort we just did, this will also
-                    // be correct for left-handed playing, where the  
-                    time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[most_centered_ball_index + best_final_offset_of_distance_ratios]);
+                    // be correct for left-handed playing, where the
+                    size_t interval_index = most_centered_ball_index + best_final_offset_of_distance_ratios;
+                    if (interval_index < pulse_intervals.size()) {
+                        time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[interval_index]);
+                    } else {
+                        GS_LOG_MSG(warning, "Time interval index " + std::to_string(interval_index) +
+                                 " out of bounds (size: " + std::to_string(pulse_intervals.size()) + ")");
+                        time_between_ball_images_uS = 0;
+                    }
                 }
                 else {
                     // Ball2 is to the left of the middle ball.
-                    time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[most_centered_ball_index + best_final_offset_of_distance_ratios - 1]);
+                    size_t interval_index = most_centered_ball_index + best_final_offset_of_distance_ratios - 1;
+                    if (interval_index < pulse_intervals.size()) {
+                        time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[interval_index]);
+                    } else {
+                        GS_LOG_MSG(warning, "Time interval index " + std::to_string(interval_index) +
+                                 " out of bounds (size: " + std::to_string(pulse_intervals.size()) + ")");
+                        time_between_ball_images_uS = 0;
+                    }
                 }
 
             }
@@ -3155,6 +3180,14 @@ namespace golf_sim {
 
                 // Collapse
                 for (int i = 0; i < number_pulses_to_collapse; i++) {
+                    // After each erase(), the vector shrinks, so we must recheck bounds
+                    if (collapse_offset + 1 >= (int)working_pulse_intervals.size()) {
+                        GS_LOG_MSG(warning, "GetPulseIntervalsAndRatios: Cannot collapse more intervals - " +
+                                 std::to_string(i) + " of " + std::to_string(number_pulses_to_collapse) +
+                                 " completed, vector size now " + std::to_string(working_pulse_intervals.size()));
+                        break;
+                    }
+
                     working_pulse_intervals[collapse_offset] += working_pulse_intervals[collapse_offset + 1];
 
                     // The erase() will both remove the collapsed element and also move the remaining element(s)
@@ -3163,14 +3196,14 @@ namespace golf_sim {
                 }
             }
 
-            LoggingTools::Trace("Collapsed pulse vector is: ", working_pulse_intervals);
+            // Collapsed pulse vector logging removed - was too verbose even for trace level
 
             pulse_pause_intervals = working_pulse_intervals;
 
 
             // Now, calculate the resulting ratios
-            // 
-            // The "- 2" deals with having a 0 at the end of the sequence. 
+            //
+            // The "- 2" deals with having a 0 at the end of the sequence.
             pulse_pause_ratios.clear();
 
             for (size_t i = 0; i < pulse_pause_intervals.size() - 1; i++) {
@@ -3278,7 +3311,11 @@ namespace golf_sim {
 
             cv::Mat strobed_balls_gray_image;
 
+            auto grayscale_start = std::chrono::high_resolution_clock::now();
             cv::cvtColor(strobed_balls_color_image, strobed_balls_gray_image, cv::COLOR_BGR2GRAY);
+            auto grayscale_end = std::chrono::high_resolution_clock::now();
+            auto grayscale_duration = std::chrono::duration_cast<std::chrono::microseconds>(grayscale_end - grayscale_start);
+            GS_LOG_MSG(info, "Grayscale conversion completed in " + std::to_string(grayscale_duration.count()) + "us");
 
             const CameraHardware::CameraModel  camera_1_model = GolfSimCamera::kSystemSlot1CameraType;
             const CameraHardware::LensType  camera_lens_type = GolfSimCamera::kSystemSlot1LensType;
@@ -4130,7 +4167,10 @@ namespace golf_sim {
             sleep(6);
 
             // Get the image that the IPC system should have saved
-            color_image = GolfSimIpcSystem::last_received_image_;
+            {
+                std::lock_guard<std::mutex> lock(GolfSimIpcSystem::last_received_image_mutex_);
+                color_image = GolfSimIpcSystem::last_received_image_.clone();
+            }
 
             if (color_image.empty()) {
                 GS_LOG_MSG(error, "FAILED to find an image from the IPC system.");
@@ -4323,6 +4363,15 @@ namespace golf_sim {
             camera_angles[0] = x_angle_degrees_of_ball_lm_perspective - x_angle_degrees_of_ball_camera_perspective;
             camera_angles[1] = y_angle_degrees_of_ball_lm_perspective - y_angle_degrees_of_ball_camera_perspective;
 
+            const double kMaxReasonableAngle = 45.0;
+            if (std::abs(camera_angles[0]) > kMaxReasonableAngle || std::abs(camera_angles[1]) > kMaxReasonableAngle) {
+                GS_LOG_MSG(error, "GolfSimCamera::DetermineCameraAngles computed invalid camera angles: " +
+                    std::to_string(camera_angles[0]) + ", " + std::to_string(camera_angles[1]) +
+                    " degrees. Angles must be within +/- " + std::to_string(kMaxReasonableAngle) +
+                    " degrees. Rejecting calibration.");
+                return false;
+            }
+
             GS_LOG_TRACE_MSG(trace, "GolfSimCamera::DetermineCameraAngles computed angles to the camera of: " +
                 std::to_string(camera_angles[0]) + ", " +
                 std::to_string(camera_angles[1]));
@@ -4394,10 +4443,24 @@ namespace golf_sim {
             // should be pretty tight
             double expectedRadius = getExpectedBallRadiusPixels(camera.camera_hardware_, camera.camera_hardware_.resolution_x_, distance_direct_to_ball);
 
-            // The problem with calculating the min/max ball radii using a multiplicative ratio, 
+            const double kMaxReasonableRadius = 10000.0;
+            if (expectedRadius <= 0.0 || expectedRadius > kMaxReasonableRadius) {
+                GS_LOG_MSG(error, "GolfSimCamera::AutoCalibrateCamera computed invalid expected ball radius: " +
+                    std::to_string(expectedRadius) + " pixels. Must be positive and less than " +
+                    std::to_string(kMaxReasonableRadius) + " pixels. Rejecting calibration.");
+                return false;
+            }
+
+            // The problem with calculating the min/max ball radii using a multiplicative ratio,
             // is that for smaller expected radii, the range ended up too small.
             ip->min_ball_radius_ = std::max(0, (int)expectedRadius - kMinRadiusOffset);
             ip->max_ball_radius_ = (int)expectedRadius + kMaxRadiusOffset;
+
+            if (ip->max_ball_radius_ <= 0 || ip->max_ball_radius_ > static_cast<int>(kMaxReasonableRadius)) {
+                GS_LOG_MSG(error, "GolfSimCamera::AutoCalibrateCamera computed invalid max_ball_radius: " +
+                    std::to_string(ip->max_ball_radius_) + " pixels. This would cause detection failures. Rejecting calibration.");
+                return false;
+            }
 
             GS_LOG_TRACE_MSG(trace, "Min/Max expected ball radii are: " + std::to_string(ip->min_ball_radius_) + " / " + std::to_string(ip->max_ball_radius_));
 
@@ -4436,8 +4499,23 @@ namespace golf_sim {
                 GS_LOG_MSG(info, calibration_results_message);
             }
 
+            if (number_samples == 0) {
+                GS_LOG_MSG(error, "GolfSimCamera::AutoCalibrateCamera failed: All focal length samples failed. Unable to determine focal length.");
+                return false;
+            }
+
             average_focal_length /= number_samples;
             GS_LOG_MSG(info, "====>  Average Focal Length = " + std::to_string(average_focal_length) + ". Will set this value into the gs_config.json file.");
+
+            const double kMinFocalLength = 2.0;
+            const double kMaxFocalLength = 50.0;
+            if (average_focal_length < kMinFocalLength || average_focal_length > kMaxFocalLength) {
+                GS_LOG_MSG(error, "GolfSimCamera::AutoCalibrateCamera computed invalid focal length: " +
+                    std::to_string(average_focal_length) + " mm. Valid range is " +
+                    std::to_string(kMinFocalLength) + " to " + std::to_string(kMaxFocalLength) +
+                    " mm for typical camera lenses. Rejecting calibration.");
+                return false;
+            }
 
             // Re-set the camera_hardware object's focal length to reflect the real-world focal length we just determined.
             camera.camera_hardware_.focal_length_ = (float)average_focal_length;

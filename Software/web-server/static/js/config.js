@@ -1248,40 +1248,83 @@ async function detectAndSetCameras(targetKey = null) {
         updateStatus('Detecting cameras...', 'info');
 
         const response = await fetch('/api/cameras/detect');
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
         const result = await response.json();
+        console.log('Camera detection result:', result);
 
         if (result.success && result.cameras && result.cameras.length > 0) {
             const config = result.configuration;
+            console.log('Configuration:', config);
 
             if (targetKey === 'cameras.slot1.type') {
-                const input = document.querySelector('[data-key="cameras.slot1.type"]');
+                const input = document.querySelector('.config-input[data-key="cameras.slot1.type"]');
+                console.log('Found slot1 input:', input);
                 if (input) {
                     const typeValue = String(config.slot1.type);
+                    console.log('Setting slot1 to:', typeValue);
                     input.value = typeValue;
-                    handleValueChange('cameras.slot1.type', typeValue, input.dataset.original);
+
+                    // Trigger change event for select elements
+                    const event = new Event('change', { bubbles: true });
+                    input.dispatchEvent(event);
+
+                    await handleValueChange('cameras.slot1.type', typeValue, input.dataset.original);
+                } else {
+                    console.error('Could not find input for cameras.slot1.type');
                 }
                 updateStatus(`Camera 1 detected: Type ${config.slot1.type}`, 'success');
             } else if (targetKey === 'cameras.slot2.type') {
-                const input = document.querySelector('[data-key="cameras.slot2.type"]');
+                const input = document.querySelector('.config-input[data-key="cameras.slot2.type"]');
+                console.log('Found slot2 input:', input);
                 if (input) {
                     const typeValue = String(config.slot2.type);
+                    console.log('Setting slot2 to:', typeValue);
                     input.value = typeValue;
-                    handleValueChange('cameras.slot2.type', typeValue, input.dataset.original);
+
+                    // Trigger change event for select elements
+                    const event = new Event('change', { bubbles: true });
+                    input.dispatchEvent(event);
+
+                    await handleValueChange('cameras.slot2.type', typeValue, input.dataset.original);
+                } else {
+                    console.error('Could not find input for cameras.slot2.type');
                 }
                 updateStatus(`Camera 2 detected: Type ${config.slot2.type}`, 'success');
             } else {
-                const input1 = document.querySelector('[data-key="cameras.slot1.type"]');
-                const input2 = document.querySelector('[data-key="cameras.slot2.type"]');
+                const input1 = document.querySelector('.config-input[data-key="cameras.slot1.type"]');
+                const input2 = document.querySelector('.config-input[data-key="cameras.slot2.type"]');
+                console.log('Found inputs - slot1:', input1, 'slot2:', input2);
 
                 if (input1) {
                     const typeValue = String(config.slot1.type);
+                    console.log('Setting slot1 to:', typeValue);
                     input1.value = typeValue;
-                    handleValueChange('cameras.slot1.type', typeValue, input1.dataset.original);
+
+                    // Trigger change event for select elements
+                    const event = new Event('change', { bubbles: true });
+                    input1.dispatchEvent(event);
+
+                    await handleValueChange('cameras.slot1.type', typeValue, input1.dataset.original);
+                } else {
+                    console.warn('Could not find input for cameras.slot1.type');
                 }
+
                 if (input2) {
                     const typeValue = String(config.slot2.type);
+                    console.log('Setting slot2 to:', typeValue);
                     input2.value = typeValue;
-                    handleValueChange('cameras.slot2.type', typeValue, input2.dataset.original);
+
+                    // Trigger change event for select elements
+                    const event = new Event('change', { bubbles: true });
+                    input2.dispatchEvent(event);
+
+                    await handleValueChange('cameras.slot2.type', typeValue, input2.dataset.original);
+                } else {
+                    console.warn('Could not find input for cameras.slot2.type');
                 }
 
                 updateStatus(`Detected cameras - Slot 1: Type ${config.slot1.type}, Slot 2: Type ${config.slot2.type}`, 'success');
@@ -1290,6 +1333,7 @@ async function detectAndSetCameras(targetKey = null) {
         } else {
             const errorMsg = result.message || 'No cameras detected';
             updateStatus(`Camera detection failed: ${errorMsg}`, 'error');
+            console.error('Camera detection failed:', result);
 
             if (result.warnings && result.warnings.length > 0) {
                 showModal('Camera Detection Failed',

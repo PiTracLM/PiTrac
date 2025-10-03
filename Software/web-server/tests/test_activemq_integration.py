@@ -412,3 +412,182 @@ class TestActiveMQIntegration:
 
         assert shot_store.update.call_count == 1
         assert connection_manager.broadcast.called
+
+    def test_base64_decode_failure(self, shot_store, connection_manager, parser):
+        """Test handling of failed base64 decode"""
+        mock_loop = MagicMock()
+        listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
+
+        mock_frame = MagicMock()
+        mock_frame.body = "not-valid-base64!@#$"
+        mock_frame.headers = {"encoding": "base64"}
+
+        with patch("listeners.logger") as mock_logger:
+            listener.on_message(mock_frame)
+            assert mock_logger.warning.called or mock_logger.error.called
+
+    def test_camera2_image_message_handling(self, shot_store, connection_manager, parser):
+        """Test handling of Camera2 image messages"""
+        mock_loop = MagicMock()
+        listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
+
+        mock_frame = MagicMock()
+        mock_frame.body = "binary_image_data_string" * 100
+        mock_frame.headers = {
+            "content-length": "5000",
+            "IPCMessageType": "2",
+        }
+
+        with patch("listeners.logger") as mock_logger:
+            listener.on_message(mock_frame)
+            # Empty message is returned, so no error
+            assert listener.message_count == 1
+
+    def test_large_binary_data_handling(self, shot_store, connection_manager, parser):
+        """Test handling of large binary data without IPCMessageType"""
+        mock_loop = MagicMock()
+        listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
+
+        mock_frame = MagicMock()
+        mock_frame.body = "binary_data" * 50
+        mock_frame.headers = {"content-length": "2000"}
+
+        with patch("listeners.logger") as mock_logger:
+            listener.on_message(mock_frame)
+            assert listener.message_count == 1
+
+    def test_utf8_encoding_with_regular_string(self, shot_store, connection_manager, parser):
+        """Test UTF-8 encoding of regular string messages"""
+        mock_loop = MagicMock()
+        listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
+
+        shot_data = {"speed": 150.0, "carry": 270.0, "result_type": 7}
+        packed_data = msgpack.packb(shot_data)
+
+        mock_frame = MagicMock()
+        # String body that will be UTF-8 encoded (no special headers)
+        mock_frame.body = packed_data.decode("latin-1")
+        mock_frame.headers = {}  # No headers, will go through UTF-8 path
+
+        with patch("asyncio.run_coroutine_threadsafe") as mock_run_coroutine:
+            listener.on_message(mock_frame)
+            # Message should be processed
+            assert listener.message_count == 1
+
+    def test_unknown_body_type_iterable(self, shot_store, connection_manager, parser):
+        """Test handling of iterable body type"""
+        mock_loop = MagicMock()
+        listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
+
+        shot_data = {"speed": 150.0, "carry": 270.0, "result_type": 7}
+        packed_data = msgpack.packb(shot_data)
+
+        mock_frame = MagicMock()
+        mock_frame.body = list(packed_data)
+        mock_frame.headers = {}
+
+        with patch("asyncio.run_coroutine_threadsafe") as mock_run_coroutine:
+            listener.on_message(mock_frame)
+            mock_run_coroutine.assert_called_once()
+
+    def test_unknown_body_type_conversion(self, shot_store, connection_manager, parser):
+        """Test conversion of unknown body types"""
+        mock_loop = MagicMock()
+        listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
+
+        mock_frame = MagicMock()
+        mock_frame.body = 12345
+        mock_frame.headers = {}
+
+        with patch("listeners.logger"):
+            listener.on_message(mock_frame)
+            assert listener.message_count == 1
+
+    def test_frame_without_body(self, shot_store, connection_manager, parser):
+        """Test handling of frame without body attribute"""
+        mock_loop = MagicMock()
+        listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
+
+        mock_frame = MagicMock(spec=[])
+        del mock_frame.body
+
+        with patch("listeners.logger") as mock_logger:
+            listener.on_message(mock_frame)
+            mock_logger.error.assert_called()
+
+    def test_on_heartbeat(self, shot_store, connection_manager, parser):
+        """Test heartbeat handler"""
+        listener = ActiveMQListener(shot_store, connection_manager, parser)
+        listener.on_heartbeat()
+
+    def test_on_heartbeat_timeout(self, shot_store, connection_manager, parser):
+        """Test heartbeat timeout handler"""
+        listener = ActiveMQListener(shot_store, connection_manager, parser)
+        listener.connected = True
+
+        listener.on_heartbeat_timeout()
+        assert listener.connected is False
+
+    def test_empty_msgpack_data(self, shot_store, connection_manager, parser):
+        """Test handling of empty msgpack data"""
+        mock_loop = MagicMock()
+        listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
+
+        mock_frame = MagicMock()
+        mock_frame.body = b""
+        mock_frame.headers = {}
+
+        with patch("listeners.logger") as mock_logger:
+            listener.on_message(mock_frame)
+            assert any("Empty msgpack data" in str(call) for call in mock_logger.warning.call_args_list)
+
+    def test_camera2_image_latin1_encoding_failure(self, shot_store, connection_manager, parser):
+        """Test Camera2 image with latin-1 encoding failure"""
+        mock_loop = MagicMock()
+        listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
+
+        mock_frame = MagicMock()
+        mock_frame.body = "\udcff" * 100
+        mock_frame.headers = {
+            "content-length": "5000",
+            "IPCMessageType": "2",
+        }
+
+        with patch("listeners.logger") as mock_logger:
+            listener.on_message(mock_frame)
+            assert listener.message_count == 1
+
+    def test_large_binary_latin1_encoding_failure(self, shot_store, connection_manager, parser):
+        """Test large binary data with latin-1 encoding failure"""
+        mock_loop = MagicMock()
+        listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
+
+        mock_frame = MagicMock()
+        mock_frame.body = "\udcff" * 100
+        mock_frame.headers = {"content-length": "5000"}
+
+        with patch("listeners.logger") as mock_logger:
+            listener.on_message(mock_frame)
+            assert listener.message_count == 1
+
+    def test_utf8_encoding_error_with_latin1_fallback(self, shot_store, connection_manager, parser):
+        """Test UTF-8 encoding error triggering latin-1 fallback"""
+        mock_loop = MagicMock()
+        listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
+
+        # Need a mock that will pass hasattr checks but fail encoding
+        mock_frame = MagicMock()
+
+        # Create a mock string that will fail UTF-8 encoding
+        class BadString(str):
+            def encode(self, encoding='utf-8', errors='strict'):
+                if encoding == 'utf-8':
+                    raise UnicodeEncodeError('utf-8', '', 0, 1, 'test error')
+                return super().encode(encoding, errors)
+
+        mock_frame.body = BadString("test")
+        mock_frame.headers = {}
+
+        with patch("listeners.logger") as mock_logger:
+            listener.on_message(mock_frame)
+            assert listener.message_count == 1

@@ -59,27 +59,43 @@ std::string WebApi::GetWebServerUrl() {
     }
     return kDefaultWebServerUrl;
 }
+std::string WebApi::ShellEscape(const std::string& input) {
+    std::stringstream escaped;
 
-bool WebApi::ExecuteCurl(const std::string& url, const std::string& method, 
+    escaped << "'";
+
+    for (char c : input) {
+        if (c == '\'') {
+            escaped << "'\\''";
+        } else {
+            escaped << c;
+        }
+    }
+
+    escaped << "'";
+    return escaped.str();
+}
+
+bool WebApi::ExecuteCurl(const std::string& url, const std::string& method,
                          const std::string& payload, std::string& response) {
     std::stringstream cmd;
-    
+
     // Build curl command with timeout and silent mode
-    cmd << "curl -s -m 2 -X " << method;
-    
+    cmd << "curl -s -m 2 -X " << ShellEscape(method);
+
     if (!payload.empty()) {
         cmd << " -H 'Content-Type: application/json'";
-        cmd << " -d '" << payload << "'";
+        cmd << " -d " << ShellEscape(payload);
+        
     }
-    
-    cmd << " '" << url << "' 2>/dev/null";
-    
+    cmd << " " << ShellEscape(url) << " 2>/dev/null";
+
     // Execute curl command
     FILE* pipe = popen(cmd.str().c_str(), "r");
     if (!pipe) {
         return false;
     }
-    
+
     // Read response
     char buffer[128];
     response.clear();
@@ -88,9 +104,9 @@ bool WebApi::ExecuteCurl(const std::string& url, const std::string& method,
             response += buffer;
         }
     }
-    
+
     int exit_code = pclose(pipe);
-    
+
     // Check if curl succeeded (exit code 0)
     return exit_code == 0 && !response.empty();
 }

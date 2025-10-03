@@ -52,27 +52,60 @@ show_usage() {
 
 check_artifacts() {
     local missing=()
+    local use_debs="${USE_DEB_PACKAGES:-true}"
 
     log_info "Checking for pre-built artifacts..."
 
-    if [ ! -f "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" ]; then
-        missing+=("opencv")
-    fi
-    if [ ! -f "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" ]; then
-        missing+=("activemq")
-    fi
-    if [ ! -f "$ARTIFACT_DIR/lgpio-0.2.2-arm64.tar.gz" ]; then
-        missing+=("lgpio")
-    fi
-    if [ ! -f "$ARTIFACT_DIR/msgpack-cxx-6.1.1-arm64.tar.gz" ]; then
-        missing+=("msgpack")
+    if [[ "$use_debs" == "true" ]]; then
+        # Check for DEB packages first
+        if [ ! -f "$ARTIFACT_DIR/libopencv4.11_4.11.0-1_arm64.deb" ] && [ ! -f "$ARTIFACT_DIR/libopencv-dev_4.11.0-1_arm64.deb" ]; then
+            if [ ! -f "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" ]; then
+                missing+=("opencv")
+            fi
+        fi
+        if [ ! -f "$ARTIFACT_DIR/libactivemq-cpp_3.9.5-1_arm64.deb" ] && [ ! -f "$ARTIFACT_DIR/libactivemq-cpp-dev_3.9.5-1_arm64.deb" ]; then
+            if [ ! -f "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" ]; then
+                missing+=("activemq")
+            fi
+        fi
+        if [ ! -f "$ARTIFACT_DIR/liblgpio1_0.2.2-1_arm64.deb" ]; then
+            if [ ! -f "$ARTIFACT_DIR/lgpio-0.2.2-arm64.tar.gz" ]; then
+                missing+=("lgpio")
+            fi
+        fi
+        if [ ! -f "$ARTIFACT_DIR/libmsgpack-cxx-dev_6.1.1-1_all.deb" ]; then
+            if [ ! -f "$ARTIFACT_DIR/msgpack-cxx-6.1.1-arm64.tar.gz" ]; then
+                missing+=("msgpack")
+            fi
+        fi
+        if [ ! -f "$ARTIFACT_DIR/libonnxruntime1.17.3_1.17.3-xnnpack-verified_arm64.deb" ]; then
+            missing+=("onnxruntime")
+        fi
+    else
+        # Check for tar.gz packages
+        if [ ! -f "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" ]; then
+            missing+=("opencv")
+        fi
+        if [ ! -f "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" ]; then
+            missing+=("activemq")
+        fi
+        if [ ! -f "$ARTIFACT_DIR/lgpio-0.2.2-arm64.tar.gz" ]; then
+            missing+=("lgpio")
+        fi
+        if [ ! -f "$ARTIFACT_DIR/msgpack-cxx-6.1.1-arm64.tar.gz" ]; then
+            missing+=("msgpack")
+        fi
     fi
 
     if [ ${#missing[@]} -gt 0 ]; then
         log_warn "Missing artifacts: ${missing[*]}"
         return 1
     else
-        log_success "All artifacts present"
+        if [[ "$use_debs" == "true" ]] && [ -f "$ARTIFACT_DIR/libopencv4.11_4.11.0-1_arm64.deb" ]; then
+            log_success "All DEB packages present"
+        else
+            log_success "All artifacts present"
+        fi
         return 0
     fi
 }
@@ -262,12 +295,34 @@ build_dev() {
 
     # Core libraries
     for pkg in libcamera0.0.3 libcamera-dev libcamera-tools libfmt-dev libssl-dev libssl3 \
-               liblgpio-dev liblgpio1 libmsgpack-cxx-dev \
+               libmsgpack-cxx-dev \
                libapr1 libaprutil1 libapr1-dev libaprutil1-dev; do
         if ! dpkg -l | grep -q "^ii  $pkg"; then
             missing_deps+=("$pkg")
         fi
     done
+
+    # ========================================================================
+    # lgpio Library Strategy
+    # ========================================================================
+    # lgpio is available in both custom debs (deps-artifacts/) and system repos
+    #
+    # Problem: Version mismatch causes conflicts:
+    #   - Custom: liblgpio1 (0.2.2-1)
+    #   - System: liblgpio1 (0.2.2-1~rpt1) + liblgpio-dev (0.2.2-1~rpt1)
+    #   - Custom package declares "Conflicts: liblgpio-dev"
+    #   - System packages like libcamera-dev depend on liblgpio-dev
+    #
+    # Solution: Prefer system packages when available
+    #   1. Remove custom lgpio before apt-get install (line ~426)
+    #   2. Let apt install system lgpio packages
+    #   3. extract_all_dependencies() will skip custom lgpio if system exists
+    # ========================================================================
+    if ! dpkg -l | grep -qE "^ii\s+(liblgpio1|liblgpio-dev)"; then
+        log_info "lgpio not installed - will use custom package from deps-artifacts"
+    else
+        log_info "System lgpio packages detected - will use those instead of custom"
+    fi
     
     if ! command -v rpicam-hello &> /dev/null && ! command -v libcamera-hello &> /dev/null; then
         if apt-cache show rpicam-apps &> /dev/null; then
@@ -325,40 +380,83 @@ build_dev() {
         missing_deps+=("activemq")
     fi
 
+    # ========================================================================
+    # Fix initramfs-tools configuration issues on Raspberry Pi
+    # ========================================================================
+    # Issue: Recent Pi OS images (2024-11-13+) changed MODULES=dep which causes
+    # "failed to determine device for /" errors during initramfs generation
+    # Reference: https://github.com/RPi-Distro/repo/issues/382
+    #
+    # Solution: Change back to MODULES=most for proper Pi support (including NVMe boot)
+    # ========================================================================
+
+    local initramfs_conf="/etc/initramfs-tools/initramfs.conf"
+    if [[ -f "$initramfs_conf" ]]; then
+        if grep -q "^MODULES=dep" "$initramfs_conf"; then
+            log_warn "Detected problematic MODULES=dep in initramfs configuration"
+            log_info "Fixing initramfs.conf for Raspberry Pi compatibility..."
+            sed -i.bak 's/^MODULES=dep/MODULES=most/' "$initramfs_conf"
+            log_success "Changed MODULES=dep to MODULES=most"
+
+            # If initramfs-tools is in a broken state, try to fix it now
+            if dpkg -l | grep -E "^[a-z]F\s+initramfs-tools"; then
+                log_info "Attempting to repair initramfs-tools package..."
+                if dpkg --configure initramfs-tools 2>&1 | tee /tmp/initramfs-fix.log; then
+                    log_success "initramfs-tools repaired successfully"
+                else
+                    log_warn "initramfs-tools still has issues, will use INITRD=No fallback"
+                fi
+            fi
+        elif grep -q "^MODULES=most" "$initramfs_conf"; then
+            log_info "initramfs.conf already correctly configured (MODULES=most)"
+        else
+            log_warn "initramfs.conf has non-standard MODULES setting"
+            log_info "Adding MODULES=most to initramfs.conf..."
+            sed -i.bak '/^#.*MODULES/a MODULES=most' "$initramfs_conf"
+            log_success "Set MODULES=most in initramfs.conf"
+        fi
+    else
+        log_warn "initramfs.conf not found, will use INITRD=No for package operations"
+    fi
+
+    # Fix any remaining broken packages
+    log_info "Checking for broken package states..."
+    if dpkg -l | grep -qE "^[a-z][^i]"; then
+        log_warn "Found packages in broken state, attempting repair..."
+        # Try normal configure first (now that initramfs.conf is fixed)
+        if ! dpkg --configure -a 2>&1; then
+            log_warn "Normal repair failed, using INITRD=No fallback..."
+            INITRD=No dpkg --configure -a 2>&1 || true
+        fi
+        log_success "Package state cleanup complete"
+    else
+        log_info "No broken packages detected"
+    fi
+
     if [ ${#missing_deps[@]} -gt 0 ]; then
         log_warn "Missing build dependencies: ${missing_deps[*]}"
         log_info "Installing missing dependencies..."
+
+        # Remove custom lgpio package if it exists to avoid conflicts with system packages
+        # System packages (libcamera-dev, etc.) may pull in liblgpio-dev from repos
+        # Our custom package has version 0.2.2-1 but system has 0.2.2-1~rpt1
+        if dpkg -l | grep -qE "^ii\s+liblgpio1\s+0\.2\.2-1\s"; then
+            log_warn "Removing custom liblgpio1 package to avoid apt conflicts..."
+            log_info "System lgpio packages will be used instead (from repos)"
+            dpkg --remove --force-depends liblgpio1 2>/dev/null || true
+        fi
+
         apt-get update
-        apt-get install -y "${missing_deps[@]}"
+        # Use INITRD=No as safety measure - these are just libraries, not kernel modules
+        INITRD=No apt-get install -y "${missing_deps[@]}"
     fi
 
-    log_info "Extracting pre-built dependencies..."
+    log_info "Installing pre-built dependencies..."
     mkdir -p /usr/lib/pitrac
     extract_all_dependencies "$ARTIFACT_DIR" "/usr/lib/pitrac"
-    
-    if [[ ! -d /opt/activemq-cpp/include ]]; then
-        log_info "  Setting up ActiveMQ headers..."
-        tar xzf "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" -C /tmp/
-        mkdir -p /opt/activemq-cpp
-        cp -r /tmp/activemq-cpp/* /opt/activemq-cpp/
-        rm -rf /tmp/activemq-cpp
-    fi
-
-    if [[ ! -d /opt/opencv/include/opencv4 ]]; then
-        log_info "  Setting up OpenCV headers..."
-        tar xzf "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" -C /tmp/
-        mkdir -p /opt/opencv
-        cp -r /tmp/opencv/* /opt/opencv/
-        rm -rf /tmp/opencv
-    else
-        log_info "  OpenCV headers already installed"
-    fi
 
     # Update library cache
     ldconfig
-
-    # Create pkg-config files using common function
-    create_pkgconfig_files
 
     # Build PiTrac
     log_info "Building PiTrac..."
@@ -368,16 +466,54 @@ build_dev() {
     apply_boost_cxx20_fix
 
     # Set build environment
-    export PKG_CONFIG_PATH="/opt/opencv/lib/pkgconfig:/opt/activemq-cpp/lib/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig"
-    export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
-    export CMAKE_PREFIX_PATH="/opt/opencv:/opt/activemq-cpp"
-    export CPLUS_INCLUDE_PATH="/opt/opencv/include/opencv4:/opt/activemq-cpp/include/activemq-cpp-3.9.5"
+    # DEB packages now install to standard Debian locations
+    export PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
+    export LD_LIBRARY_PATH="/usr/lib/aarch64-linux-gnu:/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
+    export CMAKE_PREFIX_PATH="/usr"
+    export CPLUS_INCLUDE_PATH="/usr/include/opencv4:/usr/include/activemq-cpp-3.9.5"
     export PITRAC_ROOT="$REPO_ROOT/Software/LMSourceCode"
-    export CXXFLAGS="-I/opt/opencv/include/opencv4"
+    export CXXFLAGS="-I/usr/include/opencv4"
 
     # Create dummy closed source file if needed
     mkdir -p ClosedSourceObjectFiles
     touch ClosedSourceObjectFiles/gs_e6_response.cpp.o
+
+    # ========================================================================
+    # Detect stale build directory from tarball/Docker installation
+    # ========================================================================
+    # Issue: If build directory was created when using tarball extraction to /opt/,
+    # Meson caches those paths. When switching to DEB packages (which install to
+    # /usr/lib/aarch64-linux-gnu/), the cached paths cause linker failures.
+    #
+    # Solution: Detect /opt/ paths in build.ninja and force rebuild if DEB packages
+    # are installed (which use /usr/ paths instead).
+    # ========================================================================
+    if [[ -f "build/build.ninja" ]]; then
+        if grep -q "/opt/opencv\|/opt/activemq" build/build.ninja 2>/dev/null; then
+            # Check if DEB packages are installed (they use /usr/, not /opt/)
+            if dpkg -l 2>/dev/null | grep -qE "^ii\s+(libopencv4\.11|libactivemq-cpp)\s"; then
+                log_warn "Detected build directory with /opt/ paths but DEB packages use /usr/"
+                log_warn "This causes linker failures - cached paths are stale"
+                log_info "Automatically cleaning build directory for compatibility..."
+                rm -rf build
+                FORCE_REBUILD="true"
+
+                # Warn if old /opt/ installations still exist alongside DEB packages
+                if [[ -d "/opt/opencv" ]] || [[ -d "/opt/activemq-cpp" ]]; then
+                    echo
+                    log_warn "Old tarball installations detected in /opt/ alongside DEB packages"
+                    log_warn "This may cause runtime library conflicts"
+                    log_info "Recommended: Run 'sudo ./uninstall-tar-deps.sh' to remove old installations"
+                    echo
+                fi
+            elif [[ ! -d "/opt/opencv" ]] && [[ ! -d "/opt/activemq-cpp" ]]; then
+                log_warn "Detected build directory expects /opt/ libraries but they don't exist"
+                log_info "Cleaning build directory - will reconfigure for system paths..."
+                rm -rf build
+                FORCE_REBUILD="true"
+            fi
+        fi
+    fi
 
     # Determine if we need a clean build
     if [[ "$FORCE_REBUILD" == "true" ]]; then

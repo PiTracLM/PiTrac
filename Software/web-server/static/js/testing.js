@@ -3,10 +3,12 @@
 let runningTools = new Set();
 let outputBuffer = [];
 const MAX_OUTPUT_LINES = 1000;
+let uploadedImageFilename = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     loadAvailableTools();
     startOutputPolling();
+    setupImageUpload();
 });
 
 async function loadAvailableTools() {
@@ -248,4 +250,106 @@ function showImageResult(toolId, imageUrl) {
 
 function showError(message) {
     appendOutput(`[ERROR] ${message}`, 'error');
+}
+
+// Image Upload Functions
+function setupImageUpload() {
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('imageUpload');
+
+    // Click to upload
+    uploadArea.addEventListener('click', () => fileInput.click());
+
+    // File input change
+    fileInput.addEventListener('change', handleFileSelect);
+
+    // Drag and drop
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('drag-over');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('drag-over');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+
+        if (e.dataTransfer.files.length > 0) {
+            handleFileSelect({ target: { files: e.dataTransfer.files } });
+        }
+    });
+}
+
+async function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+        showError('Please select an image file');
+        return;
+    }
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        document.getElementById('previewImg').src = e.target.result;
+        document.getElementById('imageName').textContent = file.name;
+        document.getElementById('uploadArea').style.display = 'none';
+        document.getElementById('imagePreview').style.display = 'block';
+        document.getElementById('runPipelineBtn').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+
+    // Upload to server
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        appendOutput('[INFO] Uploading image...', 'info');
+
+        const response = await fetch('/api/testing/upload-image', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            uploadedImageFilename = result.filename;
+            appendOutput(`[SUCCESS] Image uploaded: ${result.filename}`, 'success');
+        } else {
+            showError(result.message);
+            clearImage();
+        }
+    } catch (error) {
+        showError(`Upload failed: ${error.message}`);
+        clearImage();
+    }
+}
+
+// eslint-disable-next-line no-unused-vars
+function clearImage() {
+    document.getElementById('uploadArea').style.display = 'flex';
+    document.getElementById('imagePreview').style.display = 'none';
+    document.getElementById('runPipelineBtn').style.display = 'none';
+    document.getElementById('imageUpload').value = '';
+    uploadedImageFilename = null;
+}
+
+// eslint-disable-next-line no-unused-vars
+async function runImageTest() {
+    if (!uploadedImageFilename) {
+        showError('No image uploaded');
+        return;
+    }
+
+    appendOutput('[INFO] Starting full pipeline test...', 'info');
+    appendOutput('[INFO] Processing strobed ball image through: Ball Detection → Spin Analysis → Shot Calculation', 'info');
+
+    // Run the test_uploaded_image tool
+    await runTool('test_uploaded_image');
 }

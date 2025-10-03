@@ -1585,7 +1585,7 @@ int main(int argc, char *argv[])
 #endif
         }
         // If the configuration file forgot to add a "/" at the end of the logging directory, we should add it here ourselves
-        if (kBaseTestDir.back() != '/') {
+        if (!kBaseTestDir.empty() && kBaseTestDir.back() != '/') {
             kBaseTestDir += '/';
         }
 
@@ -1593,10 +1593,16 @@ int main(int argc, char *argv[])
         // TBD - consider if there is a better place for this?
         GolfSimGlobals::golf_sim_running_ = true;
 
+        // Load BallImageProc configuration values after JSON config is loaded
+        BallImageProc::LoadConfigurationValues();
+
         run_main(argc, argv);
-        
+
         GS_LOG_MSG(info, "PiTrac Launch Monitor shutting down normally...");
-        
+
+        // Signal all background threads to stop (required for IPC consumer thread to exit)
+        GolfSimGlobals::golf_sim_running_ = false;
+
         try {
             golf_sim::PulseStrobe::DeinitGPIOSystem();
             GS_LOG_MSG(info, "GPIO system cleaned up successfully");

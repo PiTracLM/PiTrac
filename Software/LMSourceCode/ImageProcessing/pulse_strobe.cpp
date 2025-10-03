@@ -449,6 +449,7 @@ namespace golf_sim {
                 // camera1 process would already have done so
                 if (GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kCamera1 &&
                     GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kCamera1TestStandalone &&
+                    GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kTest &&
                     !GolfSimOptions::GetCommandLineOptions().camera_still_mode_ &&
                     GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kCamera1AutoCalibrate &&
                     GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kCamera2AutoCalibrate &&
@@ -458,59 +459,64 @@ namespace golf_sim {
 			return true;
 
 		}
-	
+
 
 #ifdef __unix__  // Ignore in Windows environment
 
-		if (GolfSimConfiguration::GetPiModel() == GolfSimConfiguration::PiModel::kRPi5) {
-			lggpio_chip_handle_ = lgGpiochipOpen(kRPi5GpioChipNumber);
-		}
-		else {
-			lggpio_chip_handle_ = lgGpiochipOpen(kRPi4GpioChipNumber);
-		}
+		// Skip GPIO hardware initialization in test mode - we only need pulse timing data
+		if (GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kTest) {
+			// Only initialize GPIO hardware for non-test modes
+			if (GolfSimConfiguration::GetPiModel() == GolfSimConfiguration::PiModel::kRPi5) {
+				lggpio_chip_handle_ = lgGpiochipOpen(kRPi5GpioChipNumber);
+			}
+			else {
+				lggpio_chip_handle_ = lgGpiochipOpen(kRPi4GpioChipNumber);
+			}
 
-		if (lggpio_chip_handle_ < 0) {
-			GS_LOG_MSG(trace, "PulseStrobe::InitGPIOSystem failed to initialize (lgGpioChipOpen). Attempting with different chip number kRPi4GpioChipNumber.");
-			lggpio_chip_handle_ = lgGpiochipOpen(kRPi4GpioChipNumber);
-		}
+			if (lggpio_chip_handle_ < 0) {
+				GS_LOG_MSG(trace, "PulseStrobe::InitGPIOSystem failed to initialize (lgGpioChipOpen). Attempting with different chip number kRPi4GpioChipNumber.");
+				lggpio_chip_handle_ = lgGpiochipOpen(kRPi4GpioChipNumber);
+			}
 
-		if (lggpio_chip_handle_ < 0) {
-			GS_LOG_MSG(error, "PulseStrobe::InitGPIOSystem failed to initialize (lgGpioChipOpen).  Received handle: " + std::to_string(lggpio_chip_handle_) );
-			return false;
-		}
+			if (lggpio_chip_handle_ < 0) {
+				GS_LOG_MSG(error, "PulseStrobe::InitGPIOSystem failed to initialize (lgGpioChipOpen).  Received handle: " + std::to_string(lggpio_chip_handle_) );
+				return false;
+			}
 
-		if (lgGpioClaimOutput(lggpio_chip_handle_, 0, kPulseTriggerOutputPin, 0) != LG_OKAY) {
-			GS_LOG_MSG(error, "PulseStrobe::InitGPIOSystem failed to ClaimOutput pin");
-			return false;
-		}
+			if (lgGpioClaimOutput(lggpio_chip_handle_, 0, kPulseTriggerOutputPin, 0) != LG_OKAY) {
+				GS_LOG_MSG(error, "PulseStrobe::InitGPIOSystem failed to ClaimOutput pin");
+				return false;
+			}
 
 
-		const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot2CameraType;
+			const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot2CameraType;
 
-		// Certain InnoMaker cameras may be active high, not low,  If so, activate the next line
-		// kUsingActiveHighTriggerCamera = (camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS_Mono);
-		kUsingActiveHighTriggerCamera = false;
+			// Certain InnoMaker cameras may be active high, not low,  If so, activate the next line
+			// kUsingActiveHighTriggerCamera = (camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS_Mono);
+			kUsingActiveHighTriggerCamera = false;
 
-		// Note that the Connector Board will invert the shutter output
-		if (kUsingActiveHighTriggerCamera) {
-			GS_LOG_MSG(trace, "PulseStrobe::InitGPIOSystem - Will be using an active-HIGH camera");
-			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kON);
-		}
-		else {
-			GS_LOG_MSG(trace, "PulseStrobe::InitGPIOSystem - Will be using an active-LOW camera");
-			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kOFF);
-		}
+			// Note that the Connector Board will invert the shutter output
+			if (kUsingActiveHighTriggerCamera) {
+				GS_LOG_MSG(trace, "PulseStrobe::InitGPIOSystem - Will be using an active-HIGH camera");
+				lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kON);
+			}
+			else {
+				GS_LOG_MSG(trace, "PulseStrobe::InitGPIOSystem - Will be using an active-LOW camera");
+				lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kOFF);
+			}
 
-		if (callback_function != nullptr) {
-			/* TBD
-			gpioSetSignalFunc(SIGUSR1, callback_function);
-			gpioSetSignalFunc(SIGUSR2, callback_function);
-			gpioSetSignalFunc(SIGINT, callback_function);
-			*/
+			if (callback_function != nullptr) {
+				/* TBD
+				gpioSetSignalFunc(SIGUSR1, callback_function);
+				gpioSetSignalFunc(SIGUSR2, callback_function);
+				gpioSetSignalFunc(SIGINT, callback_function);
+				*/
+			}
+		} else {
+			GS_LOG_MSG(trace, "PulseStrobe::InitGPIOSystem - Test mode: skipping GPIO hardware init, loading pulse timing only");
 		}
 
 #endif // #ifdef __unix__  // Ignore in Windows environment
-
 		// Pull the pulse intervals and strobe-on times from the JSON file each time to allow changes on the fly
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kStrobePulseVectorDriver", pulse_intervals_fast_ms_);
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kStrobePulseVectorPutter", pulse_intervals_slow_ms_);
@@ -739,6 +745,11 @@ namespace golf_sim {
 		}
 		else {
 			intervals = pulse_intervals_fast_ms_;
+		}
+
+		if (intervals.empty()) {
+			GS_LOG_TRACE_MSG(error, "GetPulseIntervals: pulse intervals vector is empty. Check JSON configuration or InitGPIOSystem() call.");
+			return intervals;
 		}
 
 		if (intervals[intervals.size()-1] > 0.0001) {

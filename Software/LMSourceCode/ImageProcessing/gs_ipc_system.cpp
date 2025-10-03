@@ -83,6 +83,7 @@ namespace golf_sim {
 
 
     cv::Mat GolfSimIpcSystem::last_received_image_;
+    std::mutex GolfSimIpcSystem::last_received_image_mutex_;
 
     bool GolfSimIpcSystem::InitializeIPCSystem() {
 
@@ -153,13 +154,27 @@ namespace golf_sim {
 
         GS_LOG_TRACE_MSG(trace, "Active-MQ broker_URI is: " + broker_URI);
 
-        // Initialization order probably doesn't matter, but we will initialize the consumer first to
-        // clear out any messages before the producer starts.
-        consumer_ = GolfSimMessageConsumer::Initialize(broker_URI);
+        // Test modes only need producer (send results), not consumer (receive messages)
+        // Test modes run single-process with static images, so no IPC messages to receive
+        SystemMode mode = GolfSimOptions::GetCommandLineOptions().system_mode_;
+        bool skip_consumer = (mode == SystemMode::kTest ||
+                             mode == SystemMode::kTestSpin ||
+                             mode == SystemMode::kTestExternalSimMessage ||
+                             mode == SystemMode::kTestGSProServer ||
+                             mode == SystemMode::kAutomatedTesting);
 
-        if (!consumer_) {
-            GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem could not Initialize consumer");
-            return false;
+        if (!skip_consumer) {
+            // Initialization order probably doesn't matter, but we will initialize the consumer first to
+            // clear out any messages before the producer starts.
+            consumer_ = GolfSimMessageConsumer::Initialize(broker_URI);
+
+            if (!consumer_) {
+                GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem could not Initialize consumer");
+                return false;
+            }
+        } else {
+            GS_LOG_MSG(info, "Skipping IPC consumer initialization for test mode - only producer needed for sending results");
+            consumer_ = nullptr;
         }
 
         producer_ = GolfSimMessageProducer::Initialize(broker_URI);
@@ -178,13 +193,19 @@ namespace golf_sim {
     bool GolfSimIpcSystem::ShutdownIPCSystem() {
         GS_LOG_TRACE_MSG(trace, "GolfSimIpcSystem::ShutdownIPC");
 
-        consumer_->Shutdown();
+        // Consumer may be null if test mode skipped initialization
+        if (consumer_ != nullptr) {
+            consumer_->Shutdown();
+        }
+
         producer_->Shutdown();
 
         // TBD - Give other threads a moment to shut down
         sleep(4);
 
-        delete consumer_;
+        if (consumer_ != nullptr) {
+            delete consumer_;
+        }
         delete producer_;
 
         activemq::library::ActiveMQCPP::shutdownLibrary();
@@ -407,7 +428,10 @@ namespace golf_sim {
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2BallLocation) {
             GS_LOG_TRACE_MSG(trace, "In still-picture, locate or AutoCalibrate camera mode.  Will save received image.");
 
-            last_received_image_ = message.GetImageMat().clone();
+            {
+                std::lock_guard<std::mutex> lock(last_received_image_mutex_);
+                last_received_image_ = message.GetImageMat().clone();
+            }
 
             return true;
         }
@@ -489,6 +513,7 @@ namespace golf_sim {
 
         GS_LOG_TRACE_MSG(trace, "BuildIpcMessageFromBytesMessage called.");
         GolfSimIPCMessage* ipc_message = nullptr;
+        std::unique_ptr<GolfSimIPCMessage> ipc_message_ptr;
 
         try {
             std::string main_message_type = active_mq_message.getStringProperty(kGolfSimMessageTypeTag);
@@ -507,7 +532,9 @@ namespace golf_sim {
             // We appear to have a valid GolfSimIpcMessage
             GS_LOG_TRACE_MSG(trace, "BuildIpcMessageFromBytesMessage converting Active-MQ message of type " + main_message_type +
                                         " and message-type " + std::to_string((int)ipc_message_type) + " to GolfSimIpcMessage");
-            ipc_message = new GolfSimIPCMessage(ipc_message_type);
+
+            ipc_message_ptr.reset(new GolfSimIPCMessage(ipc_message_type));
+            ipc_message = ipc_message_ptr.get();
 
             if (ipc_message == nullptr) {
                 return nullptr;
@@ -519,32 +546,26 @@ namespace golf_sim {
                 GS_LOG_TRACE_MSG(trace, "BuildIpcMessageFromBytesMessage about to UnpackMatData.");
                 // The ActiveMQ message's Byte body has the serialized data from which
                 // the cv::Mat can be reconstructed.
-                char* body_data = (char*)active_mq_message.getBodyBytes();
-                ipc_message->UnpackMatData(body_data, active_mq_message.getBodyLength());
-
-                // The caller of getBodyBytes owns the data, so clean it up here
-                delete body_data;
+                std::unique_ptr<char[]> body_data((char*)active_mq_message.getBodyBytes());
+                ipc_message->UnpackMatData(body_data.get(), active_mq_message.getBodyLength());
             }
             else if (ipc_message->GetMessageType() == GolfSimIPCMessage::IPCMessageType::kResults) {
 
                 GS_LOG_TRACE_MSG(trace, "BuildIpcMessageFromBytesMessage will NOT UnpackMatData for IPCMessageType::kResults.");
                 // The ActiveMQ message's Byte body has the serialized data from which
                 // the GsIPCResults oiject can be reconstructed.
-                char* body_data = (char*)active_mq_message.getBodyBytes();
+                std::unique_ptr<char[]> body_data((char*)active_mq_message.getBodyBytes());
 
                 /*
                 int number_bytes = active_mq_message.getBodyLength();
 
                 msgpack::unpacked unpacked_result_data;
-                msgpack::unpack(unpacked_result_data, static_cast<const char*>(body_data), number_bytes);
+                msgpack::unpack(unpacked_result_data, static_cast<const char*>(body_data.get()), number_bytes);
 
                 auto unpacked_gs_ipc_result = unpacked_result_data.get().as<GsIPCResult>();
 
                 ipc_message->GetResultsForModification() = unpacked_gs_ipc_result;
                 */
-
-                // The caller of getBodyBytes owns the data, so clean it up here
-                delete body_data;
             }
             else if (ipc_message->GetMessageType() == GolfSimIPCMessage::IPCMessageType::kControlMessage) {
 
@@ -552,7 +573,7 @@ namespace golf_sim {
 
                 // The ActiveMQ message's Byte body has the serialized data from which
                 // the GsIPCControlMsg oiject can be reconstructed.
-                char* body_data = (char*)active_mq_message.getBodyBytes();
+                std::unique_ptr<char[]> body_data((char*)active_mq_message.getBodyBytes());
 
                 int number_bytes = active_mq_message.getBodyLength();
 
@@ -560,7 +581,7 @@ namespace golf_sim {
 
                 msgpack::object_handle oh;
 
-                msgpack::unpack(oh, body_data, number_bytes);
+                msgpack::unpack(oh, body_data.get(), number_bytes);
 
                 // Get the packed value(s)
                 int control_msg_type;
@@ -572,9 +593,6 @@ namespace golf_sim {
                 msg.control_type_ = (GsIPCControlMsgType)control_msg_type;
 
                 GS_LOG_TRACE_MSG(trace, "Unpacked IPCMessageType::kControlMessage - message was: " + ipc_message->GetControlMessage().Format());
-
-                // The caller of getBodyBytes owns the data, so clean it up here
-                delete body_data;
             }
         }
         catch (CMSException& e) {
@@ -584,9 +602,10 @@ namespace golf_sim {
         }
         catch (std::exception& ex) {
             GS_LOG_TRACE_MSG(trace, "Exception! - " + std::string(ex.what()) + ".  Restarting...");
+            return nullptr;
         }
 
-        return ipc_message;
+        return ipc_message_ptr.release();
     }
 
 

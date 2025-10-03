@@ -12,6 +12,7 @@
 #include <iostream>
 #include <filesystem>
 #include <mutex>
+#include <atomic>
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -19,10 +20,13 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/dnn.hpp>
 
+#include <onnxruntime/core/session/onnxruntime_cxx_api.h>
+
 #include "logging_tools.h"
 #include "gs_camera.h"
 #include "colorsys.h"
 #include "golf_ball.h"
+#include "onnx_runtime_detector.hpp"
 
 
 namespace golf_sim {
@@ -194,6 +198,10 @@ public:
     static float kSAHIOverlapRatio;
     static std::string kONNXDeviceType;
 
+    static std::string kONNXBackend;  // "onnxruntime" (primary) or "opencv_dnn" (fallback)
+    static bool kONNXRuntimeAutoFallback;  // Enable automatic fallback to OpenCV DNN
+    static int kONNXRuntimeThreads;  // Number of threads for ONNX Runtime (ARM optimization)
+
     // This determines which potential 3D angles will be searched for spin processing
     struct RotationSearchSpace {
         int anglex_rotation_degrees_increment = 0;
@@ -325,24 +333,32 @@ public:
     static bool DetectBalls(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
     static bool DetectBallsHoughCircles(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
     static bool DetectBallsONNX(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
-    
-    // Preload YOLO model at startup for faster first detection
+
+    static bool DetectBallsONNXRuntime(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
+    static bool DetectBallsOpenCVDNN(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
+
     static bool PreloadYOLOModel();
-    
+    static bool PreloadONNXRuntimeModel();
+    static void CleanupONNXRuntime();
+
+    // Load configuration values from JSON after config is initialized
+    static void LoadConfigurationValues();
+
     // Custom single-class NMS optimized for golf balls (faster than generic multi-class NMS)
-    static std::vector<int> SingleClassNMS(const std::vector<cv::Rect>& boxes, 
+    static std::vector<int> SingleClassNMS(const std::vector<cv::Rect>& boxes,
                                           const std::vector<float>& confidences,
-                                          float conf_threshold, 
+                                          float conf_threshold,
                                           float nms_threshold);
 
 private:
-    // YOLO model caching - CRITICAL PERFORMANCE FIX
-    // This prevents loading the 50MB ONNX model from disk on every detection
+    // ONNX Runtime detector instance - replaces all static ONNX members
+    static std::unique_ptr<ONNXRuntimeDetector> onnx_detector_;
+    static std::atomic<bool> onnx_detector_initialized_;
+    static std::mutex onnx_detector_mutex_;
+
     static cv::dnn::Net yolo_model_;
     static bool yolo_model_loaded_;
     static std::mutex yolo_model_mutex_;  // Thread safety for model loading
-    
-    // PERFORMANCE FIX #2: Pre-allocated buffers for YOLO inference
     // Prevents allocating ~1.2MB per frame (640x640x3 multiple times)
     static cv::Mat yolo_input_buffer_;        // Reusable input conversion buffer
     static cv::Mat yolo_letterbox_buffer_;    // 640x640x3 letterboxed image

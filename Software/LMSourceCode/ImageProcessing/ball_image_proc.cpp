@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <vector>
 #include <chrono>
+#include <fstream>
 #include "gs_format_lib.h"
 
 #include <boost/timer/timer.hpp>
@@ -206,9 +207,9 @@ namespace golf_sim {
     std::string BallImageProc::kBallPlacementDetectionMethod = "legacy";
     // Default ONNX model path - can be overridden by config file or (more likely) the PITRAC_ROOT environment variable
     #ifdef _WIN32
-    std::string BallImageProc::kONNXModelPath = "../../Software/GroundTruthAnnotator/experiments/high_performance_300e2/weights/best.onnx";
+    std::string BallImageProc::kONNXModelPath = "../../Software/LMSourceCode/ml_models/pitrac-ball-detection-09-25-25/weights/best.onnx";
     #else
-    std::string BallImageProc::kONNXModelPath = "../GroundTruthAnnotator/experiments/maximum_performance_v3/weights/best.onnx";
+    std::string BallImageProc::kONNXModelPath = "../ml_models/pitrac-ball-detection-09-25-25/weights/best.onnx";
     #endif
     float BallImageProc::kONNXConfidenceThreshold = 0.5f;
     float BallImageProc::kONNXNMSThreshold = 0.4f;
@@ -218,11 +219,20 @@ namespace golf_sim {
     float BallImageProc::kSAHIOverlapRatio = 0.2f;
     std::string BallImageProc::kONNXDeviceType = "CPU";
 
-    // YOLO model caching - static members
+    // Dual-Backend Configuration
+    std::string BallImageProc::kONNXBackend = "onnxruntime";  // Default to ONNX Runtime
+    bool BallImageProc::kONNXRuntimeAutoFallback = true;     // Enable automatic fallback
+    int BallImageProc::kONNXRuntimeThreads = 4;              // ARM64 optimized default
+
+    // ONNX Runtime detector instance - replaces all static ONNX members
+    std::unique_ptr<ONNXRuntimeDetector> BallImageProc::onnx_detector_;
+    std::atomic<bool> BallImageProc::onnx_detector_initialized_{false};
+    std::mutex BallImageProc::onnx_detector_mutex_;
+
     cv::dnn::Net BallImageProc::yolo_model_;
     bool BallImageProc::yolo_model_loaded_ = false;
     std::mutex BallImageProc::yolo_model_mutex_;
-    
+
     // Pre-allocated buffers - static members
     cv::Mat BallImageProc::yolo_input_buffer_;
     cv::Mat BallImageProc::yolo_letterbox_buffer_;
@@ -231,6 +241,7 @@ namespace golf_sim {
     std::vector<cv::Rect> BallImageProc::yolo_detection_boxes_;
     std::vector<float> BallImageProc::yolo_detection_confidences_;
     std::vector<cv::Mat> BallImageProc::yolo_outputs_;
+
 
     BallImageProc::BallImageProc() {
         min_ball_radius_ = -1;
@@ -366,47 +377,45 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingStartingParam2", kPlacedNarrowingStartingParam2);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingRadiiDpParam", kPlacedNarrowingRadiiDpParam);
 
-        // ONNX Detection Configuration
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kDetectionMethod", kDetectionMethod);
-        
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXModelPath", kONNXModelPath);
-        
-        if (!kONNXModelPath.empty() && kONNXModelPath[0] != '/' && kONNXModelPath[0] != '~') {
-            std::string root_path = GolfSimConfiguration::GetPiTracRootPath();
-            if (!root_path.empty()) {
-                kONNXModelPath = root_path + "/" + kONNXModelPath;
-                GS_LOG_MSG(info, "Using PITRAC_ROOT environment variable to set ONNX model path to: " + kONNXModelPath);
-            }
-        }
-        else {
-            GS_LOG_MSG(info, "Using absolute or home-relative ONNX model path from config: " + kONNXModelPath);
-        }
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBallPlacementDetectionMethod", kBallPlacementDetectionMethod);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXConfidenceThreshold", kONNXConfidenceThreshold);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXNMSThreshold", kONNXNMSThreshold);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXInputSize", kONNXInputSize);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kSAHISliceHeight", kSAHISliceHeight);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kSAHISliceWidth", kSAHISliceWidth);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kSAHIOverlapRatio", kSAHIOverlapRatio);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXDeviceType", kONNXDeviceType);
+        // ONNX Detection Configuration values will be loaded later via LoadConfigurationValues()
+        // which is called after the JSON config file has been loaded in main()
 
         GolfSimConfiguration::SetConstant("gs_config.logging.kLogIntermediateSpinImagesToFile", kLogIntermediateSpinImagesToFile);
         
-        // Preload YOLO model at startup if using experimental detection for either ball placement or flight
-        if (kDetectionMethod == "experimental" || kDetectionMethod == "experimental_sahi" || 
+        // Preload model at startup if using experimental detection for either ball placement or flight
+        if (kDetectionMethod == "experimental" || kDetectionMethod == "experimental_sahi" ||
             kBallPlacementDetectionMethod == "experimental") {
             GS_LOG_MSG(info, "Detection method is '" + kDetectionMethod + "' / Placement method is '" + kBallPlacementDetectionMethod + "', preloading YOLO model at startup...");
-            if (PreloadYOLOModel()) {
-                GS_LOG_MSG(info, "YOLO model preloaded successfully - first detection will be fast!");
+
+            // Try ONNX Runtime first if configured
+            if (kONNXBackend == "onnxruntime") {
+                if (PreloadONNXRuntimeModel()) {
+                    GS_LOG_MSG(info, "ONNX Runtime model preloaded successfully - first detection will be fast!");
+                } else {
+                    GS_LOG_MSG(warning, "Failed to preload ONNX Runtime model");
+                    if (kONNXRuntimeAutoFallback) {
+                        GS_LOG_MSG(info, "Auto-fallback enabled, attempting to preload OpenCV DNN model...");
+                        if (PreloadYOLOModel()) {
+                            GS_LOG_MSG(info, "OpenCV DNN fallback model preloaded successfully!");
+                        } else {
+                            GS_LOG_MSG(warning, "Failed to preload both ONNX Runtime and OpenCV DNN models");
+                        }
+                    }
+                }
             } else {
-                GS_LOG_MSG(warning, "Failed to preload YOLO model - will load on first detection");
+                // Use OpenCV DNN backend
+                if (PreloadYOLOModel()) {
+                    GS_LOG_MSG(info, "OpenCV DNN model preloaded successfully - first detection will be fast!");
+                } else {
+                    GS_LOG_MSG(warning, "Failed to preload OpenCV DNN model - will load on first detection");
+                }
             }
         }
     }
 
     BallImageProc::~BallImageProc() {
-
+        // Cleanup is handled by static cleanup, since model is shared across instances
+        // Call CleanupONNXRuntime() only on program exit, not per-instance destruction
     }
 
     /**
@@ -561,15 +570,16 @@ namespace golf_sim {
     // Should be much more successful if called with a calibrated golf ball so that the code has
     // some hints about where to look.
     // Returns a new GolfBall object iff success. 
-    bool BallImageProc::GetBall(const cv::Mat& rgbImg, 
-                                const GolfBall& baseBallWithSearchParams, 
-                                std::vector<GolfBall> &return_balls, 
-                                cv::Rect& expectedBallArea, 
+    bool BallImageProc::GetBall(const cv::Mat& rgbImg,
+                                const GolfBall& baseBallWithSearchParams,
+                                std::vector<GolfBall> &return_balls,
+                                cv::Rect& expectedBallArea,
                                 BallSearchMode search_mode,
                                 bool chooseLargestFinalBall,
                                 bool report_find_failures) {
 
-        GS_LOG_TRACE_MSG(trace, "GetBall called with PREBLUR_IMAGE = " + std::to_string(PREBLUR_IMAGE) + " IS_COLOR_MASKING = " + 
+        auto getball_start = std::chrono::high_resolution_clock::now();
+        GS_LOG_TRACE_MSG(trace, "GetBall called with PREBLUR_IMAGE = " + std::to_string(PREBLUR_IMAGE) + " IS_COLOR_MASKING = " +
                     std::to_string(IS_COLOR_MASKING) + " FINAL_BLUR = " + std::to_string(FINAL_BLUR) + " search_mode = " + std::to_string(search_mode));
 
         if (rgbImg.empty()) {
@@ -579,12 +589,8 @@ namespace golf_sim {
 
         // *** ONNX DETECTION INTEGRATION - Process through full trajectory analysis pipeline ***
         if (kDetectionMethod == "experimental" || kDetectionMethod == "experimental_sahi") {
-            GS_LOG_TRACE_MSG(trace, "ONNX Detection Mode - Using ONNX detection, will process through full trajectory analysis");
-            
             std::vector<GsCircle> onnx_circles;
             if (DetectBallsONNX(rgbImg, search_mode, onnx_circles)) {
-                GS_LOG_TRACE_MSG(trace, "ONNX detected " + std::to_string(onnx_circles.size()) + " circles - converting to GolfBall objects");
-                
                 // Convert GsCircle results to GolfBall objects for trajectory analysis
                 return_balls.clear();
                 for (size_t i = 0; i < onnx_circles.size(); ++i) {
@@ -594,17 +600,14 @@ namespace golf_sim {
                     ball.ball_color_ = GolfBall::BallColor::kONNXDetected; // Mark as ONNX-detected
                     ball.measured_radius_pixels_ = onnx_circles[i][2];
                     ball.radius_at_calibration_pixels_ = baseBallWithSearchParams.radius_at_calibration_pixels_;
-                    
+
                     // Set color info - ONNX doesn't analyze color but we need placeholders
                     ball.average_color_ = baseBallWithSearchParams.average_color_;
                     ball.median_color_ = baseBallWithSearchParams.average_color_;
                     ball.std_color_ = GsColorTriplet(0, 0, 0); // Zero std indicates no color analysis
-                    
+
                     return_balls.push_back(ball);
                 }
-                
-                GS_LOG_TRACE_MSG(trace, "ONNX detection complete - returning " + 
-                               std::to_string(return_balls.size()) + " balls for trajectory analysis");
                 return !return_balls.empty();
             } else {
                 GS_LOG_MSG(warning, "ONNX detection failed - no balls found");
@@ -1117,28 +1120,25 @@ namespace golf_sim {
                 
                 if (!test_circles.empty()) {
                     circles.assign(test_circles.begin(), test_circles.end());
-                    
-                    // ⚠️  WARNING: This old ONNX coordinate offset logic should NEVER execute 
+
+                    // ⚠️  WARNING: This old ONNX coordinate offset logic should NEVER execute
                     // with the new early bypass. If you see this, the early bypass failed!
                     GS_LOG_MSG(error, "OLD ONNX path executed - this indicates early bypass failure!");
-                    
+
                     // Apply coordinate transformation if using sub-image
                     for (auto& c : circles) {
                         c[0] += offset_sub_to_full.x;
                         c[1] += offset_sub_to_full.y;
                     }
-                    
+
                     finalNumberOfFoundCircles = (int)circles.size();
-                    GS_LOG_TRACE_MSG(trace, "ONNX detected " + std::to_string(finalNumberOfFoundCircles) + " circles");
                 } else {
-                    GS_LOG_TRACE_MSG(trace, "ONNX found circles but all filtered out by radius constraints");
                     if (report_find_failures) {
                         GS_LOG_MSG(warning, "ONNX detection found no balls within radius constraints");
                     }
                     return false;
                 }
             } else {
-                GS_LOG_TRACE_MSG(trace, "ONNX detection found no balls");
                 if (report_find_failures) {
                     GS_LOG_MSG(warning, "ONNX detection failed to find any balls");
                 }
@@ -1589,6 +1589,10 @@ namespace golf_sim {
         best_ball.ball_color_ = GolfBall::BallColor::kCalibrated;
         best_ball.average_color_ = stats[0];  // Average RGB
         best_ball.radius_at_calibration_pixels_ = baseBallWithSearchParams.radius_at_calibration_pixels_;
+
+        auto getball_end = std::chrono::high_resolution_clock::now();
+        auto getball_duration = std::chrono::duration_cast<std::chrono::milliseconds>(getball_end - getball_start);
+        GS_LOG_MSG(info, "GetBall (ball detection) completed in " + std::to_string(getball_duration.count()) + "ms");
 
         return true;
     }
@@ -2824,17 +2828,18 @@ namespace golf_sim {
     }
 
 
-    cv::Vec3d BallImageProc::GetBallRotation(const cv::Mat& full_gray_image1, 
-                                             const GolfBall& ball1, 
-                                             const cv::Mat& full_gray_image2, 
+    cv::Vec3d BallImageProc::GetBallRotation(const cv::Mat& full_gray_image1,
+                                             const GolfBall& ball1,
+                                             const cv::Mat& full_gray_image2,
                                              const GolfBall& ball2) {
         // NOTE - This function (and downstream functions) assumes that ball1 is the earlier-in-time ball
         // for a right-handed shot.  So, for example, the expected spin will be largely counter-clockwise
         // from ball 1 to ball 2.
         // Make sure that for left-handed shots this is correct - we will assume that for
         // left-handed shots, ball1 is still to the LEFT of ball 2
-        
+
         BOOST_LOG_FUNCTION();
+        auto spin_detection_start = std::chrono::high_resolution_clock::now();
 
         GS_LOG_TRACE_MSG(trace, "GetBallRotation called with ball1 = " + ball1.Format() + ",\nball2 = " + ball2.Format());
         LoggingTools::DebugShowImage("full_gray_image1", full_gray_image1);
@@ -3187,6 +3192,10 @@ namespace golf_sim {
         // Looks like golf folks consider the X (side) spin to be positive if the surface is
         // going from right to left.  So we negate it here.
         rotationResult[0] = -rotationResult[0];
+
+        auto spin_detection_end = std::chrono::high_resolution_clock::now();
+        auto spin_duration = std::chrono::duration_cast<std::chrono::milliseconds>(spin_detection_end - spin_detection_start);
+        GS_LOG_MSG(info, "Spin detection completed in " + std::to_string(spin_duration.count()) + "ms");
 
         // Note that we return angles, not angular velocities.  The velocities will
         // be determined later based on the derived ball speed.
@@ -4199,20 +4208,20 @@ namespace golf_sim {
     }
     
     bool BallImageProc::PreloadYOLOModel() {
-        GS_LOG_MSG(info, "Preloading YOLO model at startup for detection method: " + kDetectionMethod);
-        
         if (yolo_model_loaded_) {
-            GS_LOG_MSG(trace, "YOLO model already loaded");
+            GS_LOG_MSG(trace, "YOLO model already loaded, skipping preload");
             return true;
         }
-        
+
         try {
             std::lock_guard<std::mutex> lock(yolo_model_mutex_);
-            
+
             if (yolo_model_loaded_) {
+                GS_LOG_MSG(trace, "YOLO model already loaded by another thread");
                 return true;
             }
-            
+
+            GS_LOG_MSG(info, "Preloading YOLO model at startup for detection method: " + kDetectionMethod);
             GS_LOG_MSG(trace, "Loading YOLO model from: " + kONNXModelPath);
             auto start_time = std::chrono::high_resolution_clock::now();
             
@@ -4255,24 +4264,160 @@ namespace golf_sim {
         }
     }
 
-    bool BallImageProc::DetectBallsONNX(const cv::Mat& preprocessed_img, BallSearchMode search_mode, 
+    bool BallImageProc::DetectBallsONNX(const cv::Mat& preprocessed_img, BallSearchMode search_mode,
                                        std::vector<GsCircle>& detected_circles) {
-        GS_LOG_TRACE_MSG(trace, "BallImageProc::DetectBallsONNX");
-        
-        
+        GS_LOG_TRACE_MSG(trace, "BallImageProc::DetectBallsONNX - Dispatching to backend: " + kONNXBackend);
+
+        // Dual-Backend Dispatcher: Try ONNX Runtime first, fallback to OpenCV DNN if needed
+        if (kONNXBackend == "onnxruntime") {
+            if (DetectBallsONNXRuntime(preprocessed_img, search_mode, detected_circles)) {
+                return true;
+            } else if (kONNXRuntimeAutoFallback) {
+                GS_LOG_MSG(warning, "ONNX Runtime detection failed, falling back to OpenCV DNN");
+                return DetectBallsOpenCVDNN(preprocessed_img, search_mode, detected_circles);
+            } else {
+                return false;
+            }
+        } else {
+            // Use OpenCV DNN backend directly
+            return DetectBallsOpenCVDNN(preprocessed_img, search_mode, detected_circles);
+        }
+    }
+
+    bool BallImageProc::DetectBallsONNXRuntime(const cv::Mat& preprocessed_img, BallSearchMode search_mode,
+                                              std::vector<GsCircle>& detected_circles) {
+        auto detection_start = std::chrono::high_resolution_clock::now();
+
+        try {
+            // Initialize detector only once with double-checked locking pattern (optimized for Pi)
+            if (!onnx_detector_initialized_.load(std::memory_order_acquire)) {
+                std::lock_guard<std::mutex> lock(onnx_detector_mutex_);
+                if (!onnx_detector_initialized_.load(std::memory_order_relaxed)) {
+
+                    // Configure detector with static configuration
+                    ONNXRuntimeDetector::Config config;
+                    config.model_path = kONNXModelPath;
+                    config.confidence_threshold = kONNXConfidenceThreshold;
+                    config.nms_threshold = kONNXNMSThreshold;
+                    config.input_width = kONNXInputSize;
+                    config.input_height = kONNXInputSize;
+                    config.num_threads = kONNXRuntimeThreads;
+
+                    // Pi-optimized settings
+                    config.use_arm_compute_library = true;
+                    config.use_thread_affinity = true;
+                    config.use_memory_pool = true;
+                    config.use_neon_preprocessing = true;
+                    config.use_zero_copy = true;
+
+                    GS_LOG_MSG(info, "Attempting to initialize ONNX Runtime detector with model: " + config.model_path);
+                    onnx_detector_ = std::make_unique<ONNXRuntimeDetector>(config);
+
+                    if (!onnx_detector_->Initialize()) {
+                        GS_LOG_MSG(error, "Failed to initialize ONNX Runtime detector with model: " + config.model_path);
+                        onnx_detector_.reset();  // Clean up failed detector
+                        return false;
+                    }
+
+                    onnx_detector_initialized_.store(true, std::memory_order_release);
+                    GS_LOG_MSG(info, "ONNX Runtime detector initialized successfully");
+                }
+            }
+
+            // Convert to RGB if needed (minimal overhead)
+            cv::Mat input_image;
+            if (preprocessed_img.channels() == 1) {
+                cv::cvtColor(preprocessed_img, input_image, cv::COLOR_GRAY2RGB);
+            } else {
+                input_image = preprocessed_img;  // Use directly (no copy)
+            }
+
+            // Handle SAHI slicing if enabled
+            if (kDetectionMethod == "experimental_sahi") {
+                std::vector<cv::Mat> slices;
+                slices.reserve(16);  // Pre-allocate for typical slice count
+
+                const int overlap = static_cast<int>(kSAHISliceWidth * kSAHIOverlapRatio);
+                for (int y = 0; y < input_image.rows; y += kSAHISliceHeight - overlap) {
+                    for (int x = 0; x < input_image.cols; x += kSAHISliceWidth - overlap) {
+                        cv::Rect slice_rect(x, y,
+                                           std::min(kSAHISliceWidth, input_image.cols - x),
+                                           std::min(kSAHISliceHeight, input_image.rows - y));
+                        slices.push_back(input_image(slice_rect));
+                    }
+                }
+
+                // Process all slices in batch for efficiency
+                std::vector<std::vector<ONNXRuntimeDetector::Detection>> batch_detections =
+                    onnx_detector_->DetectBatch(slices);
+
+                // Convert and merge all detections
+                detected_circles.clear();
+                detected_circles.reserve(batch_detections.size() * 2);  // Estimate
+
+                size_t slice_idx = 0;
+                for (int y = 0; y < input_image.rows; y += kSAHISliceHeight - overlap) {
+                    for (int x = 0; x < input_image.cols; x += kSAHISliceWidth - overlap) {
+                        if (slice_idx < batch_detections.size()) {
+                            for (const auto& detection : batch_detections[slice_idx]) {
+                                GsCircle circle;
+                                circle[0] = detection.bbox.x + detection.bbox.width * 0.5f + x;   // center_x
+                                circle[1] = detection.bbox.y + detection.bbox.height * 0.5f + y;  // center_y
+                                circle[2] = std::max(detection.bbox.width, detection.bbox.height) * 0.5f;  // radius
+                                detected_circles.push_back(circle);
+                            }
+                        }
+                        ++slice_idx;
+                    }
+                }
+            } else {
+                // Single image detection (fastest path)
+                std::vector<ONNXRuntimeDetector::Detection> detections = onnx_detector_->Detect(input_image);
+
+                // Convert ONNXRuntimeDetector::Detection to GsCircle format
+                detected_circles.clear();
+                detected_circles.reserve(detections.size());
+
+                for (const auto& detection : detections) {
+                    GsCircle circle;
+                    circle[0] = detection.bbox.x + detection.bbox.width * 0.5f;   // center_x
+                    circle[1] = detection.bbox.y + detection.bbox.height * 0.5f;  // center_y
+                    circle[2] = std::max(detection.bbox.width, detection.bbox.height) * 0.5f;  // radius
+                    detected_circles.push_back(circle);
+                }
+            }
+
+            auto detection_end = std::chrono::high_resolution_clock::now();
+            auto detection_duration = std::chrono::duration_cast<std::chrono::milliseconds>(detection_end - detection_start);
+
+            GS_LOG_TRACE_MSG(trace, "ONNX Runtime detected " + std::to_string(detected_circles.size()) +
+                           " balls in " + std::to_string(detection_duration.count()) + "ms");
+            return !detected_circles.empty();
+
+        } catch (const std::exception& e) {
+            GS_LOG_MSG(error, "ONNX Runtime detection failed: " + std::string(e.what()));
+            return false;
+        }
+    }
+
+
+    bool BallImageProc::DetectBallsOpenCVDNN(const cv::Mat& preprocessed_img, BallSearchMode search_mode,
+                                            std::vector<GsCircle>& detected_circles) {
+        GS_LOG_TRACE_MSG(trace, "BallImageProc::DetectBallsOpenCVDNN - Fallback backend");
+
         try {
             {
                 std::lock_guard<std::mutex> lock(yolo_model_mutex_);
                 if (!yolo_model_loaded_) {
-                    GS_LOG_MSG(trace, "Loading YOLO model for the first time (one-time ~500ms operation)...");
+                    GS_LOG_MSG(trace, "Loading YOLO model for OpenCV DNN backend...");
                     auto start_time = std::chrono::high_resolution_clock::now();
-                    
+
                     yolo_model_ = cv::dnn::readNetFromONNX(kONNXModelPath);
                     if (yolo_model_.empty()) {
-                        GS_LOG_MSG(error, "Failed to load ONNX model: " + kONNXModelPath);
+                        GS_LOG_MSG(error, "Failed to load ONNX model for OpenCV DNN: " + kONNXModelPath);
                         return false;
                     }
-                    
+
                     // Set backend and target
                     if (kONNXDeviceType == "CPU") {
                         yolo_model_.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
@@ -4281,152 +4426,124 @@ namespace golf_sim {
                         yolo_model_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
                         yolo_model_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
                     }
-                    
+
                     yolo_letterbox_buffer_ = cv::Mat(kONNXInputSize, kONNXInputSize, CV_8UC3);
-                    yolo_detection_boxes_.reserve(10);  // Max 10 golf balls
-                    yolo_detection_confidences_.reserve(10);
-                    yolo_outputs_.reserve(3);  // Network typically has 1-3 output layers
-                    
+                    yolo_detection_boxes_.reserve(50);
+                    yolo_detection_confidences_.reserve(50);
+                    yolo_outputs_.reserve(3);
+
                     yolo_model_loaded_ = true;
-                    
+
                     auto end_time = std::chrono::high_resolution_clock::now();
                     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-                    GS_LOG_MSG(trace, "YOLO model loaded and cached successfully in " + 
-                                    std::to_string(duration.count()) + "ms. Buffers pre-allocated. Future detections will be fast!");
+                    GS_LOG_MSG(info, "OpenCV DNN model loaded successfully in " +
+                                   std::to_string(duration.count()) + "ms (fallback backend)");
                 }
             }
-            
-            cv::dnn::Net& net = yolo_model_;
-            
-            auto processing_start_time = std::chrono::high_resolution_clock::now();
-            GS_LOG_MSG(trace, "YOLO processing started.");
 
+            auto processing_start_time = std::chrono::high_resolution_clock::now();
+            GS_LOG_MSG(trace, "OpenCV DNN processing started.");
+
+            cv::Mat input_image;
             if (preprocessed_img.channels() == 1) {
-                cv::cvtColor(preprocessed_img, yolo_input_buffer_, cv::COLOR_GRAY2RGB);
+                cv::cvtColor(preprocessed_img, input_image, cv::COLOR_GRAY2RGB);
             } else if (preprocessed_img.channels() == 3) {
-                if (yolo_input_buffer_.size() != preprocessed_img.size() || yolo_input_buffer_.type() != preprocessed_img.type()) {
-                    yolo_input_buffer_ = cv::Mat(preprocessed_img.size(), preprocessed_img.type());
-                }
-                preprocessed_img.copyTo(yolo_input_buffer_);
+                input_image = preprocessed_img;
             } else {
                 GS_LOG_MSG(error, "Unsupported number of channels: " + std::to_string(preprocessed_img.channels()));
                 return false;
             }
-            
-            // SAHI slicing for experimental_sahi mode
+
+            // SAHI slicing
             bool use_sahi = (kDetectionMethod == "experimental_sahi");
             std::vector<cv::Rect> slices;
-            
+
             if (use_sahi) {
-                // Create overlapping slices
                 int overlap = static_cast<int>(kSAHISliceWidth * kSAHIOverlapRatio);
-                for (int y = 0; y < yolo_input_buffer_.rows; y += kSAHISliceHeight - overlap) {
-                    for (int x = 0; x < yolo_input_buffer_.cols; x += kSAHISliceWidth - overlap) {
-                        cv::Rect slice(x, y, 
-                                      std::min(kSAHISliceWidth, yolo_input_buffer_.cols - x),
-                                      std::min(kSAHISliceHeight, yolo_input_buffer_.rows - y));
+                for (int y = 0; y < input_image.rows; y += kSAHISliceHeight - overlap) {
+                    for (int x = 0; x < input_image.cols; x += kSAHISliceWidth - overlap) {
+                        cv::Rect slice(x, y,
+                                      std::min(kSAHISliceWidth, input_image.cols - x),
+                                      std::min(kSAHISliceHeight, input_image.rows - y));
                         slices.push_back(slice);
                     }
                 }
-                GS_LOG_TRACE_MSG(trace, "SAHI: Created " + std::to_string(slices.size()) + " slices");
+                GS_LOG_TRACE_MSG(trace, "OpenCV DNN SAHI: Created " + std::to_string(slices.size()) + " slices");
             } else {
-                // Single slice = whole image
-                slices.push_back(cv::Rect(0, 0, yolo_input_buffer_.cols, yolo_input_buffer_.rows));
+                slices.push_back(cv::Rect(0, 0, input_image.cols, input_image.rows));
             }
-            
-            // Run inference on each slice
-            yolo_detection_boxes_.clear();  // Clear but keep capacity
+
+            yolo_detection_boxes_.clear();
             yolo_detection_confidences_.clear();
-            
+
             for (const auto& slice : slices) {
-                cv::Mat slice_img = yolo_input_buffer_(slice);
-                
-                GS_LOG_TRACE_MSG(trace, "Processing slice: " + std::to_string(slice.x) + "," + 
-                               std::to_string(slice.y) + " size=" + std::to_string(slice.width) + "x" + 
-                               std::to_string(slice.height) + " slice_img=" + std::to_string(slice_img.cols) + "x" + 
-                               std::to_string(slice_img.rows));
-                
-                // Create letterboxed input to match rect=True training format
-                float scale = std::min(float(kONNXInputSize) / slice_img.cols, 
+                cv::Mat slice_img = input_image(slice);
+
+                // Create letterboxed input
+                float scale = std::min(float(kONNXInputSize) / slice_img.cols,
                                      float(kONNXInputSize) / slice_img.rows);
                 int new_width = int(slice_img.cols * scale);
                 int new_height = int(slice_img.rows * scale);
-                
-                // Resize maintaining aspect ratio
+
                 if (yolo_resized_buffer_.size() != cv::Size(new_width, new_height) || yolo_resized_buffer_.type() != CV_8UC3) {
                     yolo_resized_buffer_ = cv::Mat(new_height, new_width, CV_8UC3);
                 }
                 cv::resize(slice_img, yolo_resized_buffer_, cv::Size(new_width, new_height));
-                
-                // Fill letterbox buffer with gray padding (114, 114, 114) like YOLOv8
+
+                // Create letterbox with gray padding
                 yolo_letterbox_buffer_.setTo(cv::Scalar(114, 114, 114));
                 int x_offset = (kONNXInputSize - new_width) / 2;
                 int y_offset = (kONNXInputSize - new_height) / 2;
                 yolo_resized_buffer_.copyTo(yolo_letterbox_buffer_(cv::Rect(x_offset, y_offset, new_width, new_height)));
-                // Create blob from letterboxed image
-                cv::dnn::blobFromImage(yolo_letterbox_buffer_, yolo_blob_buffer_, 1.0/255.0, 
-                                      cv::Size(kONNXInputSize, kONNXInputSize), 
+
+                // Create blob
+                cv::dnn::blobFromImage(yolo_letterbox_buffer_, yolo_blob_buffer_, 1.0/255.0,
+                                      cv::Size(kONNXInputSize, kONNXInputSize),
                                       cv::Scalar(), false, false);  // swapRB=false for YOLOv8 BGR input
-                
-                // Run inference - reuse output buffer
-                net.setInput(yolo_blob_buffer_);
-                yolo_outputs_.clear();  // Clear but keep capacity
-                net.forward(yolo_outputs_, net.getUnconnectedOutLayersNames());
-                
-                // Parse YOLOv8 ONNX output format [1, 5, 44436] -> transpose to [44436, 5]
+
+                // Run inference
+                yolo_model_.setInput(yolo_blob_buffer_);
+                yolo_outputs_.clear();
+                yolo_model_.forward(yolo_outputs_, yolo_model_.getUnconnectedOutLayersNames());
+
+                // Parse output 
                 if (!yolo_outputs_.empty()) {
                     cv::Mat output = yolo_outputs_[0];
-                    
+
                     // Reshape and transpose YOLOv8 output to [detections, features] format
                     if (output.dims == 3 && output.size[0] == 1) {
-                        output = output.reshape(1, output.size[1]); // [5, 44436]
-                        cv::transpose(output, output);              // [44436, 5]
+                        output = output.reshape(1, output.size[1]); // [5, num_detections]
+                        cv::transpose(output, output);              // [num_detections, 5]
                     }
-                    
+
                     float* data = (float*)output.data;
                     int num_detections = output.rows;
-                    int num_features = output.cols; // Should be 5 for single-class: cx,cy,w,h,confidence
-                    
-                    GS_LOG_TRACE_MSG(trace, "ONNX output: " + std::to_string(num_detections) + " detections, " + 
-                                   std::to_string(num_features) + " features (output dims: " + 
-                                   std::to_string(output.rows) + "x" + std::to_string(output.cols) + ")");
-                    
+
                     for (int i = 0; i < num_detections; ++i) {
                         float* detection = data + i * output.cols;
-                        
-                        // YOLOv8 format: [center_x, center_y, width, height, confidence] (in letterboxed space)
+
                         float cx_letterbox = detection[0];
                         float cy_letterbox = detection[1];
                         float w_letterbox = detection[2];
                         float h_letterbox = detection[3];
                         float confidence = detection[4];
-                        
-                        // Debug: Log first few detections with their confidence scores
-                        if (i < 10) {
-                            GS_LOG_TRACE_MSG(trace, "Detection " + std::to_string(i) + ": conf=" + 
-                                           std::to_string(confidence) + ", cx_letterbox=" + std::to_string(cx_letterbox) + 
-                                           ", cy_letterbox=" + std::to_string(cy_letterbox) + ", w_letterbox=" + std::to_string(w_letterbox) + 
-                                           ", h_letterbox=" + std::to_string(h_letterbox));
-                        }
-                        
+
                         if (confidence >= kONNXConfidenceThreshold) {
-                            // ONNX coordinates are already in letterboxed space, not normalized
-                            
-                            // Remove letterbox padding and scale back to slice dimensions
+                            // Convert from letterbox coordinates back to slice coordinates
                             float cx_slice = (cx_letterbox - x_offset) / scale;
                             float cy_slice = (cy_letterbox - y_offset) / scale;
                             float w_slice = w_letterbox / scale;
                             float h_slice = h_letterbox / scale;
-                            
+
                             // Convert center format to top-left format
                             int x = static_cast<int>(cx_slice - w_slice/2) + slice.x;
                             int y = static_cast<int>(cy_slice - h_slice/2) + slice.y;
                             int w = static_cast<int>(w_slice);
                             int h = static_cast<int>(h_slice);
-                            
-                            // Bounds checking to ensure valid cv::Rect
-                            if (w > 0 && h > 0 && x >= 0 && y >= 0 && 
-                                x + w <= yolo_input_buffer_.cols && y + h <= yolo_input_buffer_.rows) {
+
+                            // Bounds checking
+                            if (w > 0 && h > 0 && x >= 0 && y >= 0 &&
+                                x + w <= input_image.cols && y + h <= input_image.rows) {
                                 yolo_detection_boxes_.push_back(cv::Rect(x, y, w, h));
                                 yolo_detection_confidences_.push_back(confidence);
                             }
@@ -4434,34 +4551,134 @@ namespace golf_sim {
                     }
                 }
             }
-            
-            // Apply custom single-class NMS (optimized for golf balls only)
-            // This is 2-3x faster than OpenCV's generic multi-class NMS
-            std::vector<int> indices = SingleClassNMS(yolo_detection_boxes_, yolo_detection_confidences_, 
+
+            // Apply NMS and convert to circles
+            std::vector<int> indices = SingleClassNMS(yolo_detection_boxes_, yolo_detection_confidences_,
                                                       kONNXConfidenceThreshold, kONNXNMSThreshold);
-            
-            // Convert bounding boxes to circles
+
             detected_circles.clear();
+            detected_circles.reserve(indices.size());
             for (int idx : indices) {
                 const cv::Rect& box = yolo_detection_boxes_[idx];
                 GsCircle circle;
                 circle[0] = box.x + box.width / 2;
                 circle[1] = box.y + box.height / 2;
                 circle[2] = std::max(box.width, box.height) / 2;
-                // Store confidence in unused field (we can add this to GsCircle later if needed)
                 detected_circles.push_back(circle);
             }
-            
+
             auto processing_end_time = std::chrono::high_resolution_clock::now();
             auto processing_duration = std::chrono::duration_cast<std::chrono::milliseconds>(processing_end_time - processing_start_time);
-            GS_LOG_MSG(trace, "YOLO model completed processing in " + std::to_string(processing_duration.count()) + " ms.");
+            GS_LOG_MSG(trace, "OpenCV DNN completed processing in " + std::to_string(processing_duration.count()) + " ms (fallback)");
 
-            GS_LOG_TRACE_MSG(trace, "ONNX detected " + std::to_string(detected_circles.size()) + " balls.  YOLO processing complete");
+            GS_LOG_TRACE_MSG(trace, "OpenCV DNN detected " + std::to_string(detected_circles.size()) + " balls after NMS");
             return !detected_circles.empty();
-            
+
         } catch (const cv::Exception& e) {
-            GS_LOG_MSG(error, "ONNX detection failed: " + std::string(e.what()));
+            GS_LOG_MSG(error, "OpenCV DNN detection failed: " + std::string(e.what()));
             return false;
+        } catch (const std::exception& e) {
+            GS_LOG_MSG(error, "OpenCV DNN fallback detection failed: " + std::string(e.what()));
+            return false;
+        }
+    }
+
+    bool BallImageProc::PreloadONNXRuntimeModel() {
+        if (onnx_detector_initialized_.load(std::memory_order_relaxed)) {
+            GS_LOG_MSG(trace, "ONNX Runtime detector already preloaded, skipping");
+            return true;
+        }
+
+        std::lock_guard<std::mutex> lock(onnx_detector_mutex_);
+        if (onnx_detector_initialized_.load(std::memory_order_relaxed)) {
+            GS_LOG_MSG(trace, "ONNX Runtime detector already preloaded by another thread");
+            return true;
+        }
+
+        GS_LOG_MSG(info, "Preloading ONNX Runtime detector for ARM64 optimization...");
+
+        try {
+            auto start_time = std::chrono::high_resolution_clock::now();
+
+            // Configure detector with static configuration
+            ONNXRuntimeDetector::Config config;
+            config.model_path = kONNXModelPath;
+            config.confidence_threshold = kONNXConfidenceThreshold;
+            config.nms_threshold = kONNXNMSThreshold;
+            config.input_width = kONNXInputSize;
+            config.input_height = kONNXInputSize;
+            config.num_threads = kONNXRuntimeThreads;
+
+            // Pi-optimized settings
+            config.use_arm_compute_library = true;
+            config.use_thread_affinity = true;
+            config.use_memory_pool = true;
+            config.use_neon_preprocessing = true;
+            config.use_zero_copy = true;
+
+            onnx_detector_ = std::make_unique<ONNXRuntimeDetector>(config);
+
+            if (!onnx_detector_->Initialize()) {
+                GS_LOG_MSG(error, "Failed to initialize ONNX Runtime detector");
+                return false;
+            }
+
+            onnx_detector_initialized_.store(true, std::memory_order_release);
+
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+            GS_LOG_MSG(info, "ONNX Runtime detector preloaded successfully in " +
+                           std::to_string(duration.count()) + "ms with " +
+                           std::to_string(kONNXRuntimeThreads) + " threads (ARM64 optimized)");
+            return true;
+
+        } catch (const std::exception& e) {
+            GS_LOG_MSG(error, "Failed to preload ONNX Runtime detector: " + std::string(e.what()));
+            return false;
+        }
+    }
+
+    void BallImageProc::CleanupONNXRuntime() {
+        std::lock_guard<std::mutex> lock(onnx_detector_mutex_);
+        if (onnx_detector_initialized_.load(std::memory_order_relaxed)) {
+            GS_LOG_MSG(info, "Cleaning up ONNX Runtime detector...");
+
+            onnx_detector_.reset();
+            onnx_detector_initialized_.store(false, std::memory_order_release);
+
+            GS_LOG_MSG(info, "ONNX Runtime detector cleanup completed");
+        }
+    }
+
+    void BallImageProc::LoadConfigurationValues() {
+        // This function should be called AFTER GolfSimConfiguration::Initialize() has loaded the JSON config
+        // It reads the ONNX configuration values FROM the JSON and updates the static variables
+
+        GS_LOG_MSG(info, "Loading BallImageProc configuration values from JSON...");
+
+        // Read ONNX/AI Detection configuration values
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXModelPath", kONNXModelPath);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kDetectionMethod", kDetectionMethod);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBallPlacementDetectionMethod", kBallPlacementDetectionMethod);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXConfidenceThreshold", kONNXConfidenceThreshold);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXNMSThreshold", kONNXNMSThreshold);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXInputSize", kONNXInputSize);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXBackend", kONNXBackend);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXRuntimeAutoFallback", kONNXRuntimeAutoFallback);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXRuntimeThreads", kONNXRuntimeThreads);
+
+        GS_LOG_MSG(info, "Loaded ONNX Model Path: " + kONNXModelPath);
+        GS_LOG_MSG(info, "Loaded Detection Method: " + kDetectionMethod);
+        GS_LOG_MSG(info, "Loaded Backend: " + kONNXBackend);
+
+        if (!kONNXModelPath.empty()) {
+            std::ifstream model_file(kONNXModelPath);
+            if (model_file.good()) {
+                GS_LOG_MSG(info, "ONNX model file verified to exist at: " + kONNXModelPath);
+                model_file.close();
+            } else {
+                GS_LOG_MSG(error, "ONNX model file NOT FOUND at: " + kONNXModelPath);
+            }
         }
     }
 

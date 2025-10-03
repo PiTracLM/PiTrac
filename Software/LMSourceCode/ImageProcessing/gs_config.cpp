@@ -207,7 +207,7 @@ bool GolfSimConfiguration::ReadValues() {
 	}
 
 	// If the configuration file forgot to add a "/" at the end of the logging directory, we should add it here ourselves
-	if (GsUISystem::kWebServerShareDirectory.back() != '/') {
+	if (!GsUISystem::kWebServerShareDirectory.empty() && GsUISystem::kWebServerShareDirectory.back() != '/') {
 		GsUISystem::kWebServerShareDirectory += '/';
 	}
 
@@ -412,7 +412,7 @@ bool GolfSimConfiguration::ReadValues() {
 
 		// Fall back to original JSON behavior
 		 try {
-			 constant_value = configuration_root_.get<std::string>(tag_name, "");
+			 constant_value = configuration_root_.get<std::string>(tag_name, constant_value);
 		 }
 		 catch (std::exception const& e)
 		 {

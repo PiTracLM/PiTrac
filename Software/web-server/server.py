@@ -3,16 +3,20 @@ import json
 import logging
 import os
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import stomp
 import yaml
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from calibration_manager import CalibrationManager
+from camera_detector import CameraDetector
+from config_manager import ConfigurationManager
 from constants import (
     CONFIG_FILE,
     DEFAULT_BROKER,
@@ -24,10 +28,7 @@ from constants import (
 from listeners import ActiveMQListener
 from managers import ConnectionManager, ShotDataStore
 from parsers import ShotDataParser
-from config_manager import ConfigurationManager
 from pitrac_manager import PiTracProcessManager
-from camera_detector import CameraDetector
-from calibration_manager import CalibrationManager
 from testing_tools_manager import TestingToolsManager
 
 logger = logging.getLogger(__name__)
@@ -317,6 +318,8 @@ class PiTracServer:
             """Check ball location for calibration setup"""
             if camera not in ["camera1", "camera2"]:
                 return {"status": "error", "message": "Invalid camera"}
+            if self.calibration_manager.loop is None:
+                return {"status": "error", "message": "Server still starting up, please retry in a moment"}
             return await self.calibration_manager.check_ball_location(camera)
 
         @self.app.post("/api/calibration/auto/{camera}")
@@ -324,6 +327,8 @@ class PiTracServer:
             """Run automatic calibration for specified camera"""
             if camera not in ["camera1", "camera2"]:
                 return {"status": "error", "message": "Invalid camera"}
+            if self.calibration_manager.loop is None:
+                return {"status": "error", "message": "Server still starting up, please retry in a moment"}
             return await self.calibration_manager.run_auto_calibration(camera)
 
         @self.app.post("/api/calibration/manual/{camera}")
@@ -331,6 +336,8 @@ class PiTracServer:
             """Run manual calibration for specified camera"""
             if camera not in ["camera1", "camera2"]:
                 return {"status": "error", "message": "Invalid camera"}
+            if self.calibration_manager.loop is None:
+                return {"status": "error", "message": "Server still starting up, please retry in a moment"}
             return await self.calibration_manager.run_manual_calibration(camera)
 
         @self.app.post("/api/calibration/capture/{camera}")
@@ -338,6 +345,8 @@ class PiTracServer:
             """Capture a still image for camera setup"""
             if camera not in ["camera1", "camera2"]:
                 return {"status": "error", "message": "Invalid camera"}
+            if self.calibration_manager.loop is None:
+                return {"status": "error", "message": "Server still starting up, please retry in a moment"}
             return await self.calibration_manager.capture_still_image(camera)
 
         @self.app.post("/api/calibration/stop")
@@ -386,6 +395,40 @@ class PiTracServer:
                 self.testing_manager.completed_results = {}
 
             return {"running": running, "results": results}
+
+        @self.app.post("/api/testing/upload-image")
+        async def upload_test_image(file: UploadFile = File(...)) -> Dict[str, Any]:
+            """Upload a test image for pipeline testing"""
+            try:
+                # Validate file type
+                if not file.content_type or not file.content_type.startswith("image/"):
+                    return {"status": "error", "message": "File must be an image"}
+
+                # Save to TestImages directory
+                test_images_dir = Path.home() / "LM_Shares/TestImages"
+                test_images_dir.mkdir(parents=True, exist_ok=True)
+
+                # Use original filename or generate one
+                filename = file.filename or f"test_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                file_path = test_images_dir / filename
+
+                # Save uploaded file
+                content = await file.read()
+                with open(file_path, "wb") as f:
+                    f.write(content)
+
+                logger.info(f"Test image uploaded: {file_path}")
+
+                return {
+                    "status": "success",
+                    "message": "Image uploaded successfully",
+                    "filename": filename,
+                    "path": str(file_path),
+                }
+
+            except Exception as e:
+                logger.error(f"Error uploading test image: {e}")
+                return {"status": "error", "message": str(e)}
 
         @self.app.get("/api/cameras/detect")
         async def detect_cameras() -> Dict[str, Any]:
@@ -735,6 +778,10 @@ class PiTracServer:
     async def startup_event(self) -> None:
         logger.info("Starting PiTrac Web Server...")
         loop = asyncio.get_event_loop()
+
+        self.calibration_manager.loop = loop
+
+        await self.calibration_manager._replay_pending_updates()
 
         self.mq_conn = self.setup_activemq(loop)
 

@@ -24,7 +24,20 @@ class TestingToolsManager:
         self.running_processes = {}
         self.completed_results = {}
 
+        # Create TestImages directory if it doesn't exist
+        self.test_images_dir = Path.home() / "LM_Shares/TestImages"
+        self.test_images_dir.mkdir(parents=True, exist_ok=True)
+
         self.tools = {
+            "test_uploaded_image": {
+                "name": "Test Uploaded Image",
+                "description": "Run full pipeline on uploaded flight camera image",
+                "category": "testing",
+                "args": ["--system_mode", "test", "--skip_wait_armed"],
+                "requires_sudo": False,
+                "timeout": 60,
+                "uses_uploaded_image": True,
+            },
             "pulse_test": {
                 "name": "Strobe Pulse Test",
                 "description": "Test IR strobe pulse functionality",
@@ -128,6 +141,39 @@ class TestingToolsManager:
 
         try:
             config_path = self.config_manager.generate_golf_sim_config()
+
+            # For image test tool, update config with uploaded image
+            if tool_info.get("uses_uploaded_image"):
+                test_images = list(self.test_images_dir.glob("*"))
+                if not test_images:
+                    return {"status": "error", "message": "No test images found. Please upload an image first."}
+
+                # Use the most recent image
+                latest_image = max(test_images, key=lambda p: p.stat().st_mtime)
+                logger.info(f"Using test image: {latest_image}")
+
+                # Modify the generated config to add test image path
+                import json
+
+                with open(config_path, "r") as f:
+                    config_json = json.load(f)
+
+                # Add test configuration section for SystemMode::kTest
+                if "gs_config" not in config_json:
+                    config_json["gs_config"] = {}
+                if "testing" not in config_json["gs_config"]:
+                    config_json["gs_config"]["testing"] = {}
+
+                image_filename = latest_image.name
+
+                # Set the base directory to where our test images are
+                config_json["gs_config"]["testing"]["kBaseTestImageDir"] = str(self.test_images_dir) + "/"
+                config_json["gs_config"]["testing"]["kTwoImageTestTeedBallImage"] = image_filename
+                config_json["gs_config"]["testing"]["kTwoImageTestStrobedImage"] = image_filename
+                config_json["gs_config"]["testing"]["kTwoImageTestPreImage"] = ""  # Optional
+
+                with open(config_path, "w") as f:
+                    json.dump(config_json, f, indent=2)
 
             cmd = [self.pitrac_binary]
 
@@ -339,6 +385,11 @@ class TestingToolsManager:
                         content = "... (truncated) ...\n" + "".join(lines[-1000:])
                     else:
                         content = "".join(lines)
+
+                    timing_summary = self._extract_timing_summary(lines)
+                    if timing_summary:
+                        content += "\n\n" + timing_summary
+
                     return content
             else:
                 logger.debug("No test log file found")
@@ -347,6 +398,140 @@ class TestingToolsManager:
             logger.error(f"Error reading test log: {e}")
 
         return None
+
+    def _extract_timing_summary(self, log_lines: List[str]) -> Optional[str]:
+        """Extract timing information from log lines and create a summary
+
+        Args:
+            log_lines: List of log file lines
+
+        Returns:
+            Formatted timing summary string, or None if no timing data found
+        """
+        import re
+
+        timing_data = {
+            "grayscale": [],
+            "onnx_preload": None,
+            "onnx_warmup": None,
+            "onnx_detection": [],
+            "opencv_fallback": [],
+            "getball": [],
+            "spin_detection": [],
+        }
+
+        for line in log_lines:
+            # Grayscale conversion (microseconds)
+            if "Grayscale conversion completed in" in line:
+                match = re.search(r"(\d+)us", line)
+                if match:
+                    timing_data["grayscale"].append(int(match.group(1)))
+
+            # ONNX Runtime preload
+            elif "ONNX Runtime detector preloaded successfully" in line:
+                match = re.search(r"in (\d+)ms", line)
+                if match:
+                    timing_data["onnx_preload"] = int(match.group(1))
+
+            # ONNX Runtime warmup
+            elif "Warmup complete. Final inference time" in line:
+                match = re.search(r"time: ([\d.]+) ms", line)
+                if match:
+                    timing_data["onnx_warmup"] = float(match.group(1))
+
+            # ONNX Runtime detection
+            elif "ONNX Runtime detected" in line and "balls in" in line:
+                match = re.search(r"in (\d+)ms", line)
+                if match:
+                    timing_data["onnx_detection"].append(int(match.group(1)))
+
+            # OpenCV DNN fallback
+            elif "OpenCV DNN completed processing in" in line:
+                match = re.search(r"in (\d+) ms", line)
+                if match:
+                    timing_data["opencv_fallback"].append(int(match.group(1)))
+
+            # GetBall (ball detection)
+            elif "GetBall (ball detection) completed in" in line:
+                match = re.search(r"in (\d+)ms", line)
+                if match:
+                    timing_data["getball"].append(int(match.group(1)))
+
+            # Spin detection
+            elif "Spin detection completed in" in line:
+                match = re.search(r"in (\d+)ms", line)
+                if match:
+                    timing_data["spin_detection"].append(int(match.group(1)))
+
+        # Check if we have any timing data
+        has_data = (
+            timing_data["onnx_preload"]
+            or timing_data["onnx_warmup"]
+            or timing_data["onnx_detection"]
+            or timing_data["opencv_fallback"]
+            or timing_data["getball"]
+            or timing_data["spin_detection"]
+            or timing_data["grayscale"]
+        )
+
+        if not has_data:
+            return None
+
+        # Build summary
+        summary = ["=" * 80]
+        summary.append("PERFORMANCE TIMING SUMMARY")
+        summary.append("=" * 80)
+
+        if timing_data["onnx_preload"]:
+            summary.append(f"\n Initialization:")
+            summary.append(f"  ONNX Runtime Preload: {timing_data['onnx_preload']}ms")
+            if timing_data["onnx_warmup"]:
+                summary.append(f"  Final Warmup Inference: {timing_data['onnx_warmup']:.2f}ms")
+
+        if timing_data["grayscale"]:
+            avg_gray = sum(timing_data["grayscale"]) / len(timing_data["grayscale"])
+            summary.append(f"\n Image Preprocessing:")
+            summary.append(f"  Grayscale Conversion: {avg_gray:.0f}μs (avg of {len(timing_data['grayscale'])} ops)")
+
+        if timing_data["onnx_detection"]:
+            avg_onnx = sum(timing_data["onnx_detection"]) / len(timing_data["onnx_detection"])
+            summary.append(f"\n Ball Detection (ONNX Runtime):")
+            summary.append(f"  Average: {avg_onnx:.0f}ms")
+            summary.append(f"  Count: {len(timing_data['onnx_detection'])} detections")
+            if len(timing_data["onnx_detection"]) > 1:
+                summary.append(
+                    f"  Range: {min(timing_data['onnx_detection'])}ms - {max(timing_data['onnx_detection'])}ms"
+                )
+
+        if timing_data["opencv_fallback"]:
+            avg_opencv = sum(timing_data["opencv_fallback"]) / len(timing_data["opencv_fallback"])
+            summary.append(f"\n OpenCV DNN Fallback:")
+            summary.append(f"  Average: {avg_opencv:.0f}ms")
+            summary.append(f"  Fallback Count: {len(timing_data['opencv_fallback'])}")
+
+        if timing_data["getball"]:
+            avg_getball = sum(timing_data["getball"]) / len(timing_data["getball"])
+            summary.append(f"\n GetBall (Legacy Detection):")
+            summary.append(f"  Average: {avg_getball:.0f}ms")
+            summary.append(f"  Count: {len(timing_data['getball'])}")
+
+        if timing_data["spin_detection"]:
+            avg_spin = sum(timing_data["spin_detection"]) / len(timing_data["spin_detection"])
+            summary.append(f"\n Spin Analysis:")
+            summary.append(f"  Average: {avg_spin:.0f}ms")
+            summary.append(f"  Count: {len(timing_data['spin_detection'])}")
+
+        # Calculate total per-shot time if we have detection + spin
+        if timing_data["onnx_detection"] and timing_data["spin_detection"]:
+            avg_detection = sum(timing_data["onnx_detection"]) / len(timing_data["onnx_detection"])
+            avg_spin = sum(timing_data["spin_detection"]) / len(timing_data["spin_detection"])
+            total_per_shot = avg_detection + avg_spin
+            summary.append(f"\n  Total Per-Shot Time:")
+            summary.append(f"  Detection + Spin: ~{total_per_shot:.0f}ms ({total_per_shot/1000:.2f}s)")
+
+        summary.append("\n" + "=" * 80)
+
+        return "\n".join(summary)
 
     def get_running_tools(self) -> List[str]:
         """Get list of currently running tools"""
