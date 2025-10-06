@@ -2,7 +2,7 @@
 title: Camera Calibration
 layout: default
 nav_order: 1
-parent: Camera
+parent: Cameras
 ---
 
 # PiTrac - Camera Calibration
@@ -16,14 +16,14 @@ Camera 2 Calibration Setup:
 **Camera Setup & Calibration Guide**
 
 {: .warning }
-🔧 **Difficulty:** Camera calibration is noted in the project errata as being "too difficult and takes too much time." Consider using the [Auto-Calibration]({% link camera/auto-calibration.md %}) process instead for a more streamlined experience.
+**Difficulty:** Camera calibration is noted in the project errata as being "too difficult and takes too much time." Consider using the [Auto-Calibration]({% link camera/auto-calibration.md %}) process instead for a more streamlined experience.
 
 NOTE:  As of May 6, 2025, the portion of this guide that deals with measuring the focal length and camera angles is deprecated.  The focusing and de-distortion information is still correct (and necessary).  However, once the cameras are focused and you have generated the de-distortion matrices and entered them into your golf_sim_config.json file, please perform the rest of the calibration by following the [Auto-Calibration Instructions]({% link camera/auto-calibration.md %}).
 1. Overview  
    1. The PiTrac system needs to know the angles of the cameras and the relative distances between them in order to locate the ball in space.  Camera calibration helps establish these values.  
    2. During this calibration, various distances are measured from each camera to a test point in front of the camera.  Those values are used, along with the calibration spreadsheet (which computes additional, derived values) to determine a set of calibration values.  Those values are then given to the PiTrac monitor by entering them in the golf\_sim\_config.json configuration file, which PiTrac reads when it starts up.
    
-   📥 **[Download Calibration Spreadsheet](../assets/PiTrac-Camera-Calibration-Worksheet.xlsx)** - Excel worksheet for calibration calculations  
+   **[Download Calibration Spreadsheet](../assets/PiTrac-Camera-Calibration-Worksheet.xlsx)** - Excel worksheet for calibration calculations  
    3. The basic idea is to center a known point in 3D space in the camera lens and then measure the distances to that point.  That in turn determines the camera’s angles.  This process also establishes the effective focal distance of the camera, which in turn is used to establish the distance of the ball from the cameras.  
    4. After the marker points are used to aim the cameras, an actual golf-ball is used to calibrate focus and focal length.  
    5. It’s best to calibrate the cameras in the environment in which you expect to use the LM.   
@@ -158,7 +158,7 @@ NOTE:  As of May 6, 2025, the portion of this guide that deals with measuring th
       10. Run the “runCam1Calibration.sh” or “runCam2Calibration.sh” script to get the focal length.    
           1. It will take multiple measurements and average them.  
           
-          ⏱️ **Time estimate:** About 1 minute for measurement averaging  
+          **Time estimate:** About 1 minute for measurement averaging  
       11. Set the resulting focal length into the .JSON file.    
           1. E.g., "kCamera1FocalLength": 5.216    would be typical  
    8. Determine the x & y (pan and tilt) camera1 angles for the configuration .JSON file  
@@ -215,4 +215,20 @@ NOTE:  As of May 6, 2025, the portion of this guide that deals with measuring th
     4. \[ 0.000000000000000000e+00, 0.000000000000000000e+00, 1.000000000000000000e+00 \]  \],  
     5. "kCamera1DistortionVector": \[  \-0.504763   0.173410   0.001554   0.000916   0.355220 \],  
 16. Do the same for camera 1 and camera 2
+
+[image1]: {{ '/assets/images/camera/image1.jpg' | relative_url }}
+[image2]: {{ '/assets/images/camera/image2.jpg' | relative_url }}
+[image3]: {{ '/assets/images/camera/image3.jpg' | relative_url }}
+[image4]: {{ '/assets/images/camera/image4.jpg' | relative_url }}
+[image5]: {{ '/assets/images/camera/image5.jpg' | relative_url }}
+[image6]: {{ '/assets/images/camera/image6.png' | relative_url }}
+[image7]: {{ '/assets/images/camera/image7.jpg' | relative_url }}
+[image8]: {{ '/assets/images/camera/image8.png' | relative_url }}
+[image9]: {{ '/assets/images/camera/image9.jpg' | relative_url }}
+[image10]: {{ '/assets/images/camera/image10.png' | relative_url }}
+[image11]: {{ '/assets/images/camera/image11.jpg' | relative_url }}
+[image12]: {{ '/assets/images/camera/image12.png' | relative_url }}
+[image13]: {{ '/assets/images/camera/image13.png' | relative_url }}
+[image14]: {{ '/assets/images/camera/image14.png' | relative_url }}
+[image15]: {{ '/assets/images/camera/image15.png' | relative_url }}
 
