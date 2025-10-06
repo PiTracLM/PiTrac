@@ -5,68 +5,256 @@ nav_order: 4
 parent: Hardware
 ---
 
-# Connector Board Overview
+# Connector Board
 
-The PiTrac system requires a custom Connector Board - a small printed circuit board that handles connections between the Pi computer(s) and the strobe light as well as providing the power for the strobe.
+The Connector Board is the central hub of your PiTrac. It handles connections between the Raspberry Pi computers and the strobe light while also providing regulated power for the IR LED array.
 
-## Manufacturing the PCB
+## Board Versions
 
-### Design Files
+### V2 - Dual Pi5 Connector Board (Current)
 
-The PCB design files are available in the main PiTrac repository under:
-- `Hardware/Dual Pi5 Connector Board` directory
+The V2 board is a complete redesign focused on simplification and cost reduction.
 
-To simply get the fabrication files pack you can grab `Hardware/Dual Pi5 Connector Board/Fabrication Files/Gerbers.zip`
+**What it does:**
+- Connects two Pi units safely with shared power (no opto-couplers needed)
+- Provides adjustable boost converter output (~15V to ~42V range)
+- Stores energy in large caps for strobe pulses
+- Adjustable LED current draw (supports various IR LED configurations)
+- Hardware-enforced 10% duty cycle for thermal protection (dual 555 timers)
+- Replaces several power supplies with a single +5V input
 
-### Fabrication
+**What changed from V1:**
 
-**Before ordering your own boards it is worth checking our Discord under the "pitrac-stuff-for-sale" channel as there is usually a high chance of some spares floating around.**
+The original board was designed to connect two Raspberry Pi units with separate AC/DC supplies and opto-coupler isolation. This protected them from power switching issues that can kill a Pi. The V1 board works, but needed better integration to reduce system cost.
 
-- **Cost:** At time of writing PCBway works out to ~$40 shipped for 5 boards or $8/board.
-- **Complexity:** Easy to build by all major consumer accessible board houses. FR4, 1.6mm finished thickness, 2-layer, 1oz outers, 6mil/6mil trace width and space, 0.25mm minimum hole size.
-- **Quantity:** Only 1 is needed for a PiTrac
+V2 moves to a single AC/DC supply, eliminating the need for opto-couplers by safely sharing power between Pi units. The integrated boost converter and LED driver circuit replace several external power supplies. All told, you go from multiple power supplies (including the LED driver) to a single +5V supply.
 
-Popular PCB manufacturers include:
-- JLCPCB
-- PCBWay  
-- OSHPark
-- Any local PCB fabrication service
+### V1 - Original Connector Board (Deprecated)
 
-When placing your order, if HASL is chosen as the surface treatment, ensure it is LEAD-FREE.
+If you have a V1 board, it works fine. Just follow V1-specific instructions. If you're building new, use V2.
 
-## Component Assembly
+## Ordering the PCB
 
-### Required Components
+### Where to Order
 
-BOM can be found in two locations:
-`Hardware/Dual Pi5 Connector Board/Assembly Files` Contains the Excel sheet as designed in 9/2025
-or
-`docs/hardware/parts-list.md` Transcribed BOM as designed with direct links on Digikey for reference. Information provided for selecting alternates for possible as well.
+Any decent PCB fabricator can make this board. Two popular options:
+
+- **JLCPCB** - https://jlcpcb.com
+- **PCBway** - https://www.pcbway.com
+
+Both have easy file upload and offer assembly services.
+
+{: .tip }
+**Save Money:** Check Discord #pitrac-stuff-for-sale before ordering. Community members often have spare boards at cost.
+
+### Fabrication Files
+
+Everything the fab house needs is in one zip:
+
+```
+Hardware/Connector Board v2/Fabrication Files/Gerbers.zip
+```
+
+### Ordering Process
+
+1. **Upload the Gerbers** - Upload Gerbers.zip to JLCPCB or PCBway
+
+   ![Upload Gerber Files]({{ '/assets/images/hardware/gerber-files.png' | relative_url }})
+
+2. **Board specs** - Leave defaults, they're fine:
+   - Material: FR4
+   - Thickness: 1.6mm
+   - Layers: 2
+   - Copper: 1oz
+   - Min trace/space: 6mil/6mil
+   - Min hole: 0.25mm
+
+3. **Surface Finish** - **Change to Lead-Free**
+
+   Switch from "HASL with Lead" to "HASL Lead-Free"
+
+   ![Surface Finish Selection]({{ '/assets/images/hardware/surface-finish.png' | relative_url }})
+
+   Use lead-free solder for assembly, so get a lead-free board finish.
+
+4. **Quantity** - Minimum order is usually 5 boards. You only need 1.
+
+**Cost:** ~$40 shipped for 5 boards ($8/board) from PCBway
+
+### Assembly Service (Optional)
+
+Don't want to solder? Both JLCPCB and PCBway offer assembly services.
+
+**Assembly files needed:**
+```
+Hardware/Connector Board v2/Assembly Files/
+├── PiTrac Pi Connector Bill of Materials.csv
+└── PiTrac Pi Connector Top Position.csv
+```
+
+Upload these when selecting assembly service:
+
+![Assembly Service]({{ '/assets/images/hardware/assembly-service.png' | relative_url }})
+
+The fab house sources components, solders everything, and ships you a completed board. Costs more, but saves significant time.
+
+## Component Sourcing
+
+### Bill of Materials
+
+Complete BOM with Digikey links: [Parts List]({% link hardware/parts-list.md %})
+
+**Cost:** ~$23 on Digikey (at time of writing)
+
+### Out of Stock Parts?
+
+If a part is unavailable, check the "Important Parameters" column in the parts list. Match those parameters when selecting alternates:
+
+![Shopping Cart]({{ '/assets/images/hardware/shopping-cart.png' | relative_url }})
+
+The parts list shows which component values are critical and which can be substituted.
+
+![Important Parameters]({{ '/assets/images/hardware/important-parameters.png' | relative_url }})
+
+**Don't substitute these:**
+- J1, J2 - Pi connectors (Amphenol YK3210203000G)
+- J3, J4 - USB-C connectors (GCT USB4085-GF-A)
+- U1 - Boost controller (TI UCC2813DTR-3)
+- L1 - Power inductor (Bourns RLB0914-330KL)
+- RV1, RV2 - Adjustment pots (Bourns 3362W-1-501LF)
+
+**Can substitute if specs match:**
+- Most capacitors and resistors
+- Small transistors and diodes
+- Logic ICs (if same function)
+
+Unfortunately, some parts are challenging to find alternates for. Don't waste time hunting for alternatives to the critical components.
+
+## Assembly
+
+### Difficulty Assessment
+
+**Skill Level:** Intermediate soldering required
+
+The board was designed to be as approachable as possible, but it's still SMD work:
+
+**What helps:**
+- Oversized footprints (easier iron contact)
+- All passives are 0603 or larger (still tiny, but not impossible)
+- All SMD parts have external leads (no BGA or QFN nightmares)
+- Works with or without flux
+
+**What's challenging:**
+- **Ground connections** - Most of the copper is ground, acting like a massive heatsink. Be patient. Let the heat soak in. The solder will stick.
+- **Component size** - 0603 parts are small. Use a magnifying lamp.
+- **Lead-free solder** - Higher temps, more patience than leaded.
+
+![Component Size]({{ '/assets/images/hardware/0805.png' | relative_url }})
+
+**Time estimate:**
+- First build: 2-4 hours
+- With experience: 1-2 hours
+
+If you're a true novice at soldering, some of it will take time, especially ground connections. Be patient and let the heat soak in. You'll get the solder to stick.
 
 ### Assembly Tips
 
-1. **Component orientation:** Pay careful attention to IC orientation and polarity
+1. **Order matters:**
+   - SMD components first (smallest to largest)
+   - Through-hole components second
+   - Connectors last
 
-2. **Soldering order:** 
-   - Install surface mount components first
-   - Thru-hole should be second
+2. **For ground pads:**
+   - Use 40W+ iron if available
+   - Add extra solder to build thermal mass
+   - Touch pad and component lead simultaneously
+   - Wait 3-5 seconds for heat to soak
 
-3. **Testing:** Test continuity and check for shorts before connecting to Pi systems
+3. **Before power-up:**
+   - Check for solder bridges with multimeter
+   - Verify no shorts between power and ground
+   - Double-check component orientation (ICs, diodes, polarized caps)
 
-## Connection Diagram
+## Board Configuration
 
-###Section under construction
+After assembly, adjust voltage and current before use.
 
-Refer to the PCB wiring diagram in the [Assembly Guide]({% link hardware/assembly-guide.md %}) for proper connections to:
-- Pi GPIO pins
-- LED power supply
-- Camera trigger signals
-- Power input
+### Test Points
 
-## Troubleshooting
+**TP4** - Ground reference (use for all DC measurements)
 
-- **No strobe pulse:** Check power connections and MOS driver module
-- **Camera not triggering:** Verify optocoupler installation and GPIO connections  
-- **System instability:** Ensure proper grounding and power isolation
+**TP5** - Voltage output measurement
+**TP11** - Current sense measurement
 
-For detailed wiring instructions, see the [Assembly Guide]({% link hardware/assembly-guide.md %}).
+{: .warning }
+**Silkscreen Error:** On unlabeled V1 boards, CC+/- and VIR+/- symbols are backwards. Use test points instead.
+
+### Adjusting Current (RV2)
+
+Sets maximum current to IR LED array.
+
+1. Multimeter between **TP4 (GND)** and **TP11**
+2. Adjust **RV2** potentiometer
+3. Target: **100mV (0.1V)**
+4. This equals 0.1V / 0.033Ω = **~3.03A**
+
+### Adjusting Voltage (RV1)
+
+Sets boost converter output voltage.
+
+1. Multimeter between **TP4 (GND)** and **TP5**
+2. Adjust **RV1** potentiometer
+3. Target: **~36V** (typical, adjust for your LED requirements)
+4. Don't worry about hitting it exactly - close is fine
+
+{: .important }
+**Order matters:** Set current limit (RV2) first, then voltage (RV1). Prevents overcurrent during voltage adjustment.
+
+### Thermal Protection
+
+The dual 555 timer circuit forces a 10% duty cycle on the strobe line, preventing LED thermal runaway. The duty cycle limiting is adjustable by changing passive components per the schematic.
+
+## Connections
+
+### Power Input
+
+- **J3/J4:** USB-C ports for Pi power (5V)
+- **Screw terminals:** 5V input from Meanwell LRS-75-5
+
+### Pi GPIO
+
+- **J1:** Pi 1 GPIO header
+- **J2:** Pi 2 GPIO header
+- **4-wire harness:** Control signals (see assembly guide for pinout)
+
+### LED Output
+
+- **Screw terminals:** Regulated high-voltage output to IR LED array
+- Current limiting via RV2
+- 10% max duty cycle (hardware enforced)
+
+### Optional
+
+- **J6 (USB-A):** Originally for LED strip, but Pi5 has USB 2.0 ports already - this is redundant
+
+## Design Files
+
+Full design documentation:
+```
+Hardware/Connector Board v2/
+├── PiTrac Pi Connector Schematic.pdf
+├── PiTrac Pi Connector.kicad_pcb
+├── Design/                    (Excel calculations)
+└── Fabrication Files/         (Production files)
+```
+
+KiCAD files are editable if you want to modify the design.
+
+## Next Steps
+
+Once assembled and configured:
+
+1. Adjust voltage and current per above
+2. Test with multimeter before connecting LEDs
+3. Connect to Pi units and LED array
+4. See [Assembly Guide]({% link hardware/assembly-guide.md %}) for system integration
