@@ -59,7 +59,6 @@ Verified subcommands include:
 The following documentation pages are available:
 
 **[Overview]({% link development/overview.md %})** - Architecture and system components  
-**[Build System]({% link development/build-system.md %})** - Building from source  
 **[Configuration Management]({% link development/configuration.md %})** - Configuration system details  
 **[Packaging Guide]({% link development/packaging.md %})** - Creating APT packages  
 **[CLI Interface]({% link development/cli-interface.md %})** - `pitrac` command reference  
@@ -197,5 +196,4 @@ Before submitting:
 ## Next Steps
 
 - Review [Overview]({% link development/overview.md %}) for system architecture
-- See [Build System]({% link development/build-system.md %}) for build details
 - Check [Packaging Guide]({% link development/packaging.md %}) for APT package creation

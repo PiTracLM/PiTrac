@@ -44,7 +44,7 @@ The build process:
 - Sets up libcamera for dual Pi cameras
 - Creates user directories and configuration files
 
-**Expected time**: 5-10 minutes on a Pi 5 (first installation)
+**Expected time**: 10-20 minutes on a Pi 5 (first installation, network-dependent)
 
 ## Step 1: Clone the Repository
 
@@ -113,7 +113,8 @@ The script compiles the C++ launch monitor binary:
 - Compiles only changed files (incremental build)
 
 **Build times**:
-- First build: 2-5 minutes
+- **Total first install**: 10-20 minutes (all dependencies + services + build)
+- **PiTrac binary build**: 2-5 minutes
 - Incremental rebuild: 30 seconds - 2 minutes
 - Clean rebuild (with `force` flag): 2-5 minutes
 
@@ -125,19 +126,22 @@ The script compiles the C++ launch monitor binary:
 - `/usr/lib/pitrac/ImageProcessing/CameraTools/` - Camera utilities and scripts
 
 **Configuration**:
-- `/etc/pitrac/pitrac.yaml` - Main configuration file
-- `/etc/pitrac/golf_sim_config.json` - Simulator settings
+- `/etc/pitrac/pitrac.yaml` - Main configuration template
 - `/etc/pitrac/config/parameter-mappings.yaml` - Parameter definitions
 - `/etc/pitrac/models/` - ONNX AI models for ball detection
+- `/usr/lib/pitrac/web-server/configurations.json` - Configuration metadata (283 settings)
 
 **Test Resources**:
 - `/usr/share/pitrac/test-images/` - Sample test images (teed-ball.png, strobed.png)
 - `/usr/share/pitrac/test-suites/` - Automated test suites
 
 **User Directories**:
-- `~/.pitrac/config/` - User configuration overrides
+- `~/.pitrac/config/` - User configuration and calibration data
+  - `user_settings.json` - Your configuration overrides
+  - `calibration_data.json` - Camera calibration results (focal lengths, angles)
+  - `generated_golf_sim_config.json` - Merged runtime configuration
 - `~/.pitrac/state/` - Runtime state
-- `~/.pitrac/calibration/` - Calibration data
+- `~/.pitrac/calibration/` - Calibration tools (checkerboard images, scripts)
 - `~/LM_Shares/Images/` - Captured images from shots
 - `~/LM_Shares/WebShare/` - Web-accessible data
 
@@ -407,9 +411,10 @@ After installation:
 - `/usr/lib/pitrac/web-server/` - Python web application
 
 **Configuration**:
-- `/etc/pitrac/pitrac.yaml` - Main config (system-wide)
-- `/etc/pitrac/golf_sim_config.json` - Simulator settings
-- `~/.pitrac/config/` - User overrides
+- `/etc/pitrac/pitrac.yaml` - Main config template (system-wide)
+- `~/.pitrac/config/user_settings.json` - Your configuration overrides
+- `~/.pitrac/config/calibration_data.json` - Camera calibration results
+- `~/.pitrac/config/generated_golf_sim_config.json` - Merged runtime configuration
 
 **User Data**:
 - `~/.pitrac/state/` - Runtime state

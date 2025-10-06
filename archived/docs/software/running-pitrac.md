@@ -276,15 +276,10 @@ restart-cam1   - Run Camera 1 with auto-restart
 restart-cam2   - Run Camera 2 with auto-restart
 ```
 
-## Testing Without Cameras
-
-No hardware connected? Use the test processor - see the [Testing Without Hardware]({% link troubleshooting/testing-without-hardware.md %}) guide.
-
 ## Next Steps
 
 PiTrac running? Great! Now:
 1. [Camera Calibration]({% link camera/camera-calibration.md %}) - Get accurate measurements
-2. [Simulator Integration]({% link integration/integration.md %}) - Connect to GSPro or E6
-3. [Open Interface]({% link integration/open-interface.md %}) - Access the browser UI
+2. [Simulator Integration]({% link simulator-integration.md %}) - Connect to GSPro or E6
 
-Having issues? Check the [Troubleshooting Guide]({% link troubleshooting/troubleshooting.md %}).
+Having issues? Check the [Troubleshooting Guide]({% link troubleshooting.md %}).

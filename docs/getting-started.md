@@ -91,7 +91,7 @@ Install the PiTrac software on your configured Raspberry Pi.
 
 Choose your installation method and get PiTrac running.
 
-**→ [Installation Guide]({% link software/startup-guide.md %})**
+**→ [Installation Guide]({% link software/pitrac-install.md %})**
 
 Options:
 - **Build from Source** - Clone the repository and compile (recommended for now)
@@ -124,7 +124,7 @@ Use the built-in calibration wizard to:
 Once you're up and running, these guides will help you use and maintain PiTrac:
 
 - **[Using PiTrac]({% link software/using-pitrac.md %})** - Operating the system day-to-day
-- **[Troubleshooting]({% link troubleshooting/troubleshooting.md %})** - Common issues and solutions
+- **[Troubleshooting]({% link troubleshooting.md %})** - Common issues and solutions
 - **[Hardware Overview]({% link hardware/hardware.md %})** - Detailed hardware documentation
 
 ---

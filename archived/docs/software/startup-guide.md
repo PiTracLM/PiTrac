@@ -143,7 +143,7 @@ Start Pi 2 executable first so it's ready to take pictures as soon as Pi 1 deter
 
 ### Troubleshooting
 
-For problems, see the [Troubleshooting Guide]({% link troubleshooting/troubleshooting.md %}).
+For problems, see the [Troubleshooting Guide]({% link troubleshooting.md %}).
 
 ## Performance Tips
 
@@ -157,5 +157,5 @@ For problems, see the [Troubleshooting Guide]({% link troubleshooting/troublesho
 Once the system is running reliably:
 
 1. **Calibration:** Fine-tune camera calibration if needed ([Camera Calibration]({% link camera/camera-calibration.md %}))
-2. **Integration:** Set up simulator connections ([Integration]({% link integration/integration.md %}))
+2. **Integration:** Set up simulator connections ([Integration]({% link simulator-integration.md %}))
 3. **Optimization:** Adjust settings for your specific setup and environment
