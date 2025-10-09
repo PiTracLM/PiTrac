@@ -59,14 +59,15 @@ Hardware/Connector Board v2/Fabrication Files/Gerbers.zip
 
 1. **Upload the Gerbers** - Upload Gerbers.zip to JLCPCB or PCBway
 
-   ![Upload Gerber Files]({{ '/assets/images/hardware/gerber-files.png' | relative_url }})
-
+   ![Upload Gerber Files]({{ '/assets/images/hardware/upload-gerber-files.png' | relative_url }})
+   ![Upload Gerber Files]({{ '/assets/images/hardware/upload-gerber-files-step-2.png' | relative_url }})
+   
 2. **Board specs** - Leave defaults, they're fine:
    - Material: FR4
    - Thickness: 1.6mm
    - Layers: 2
    - Copper: 1oz
-   - Min trace/space: 6mil/6mil
+   - Min trace/space: 5mil/5mil
    - Min hole: 0.25mm
 
 3. **Surface Finish** - **Change to Lead-Free**
@@ -92,11 +93,19 @@ Hardware/Connector Board v2/Assembly Files/
 └── PiTrac Pi Connector Top Position.csv
 ```
 
-Upload these when selecting assembly service:
+Select Assembly Service:
 
 ![Assembly Service]({{ '/assets/images/hardware/assembly-service.png' | relative_url }})
 
 The fab house sources components, solders everything, and ships you a completed board. Costs more, but saves significant time.
+
+Once you have added the board with assembly to your cart you will need to provide the information they need for assembly.
+
+![Shopping Cart]({{ '/assets/images/hardware/shopping-cart.png' | relative_url }})
+
+**Top Position is the "Centroid" File**
+
+![Upload Gerber Files]({{ '/assets/images/hardware/gerber-files.png' | relative_url }})
 
 ## Component Sourcing
 
@@ -110,17 +119,12 @@ Complete BOM with Digikey links: [Parts List]({% link hardware/parts-list.md %})
 
 If a part is unavailable, check the "Important Parameters" column in the parts list. Match those parameters when selecting alternates:
 
-![Shopping Cart]({{ '/assets/images/hardware/shopping-cart.png' | relative_url }})
-
-The parts list shows which component values are critical and which can be substituted.
-
 ![Important Parameters]({{ '/assets/images/hardware/important-parameters.png' | relative_url }})
 
 **Don't substitute these:**
-- J1, J2 - Pi connectors (Amphenol YK3210203000G)
-- J3, J4 - USB-C connectors (GCT USB4085-GF-A)
 - U1 - Boost controller (TI UCC2813DTR-3)
 - L1 - Power inductor (Bourns RLB0914-330KL)
+- Q2, Q4 - Power NMOS (Diodes DMT616MLSS-13)
 - RV1, RV2 - Adjustment pots (Bourns 3362W-1-501LF)
 
 **Can substitute if specs match:**
@@ -187,13 +191,13 @@ After assembly, adjust voltage and current before use.
 **TP11** - Current sense measurement
 
 {: .warning }
-**Silkscreen Error:** On unlabeled V1 boards, CC+/- and VIR+/- symbols are backwards. Use test points instead.
+**Silkscreen Error:** On unlabeled V1 boards, CC+/- and VIR+/- symbols are backwards. Meaning if you turn the knob towards +, it will actually decrease.
 
 ### Adjusting Current (RV2)
 
 Sets maximum current to IR LED array.
 
-1. Multimeter between **TP4 (GND)** and **TP11**
+1. Multimeter between **TP11** and **TP4 (GND)**
 2. Adjust **RV2** potentiometer
 3. Target: **100mV (0.1V)**
 4. This equals 0.1V / 0.033Ω = **~3.03A**
@@ -202,13 +206,10 @@ Sets maximum current to IR LED array.
 
 Sets boost converter output voltage.
 
-1. Multimeter between **TP4 (GND)** and **TP5**
+1. Multimeter between **TP5** and **TP4 (GND)**
 2. Adjust **RV1** potentiometer
 3. Target: **~36V** (typical, adjust for your LED requirements)
 4. Don't worry about hitting it exactly - close is fine
-
-{: .important }
-**Order matters:** Set current limit (RV2) first, then voltage (RV1). Prevents overcurrent during voltage adjustment.
 
 ### Thermal Protection
 
@@ -218,8 +219,11 @@ The dual 555 timer circuit forces a 10% duty cycle on the strobe line, preventin
 
 ### Power Input
 
+- **Screw Terminals:** 5V input from Meanwell LRS-75-5
+
+### Power Output
+
 - **J3/J4:** USB-C ports for Pi power (5V)
-- **Screw terminals:** 5V input from Meanwell LRS-75-5
 
 ### Pi GPIO
 
