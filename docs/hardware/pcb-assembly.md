@@ -219,7 +219,7 @@ The dual 555 timer circuit forces a 10% duty cycle on the strobe line, preventin
 
 ### Power Input
 
-- **Screw Terminals:** 5V input from Meanwell LRS-75-5
+- **J1:** 5V input from Meanwell LRS-75-5 (screw terminals)
 
 ### Power Output
 
@@ -227,13 +227,12 @@ The dual 555 timer circuit forces a 10% duty cycle on the strobe line, preventin
 
 ### Pi GPIO
 
-- **J1:** Pi 1 GPIO header
-- **J2:** Pi 2 GPIO header
-- **4-wire harness:** Control signals (see assembly guide for pinout)
+- **J7:** 3-pin GPIO header for control signals (see assembly guide for pinout)
 
 ### LED Output
 
-- **Screw terminals:** Regulated high-voltage output to IR LED array
+- **J2:** Regulated high-voltage output to IR LED array (screw terminals)
+- Adjustable voltage via RV1
 - Current limiting via RV2
 - 10% max duty cycle (hardware enforced)
 
