@@ -76,23 +76,27 @@ This guide covers the **initial Raspberry Pi setup** for PiTrac, from installing
 
 2. **Installing Raspberry Pi OS**
 
-   PiTrac requires Raspberry Pi OS (formerly Raspbian) **64-bit**. You have two options: **Desktop** or **Lite**. Understanding the differences will help you choose the right version for your setup.
+   {: .warning }
+   > **CRITICAL - OS Version Requirements**
+   >
+   > PiTrac currently requires **Raspberry Pi OS (Legacy, 64-bit)**
+   >
+   > - **Debian version:** 12 (Bookworm)
+   > - **Kernel version:** 6.12
+   > - **System:** 64-bit
+   >
+   > **Do NOT use:**
+   > - The latest Raspberry Pi OS (based on Debian 13 Trixie) - PiTrac packages not yet updated for this version
+   > - 32-bit versions - will not work with PiTrac
 
-   **Raspberry Pi OS Desktop (64-bit)**
-   - Full graphical desktop environment (LXDE)
-   - Includes web browser, office apps, and utilities
-   - **Recommended for**: First-time users, those with monitor/keyboard/mouse, development work
-   - Disk space: ~2.5GB base installation
-   - Use when you want an easier, more visual setup experience
+   **Why the Legacy version?**
 
-   **Raspberry Pi OS Lite (64-bit)**
-   - Command-line only (no graphical interface)
-   - Minimal installation with only essential packages
-   - **Recommended for**: Headless operation, experienced users, production deployments
-   - Disk space: ~500MB base installation
-   - Use when you want maximum performance and minimal overhead
+   The latest Raspberry Pi OS moved to Debian 13 (Trixie), but PiTrac's dependency packages haven't been updated yet. The Legacy version based on Debian 12 (Bookworm) is what's currently supported and tested.
 
-   > **Note for PiTrac**: Either version works perfectly. Desktop is easier for initial setup and troubleshooting, while Lite uses fewer system resources, leaving more available for camera processing. Most users choose Desktop during setup and can switch to Lite later if desired.
+   **Desktop or Lite?**
+
+   Both work fine. Desktop has a GUI and is easier for first-timers. Lite is command-line only and uses fewer resources.
+
 
    **Installation Steps**
 
@@ -115,10 +119,11 @@ This guide covers the **initial Raspberry Pi setup** for PiTrac, from installing
    d. **Choose the operating system**
       - Click "CHOOSE OS"
       - Navigate to "Raspberry Pi OS (other)"
-      - Select **ONE** of the following (both are 64-bit):
-        - **"Raspberry Pi OS (64-bit)"** - This is the Desktop version with GUI
-        - **"Raspberry Pi OS Lite (64-bit)"** - This is the command-line only version
-      - **Important**: Only use 64-bit versions. Do not use the 32-bit versions.
+      - Select **ONE** of the following Legacy versions:
+        - **"Raspberry Pi OS (Legacy, 64-bit)"** - Desktop version with GUI
+        - **"Raspberry Pi OS (Legacy, 64-bit) Lite"** - Command-line only
+      - Based on Debian 12 (Bookworm), Kernel 6.12
+      - **Important**: Must be Legacy version. Do not use regular Raspberry Pi OS (Trixie) or 32-bit versions.
 
    e. **Select storage**
       - Click "CHOOSE STORAGE"

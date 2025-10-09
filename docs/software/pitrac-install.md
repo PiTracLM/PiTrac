@@ -126,8 +126,6 @@ The script compiles the C++ launch monitor binary:
 - `/usr/lib/pitrac/ImageProcessing/CameraTools/` - Camera utilities and scripts
 
 **Configuration**:
-- `/etc/pitrac/pitrac.yaml` - Main configuration template
-- `/etc/pitrac/config/parameter-mappings.yaml` - Parameter definitions
 - `/etc/pitrac/models/` - ONNX AI models for ball detection
 - `/usr/lib/pitrac/web-server/configurations.json` - Configuration metadata (283 settings)
 
