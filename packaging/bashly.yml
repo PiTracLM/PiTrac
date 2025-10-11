@@ -4,19 +4,12 @@ version: 1.0.0
 
 # Global environment variables
 environment_variables:
-  - name: PITRAC_CONFIG
-    help: Path to PiTrac configuration file
-    default: /etc/pitrac/pitrac.yaml
   - name: PITRAC_HOME
     help: PiTrac home directory
     default: ${HOME}/.pitrac
 
 # Global flags available to all commands
 flags:
-  - long: --config
-    short: -c
-    arg: path
-    help: Use alternate configuration file
   - long: --verbose
     short: -v
     help: Enable verbose output (info level)
@@ -101,107 +94,6 @@ commands:
       - long: --skip-reboot
         help: Don't prompt for reboot after setup
 
-  # Configuration management
-  - name: config
-    alias: cfg
-    help: Manage PiTrac configuration
-    commands:
-      - name: show
-        help: Display current configuration
-        flags:
-          - long: --yaml
-            help: Show raw YAML file instead of runtime configuration
-
-      - name: edit
-        help: Edit configuration file
-        examples:
-          - pitrac config edit
-          - pitrac config edit --editor vim
-        flags:
-          - long: --editor
-            arg: editor
-            help: Use specific editor
-            default: ${EDITOR:-nano}
-
-      - name: get
-        help: Get specific configuration value
-        args:
-          - name: key
-            help: Configuration key (e.g., system.mode)
-            required: true
-
-      - name: set
-        help: Set configuration value
-        args:
-          - name: key
-            help: Configuration key
-            required: true
-          - name: value
-            help: New value
-            required: true
-        flags:
-          - long: --global
-            help: Set in global config (requires sudo)
-
-      - name: validate
-        help: Validate configuration file
-        flags:
-          - long: --fix
-            help: Attempt to fix issues
-
-      - name: reset
-        help: Reset to default configuration
-        flags:
-          - long: --backup
-            help: Create backup before reset
-      
-      - name: preset
-        help: Apply a configuration preset
-        examples:
-          - pitrac config preset indoor
-          - pitrac config preset putting
-        args:
-          - name: preset_name
-            help: Preset to apply
-            required: true
-            allowed: [indoor, outdoor, putting, driver, debug]
-      
-      - name: diff
-        help: Show configuration differences from defaults
-        flags:
-          - long: --json
-            help: Output in JSON format
-      
-      - name: backup
-        help: Create configuration backup
-        flags:
-          - long: --name
-            arg: name
-            help: Backup name (default is timestamp)
-      
-      - name: restore
-        help: Restore configuration from backup
-        args:
-          - name: backup_name
-            help: Backup to restore (use 'list' to see available)
-            required: true
-        flags:
-          - long: --force
-            help: Force restore even if config exists
-      
-      - name: migrate
-        help: Migrate from old JSON configuration
-        flags:
-          - long: --dry-run
-            help: Show what would be migrated without changing files
-      
-      - name: source
-        help: Show where a configuration value comes from
-        args:
-          - name: key
-            help: Configuration key to check
-            required: true
-
   # Camera management
   - name: camera
     alias: cam
@@ -248,59 +140,6 @@ commands:
                 help: Timeout in milliseconds
                 required: true
 
-  # Testing commands
-  - name: test
-    help: Run tests
-    examples:
-      - pitrac test hardware
-      - pitrac test quick
-      - pitrac test camera --slot 1
-    commands:
-      - name: hardware
-        help: Test hardware components
-        flags:
-          - long: --skip-camera
-            help: Skip camera tests
-          - long: --skip-gpio
-            help: Skip GPIO tests
-
-      - name: pulse
-        help: Test strobe pulses (Ctrl+C to stop)
-        flags:
-          - long: --duration
-            arg: seconds
-            help: Test duration (0 for continuous)
-            default: "0"
-
-      - name: quick
-        help: Quick image processing test (no camera)
-
-      - name: spin
-        help: Test spin detection algorithms
-
-      - name: gspro
-        help: Test GSPro server connection
-        flags:
-          - long: --host
-            arg: address
-            help: GSPro host address
-
-      - name: automated
-        help: Run automated test suite
-        flags:
-          - long: --suite
-            arg: name
-            help: Test suite to run
-            allowed: [basic, full, performance]
-
-      - name: camera
-        help: Test specific camera
-        args:
-          - name: slot
-            help: Camera slot number
-            required: true
-            allowed: ["1", "2"]
-
   # Calibration commands
   - name: calibrate
     alias: cal
@@ -330,19 +169,6 @@ commands:
 
       - name: wizard
         help: Calibration wizard
-
-  # Service management
-  - name: service
-    alias: svc
-    help: Manage PiTrac service
-    args:
-      - name: action
-        help: Service action
-        required: true
-        allowed: [start, stop, restart, status, enable, disable]
-    examples:
-      - pitrac service start
-      - pitrac service enable
 
   # External service management
   - name: web

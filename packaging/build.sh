@@ -583,32 +583,8 @@ fi
 EOF
     chmod 755 /usr/lib/pitrac/calibration-wizard
 
-    # Install config templates (only if they don't exist)
-    log_info "Installing configuration templates..."
+    # Create base directory for models and other system files
     mkdir -p /etc/pitrac
-    mkdir -p /etc/pitrac/config
-    
-    if [[ ! -f /etc/pitrac/pitrac.yaml ]]; then
-        cp "$SCRIPT_DIR/templates/pitrac.yaml" /etc/pitrac/pitrac.yaml
-    else
-        log_info "  pitrac.yaml already exists, skipping"
-    fi
-
-    if [[ ! -f /etc/pitrac/golf_sim_config.json ]]; then
-        cp "$SCRIPT_DIR/templates/golf_sim_config.json" /etc/pitrac/golf_sim_config.json
-    else
-        log_info "  golf_sim_config.json already exists, skipping"
-    fi
-    
-    if [[ -d "$SCRIPT_DIR/templates/config" ]]; then
-        if [[ ! -f /etc/pitrac/config/parameter-mappings.yaml ]]; then
-            cp "$SCRIPT_DIR/templates/config/parameter-mappings.yaml" /etc/pitrac/config/parameter-mappings.yaml
-            log_info "  parameter-mappings.yaml installed"
-        else
-            log_info "  parameter-mappings.yaml already exists, skipping"
-        fi
-        
-    fi
 
     # Configure ActiveMQ
     if command -v activemq &>/dev/null || [[ -f /usr/share/activemq/bin/activemq ]]; then
