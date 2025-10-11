@@ -274,7 +274,7 @@ class CalibrationManager {
         }
 
         const button = event?.target || event?.currentTarget;
-        const originalText = button?.textContent || 'Check Ball Location';
+        const originalText = button?.textContent || 'Verify Ball Placement';
 
         try {
             if (button) {
@@ -289,6 +289,17 @@ class CalibrationManager {
             if (response.ok) {
                 const result = await response.json();
                 const statusDiv = document.getElementById(`${camera}-ball-status`);
+
+                if (result.image_url) {
+                    const img = document.getElementById(`${camera}-image`);
+                    img.src = result.image_url + '?t=' + Date.now(); // Cache bust
+                    img.style.display = 'block';
+
+                    const placeholder = img.parentElement.querySelector('.camera-placeholder');
+                    if (placeholder) {
+                        placeholder.style.display = 'none';
+                    }
+                }
 
                 if (result.ball_found) {
                     statusDiv.className = 'ball-status success';
