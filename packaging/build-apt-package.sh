@@ -139,7 +139,7 @@ prepare_build_env() {
     mkdir -p "$DEB_DIR"/{DEBIAN,usr/{bin,lib/pitrac,share/{pitrac,doc/pitrac}},etc/pitrac,opt/pitrac,var/lib/pitrac}
     mkdir -p "$DEB_DIR/etc/systemd/system"
     mkdir -p "$DEB_DIR/usr/share/pitrac"/{webapp,test-images,calibration,templates}
-    mkdir -p "$DEB_DIR/etc/pitrac/config"
+    mkdir -p "$DEB_DIR/etc/pitrac"
     log_success "Build directories created"
 }
 
@@ -227,22 +227,8 @@ bundle_dependencies() {
 }
 
 create_configs() {
-    log_info "Creating configs..."
-    
-    cp "$SCRIPT_DIR/templates/pitrac.yaml" "$DEB_DIR/etc/pitrac/pitrac.yaml"
-    cp "$DEB_DIR/etc/pitrac/pitrac.yaml" "$DEB_DIR/usr/share/pitrac/config.yaml.default"
-    
-    cp "$SCRIPT_DIR/templates/golf_sim_config.json" "$DEB_DIR/etc/pitrac/golf_sim_config.json"
-    cp "$SCRIPT_DIR/templates/golf_sim_config.json" "$DEB_DIR/usr/share/pitrac/golf_sim_config.json.default"
-    
-    if [[ -d "$SCRIPT_DIR/templates/config" ]]; then
-        cp "$SCRIPT_DIR/templates/config/parameter-mappings.yaml" "$DEB_DIR/etc/pitrac/config/"
-        log_info "Parameter mappings installed"
-    else
-        log_warn "Configuration templates not found in $SCRIPT_DIR/templates/config/"
-    fi
+    log_info "Installing service templates..."
 
-    cp "$SCRIPT_DIR/templates/pitrac.service.template" "$DEB_DIR/usr/share/pitrac/templates/pitrac.service.template"
     cp "$SCRIPT_DIR/templates/pitrac-web.service.template" "$DEB_DIR/usr/share/pitrac/templates/pitrac-web.service.template"
     
     if [[ -f "$SCRIPT_DIR/templates/activemq.xml.template" ]]; then
@@ -305,11 +291,6 @@ EOF
 
     cp "$SCRIPT_DIR/templates/prerm.sh" "$DEB_DIR/DEBIAN/prerm"
     chmod 755 "$DEB_DIR/DEBIAN/prerm"
-
-    cat > "$DEB_DIR/DEBIAN/conffiles" << EOF
-/etc/pitrac/pitrac.yaml
-/etc/pitrac/golf_sim_config.json
-EOF
 
     log_success "Control files created"
 }

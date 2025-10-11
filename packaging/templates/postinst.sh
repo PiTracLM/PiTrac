@@ -49,42 +49,12 @@ case "$1" in
                 mkdir -p "$USER_HOME/.pitrac"/{config,cache,state,calibration}
                 mkdir -p "$USER_HOME/LM_Shares"/{Images,WebShare}
                 chown -R "$ACTUAL_USER:$ACTUAL_USER" "$USER_HOME/.pitrac" "$USER_HOME/LM_Shares"
-
-                # Copy default config to user directory if it doesn't exist
-                if [ ! -f "$USER_HOME/.pitrac/config/pitrac.yaml" ]; then
-                    cp /etc/pitrac/pitrac.yaml "$USER_HOME/.pitrac/config/pitrac.yaml"
-                    chown "$ACTUAL_USER:$ACTUAL_USER" "$USER_HOME/.pitrac/config/pitrac.yaml"
-                fi
             fi
         fi
 
-        if type -t set_config_permissions &>/dev/null; then
-            chown root:root /etc/pitrac
-            chmod 755 /etc/pitrac
-            set_config_permissions "/etc/pitrac/pitrac.yaml"
-            set_config_permissions "/etc/pitrac/golf_sim_config.json"
-            
-            if [ -d /etc/pitrac/config ]; then
-                chown -R root:root /etc/pitrac/config
-                chmod 755 /etc/pitrac/config
-                find /etc/pitrac/config -type f -exec chmod 644 {} \;
-            fi
-        else
-            chown root:root /etc/pitrac
-            chmod 755 /etc/pitrac
-            chown root:root /etc/pitrac/pitrac.yaml
-            chmod 644 /etc/pitrac/pitrac.yaml
-            if [ -f /etc/pitrac/golf_sim_config.json ]; then
-                chown root:root /etc/pitrac/golf_sim_config.json
-                chmod 644 /etc/pitrac/golf_sim_config.json
-            fi
-            
-            if [ -d /etc/pitrac/config ]; then
-                chown -R root:root /etc/pitrac/config
-                chmod 755 /etc/pitrac/config
-                find /etc/pitrac/config -type f -exec chmod 644 {} \;
-            fi
-        fi
+        # Set permissions on system directories
+        chown root:root /etc/pitrac
+        chmod 755 /etc/pitrac
 
 
         if [ -d /usr/lib/pitrac/web-server ]; then
