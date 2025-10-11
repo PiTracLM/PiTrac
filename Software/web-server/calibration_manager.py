@@ -309,7 +309,7 @@ class CalibrationManager:
             camera: Which camera to use ("camera1" or "camera2")
 
         Returns:
-            Dict with status and ball location info
+            Dict with status, ball location info, and image path for display
         """
         logger.info(f"Starting ball location check for {camera}")
 
@@ -348,6 +348,13 @@ class CalibrationManager:
         if camera_gain is None:
             camera_gain = 6.0
 
+        # Create output filename for the captured image
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_file = f"ball_location_{camera}_{timestamp}.png"
+        images_dir = Path.home() / "LM_Shares" / "Images"
+        images_dir.mkdir(parents=True, exist_ok=True)
+        output_path = images_dir / output_file
+
         cmd.extend(
             [
                 f"--search_center_x={search_x}",
@@ -355,6 +362,7 @@ class CalibrationManager:
                 f"--logging_level={logging_level}",
                 "--artifact_save_level=all",
                 f"--camera_gain={camera_gain}",
+                f"--output_filename={output_path}",
             ]
         )
         cmd.extend(self._build_cli_args_from_metadata(camera))
@@ -368,10 +376,19 @@ class CalibrationManager:
             self.calibration_status[camera]["message"] = "Ball detected" if ball_info else "Ball not found"
             self.calibration_status[camera]["progress"] = 100
 
+            image_url = None
+            if output_path.exists():
+                image_url = f"/api/images/{output_file}"
+                logger.info(f"Ball location image saved: {output_path}")
+            else:
+                logger.warning(f"Ball location image not found at: {output_path}")
+
             return {
                 "status": "success",
                 "ball_found": bool(ball_info),
                 "ball_info": ball_info,
+                "image_url": image_url,
+                "image_path": str(output_path) if output_path.exists() else None,
                 "output": result.get("output", ""),
             }
 
