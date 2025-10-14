@@ -161,8 +161,8 @@ configure_boot_config() {
     log_info "  Has InnoMaker: $has_innomaker"
 
     if [[ "$num_cameras" -eq 0 ]]; then
-        log_warn "No cameras detected, skipping config.txt configuration"
-        return 0
+        log_warn "No cameras detected - camera-specific overlays will be skipped"
+        log_info "Base boot configuration (camera_auto_detect, force_turbo, SPI) will still be applied"
     fi
 
     local pi_model
