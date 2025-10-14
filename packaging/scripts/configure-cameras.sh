@@ -118,6 +118,33 @@ insert_in_config_section() {
     mv "$temp_file" "$config_path"
 }
 
+apply_base_boot_config_only() {
+    log_info "Applying base boot configuration without camera-specific settings..."
+
+    local boot_config_module
+    if [[ -f "/usr/lib/pitrac/boot-config.sh" ]]; then
+        boot_config_module="/usr/lib/pitrac/boot-config.sh"
+    elif [[ -f "$(dirname "${BASH_SOURCE[0]}")/../src/lib/boot-config.sh" ]]; then
+        boot_config_module="$(dirname "${BASH_SOURCE[0]}")/../src/lib/boot-config.sh"
+    else
+        log_error "boot-config.sh module not found - cannot apply boot configuration"
+        return 1
+    fi
+    source "$boot_config_module"
+
+    local config_path=$(get_config_txt_path) || return 1
+    local pi_model
+    if grep -q "Raspberry Pi.*5" /proc/cpuinfo 2>/dev/null; then
+        pi_model="pi5"
+    elif grep -q "Raspberry Pi.*4" /proc/cpuinfo 2>/dev/null; then
+        pi_model="pi4"
+    else
+        pi_model="unknown"
+    fi
+
+    configure_pitrac_boot "$config_path" "$pi_model" 0 "false"
+}
+
 configure_boot_config() {
     local camera_json="$1"
 
@@ -270,41 +297,45 @@ main() {
             local num_cameras=$(echo "$camera_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(len(data.get('cameras', [])))")
 
             if [[ "$num_cameras" -eq 0 ]]; then
-                log_warn "No cameras detected - skipping camera configuration"
-                log_info "Camera configuration can be done manually later if needed"
-                exit 0
+                log_warn "No cameras detected - camera-specific overlays will be skipped"
+            else
+                log_success "Successfully detected ${num_cameras} camera(s)"
             fi
 
-            log_success "Successfully detected ${num_cameras} camera(s)"
-
-            echo "$camera_json" | python3 -c "
+            if [[ "$num_cameras" -gt 0 ]]; then
+                echo "$camera_json" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 for cam in data.get('cameras', []):
     print(f\"  Camera {cam['index']}: {cam['description']} on {cam['port']} (Type {cam['pitrac_type']})\")
 "
+            fi
 
             configure_boot_config "$camera_json"
 
-            if [[ -n "${SUDO_USER:-}" ]]; then
-                user_home=$(eval echo ~${SUDO_USER})
-            else
-                user_home="${HOME}"
+            if [[ "$num_cameras" -gt 0 ]]; then
+                if [[ -n "${SUDO_USER:-}" ]]; then
+                    user_home=$(eval echo ~${SUDO_USER})
+                else
+                    user_home="${HOME}"
+                fi
+                configure_user_settings "$camera_json" "${user_home}/.pitrac/config/user_settings.json"
             fi
-            configure_user_settings "$camera_json" "${user_home}/.pitrac/config/user_settings.json"
 
-            log_success "Camera configuration completed successfully"
-            log_warn "Please reboot the system for camera configuration to take effect"
+            log_success "Boot configuration completed successfully"
+            log_warn "Please reboot the system for configuration changes to take effect"
 
         else
-            log_error "Camera detection failed"
-            log_info "You can manually configure cameras later if needed"
-            exit 0
+            log_warn "Camera detection returned failure - applying base boot config only"
+            apply_base_boot_config_only
+            log_success "Base boot configuration applied"
+            log_warn "Please reboot for changes to take effect"
         fi
     else
-        log_warn "Could not run camera detection - skipping camera configuration"
-        log_info "This may be normal on non-Pi systems or if cameras are not connected"
-        exit 0
+        log_warn "Could not run camera detection - applying base boot config only"
+        apply_base_boot_config_only
+        log_success "Base boot configuration applied"
+        log_warn "Please reboot for changes to take effect"
     fi
 }
 
