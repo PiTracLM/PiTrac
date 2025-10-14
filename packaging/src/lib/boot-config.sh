@@ -93,17 +93,33 @@ validate_config_file() {
         fi
     done < "$config_path"
 
+    # Check for duplicate parameters
+    # For dtparam and dtoverlay, the full key includes the subparam (e.g., dtparam=spi)
+    # For other params, just the name matters (e.g., arm_boost)
     local duplicates
     duplicates=$(grep -vE '^#|^$' "$config_path" | \
                  grep -E '^[a-zA-Z_][a-zA-Z0-9_]*=' | \
-                 cut -d= -f1 | \
+                 while IFS='=' read -r name rest; do
+                     if [[ "$name" == "dtparam" || "$name" == "dtoverlay" ]]; then
+                         # For dt params, include the subparam (first part of rest)
+                         subparam=$(echo "$rest" | cut -d= -f1 | cut -d, -f1)
+                         echo "${name}=${subparam}"
+                     else
+                         # For regular params, just the name
+                         echo "$name"
+                     fi
+                 done | \
                  sort | \
                  uniq -d)
 
     if [[ -n "$duplicates" ]]; then
         log_warn "Duplicate parameters found:"
         while read -r param; do
-            log_warn "  - $param (appears $(grep -cE "^${param}=" "$config_path") times)"
+            if [[ "$param" =~ ^(dtparam|dtoverlay)= ]]; then
+                log_warn "  - $param (appears $(grep -cE "^${param}([=,]|$)" "$config_path") times)"
+            else
+                log_warn "  - $param (appears $(grep -cE "^${param}=" "$config_path") times)"
+            fi
             errors=$((errors + 1))
         done <<< "$duplicates"
     fi
