@@ -102,7 +102,21 @@ All options can be left default **EXCEPT Surface Finish** it is recommended to s
 
 ## Hardware - Bolts and Nuts
 
-### Version 1 Base Enclosure Hardware
+### Version 2 Enclosure Hardware (Work in Progress)
+
+| Quantity | Hardware | Purpose |
+|----------|----------|---------|
+| 2 | M3 × 8 mm self-tapping screws | AC power inlet plug |
+| 2 | M3 × 8 mm self-tapping screws | Base box end-cap |
+| 12 | M2 × 6 mm self-tapping screws | Tower back/front plate alignment |
+| 4 | M4 × 12 mm self-tapping screws | Tower feet to base box |
+| 4 | M2.5 × 8 mm self-tapping screws | To mount Pi to backplane. OPTIONALLY - if using threaded inserts, use M2.5x6 allan-head bolts instead. |
+| 4 | M3 × 8 mm self-tapping screws | Version 2 Connector board to backplane. OPTIONALLY - if using threaded inserts, use M3x6 allan-head bolts instead. |
+| 4 | M2.5 x 4 x 3.5 mm threaded inserts | Optional if you want to use the (classier) inserts and bolts to mount the Pi to backplane. 4 inserts per Pi, so typically 4 |
+| 4 | M3 x 4 x 5 mm threaded inserts | Optional if you want to use the (classier) inserts and bolts to mount the V2 Connector Board to the backplane.  |
+
+
+### Version 1 Base Enclosure Hardware (DEPRECATED)
 
 | Quantity | Hardware | Purpose |
 |----------|----------|---------|
@@ -117,14 +131,5 @@ All options can be left default **EXCEPT Surface Finish** it is recommended to s
 | 8 | M3 × 8 mm screws | LED and lens hold-down screws |
 
 
-### Version 2 Enclosure Hardware (Work in Progress)
 
-| Quantity | Hardware | Purpose |
-|----------|----------|---------|
-| 2 | M3 × 8 mm self-tapping screws | AC power inlet plug |
-| 2 | M3 × 8 mm self-tapping screws | Base box end-cap |
-| 12 | M2 × 6 mm self-tapping screws | Tower back/front plate alignment |
-| 4 | M4 × 12 mm self-tapping screws | Tower feet to base box |
-| 6–12 | M2.5 × 8 mm self-tapping screws | Compute board to backplane |
-
-**Hardware Note:** Stainless steel screws are stronger than black carbon steel and recommended, especially with PLA material. See [stainless steel assortment kit](https://www.googleadservices.com/pagead/aclk?sa=L&ai=DChcSEwiLuLi4w9eJAxW8Ka0GHe7XF-QYABALGgJwdg) for bulk purchasing.
+**Hardware Note:** Stainless steel screws are stronger than black carbon steel and recommended, especially with PLA material. See [stainless steel assortment kit](https://www.googleadservices.com/pagead/aclk?sa=L&ai=DChcSEwiLuLi4w9eJAxW8Ka0GHe7XF-QYABALGgJwdg) for bulk purchasing.  See also, e.g., [Ktehloy 400PCS Metric Threaded Inserts Kit X00401F0FF] (https://www.amazon.com/Ktehloy-Threaded-Assortment-Printing-Components/dp/B0CLKDPN65/ref=sr_1_3?crid=19PRGAMM0LHSC&dib=eyJ2IjoiMSJ9.Rwsrmvqhye5n_e2-oLfoTLv-TOZLNmyo9SCxwiWbrBF3F48asfcsFaweejcdlejptJv2IgbgSI9b_fYNDvP0z63_HYLbkK1DxQJRovFyJOPbu7kot4lM8tWm0fSAduOkOMHFGON2AOGW_PzK8Y1bGGbTOYQRmvlBeWGJrrqeBAx06ICeqf45Rs377sifWzJxeMTir0taClnzKET0RhBHmPASUQJtJrpnMhXlvtMGOcY.tjo7j88V1UyOlHfVfn5sdCBAxN53_RYHB8SW6v9ZP50&dib_tag=se&keywords=Ktehloy+%22400PCS%22+Metric+Threaded+Inserts+Kit&qid=1761691920&sprefix=ktehloy+400pcs+metric+threaded+inserts+kit%2Caps%2C126&sr=8-3) 
