@@ -532,6 +532,18 @@ extract_all_dependencies() {
 
     log_info "Installing all dependencies..."
 
+    # Check if packages were already installed from APT repository
+    local has_apt_packages=false
+    if dpkg -l | grep -qE "^ii\s+(libopencv4\.11|libactivemq-cpp)\s"; then
+        # Check if they came from our APT repo (not from local debs)
+        if grep -q "pitrac" /etc/apt/sources.list.d/pitrac.list 2>/dev/null; then
+            has_apt_packages=true
+            log_info "Dependencies already installed from PiTrac APT repository"
+            log_info "Skipping local package installation"
+            return 0
+        fi
+    fi
+
     if [[ "$use_debs" == "true" ]]; then
         # Check if deb packages exist
         if [[ -f "$artifacts_dir/libopencv4.11_4.11.0-1_arm64.deb" ]]; then
@@ -742,6 +754,162 @@ install_service_from_template() {
     fi
     
     log_success "$service_name service installed successfully!"
-    
+
+    return 0
+}
+
+# ========================================================================
+# Detect Debian distribution codename
+# ========================================================================
+# Returns: bookworm, trixie, or unknown
+# Used for: Multi-distribution APT repository support
+# ========================================================================
+detect_debian_codename() {
+    local codename="unknown"
+
+    # Try lsb_release first (most reliable)
+    if command -v lsb_release &> /dev/null; then
+        codename=$(lsb_release -cs 2>/dev/null)
+    fi
+
+    # Fallback to /etc/os-release
+    if [[ "$codename" == "unknown" ]] && [[ -f /etc/os-release ]]; then
+        codename=$(grep "^VERSION_CODENAME=" /etc/os-release | cut -d'=' -f2)
+    fi
+
+    # Fallback to /etc/debian_version (numeric to codename mapping)
+    if [[ "$codename" == "unknown" ]] && [[ -f /etc/debian_version ]]; then
+        local version=$(cat /etc/debian_version)
+        case "$version" in
+            12.*) codename="bookworm" ;;
+            13.*) codename="trixie" ;;
+        esac
+    fi
+
+    echo "$codename"
+}
+
+# ========================================================================
+# Configure PiTrac APT Repository
+# ========================================================================
+# Adds the PiTrac APT repository with GPG key and distribution detection
+# Returns: 0 on success, 1 if repo unavailable (falls back to local)
+# ========================================================================
+configure_pitrac_apt_repo() {
+    local repo_url="https://github.com/PiTracLM/packages"
+    local key_url="$repo_url/pitrac-repo.asc"
+    local sources_file="/etc/apt/sources.list.d/pitrac.list"
+    local keyring_file="/usr/share/keyrings/pitrac.gpg"
+
+    log_info "Configuring PiTrac APT repository..."
+
+    # Detect Debian codename
+    local codename=$(detect_debian_codename)
+
+    if [[ "$codename" != "bookworm" ]] && [[ "$codename" != "trixie" ]]; then
+        log_warn "Unsupported Debian version: $codename"
+        log_info "Supported: bookworm (12.x), trixie (13.x)"
+        return 1
+    fi
+
+    log_info "Detected Debian $codename"
+
+    # Check if repository is accessible
+    if ! curl --head --silent --fail "$repo_url/dists/$codename/Release" > /dev/null 2>&1; then
+        log_warn "PiTrac APT repository not accessible at $repo_url"
+        log_info "Will use local packages from deps-artifacts instead"
+        return 1
+    fi
+
+    # Download and install GPG key
+    log_info "Installing repository GPG key..."
+    if ! curl -fsSL "$key_url" | gpg --dearmor -o "$keyring_file" 2>/dev/null; then
+        log_error "Failed to download repository GPG key"
+        return 1
+    fi
+
+    # Create APT sources list entry
+    log_info "Adding repository to APT sources..."
+    echo "deb [arch=arm64 signed-by=$keyring_file] $repo_url $codename main" > "$sources_file"
+
+    # Update APT cache
+    log_info "Updating APT package index..."
+    if ! apt-get update 2>&1 | grep -v "^Ign:" | grep -v "^Get:" | grep -v "^Hit:"; then
+        log_error "Failed to update APT cache"
+        rm -f "$sources_file" "$keyring_file"
+        return 1
+    fi
+
+    log_success "PiTrac APT repository configured for Debian $codename"
+    return 0
+}
+
+# ========================================================================
+# Install Dependencies from APT Repository
+# ========================================================================
+# Installs PiTrac dependencies from the configured APT repo
+# Returns: 0 on success, 1 on failure
+# ========================================================================
+install_dependencies_from_apt() {
+    log_info "Installing PiTrac dependencies from APT repository..."
+
+    local packages=(
+        "liblgpio1"
+        "libmsgpack-cxx-dev"
+        "libactivemq-cpp"
+        "libactivemq-cpp-dev"
+        "libopencv4.11"
+        "libopencv-dev"
+    )
+
+    # Add ONNX Runtime based on distribution
+    local codename=$(detect_debian_codename)
+    case "$codename" in
+        bookworm)
+            packages+=("libonnxruntime1.17.3")
+            ;;
+        trixie)
+            packages+=("libonnxruntime1.22.1")
+            ;;
+        *)
+            log_warn "Unknown distribution, will attempt generic ONNX install"
+            ;;
+    esac
+
+    # Check which packages are available
+    log_info "Verifying package availability..."
+    local available_packages=()
+    local missing_packages=()
+
+    for pkg in "${packages[@]}"; do
+        if apt-cache show "$pkg" &>/dev/null; then
+            available_packages+=("$pkg")
+        else
+            missing_packages+=("$pkg")
+        fi
+    done
+
+    if [ ${#missing_packages[@]} -gt 0 ]; then
+        log_warn "Some packages not available in APT: ${missing_packages[*]}"
+        log_info "Will fall back to local packages for missing dependencies"
+    fi
+
+    if [ ${#available_packages[@]} -eq 0 ]; then
+        log_error "No packages available from APT repository"
+        return 1
+    fi
+
+    # Install available packages
+    log_info "Installing packages: ${available_packages[*]}"
+    if ! INITRD=No apt-get install -y "${available_packages[@]}"; then
+        log_error "Failed to install packages from APT repository"
+        return 1
+    fi
+
+    log_success "Installed ${#available_packages[@]} packages from APT repository"
+
+    # Update library cache
+    ldconfig
+
     return 0
 }

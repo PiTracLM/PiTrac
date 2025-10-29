@@ -453,7 +453,29 @@ build_dev() {
 
     log_info "Installing pre-built dependencies..."
     mkdir -p /usr/lib/pitrac
-    extract_all_dependencies "$ARTIFACT_DIR" "/usr/lib/pitrac"
+
+    # Try APT repository first, fall back to local packages
+    local use_apt=false
+    if configure_pitrac_apt_repo; then
+        if install_dependencies_from_apt; then
+            use_apt=true
+            log_success "Dependencies installed from APT repository"
+        else
+            log_warn "APT installation failed, falling back to local packages"
+        fi
+    else
+        log_info "APT repository not available, using local packages"
+    fi
+
+    # Fall back to local packages if APT didn't work
+    if [[ "$use_apt" == "false" ]]; then
+        if ! check_artifacts; then
+            log_error "Neither APT repository nor local packages available"
+            log_info "Local packages should be in: $ARTIFACT_DIR"
+            exit 1
+        fi
+        extract_all_dependencies "$ARTIFACT_DIR" "/usr/lib/pitrac"
+    fi
 
     # Update library cache
     ldconfig
@@ -813,7 +835,17 @@ EOF
     echo "  Configs: /etc/pitrac/"
     echo "  Web Server: /usr/lib/pitrac/web-server (updated)"
     echo ""
+
+    # Show dependency source
+    if [[ -f /etc/apt/sources.list.d/pitrac.list ]]; then
+        echo "Dependencies: PiTrac APT Repository"
+        echo "  Repository: https://github.com/PiTracLM/packages"
+        echo "  Distribution: $(detect_debian_codename)"
+    else
+        echo "Dependencies: Local packages (deps-artifacts)"
+    fi
     echo ""
+
     echo "Web server status:"
     if systemctl is-active --quiet pitrac-web.service; then
         echo "  Web service is running"
