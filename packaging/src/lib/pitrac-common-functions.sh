@@ -796,7 +796,7 @@ detect_debian_codename() {
 # Returns: 0 on success, 1 if repo unavailable (falls back to local)
 # ========================================================================
 configure_pitrac_apt_repo() {
-    local repo_url="https://github.com/PiTracLM/packages"
+    local repo_url="https://pitraclm.github.io/packages"
     local key_url="$repo_url/pitrac-repo.asc"
     local sources_file="/etc/apt/sources.list.d/pitrac.list"
     local keyring_file="/usr/share/keyrings/pitrac.gpg"

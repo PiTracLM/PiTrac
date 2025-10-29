@@ -284,17 +284,15 @@ build_dev() {
         fi
     done
 
-    # Boost libraries (runtime and dev)
-    for pkg in libboost-system1.74.0 libboost-thread1.74.0 libboost-filesystem1.74.0 \
-               libboost-program-options1.74.0 libboost-timer1.74.0 libboost-log1.74.0 \
-               libboost-regex1.74.0 libboost-dev libboost-all-dev libyaml-cpp-dev; do
+    # Boost libraries (dev packages pull in correct runtime versions automatically)
+    for pkg in libboost-dev libboost-all-dev libyaml-cpp-dev; do
         if ! dpkg -l | grep -q "^ii  $pkg"; then
             missing_deps+=("$pkg")
         fi
     done
 
-    # Core libraries
-    for pkg in libcamera0.0.3 libcamera-dev libcamera-tools libfmt-dev libssl-dev libssl3 \
+    # Core libraries (libcamera-dev pulls in correct runtime version)
+    for pkg in libcamera-dev libcamera-tools libfmt-dev libssl-dev \
                libmsgpack-cxx-dev \
                libapr1 libaprutil1 libapr1-dev libaprutil1-dev; do
         if ! dpkg -l | grep -q "^ii  $pkg"; then
@@ -334,9 +332,9 @@ build_dev() {
         fi
     fi
 
-    # OpenCV runtime dependencies
-    for pkg in libgtk-3-0 libavcodec59 libavformat59 libswscale6 libtbb12 \
-               libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 libopenexr-3-1-30; do
+    # OpenCV runtime dependencies (using -dev packages to handle version differences)
+    # Note: GTK3 changed from libgtk-3-0 to libgtk-3-0t64 in Trixie
+    for pkg in libgtk-3-dev libtbb-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libopenexr-dev; do
         if ! dpkg -l | grep -q "^ii  $pkg"; then
             missing_deps+=("$pkg")
         fi
