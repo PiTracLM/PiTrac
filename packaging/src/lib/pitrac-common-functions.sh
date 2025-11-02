@@ -823,6 +823,8 @@ configure_pitrac_apt_repo() {
 
     # Download and install GPG key
     log_info "Installing repository GPG key..."
+    # Remove existing key file to avoid overwrite prompts
+    rm -f "$keyring_file"
     if ! curl -fsSL "$key_url" | gpg --dearmor -o "$keyring_file" 2>/dev/null; then
         log_error "Failed to download repository GPG key"
         return 1

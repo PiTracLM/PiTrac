@@ -541,8 +541,8 @@ build_dev() {
         rm -rf build
     fi
 
-    # Only run meson setup if build directory doesn't exist
-    if [[ ! -d "build" ]]; then
+    # Only run meson setup if build directory doesn't exist or force rebuild was requested
+    if [[ ! -d "build" ]] || [[ "$FORCE_REBUILD" == "true" ]]; then
         log_info "Configuring build with Meson..."
         meson setup build --buildtype=release -Denable_recompile_closed_source=false
     elif [[ "meson.build" -nt "build/build.ninja" ]] 2>/dev/null; then
