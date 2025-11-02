@@ -113,7 +113,7 @@ check_artifacts() {
 build_deps() {
     log_info "Building dependency artifacts..."
 
-    if [ "$FORCE_REBUILD" = "true" ]; then
+    if [ "$FORCE_REBUILD" = "true" ] || [ "$FORCE_REBUILD" = "force" ]; then
         log_warn "Force rebuild enabled - removing existing artifacts"
         rm -f "$ARTIFACT_DIR"/*.tar.gz
     fi
@@ -247,12 +247,6 @@ build_dev() {
         log_error "Dev mode requires root privileges to install to system locations"
         log_info "Please run: sudo ./build.sh dev"
         exit 1
-    fi
-
-    # Check for force rebuild flag
-    if [[ "${2:-}" == "force" ]]; then
-        FORCE_REBUILD="true"
-        log_info "Force rebuild requested - will clean build directory"
     fi
 
     log_info "Regenerating pitrac CLI tool..."
@@ -536,13 +530,13 @@ build_dev() {
     fi
 
     # Determine if we need a clean build
-    if [[ "$FORCE_REBUILD" == "true" ]]; then
+    if [[ "$FORCE_REBUILD" == "true" ]] || [[ "$FORCE_REBUILD" == "force" ]]; then
         log_info "Force rebuild requested - cleaning build directory..."
         rm -rf build
     fi
 
     # Only run meson setup if build directory doesn't exist or force rebuild was requested
-    if [[ ! -d "build" ]] || [[ "$FORCE_REBUILD" == "true" ]]; then
+    if [[ ! -d "build" ]] || [[ "$FORCE_REBUILD" == "true" ]] || [[ "$FORCE_REBUILD" == "force" ]]; then
         log_info "Configuring build with Meson..."
         meson setup build --buildtype=release -Denable_recompile_closed_source=false
     elif [[ "meson.build" -nt "build/build.ninja" ]] 2>/dev/null; then
