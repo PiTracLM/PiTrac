@@ -43,8 +43,8 @@ mkdir -p "$INSTALL_DIR"
 cp -r web-server/* "$INSTALL_DIR/"
 
 # Install Python dependencies
-pip3 install -r "$INSTALL_DIR/requirements.txt" --break-system-packages 2>/dev/null || \
-pip3 install -r "$INSTALL_DIR/requirements.txt"
+pip3 install -r "$INSTALL_DIR/requirements.txt" --break-system-packages --ignore-installed 2>/dev/null || \
+pip3 install -r "$INSTALL_DIR/requirements.txt" --ignore-installed
 
 # Install systemd service
 cp "$INSTALL_DIR/pitrac-web.service" /etc/systemd/system/

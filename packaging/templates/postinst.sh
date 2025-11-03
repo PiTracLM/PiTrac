@@ -93,8 +93,8 @@ case "$1" in
                 install_python_dependencies "/usr/lib/pitrac/web-server"
             else
                 echo "Installing Python web server dependencies..."
-                pip3 install -r /usr/lib/pitrac/web-server/requirements.txt --break-system-packages 2>/dev/null || \
-                pip3 install -r /usr/lib/pitrac/web-server/requirements.txt || true
+                pip3 install -r /usr/lib/pitrac/web-server/requirements.txt --break-system-packages --ignore-installed 2>/dev/null || \
+                pip3 install -r /usr/lib/pitrac/web-server/requirements.txt --ignore-installed || true
             fi
             
             if [ -x /usr/lib/pitrac/web-service-install.sh ] && [ -n "$ACTUAL_USER" ]; then

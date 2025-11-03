@@ -610,23 +610,23 @@ install_python_dependencies() {
     log_info "Installing Python dependencies for web server..."
     
     if [[ $EUID -eq 0 ]]; then
-        if pip3 install -r "$web_server_dir/requirements.txt" --break-system-packages 2>/dev/null; then
+        if pip3 install -r "$web_server_dir/requirements.txt" --break-system-packages --ignore-installed 2>/dev/null; then
             log_success "Python dependencies installed successfully"
-        elif pip3 install -r "$web_server_dir/requirements.txt" 2>/dev/null; then
+        elif pip3 install -r "$web_server_dir/requirements.txt" --ignore-installed 2>/dev/null; then
             log_success "Python dependencies installed successfully"
         else
             log_error "Failed to install Python dependencies"
-            log_info "Try manually: pip3 install -r $web_server_dir/requirements.txt --break-system-packages"
+            log_info "Try manually: pip3 install -r $web_server_dir/requirements.txt --break-system-packages --ignore-installed"
             return 1
         fi
     else
-        if sudo pip3 install -r "$web_server_dir/requirements.txt" --break-system-packages 2>/dev/null; then
+        if sudo pip3 install -r "$web_server_dir/requirements.txt" --break-system-packages --ignore-installed 2>/dev/null; then
             log_success "Python dependencies installed successfully"
-        elif sudo pip3 install -r "$web_server_dir/requirements.txt" 2>/dev/null; then
+        elif sudo pip3 install -r "$web_server_dir/requirements.txt" --ignore-installed 2>/dev/null; then
             log_success "Python dependencies installed successfully"
         else
             log_error "Failed to install Python dependencies"
-            log_info "Try manually: sudo pip3 install -r $web_server_dir/requirements.txt --break-system-packages"
+            log_info "Try manually: sudo pip3 install -r $web_server_dir/requirements.txt --break-system-packages --ignore-installed"
             return 1
         fi
     fi
