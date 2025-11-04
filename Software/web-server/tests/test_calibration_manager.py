@@ -40,7 +40,7 @@ class TestCalibrationManagerInitialization:
         mock_config_manager.register_callback = Mock()
         custom_binary = "/custom/path/pitrac_lm"
 
-        manager = CalibrationManager(mock_config_manager, custom_binary)
+        manager = CalibrationManager(mock_config_manager, pitrac_binary=custom_binary)
 
         assert manager.pitrac_binary == custom_binary
 
@@ -206,7 +206,7 @@ class TestCommandBuilding:
 
     def test_ball_location_command_single_mode(self, mock_config_manager):
         """Test command building for ball location in single mode"""
-        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        manager = CalibrationManager(mock_config_manager, pitrac_binary="/test/pitrac_lm")
 
         config = mock_config_manager.get_config()
         system_mode = config.get("system", {}).get("mode", "single")
@@ -233,7 +233,7 @@ class TestCommandBuilding:
         }
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
-        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        manager = CalibrationManager(mock_config_manager, pitrac_binary="/test/pitrac_lm")
 
         config = mock_config_manager.get_config()
         system_mode = config.get("system", {}).get("mode", "single")
@@ -362,7 +362,7 @@ class TestStillImageCapture:
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
-        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        manager = CalibrationManager(mock_config_manager, pitrac_binary="/test/pitrac_lm")
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
@@ -387,7 +387,7 @@ class TestStillImageCapture:
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
-        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        manager = CalibrationManager(mock_config_manager, pitrac_binary="/test/pitrac_lm")
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
@@ -410,7 +410,7 @@ class TestStillImageCapture:
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
-        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        manager = CalibrationManager(mock_config_manager, pitrac_binary="/test/pitrac_lm")
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_subprocess.side_effect = Exception("Camera not found")
@@ -448,7 +448,7 @@ class TestLogFileHandling:
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
-        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        manager = CalibrationManager(mock_config_manager, pitrac_binary="/test/pitrac_lm")
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
@@ -493,7 +493,7 @@ class TestErrorHandling:
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
-        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        manager = CalibrationManager(mock_config_manager, pitrac_binary="/test/pitrac_lm")
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
@@ -517,7 +517,7 @@ class TestErrorHandling:
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
-        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        manager = CalibrationManager(mock_config_manager, pitrac_binary="/test/pitrac_lm")
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
@@ -634,7 +634,7 @@ class TestRealCalibrationWorkflows:
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
         mock_config_manager.reload = Mock()
 
-        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        manager = CalibrationManager(mock_config_manager, pitrac_binary="/test/pitrac_lm")
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
@@ -680,7 +680,7 @@ class TestRealCalibrationWorkflows:
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
         mock_config_manager.reload = Mock()
 
-        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        manager = CalibrationManager(mock_config_manager, pitrac_binary="/test/pitrac_lm")
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
@@ -710,7 +710,7 @@ class TestRealCalibrationWorkflows:
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
-        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        manager = CalibrationManager(mock_config_manager, pitrac_binary="/test/pitrac_lm")
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
@@ -753,7 +753,7 @@ class TestRealCalibrationWorkflows:
         }
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
-        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        manager = CalibrationManager(mock_config_manager, pitrac_binary="/test/pitrac_lm")
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
@@ -778,7 +778,7 @@ class TestRealCalibrationWorkflows:
         mock_config_manager.get_config.return_value = {"system": {"mode": "dual"}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
-        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        manager = CalibrationManager(mock_config_manager, pitrac_binary="/test/pitrac_lm")
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
@@ -813,7 +813,7 @@ class TestIntegrationScenarios:
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
         mock_config_manager.reload = Mock()
 
-        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        manager = CalibrationManager(mock_config_manager, pitrac_binary="/test/pitrac_lm")
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
@@ -860,7 +860,7 @@ class TestIntegrationScenarios:
         mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
-        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        manager = CalibrationManager(mock_config_manager, pitrac_binary="/test/pitrac_lm")
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
