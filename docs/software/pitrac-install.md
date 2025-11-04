@@ -15,7 +15,7 @@ Before starting, ensure you have:
 
 - **Raspberry Pi 5 with 8GB RAM** (recommended)
   - Raspberry Pi 4 with 8GB RAM also supported
-- **Raspberry Pi OS Bookworm 64-bit** installed and configured
+- **Raspberry Pi OS 64-bit** installed and configured (Bookworm or Trixie)
   - See [Pi Setup Guide]({% link software/pi-setup.md %}) for OS installation
 - **Active internet connection** for downloading packages
 - **Sudo privileges** on your Pi

@@ -79,19 +79,13 @@ This guide covers the **initial Raspberry Pi setup** for PiTrac, from installing
    {: .warning }
    > **CRITICAL - OS Version Requirements**
    >
-   > PiTrac currently requires **Raspberry Pi OS (Legacy, 64-bit)**
+   > PiTrac requires **Raspberry Pi OS 64-bit**
    >
-   > - **Debian version:** 12 (Bookworm)
-   > - **Kernel version:** 6.12
-   > - **System:** 64-bit
+   > - **Supported versions:** Debian 12 (Bookworm) or Debian 13 (Trixie)
+   > - **System:** 64-bit (required)
    >
    > **Do NOT use:**
-   > - The latest Raspberry Pi OS (based on Debian 13 Trixie) - PiTrac packages not yet updated for this version
    > - 32-bit versions - will not work with PiTrac
-
-   **Why the Legacy version?**
-
-   The latest Raspberry Pi OS moved to Debian 13 (Trixie), but PiTrac's dependency packages haven't been updated yet. The Legacy version based on Debian 12 (Bookworm) is what's currently supported and tested.
 
    **Desktop or Lite?**
 
@@ -118,12 +112,13 @@ This guide covers the **initial Raspberry Pi setup** for PiTrac, from installing
 
    d. **Choose the operating system**
       - Click "CHOOSE OS"
-      - Navigate to "Raspberry Pi OS (other)"
-      - Select **ONE** of the following Legacy versions:
-        - **"Raspberry Pi OS (Legacy, 64-bit)"** - Desktop version with GUI
-        - **"Raspberry Pi OS (Legacy, 64-bit) Lite"** - Command-line only
-      - Based on Debian 12 (Bookworm), Kernel 6.12
-      - **Important**: Must be Legacy version. Do not use regular Raspberry Pi OS (Trixie) or 32-bit versions.
+      - Select **ONE** of the following 64-bit versions:
+        - **"Raspberry Pi OS (64-bit)"** - Desktop version with GUI (Debian 13 Trixie)
+        - **"Raspberry Pi OS (64-bit) Lite"** - Command-line only (Debian 13 Trixie)
+        - **"Raspberry Pi OS (Legacy, 64-bit)"** - Desktop version with GUI (Debian 12 Bookworm)
+        - **"Raspberry Pi OS (Legacy, 64-bit) Lite"** - Command-line only (Debian 12 Bookworm)
+      - Both Bookworm (Debian 12) and Trixie (Debian 13) are fully supported
+      - **Important**: Must be 64-bit version. Do not use 32-bit versions.
 
    e. **Select storage**
       - Click "CHOOSE STORAGE"
