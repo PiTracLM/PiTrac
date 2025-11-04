@@ -2,7 +2,7 @@
 
 import pytest
 
-from utils.mock_factories import MockConfigManagerFactory
+from .utils.mock_factories import MockConfigManagerFactory
 
 
 @pytest.mark.unit

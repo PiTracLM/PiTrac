@@ -7,12 +7,19 @@ Only one camera stream can be active at a time to prevent resource conflicts.
 
 import io
 import logging
+import os
 from threading import Condition
 from typing import Dict, Optional, Generator
 
-from picamera2 import Picamera2
-from picamera2.encoders import JpegEncoder
-from picamera2.outputs import FileOutput
+# Conditional import based on test environment
+if os.environ.get("TESTING") == "true":
+    from tests.utils.mock_picamera import MockPicamera2 as Picamera2
+    from tests.utils.mock_picamera import MockJpegEncoder as JpegEncoder
+    from tests.utils.mock_picamera import MockFileOutput as FileOutput
+else:
+    from picamera2 import Picamera2
+    from picamera2.encoders import JpegEncoder
+    from picamera2.outputs import FileOutput
 
 logger = logging.getLogger(__name__)
 

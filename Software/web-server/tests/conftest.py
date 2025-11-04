@@ -17,11 +17,11 @@ from managers import ConnectionManager, ShotDataStore
 from parsers import ShotDataParser
 from server import PiTracServer
 
-from utils.mock_factories import (
+from .utils.mock_factories import (
     MockActiveMQFactory,
     MockWebSocketFactory,
 )
-from utils.test_helpers import ShotDataHelper
+from .utils.test_helpers import ShotDataHelper
 
 
 @pytest.fixture
@@ -94,7 +94,7 @@ def shot_data_instance():
 @pytest.fixture
 def mock_home_dir(tmp_path):
     """Mock home directory for testing with simplified structure"""
-    from utils.test_helpers import ConfigTestHelper
+    from .utils.test_helpers import ConfigTestHelper
 
     home = ConfigTestHelper.create_temp_config_dir()
 
