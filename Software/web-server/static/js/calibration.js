@@ -15,6 +15,7 @@ class CalibrationManager {
             camera2: false
         };
         this.calibrationResults = {};  // Store results from calibration API
+        this.activeStream = null;  // Track which camera stream is active
 
         this.init();
         this.setupPageCleanup();
@@ -46,7 +47,7 @@ class CalibrationManager {
     /**
      * Cleanup all intervals and resources
      */
-    cleanup() {
+    async cleanup() {
         if (this.statusPollInterval) {
             clearInterval(this.statusPollInterval);
             this.statusPollInterval = null;
@@ -56,6 +57,17 @@ class CalibrationManager {
             clearInterval(intervalId);
         });
         this.cameraPollIntervals.clear();
+
+        // Stop any active camera streams
+        if (this.activeStream) {
+            try {
+                await fetch(`/api/camera/${this.activeStream}/stream/stop`, {
+                    method: 'POST'
+                });
+            } catch (error) {
+                console.error('Error stopping camera stream during cleanup:', error);
+            }
+        }
     }
 
     setupEventListeners() {
@@ -214,6 +226,11 @@ class CalibrationManager {
             return;
         }
 
+        // Stop any active camera stream before calibrating
+        if (this.activeStream) {
+            await this.toggleLivePreview(this.activeStream, null);
+        }
+
         const button = event?.target || event?.currentTarget;
         const originalText = button?.textContent || 'Calibrate';
 
@@ -328,6 +345,115 @@ class CalibrationManager {
             if (button) {
                 button.disabled = false;
                 button.textContent = originalText;
+            }
+        }
+    }
+
+    /**
+     * Toggle live camera preview on/off
+     * @param {string} camera - Camera identifier (camera1 or camera2)
+     * @param {Event} event - The click event from the button (optional)
+     */
+    async toggleLivePreview(camera, event) {
+        if (!this.validateCameraName(camera)) {
+            this.showMessage(`Invalid camera name: ${camera}`, 'error');
+            return;
+        }
+
+        event?.preventDefault();
+
+        const btn = document.getElementById(`${camera}-preview-btn`);
+        const calibrateBtn = document.getElementById(`${camera}-calibrate-btn`);
+        const img = document.getElementById(`${camera}-stream`);
+        const placeholder = document.getElementById(`${camera}-placeholder`);
+
+        // If this camera is currently streaming, stop it
+        if (this.activeStream === camera) {
+            try {
+                btn.disabled = true;
+                btn.textContent = 'Stopping...';
+
+                const response = await fetch(`/api/camera/${camera}/stream/stop`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    // Hide stream, show placeholder
+                    img.style.display = 'none';
+                    img.src = '';
+                    placeholder.style.display = 'block';
+
+                    // Update button
+                    btn.textContent = 'Start Live Preview';
+                    btn.className = 'btn btn-primary';
+
+                    // Re-enable calibration button
+                    if (calibrateBtn) {
+                        calibrateBtn.disabled = false;
+                    }
+
+                    this.activeStream = null;
+
+                    // Clear ball status
+                    const statusDiv = document.getElementById(`${camera}-ball-status`);
+                    if (statusDiv) {
+                        statusDiv.className = 'ball-status';
+                        statusDiv.textContent = '';
+                    }
+                } else {
+                    const result = await response.json();
+                    this.showMessage(`Failed to stop preview: ${result.message || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error stopping camera preview:', error);
+                this.showMessage('Error stopping camera preview', 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+        // Start streaming
+        else {
+            try {
+                btn.disabled = true;
+                btn.textContent = 'Starting...';
+
+                const response = await fetch(`/api/camera/${camera}/stream/start`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+
+                    // Set stream URL with cache-busting parameter
+                    img.src = `/api/camera/${camera}/stream?t=${Date.now()}`;
+                    img.style.display = 'block';
+                    placeholder.style.display = 'none';
+
+                    // Update button
+                    btn.textContent = 'Stop Live Preview';
+                    btn.className = 'btn btn-danger';
+
+                    // Disable calibration button while preview is active
+                    if (calibrateBtn) {
+                        calibrateBtn.disabled = true;
+                    }
+
+                    this.activeStream = camera;
+
+                    const statusDiv = document.getElementById(`${camera}-ball-status`);
+                    if (statusDiv) {
+                        statusDiv.className = 'ball-status info';
+                        statusDiv.textContent = 'Live preview active. Position ball and click "Stop Live Preview" before calibrating.';
+                    }
+                } else {
+                    const result = await response.json();
+                    this.showMessage(`Failed to start preview: ${result.message || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error starting camera preview:', error);
+                this.showMessage('Error starting camera preview', 'error');
+            } finally {
+                btn.disabled = false;
             }
         }
     }

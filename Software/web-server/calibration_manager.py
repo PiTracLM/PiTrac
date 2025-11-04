@@ -27,15 +27,17 @@ CAMERA2_BACKGROUND_INIT_WAIT = 4.0  # Time to wait for background process to ini
 class CalibrationManager:
     """Manages calibration processes for PiTrac cameras"""
 
-    def __init__(self, config_manager, pitrac_binary: str = "/usr/lib/pitrac/pitrac_lm"):
+    def __init__(self, config_manager, camera_stream_manager=None, pitrac_binary: str = "/usr/lib/pitrac/pitrac_lm"):
         """
         Initialize calibration manager
 
         Args:
             config_manager: Configuration manager instance
+            camera_stream_manager: Optional camera stream manager to stop streams before calibration
             pitrac_binary: Path to pitrac_lm binary
         """
         self.config_manager = config_manager
+        self.camera_stream_manager = camera_stream_manager
         self.pitrac_binary = pitrac_binary
         self.current_processes: Dict[str, asyncio.subprocess.Process] = {}
         self._process_lock = asyncio.Lock()
@@ -311,6 +313,11 @@ class CalibrationManager:
         Returns:
             Dict with status, ball location info, and image path for display
         """
+        # Stop any active camera stream before running calibration
+        if self.camera_stream_manager and self.camera_stream_manager.is_streaming():
+            logger.info(f"Stopping camera stream before ball location check for {camera}")
+            self.camera_stream_manager.stop_stream()
+
         logger.info(f"Starting ball location check for {camera}")
 
         self.calibration_status[camera] = {
@@ -409,6 +416,10 @@ class CalibrationManager:
             Dict with calibration results
 
         """
+        # Stop any active camera stream before running calibration
+        if self.camera_stream_manager and self.camera_stream_manager.is_streaming():
+            logger.info(f"Stopping camera stream before auto calibration for {camera}")
+            self.camera_stream_manager.stop_stream()
 
         generated_config_path = self.config_manager.generate_golf_sim_config()
         logger.info(f"Generated config file at: {generated_config_path}")
@@ -881,6 +892,11 @@ class CalibrationManager:
         Returns:
             Dict with calibration results
         """
+        # Stop any active camera stream before running calibration
+        if self.camera_stream_manager and self.camera_stream_manager.is_streaming():
+            logger.info(f"Stopping camera stream before manual calibration for {camera}")
+            self.camera_stream_manager.stop_stream()
+
         logger.info(f"Starting manual calibration for {camera}")
 
         self.calibration_status[camera] = {

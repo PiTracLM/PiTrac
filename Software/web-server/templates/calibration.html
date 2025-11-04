@@ -94,17 +94,17 @@
                     <div class="camera-view" id="camera1-view">
                         <h3>Camera 1 - Tee Camera (Top/Angled or Straight)</h3>
                         <div class="camera-preview">
-                            <img id="camera1-image" src="" alt="Camera 1 preview" style="display: none;">
-                            <div class="camera-placeholder">
-                                <p>Click "Calibrate Camera 1" to verify setup</p>
+                            <img id="camera1-stream" src="" alt="Camera 1 live view" style="display: none; width: 100%; max-width: 640px;">
+                            <div class="camera-placeholder" id="camera1-placeholder">
+                                <p>Click "Start Live Preview" to view camera feed</p>
                             </div>
                         </div>
                         <div class="camera-controls">
-                            <button class="btn btn-primary" onclick="calibration.runAutoCalibration('camera1', event)">
-                                Calibrate Camera 1
+                            <button class="btn btn-primary" id="camera1-preview-btn" onclick="calibration.toggleLivePreview('camera1', event)">
+                                Start Live Preview
                             </button>
-                            <button class="btn btn-secondary" onclick="calibration.checkBallLocation('camera1', event)">
-                                Verify Ball Placement
+                            <button class="btn btn-success" id="camera1-calibrate-btn" onclick="calibration.runAutoCalibration('camera1', event)">
+                                Calibrate Camera 1
                             </button>
                         </div>
                         <div class="ball-status" id="camera1-ball-status"></div>
@@ -113,17 +113,17 @@
                     <div class="camera-view" id="camera2-view">
                         <h3>Camera 2 - Flight Camera (Bottom/Straight)</h3>
                         <div class="camera-preview">
-                            <img id="camera2-image" src="" alt="Camera 2 preview" style="display: none;">
-                            <div class="camera-placeholder">
-                                <p>Click "Calibrate Camera 2" to verify setup</p>
+                            <img id="camera2-stream" src="" alt="Camera 2 live view" style="display: none; width: 100%; max-width: 640px;">
+                            <div class="camera-placeholder" id="camera2-placeholder">
+                                <p>Click "Start Live Preview" to view camera feed</p>
                             </div>
                         </div>
                         <div class="camera-controls">
-                            <button class="btn btn-primary" onclick="calibration.runAutoCalibration('camera2', event)">
-                                Calibrate Camera 2
+                            <button class="btn btn-primary" id="camera2-preview-btn" onclick="calibration.toggleLivePreview('camera2', event)">
+                                Start Live Preview
                             </button>
-                            <button class="btn btn-secondary" onclick="calibration.checkBallLocation('camera2', event)">
-                                Verify Ball Placement
+                            <button class="btn btn-success" id="camera2-calibrate-btn" onclick="calibration.runAutoCalibration('camera2', event)">
+                                Calibrate Camera 2
                             </button>
                         </div>
                         <div class="ball-status" id="camera2-ball-status"></div>
