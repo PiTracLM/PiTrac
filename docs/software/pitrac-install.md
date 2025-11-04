@@ -3,6 +3,10 @@ title: PiTrac Installation
 layout: default
 nav_order: 2
 parent: Software
+description: Step-by-step PiTrac software installation guide including building from source, APT package installation, dependency management, and service configuration for the golf launch monitor.
+keywords: install pitrac software, build from source raspberry pi, apt package install, golf monitor software setup, compile opencv raspberry pi
+og_image: /assets/images/logos/PiTrac_Square.png
+last_modified_date: 2025-01-04
 ---
 
 # PiTrac Installation Guide

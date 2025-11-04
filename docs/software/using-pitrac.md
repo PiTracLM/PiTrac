@@ -3,6 +3,10 @@ title: Using PiTrac
 layout: default
 nav_order: 3
 parent: Software
+description: Complete guide to operating PiTrac golf launch monitor including web dashboard usage, configuration management, shot tracking, data review, and daily operation tips.
+keywords: use pitrac golf monitor, web dashboard golf, launch monitor operation, track golf shots, configure launch monitor, golf data review
+og_image: /assets/images/logos/PiTrac_Square.png
+last_modified_date: 2025-01-04
 ---
 
 # Using PiTrac

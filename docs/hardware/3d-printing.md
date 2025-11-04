@@ -3,6 +3,10 @@ title: 3D Printing
 layout: default
 nav_order: 3
 parent: Hardware
+description: 3D printing guide for PiTrac enclosure components including STL file downloads, printer requirements, material recommendations, and printing tips for the launch monitor housing.
+keywords: 3D print golf enclosure, launch monitor 3D printing, PLA golf project, DIY enclosure printing, STL files golf
+og_image: /assets/images/logos/PiTrac_Square.png
+last_modified_date: 2025-01-04
 ---
 
 # 3D Printing

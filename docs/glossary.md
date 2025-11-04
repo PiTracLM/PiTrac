@@ -2,8 +2,10 @@
 title: Glossary
 layout: default
 nav_order: 100
-description: Technical terms and definitions used throughout PiTrac documentation, based on terms found in the existing documentation.
-keywords: PiTrac glossary, technical terms, golf launch monitor terminology
+description: Technical terms and definitions used throughout PiTrac documentation including golf launch monitor terminology, camera concepts, and software components.
+keywords: PiTrac glossary, technical terms, golf launch monitor terminology, golf tech definitions, launch monitor glossary
+og_image: /assets/images/logos/PiTrac_Square.png
+last_modified_date: 2025-01-04
 ---
 
 # Glossary

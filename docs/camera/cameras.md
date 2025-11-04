@@ -3,6 +3,10 @@ title: Cameras
 layout: default
 nav_order: 5
 has_children: true
+description: Complete guide to camera selection, configuration, and calibration for PiTrac golf launch monitor including global shutter cameras, IMX296 sensors, and camera setup.
+keywords: raspberry pi global shutter camera, IMX296 camera golf, pi camera setup, camera configuration launch monitor, libcamera golf, golf camera calibration
+og_image: /assets/images/logos/PiTrac_Square.png
+last_modified_date: 2025-01-04
 ---
 
 # Camera System

@@ -3,6 +3,10 @@ title: Camera Calibration
 layout: default
 nav_order: 1
 parent: Cameras
+description: Manual camera calibration guide for PiTrac including tape measure method, manual focal length calculation, and advanced calibration techniques for accurate ball tracking.
+keywords: manual camera calibration golf, tape measure calibration, focal length calculation, camera angle measurement, calibration troubleshooting
+og_image: /assets/images/logos/PiTrac_Square.png
+last_modified_date: 2025-01-04
 ---
 
 # PiTrac - Camera Calibration

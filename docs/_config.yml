@@ -39,6 +39,23 @@ plugins:
 feed:
   excerpt_only: true
 
+# SEO and Social Media
+author: PiTrac Community
+social:
+  name: PiTrac
+  links:
+    - https://github.com/pitraclm/pitrac
+    - https://discord.gg/j9YWCMFVHN
+    - https://www.youtube.com/@PiTrac
+
+# Default front matter
+defaults:
+  - scope:
+      path: ""
+    values:
+      image: /assets/images/logos/PiTrac_Square.png
+      author: PiTrac Community
+
 search:
   # Split pages into sections that can be searched individually
   # Supports 1 - 6, default: 2

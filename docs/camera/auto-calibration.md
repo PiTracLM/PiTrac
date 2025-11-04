@@ -3,6 +3,10 @@ title: Auto-Calibration
 layout: default
 nav_order: 2
 parent: Cameras
+description: Automatic camera calibration guide for PiTrac using the built-in calibration wizard to determine focal length and camera angles for accurate ball tracking.
+keywords: automatic camera calibration, golf camera calibration wizard, focal length calibration, camera angle setup, launch monitor calibration
+og_image: /assets/images/logos/PiTrac_Square.png
+last_modified_date: 2025-01-04
 ---
 
 # Auto-Calibration

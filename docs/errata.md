@@ -3,6 +3,10 @@ title: Errata and Future Hopes
 layout: default
 nav_order: 1.4
 parent: Home
+description: Known issues, limitations, and future development hopes for PiTrac golf launch monitor including current errata and planned improvements.
+keywords: pitrac known issues, launch monitor limitations, golf tracker problems, pitrac future features, development plans
+og_image: /assets/images/logos/PiTrac_Square.png
+last_modified_date: 2025-01-04
 ---
 
 # Errata and Future Hopes for the DIY LM

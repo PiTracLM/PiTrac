@@ -4,6 +4,10 @@ title: Development Guide
 nav_order: 10
 has_children: true
 permalink: /development/
+description: Complete PiTrac development guide for contributors including build system, packaging, CLI interface, testing framework, and architecture documentation.
+keywords: pitrac development, contribute to pitrac, build pitrac source, docker development, apt packaging, raspberry pi development
+og_image: /assets/images/logos/PiTrac_Square.png
+last_modified_date: 2025-01-04
 ---
 
 # PiTrac Development Guide

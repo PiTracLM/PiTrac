@@ -1,8 +1,11 @@
 ---
-title: Quickstart
+title: Express Path
 layout: default
 nav_order: 3
-description: Get PiTrac running fast - install software, configure cameras, calibrate, and start tracking shots
+description: Fast-track setup for experienced users - streamlined installation, configuration, and calibration to get your PiTrac tracking shots quickly. Assumes hardware is assembled.
+keywords: quick start launch monitor, fast setup golf tracker, raspberry pi golf quick install, launch monitor express setup
+og_image: /assets/images/logos/PiTrac_Square.png
+last_modified_date: 2025-01-04
 ---
 
 # Quickstart Guide

@@ -3,6 +3,10 @@ title: Software
 layout: default
 nav_order: 4
 has_children: true
+description: Complete software setup guide for PiTrac including Raspberry Pi OS installation, PiTrac software installation, web dashboard configuration, and camera calibration.
+keywords: raspberry pi golf software, launch monitor software install, pitrac setup, golf tracker configuration, raspberry pi OS setup
+og_image: /assets/images/logos/PiTrac_Square.png
+last_modified_date: 2025-01-04
 ---
 
 # Software

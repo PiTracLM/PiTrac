@@ -3,6 +3,10 @@ title: Roadmap
 layout: default
 nav_order: 1.3
 parent: Home
+description: PiTrac development roadmap and project status including hardware versions, software features, and future development plans for the open-source golf launch monitor.
+keywords: pitrac roadmap, launch monitor development, golf project status, pitrac versions, future features golf
+og_image: /assets/images/logos/PiTrac_Square.png
+last_modified_date: 2025-01-04
 ---
 
 # PiTrac Roadmap (as of June 23, 2025)

@@ -3,6 +3,10 @@ title: PCB Assembly
 layout: default
 nav_order: 4
 parent: Hardware
+description: Complete guide to ordering and assembling the PiTrac Connector Board PCB, including manufacturing options, component sourcing, and assembly instructions for the custom circuit board.
+keywords: PCB assembly launch monitor, custom golf PCB, raspberry pi PCB, DIY circuit board, launch monitor electronics, JLCPCB assembly
+og_image: /assets/images/logos/PiTrac_Square.png
+last_modified_date: 2025-01-04
 ---
 
 # Connector Board
