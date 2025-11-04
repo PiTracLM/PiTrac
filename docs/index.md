@@ -40,7 +40,7 @@ We are hoping to inspire a community of developers to help test and continue PiT
 
 ## Documentation Sections
 
-- **[Getting Started]({% link getting-started.md %})** - Learn about PiTrac, project status, and roadmap
+- **[Build Your PiTrac]({% link build-guide.md %})** - Complete build guide from parts to first shot
 - **[Hardware]({% link hardware/hardware.md %})** - Parts list, assembly guides, and 3D printing
 - **[Software]({% link software/software.md %})** - Raspberry Pi setup, configuration, and startup
 - **[Integration]({% link simulator-integration.md %})** - Connect to golf simulators and third-party systems

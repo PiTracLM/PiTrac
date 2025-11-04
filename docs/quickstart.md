@@ -8,9 +8,9 @@ og_image: /assets/images/logos/PiTrac_Square.png
 last_modified_date: 2025-01-04
 ---
 
-# Quickstart Guide
+# Express Path Setup
 
-So you've built your PiTrac hardware and you're ready to start smacking some golf balls. This guide walks you through the essential steps to get from bare Raspberry Pi to tracking shots.
+**For experienced users.** Streamlined setup to get your PiTrac tracking shots quickly. If you're new to Raspberry Pi or want detailed explanations, use the [Build Your PiTrac]({% link build-guide.md %}) guide instead.
 
 ## What You'll Need
 
@@ -22,7 +22,7 @@ Before starting, make sure you have:
 - Network connection (Ethernet cable highly recommended for faster setup)
 - Computer to access the Pi remotely
 
-**Don't have hardware yet?** Check out the full [Getting Started]({% link getting-started.md %}) guide.
+**Don't have hardware yet?** Check out the full [Build Your PiTrac]({% link build-guide.md %}) guide.
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 title: Troubleshooting
 layout: default
-nav_order: 6
+nav_order: 8
 description: Comprehensive troubleshooting guide for PiTrac golf launch monitor covering installation issues, camera problems, calibration failures, and common software errors.
 keywords: pitrac troubleshooting, golf monitor problems, camera not detected, calibration failed, installation errors, raspberry pi issues
 og_image: /assets/images/logos/PiTrac_Square.png

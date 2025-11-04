@@ -1,7 +1,7 @@
 ---
 title: Roadmap
 layout: default
-nav_order: 1.3
+nav_order: 1.2
 parent: Home
 description: PiTrac development roadmap and project status including hardware versions, software features, and future development plans for the open-source golf launch monitor.
 keywords: pitrac roadmap, launch monitor development, golf project status, pitrac versions, future features golf

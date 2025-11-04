@@ -1,7 +1,7 @@
 ---
-title: Contributors and Attribution
+title: Contributors
 layout: default
-nav_order: 1.5
+nav_order: 1.4
 parent: Home
 description: PiTrac project contributors and attribution for open-source technologies including OpenCV, libcamera, ActiveMQ, and other software used in the golf launch monitor.
 keywords: pitrac contributors, open source attribution, golf project team, technology credits, opensource golf

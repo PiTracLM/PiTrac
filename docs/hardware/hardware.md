@@ -1,7 +1,7 @@
 ---
 title: Hardware
 layout: default
-nav_order: 3
+nav_order: 4
 has_children: true
 description: Complete hardware build guide for PiTrac golf launch monitor including parts list, PCB assembly, 3D printing enclosure, and final assembly instructions.
 keywords: DIY golf hardware, launch monitor parts, raspberry pi golf components, PCB assembly golf, 3D print golf enclosure
