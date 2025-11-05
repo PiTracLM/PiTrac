@@ -260,13 +260,6 @@ build_dev() {
         exit 1
     fi
 
-    # Check artifacts exist
-    if ! check_artifacts; then
-        log_error "Missing dependency artifacts. These should be in git."
-        log_error "Try: git lfs pull"
-        exit 1
-    fi
-
     # Check build dependencies (matching Dockerfile.pitrac)
     log_info "Checking build dependencies..."
     local missing_deps=()
