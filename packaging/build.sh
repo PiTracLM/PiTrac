@@ -73,8 +73,8 @@ check_artifacts() {
                 missing+=("lgpio")
             fi
         fi
-        if [ ! -f "$ARTIFACT_DIR/libmsgpack-cxx-dev_6.1.1-1_all.deb" ]; then
-            if [ ! -f "$ARTIFACT_DIR/msgpack-cxx-6.1.1-arm64.tar.gz" ]; then
+        if [ ! -f "$ARTIFACT_DIR/libmsgpack-cxx-dev_1:7.0.0-2_all.deb" ]; then
+            if [ ! -f "$ARTIFACT_DIR/msgpack-cxx-7.0.0-arm64.tar.gz" ]; then
                 missing+=("msgpack")
             fi
         fi
@@ -92,7 +92,7 @@ check_artifacts() {
         if [ ! -f "$ARTIFACT_DIR/lgpio-0.2.2-arm64.tar.gz" ]; then
             missing+=("lgpio")
         fi
-        if [ ! -f "$ARTIFACT_DIR/msgpack-cxx-6.1.1-arm64.tar.gz" ]; then
+        if [ ! -f "$ARTIFACT_DIR/msgpack-cxx-7.0.0-arm64.tar.gz" ]; then
             missing+=("msgpack")
         fi
     fi
