@@ -757,6 +757,14 @@ EOF
         cp "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh" /usr/lib/pitrac/
         chmod 644 /usr/lib/pitrac/pitrac-common-functions.sh
     fi
+
+    if [[ -f "$SCRIPT_DIR/src/lib/boot-config.sh" ]]; then
+        cp "$SCRIPT_DIR/src/lib/boot-config.sh" /usr/lib/pitrac/
+        chmod 755 /usr/lib/pitrac/boot-config.sh
+        log_success "Installed boot-config.sh module"
+    else
+        log_warn "boot-config.sh not found - boot configuration may fail"
+    fi
     
     INSTALL_USER="${SUDO_USER:-$(whoami)}"
 

@@ -118,10 +118,50 @@ insert_in_config_section() {
     mv "$temp_file" "$config_path"
 }
 
+apply_base_boot_config_only() {
+    log_info "Applying base boot configuration without camera-specific settings..."
+
+    local boot_config_module
+    if [[ -f "/usr/lib/pitrac/boot-config.sh" ]]; then
+        boot_config_module="/usr/lib/pitrac/boot-config.sh"
+    elif [[ -f "$(dirname "${BASH_SOURCE[0]}")/../src/lib/boot-config.sh" ]]; then
+        boot_config_module="$(dirname "${BASH_SOURCE[0]}")/../src/lib/boot-config.sh"
+    else
+        log_error "boot-config.sh module not found - cannot apply boot configuration"
+        return 1
+    fi
+    source "$boot_config_module"
+
+    local config_path=$(get_config_txt_path) || return 1
+    local pi_model
+    if grep -q "Raspberry Pi.*5" /proc/cpuinfo 2>/dev/null; then
+        pi_model="pi5"
+    elif grep -q "Raspberry Pi.*4" /proc/cpuinfo 2>/dev/null; then
+        pi_model="pi4"
+    else
+        pi_model="unknown"
+    fi
+
+    configure_pitrac_boot "$config_path" "$pi_model" 0 "false"
+}
+
 configure_boot_config() {
     local camera_json="$1"
-    local config_path
 
+    local boot_config_module
+    if [[ -f "/usr/lib/pitrac/boot-config.sh" ]]; then
+        boot_config_module="/usr/lib/pitrac/boot-config.sh"
+    elif [[ -f "$(dirname "${BASH_SOURCE[0]}")/../src/lib/boot-config.sh" ]]; then
+        boot_config_module="$(dirname "${BASH_SOURCE[0]}")/../src/lib/boot-config.sh"
+    else
+        log_error "boot-config.sh module not found!"
+        log_error "Cannot configure boot settings safely"
+        return 1
+    fi
+
+    source "$boot_config_module"
+
+    local config_path
     config_path=$(get_config_txt_path) || return 1
 
     local num_cameras=$(echo "$camera_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(len(data.get('cameras', [])))")
@@ -137,7 +177,6 @@ configure_boot_config() {
         slot2_type=$(echo "$camera_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('configuration', {}).get('slot2', {}).get('type', ''))" 2>/dev/null || echo "")
     fi
 
-    # Check if any camera is InnoMaker (type 5)
     if [[ "$slot1_type" == "5" ]] || [[ "$slot2_type" == "5" ]]; then
         has_innomaker=true
     fi
@@ -148,120 +187,25 @@ configure_boot_config() {
     log_info "  Slot 2 type: ${slot2_type:-none}"
     log_info "  Has InnoMaker: $has_innomaker"
 
-    # Skip if no cameras detected
     if [[ "$num_cameras" -eq 0 ]]; then
-        log_warn "No cameras detected, skipping config.txt configuration"
-        return 0
+        log_warn "No cameras detected - camera-specific overlays will be skipped"
+        log_info "Base boot configuration (camera_auto_detect, force_turbo, SPI) will still be applied"
     fi
 
-    backup_config_txt "$config_path"
-
-    log_info "Configuring ${config_path}..."
-
-    log_info "Removing existing PiTrac configuration (if present)..."
-    sed -i '/# PiTrac Camera Configuration/,/# End PiTrac Camera Configuration/d' "$config_path" 2>/dev/null || true
-
-    sed -i '/# Added by PiTrac installer/d' "$config_path" 2>/dev/null || true
-
-    # Build config block dynamically, checking for existing values
-    local config_block="# PiTrac Camera Configuration - Added by pitrac installer
-# DO NOT MODIFY - Managed automatically by PiTrac"
-
-    # Only add parameters that don't already exist
-    if ! grep -q "^camera_auto_detect=" "$config_path"; then
-        config_block="$config_block
-
-# Disable automatic camera detection for manual control
-camera_auto_detect=0"
+    local pi_model
+    if grep -q "Raspberry Pi.*5" /proc/cpuinfo 2>/dev/null; then
+        pi_model="pi5"
+    elif grep -q "Raspberry Pi.*4" /proc/cpuinfo 2>/dev/null; then
+        pi_model="pi4"
     else
-        log_info "  camera_auto_detect already exists, skipping"
+        pi_model="unknown"
     fi
 
-    config_block="$config_block
+    log_info "Detected Pi model: $pi_model"
 
-# Core system parameters for PiTrac operation"
-
-    if ! grep -q "^dtparam=spi=on" "$config_path"; then
-        config_block="$config_block
-dtparam=spi=on"
-    else
-        log_info "  dtparam=spi=on already exists, skipping"
-    fi
-
-    if ! grep -q "^force_turbo=" "$config_path"; then
-        config_block="$config_block
-force_turbo=1"
-    else
-        log_info "  force_turbo already exists, skipping"
-    fi
-
-    if ! grep -q "^arm_boost=" "$config_path"; then
-        config_block="$config_block
-arm_boost=1"
-    else
-        log_info "  arm_boost already exists, skipping"
-    fi
-
-    if [[ "$num_cameras" -eq 2 ]]; then
-        config_block="$config_block
-
-# Dual camera configuration (single-pi system)
-# Camera 0: internal trigger, Camera 1: external trigger
-[all]
-dtoverlay=imx296,cam0
-dtoverlay=imx296,sync-sink"
-    elif [[ "$num_cameras" -eq 1 ]]; then
-        config_block="$config_block
-
-# Single camera configuration
-[all]
-dtoverlay=imx296,cam0"
-    fi
-
-    if [[ "$has_innomaker" == "true" ]]; then
-        config_block="$config_block
-
-# InnoMaker IMX296 camera support
-dtparam=i2c_vc=on
-dtoverlay=vc_mipi_imx296"
-    fi
-
-    config_block="$config_block
-
-# End PiTrac Camera Configuration"
-    local temp_file=$(mktemp)
-    local inserted=false
-    local line_count=0
-
-    while IFS= read -r line; do
-        line_count=$((line_count + 1))
-
-        if [[ "$inserted" == "false" ]]; then
-            if [[ "$line" =~ ^\[.*\]$ ]]; then
-                echo "" >> "$temp_file"
-                echo "$config_block" >> "$temp_file"
-                echo "" >> "$temp_file"
-                inserted=true
-            elif [[ "$line_count" -gt 10 ]] && [[ ! "$line" =~ ^# ]] && [[ -n "$line" ]]; then
-                echo "" >> "$temp_file"
-                echo "$config_block" >> "$temp_file"
-                echo "" >> "$temp_file"
-                inserted=true
-            fi
-        fi
-
-        echo "$line" >> "$temp_file"
-    done < "$config_path"
-
-    if [[ "$inserted" == "false" ]]; then
-        echo "" >> "$temp_file"
-        echo "$config_block" >> "$temp_file"
-    fi
-
-    mv "$temp_file" "$config_path"
+    configure_pitrac_boot "$config_path" "$pi_model" "$num_cameras" "$has_innomaker"
 
     log_success "config.txt configuration complete"
-
     log_warn "IMPORTANT: System must be rebooted for camera configuration changes to take effect"
 }
 
@@ -353,41 +297,45 @@ main() {
             local num_cameras=$(echo "$camera_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(len(data.get('cameras', [])))")
 
             if [[ "$num_cameras" -eq 0 ]]; then
-                log_warn "No cameras detected - skipping camera configuration"
-                log_info "Camera configuration can be done manually later if needed"
-                exit 0
+                log_warn "No cameras detected - camera-specific overlays will be skipped"
+            else
+                log_success "Successfully detected ${num_cameras} camera(s)"
             fi
 
-            log_success "Successfully detected ${num_cameras} camera(s)"
-
-            echo "$camera_json" | python3 -c "
+            if [[ "$num_cameras" -gt 0 ]]; then
+                echo "$camera_json" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 for cam in data.get('cameras', []):
     print(f\"  Camera {cam['index']}: {cam['description']} on {cam['port']} (Type {cam['pitrac_type']})\")
 "
+            fi
 
             configure_boot_config "$camera_json"
 
-            if [[ -n "${SUDO_USER:-}" ]]; then
-                user_home=$(eval echo ~${SUDO_USER})
-            else
-                user_home="${HOME}"
+            if [[ "$num_cameras" -gt 0 ]]; then
+                if [[ -n "${SUDO_USER:-}" ]]; then
+                    user_home=$(eval echo ~${SUDO_USER})
+                else
+                    user_home="${HOME}"
+                fi
+                configure_user_settings "$camera_json" "${user_home}/.pitrac/config/user_settings.json"
             fi
-            configure_user_settings "$camera_json" "${user_home}/.pitrac/config/user_settings.json"
 
-            log_success "Camera configuration completed successfully"
-            log_warn "Please reboot the system for camera configuration to take effect"
+            log_success "Boot configuration completed successfully"
+            log_warn "Please reboot the system for configuration changes to take effect"
 
         else
-            log_error "Camera detection failed"
-            log_info "You can manually configure cameras later if needed"
-            exit 0
+            log_warn "Camera detection returned failure - applying base boot config only"
+            apply_base_boot_config_only
+            log_success "Base boot configuration applied"
+            log_warn "Please reboot for changes to take effect"
         fi
     else
-        log_warn "Could not run camera detection - skipping camera configuration"
-        log_info "This may be normal on non-Pi systems or if cameras are not connected"
-        exit 0
+        log_warn "Could not run camera detection - applying base boot config only"
+        apply_base_boot_config_only
+        log_success "Base boot configuration applied"
+        log_warn "Please reboot for changes to take effect"
     fi
 }
 

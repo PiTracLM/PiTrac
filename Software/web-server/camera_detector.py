@@ -450,14 +450,16 @@ class CameraDetector:
 
         logger.debug(f"Parsing camera info from output ({len(output)} bytes)")
         cameras = self._parse_camera_info(output)
+
+        # Detection ran successfully even if 0 cameras found
+        result["success"] = True
+        result["cameras"] = cameras
+
         if not cameras:
             logger.info("No cameras detected by parsing tool output")
             result["message"] = "No cameras detected"
             result["warnings"].append("Check ribbon cable connections and camera_auto_detect=1 in config.txt")
             return result
-
-        result["cameras"] = cameras
-        result["success"] = True
 
         logger.info(f"Found {len(cameras)} camera(s)")
         for cam in cameras:
