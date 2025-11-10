@@ -857,6 +857,7 @@ install_dependencies_from_apt() {
 
     local packages=(
         "liblgpio1"
+        "liblgpio-dev"
         "libmsgpack-cxx-dev"
         "libactivemq-cpp"
         "libactivemq-cpp-dev"
