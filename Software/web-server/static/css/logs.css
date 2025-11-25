@@ -45,6 +45,11 @@
     cursor: pointer;
 }
 
+.service-selector select option {
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+}
+
 .service-info {
     display: flex;
     align-items: center;
