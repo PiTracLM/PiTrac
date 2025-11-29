@@ -58,8 +58,8 @@ check_artifacts() {
 
     if [[ "$use_debs" == "true" ]]; then
         # Check for DEB packages first
-        if [ ! -f "$ARTIFACT_DIR/libopencv4.11_4.11.0-1_arm64.deb" ] && [ ! -f "$ARTIFACT_DIR/libopencv-dev_4.11.0-1_arm64.deb" ]; then
-            if [ ! -f "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" ]; then
+        if [ ! -f "$ARTIFACT_DIR/libopencv4.12_4.12.0-1_arm64.deb" ] && [ ! -f "$ARTIFACT_DIR/libopencv-dev_4.12.0-1_arm64.deb" ]; then
+            if [ ! -f "$ARTIFACT_DIR/opencv-4.12.0-arm64.tar.gz" ]; then
                 missing+=("opencv")
             fi
         fi
@@ -78,12 +78,12 @@ check_artifacts() {
                 missing+=("msgpack")
             fi
         fi
-        if [ ! -f "$ARTIFACT_DIR/libonnxruntime1.17.3_1.17.3-xnnpack-verified_arm64.deb" ]; then
+        if [ ! -f "$ARTIFACT_DIR/libonnxruntime1.17.3_1.17.3-xnnpack3_arm64.deb" ]; then
             missing+=("onnxruntime")
         fi
     else
         # Check for tar.gz packages
-        if [ ! -f "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" ]; then
+        if [ ! -f "$ARTIFACT_DIR/opencv-4.12.0-arm64.tar.gz" ]; then
             missing+=("opencv")
         fi
         if [ ! -f "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" ]; then
@@ -101,7 +101,7 @@ check_artifacts() {
         log_warn "Missing artifacts: ${missing[*]}"
         return 1
     else
-        if [[ "$use_debs" == "true" ]] && [ -f "$ARTIFACT_DIR/libopencv4.11_4.11.0-1_arm64.deb" ]; then
+        if [[ "$use_debs" == "true" ]] && [ -f "$ARTIFACT_DIR/libopencv4.12_4.12.0-1_arm64.deb" ]; then
             log_success "All DEB packages present"
         else
             log_success "All artifacts present"
@@ -498,7 +498,7 @@ build_dev() {
     if [[ -f "build/build.ninja" ]]; then
         if grep -q "/opt/opencv\|/opt/activemq" build/build.ninja 2>/dev/null; then
             # Check if DEB packages are installed (they use /usr/, not /opt/)
-            if dpkg -l 2>/dev/null | grep -qE "^ii\s+(libopencv4\.11|libactivemq-cpp)\s"; then
+            if dpkg -l 2>/dev/null | grep -qE "^ii\s+(libopencv4\.12|libactivemq-cpp)\s"; then
                 log_warn "Detected build directory with /opt/ paths but DEB packages use /usr/"
                 log_warn "This causes linker failures - cached paths are stale"
                 log_info "Automatically cleaning build directory for compatibility..."
