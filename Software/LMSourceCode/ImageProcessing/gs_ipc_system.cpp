@@ -80,7 +80,7 @@ namespace golf_sim {
     GolfSimMessageProducer* GolfSimIpcSystem::producer_ = nullptr;
 
     std::string GolfSimIpcSystem::kActiveMQLMIdProperty = "LM_System_ID";
-
+    bool GolfSimIpcSystem::active_mqlibrary_initialized_ = false;
 
     cv::Mat GolfSimIpcSystem::last_received_image_;
     std::mutex GolfSimIpcSystem::last_received_image_mutex_;
@@ -102,7 +102,7 @@ namespace golf_sim {
         }
 
         activemq::library::ActiveMQCPP::initializeLibrary();
-
+        active_mqlibrary_initialized_ = true;
 
         // Set the URI to point to the IP Address of your broker.
         // add any optional params to the url to enable things like
@@ -198,17 +198,26 @@ namespace golf_sim {
             consumer_->Shutdown();
         }
 
-        producer_->Shutdown();
+        if (producer_ != nullptr) {
+            producer_->Shutdown();
+        }
 
         // TBD - Give other threads a moment to shut down
         sleep(4);
 
         if (consumer_ != nullptr) {
             delete consumer_;
+            consumer_ = nullptr;
         }
-        delete producer_;
+        if (producer_ != nullptr) {
+            delete producer_;
+            producer_ = nullptr;
+        }
 
-        activemq::library::ActiveMQCPP::shutdownLibrary();
+        if (active_mqlibrary_initialized_ == true) {
+            activemq::library::ActiveMQCPP::shutdownLibrary();
+            active_mqlibrary_initialized_ = false;
+        }
 
         return true;
     }

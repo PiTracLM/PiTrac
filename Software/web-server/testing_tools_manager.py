@@ -53,7 +53,7 @@ class TestingToolsManager:
                 "category": "camera",
                 "args": ["--system_mode", "camera1", "--cam_still_mode", "--output_filename=cam1_still_picture.png"],
                 "requires_sudo": False,
-                "timeout": 10,
+                "timeout": 20,
             },
             "camera2_still": {
                 "name": "Camera 2 Still Image",
@@ -197,7 +197,7 @@ class TestingToolsManager:
             cmd.append(f"--web_server_share_dir={expanded_web_dir}")
 
             base_image_dir = str(Path.home() / "LM_Shares/Images")
-            cmd.append(f"--base_image_logging_dir={base_image_dir}")
+            cmd.append(f"--base_image_logging_dir={base_image_dir}/")
 
             cmd.append("--logging_level=trace")
 
@@ -277,7 +277,7 @@ class TestingToolsManager:
                 }
 
                 if "still" in tool_id:
-                    if "cam1" in tool_id:
+                    if "camera1" in tool_id:
                         image_path = Path.home() / "LM_Shares/Images/cam1_still_picture.png"
                     else:
                         image_path = Path.home() / "LM_Shares/Images/cam2_still_picture.png"
