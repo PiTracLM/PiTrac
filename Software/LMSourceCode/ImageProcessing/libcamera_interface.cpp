@@ -54,9 +54,11 @@ namespace golf_sim {
     uint LibCameraInterface::kMaxWatchingCropHeight = 88;
 
     double LibCameraInterface::kCamera1Gain = 6.0;
+    double LibCameraInterface::kCamera1Saturation = 1.0;
     double LibCameraInterface::kCamera1HighFPSGain = 15.0;
     double LibCameraInterface::kCamera1Contrast = 1.0;
     double LibCameraInterface::kCamera2Gain = 6.0;
+    double LibCameraInterface::kCamera2Saturation = 1.0;
     double LibCameraInterface::kCamera2ComparisonGain = 0.8;
     double LibCameraInterface::kCamera2StrobedEnvironmentGain = 0.8;
     double LibCameraInterface::kCamera2Contrast = 1.0;
@@ -776,6 +778,10 @@ bool ConfigureLibCameraOptions(const GolfSimCamera& camera, RPiCamEncoder& app, 
     options->gain = camera_gain;
     options->shutter.set(shutter_speed_string);   // TBD - should be 1,000,000 for uS setting
 
+	options->saturation = (camera_number == GsCameraNumber::kGsCamera1) ? LibCameraInterface::kCamera1Saturation : LibCameraInterface::kCamera2Saturation;
+
+    GS_LOG_MSG(trace, "Saturation = " + std::to_string(options->saturation));
+
     options->timeout.set("0ms");
 
     const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot1CameraType;
@@ -1138,9 +1144,10 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
         // only in a single Pi system.
         options->camera = (camera_number == GsCameraNumber::kGsCamera1 || !GolfSimOptions::GetCommandLineOptions().run_single_pi_) ? 0 : 1;
 
-        // Shouldn't need gain to take a "normal" picture.   Default will be 1.0
+        // Shouldn't need a special gain to take a "normal" picture.   Default will be 1.0
         // from the command line options.
         options->gain = camera_gain;
+        options->saturation = (camera_number == GsCameraNumber::kGsCamera1) ? LibCameraInterface::kCamera1Saturation : LibCameraInterface::kCamera2Saturation;
         options->contrast = camera_contrast;
         options->timeout.set("5s");
         const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot1CameraType;
@@ -1447,6 +1454,9 @@ bool WaitForCam2Trigger(cv::Mat& return_image) {
 
             options->contrast = LibCameraInterface::kCamera2Contrast;
         }
+
+        options->saturation = LibCameraInterface::kCamera2Saturation;
+    	GS_LOG_MSG(trace, "Flight camera saturation = " + std::to_string(options->saturation));
 
         options->immediate = true;
         options->timeout.set("0ms");  // Wait forever for external trigger

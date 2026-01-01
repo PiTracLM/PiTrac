@@ -103,6 +103,7 @@ namespace golf_sim {
         std::map<std::string, int> lens_table =
         { { "1", LensType::Lens_6mm },
             { "2", LensType::Lens_3_6mm_M12 },
+            { "3", LensType::Lens_Custom },
             { "100", LensType::kLensUnknown },
         };
         if (lens_table.count(lens_enum_value_string) == 0)
@@ -221,15 +222,16 @@ namespace golf_sim {
 
         if (lens_type == Lens_6mm) {
             focal_length_ = 6.0f;
-            horizontalFoV_ = 50.0f;
-            verticalFoV_ = 50.0f;
             expected_ball_radius_pixels_at_40cm_ = 87;
+        }
+
+        if (lens_type == Lens_Custom) {
+            focal_length_ = 4.0f;
+            expected_ball_radius_pixels_at_40cm_ = 68;
         }
 
         if (lens_type == Lens_3_6mm_M12) {
             focal_length_ = 3.6f;
-            horizontalFoV_ = 70.0f;
-            verticalFoV_ = 70.0f;
             expected_ball_radius_pixels_at_40cm_ = 45;
         }
 
@@ -335,8 +337,6 @@ namespace golf_sim {
 
             // TBD - This camera is no longer supported - REMOVE
             focal_length_ = 6.25f;
-            horizontalFoV_ = 63.0f;  // TBD - Not certain of FoV yet
-            verticalFoV_ = 50.0f;
             sensor_width_ = 6.287f;
             sensor_height_ = 4.712f;
 
@@ -383,8 +383,6 @@ namespace golf_sim {
         else if (model == PiCam2) {
             // TBD - This camera is no longer supported - REMOVE
             focal_length_ = 3.04f;
-            horizontalFoV_ = 62.2f;
-            verticalFoV_ = 48.8f;
             sensor_width_ = 3.68f;
             sensor_height_ = 2.76f;
 
@@ -447,8 +445,6 @@ namespace golf_sim {
          }
         else if (model == PiCam13) {
             focal_length_ = 3.6f;
-            horizontalFoV_ = 53.5f;
-            verticalFoV_ = 41.41f;
             // TBD - Other params for other potential resolutions
 
             //            resolution_x_ = 1024;
@@ -475,13 +471,29 @@ namespace golf_sim {
 
         std::string tag;
 
+        // We typically do NOT want to use the default focal length once we have calibrated the camera to a specific, actual, focal length.
+		// Instead, if we have a calibrated focal length in the .json file, we want to use that unless the use_default_focal_length flag is set.
+		// If it is set, the caller will be responsible for setting the focal length later.
         if (!use_default_focal_length) {
-            tag = "gs_config.cameras.kCamera" + std::to_string(camera_number_) + "FocalLength";
-            if (GolfSimConfiguration::PropertyExists(tag)) {
-                GolfSimConfiguration::SetConstant(tag, focal_length_);
-                GS_LOG_TRACE_MSG(trace, "Setting focal length (from JSON file) = " + std::to_string(focal_length_));
+
+            // Only if we are using a custom focal length, then use that length
+            if (lens_type == Lens_Custom) {
+                tag = "gs_config.cameras.kSlot" + std::to_string(camera_number_) + "CustomLensFocalLength";
+                if (GolfSimConfiguration::PropertyExists(tag)) {
+                    GolfSimConfiguration::SetConstant(tag, focal_length_);
+                    GS_LOG_TRACE_MSG(trace, "Setting custom focal length (from JSON file) = " + std::to_string(focal_length_));
+                }
+            }
+            else {
+				// Otherwise, for non-custom lenses, just use the standard focal length parameter
+                tag = "gs_config.cameras.kCamera" + std::to_string(camera_number_) + "FocalLength";
+                if (GolfSimConfiguration::PropertyExists(tag)) {
+                    GolfSimConfiguration::SetConstant(tag, focal_length_);
+                    GS_LOG_TRACE_MSG(trace, "Setting focal length (from JSON file) = " + std::to_string(focal_length_));
+                }
             }
         }
+
 
         tag = "gs_config.cameras.kCamera" + std::to_string(camera_number_) + "Angles";
         GolfSimConfiguration::SetConstant(tag, camera_angles_);

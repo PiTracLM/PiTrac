@@ -2887,7 +2887,7 @@ namespace golf_sim {
                 int number_of_strobes = (int)test_pulse_intervals.size();
 
                 if (number_ball_exposures > number_of_strobes) {
-                    LoggingTools::Warning("GetBallDistancesAndRatios had more exposures than strobes.");
+                    LoggingTools::Warning("GetBallDistancesAndRatios had more exposures than strobes.  It is possible the image being analyzed was generated with a different strobing configuration.");
                     return false;
                 }
 
@@ -2977,6 +2977,11 @@ namespace golf_sim {
                             + " best_intervals_pattern_index= " + std::to_string(best_intervals_pattern_index) + ".  Vector was : ");
                         PrintPulseVector(candidate_intervals_to_collapse_patterns_vector[best_intervals_pattern_index]);
                     }
+                }
+
+                // In the unlikely event we didn't find ANY best interval, just default it to the first interval
+                if (best_intervals_pattern_index < 0) {
+                    best_intervals_pattern_index = 0;
                 }
 
                 GS_LOG_TRACE_MSG(trace, "------------> Best-fitting pulse vector was number: " + std::to_string(best_intervals_pattern_index) + ".  With score of: " + 

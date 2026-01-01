@@ -133,15 +133,15 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;BOOST_BIND_GLOBAL_PLACEHOLDERS;BOOST_ALL_DYN_LINK;BOOST_USE_WINAPI_VERSION=0x0A00;YAML_CPP_STATIC_DEFINE;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>E:\Dev_Libs\opencv\build\include;E:\Dev_Libs\onnxruntime-win-x64-1.23.2\include;E:\Dev_Libs\boost_1_87_0\;E:\Dev_Libs\yaml-cpp\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Dev_Libs\opencv\build\include;E:\Dev_Libs\boost_1_87_0\;E:\Dev_Libs\yaml-cpp\include;..\packages\Microsoft.ML.OnnxRuntime.1.23.2\build\native\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>E:\Dev_Libs\opencv\build\x64\vc16\lib;E:\Dev_Libs\onnxruntime-win-x64-1.23.2\lib;E:\Dev_Libs\boost_1_87_0\lib64-msvc-14.3</AdditionalLibraryDirectories>
-      <AdditionalDependencies>E:\Dev_Libs\opencv\build\x64\vc16\lib\opencv_world4120d.lib;E:\Dev_Libs\onnxruntime-win-x64-1.23.2\lib\onnxruntime.pdb;E:\Dev_Libs\onnxruntime-win-x64-1.23.2\lib\onnxruntime_providers_shared.pdb;E:\dev_libs\yaml-cpp\build\Debug\yaml-cppd.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>E:\Dev_Libs\opencv\build\x64\vc16\lib;E:\Dev_Libs\boost_1_87_0\lib64-msvc-14.3</AdditionalLibraryDirectories>
+      <AdditionalDependencies>E:\Dev_Libs\opencv\build\x64\vc16\lib\opencv_world4120d.lib;E:\dev_libs\yaml-cpp\build\Debug\yaml-cppd.lib;..\packages\Microsoft.ML.OnnxRuntime.1.23.2\runtimes\win-x64\native\onnxruntime.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
@@ -276,6 +276,7 @@
     <ClCompile Include="gs_results.cpp" />
     <ClCompile Include="gs_sim_interface.cpp" />
     <ClCompile Include="gs_sim_socket_interface.cpp" />
+    <ClCompile Include="gs_web_api.cpp" />
     <ClCompile Include="ImageAnalysis\infrastructure\opencv_image_analyzer.cpp" />
     <ClCompile Include="lm_main.cpp" />
     <ClCompile Include="gs_ipc_mat.cpp" />
@@ -306,6 +307,7 @@
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">stdcpp20</LanguageStandard>
     </ClCompile>
     <ClCompile Include="gs_globals.cpp" />
+    <ClCompile Include="onnx_runtime_detector.cpp" />
     <ClCompile Include="output\circular_output.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
@@ -462,6 +464,7 @@
     <ClInclude Include="image\image.hpp" />
     <ClInclude Include="libcamera_interface.h" />
     <ClInclude Include="logging_tools.h" />
+    <ClInclude Include="onnx_runtime_detector.hpp" />
     <ClInclude Include="output\circular_output.hpp" />
     <ClInclude Include="output\file_output.hpp" />
     <ClInclude Include="output\net_output.hpp" />

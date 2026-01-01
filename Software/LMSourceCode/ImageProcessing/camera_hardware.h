@@ -1,3 +1,4 @@
+
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (C) 2022-2025, Verdant Consultants, LLC.
@@ -41,6 +42,7 @@ namespace golf_sim {
         enum LensType {
             Lens_6mm = 1,
             Lens_3_6mm_M12 = 2,
+            Lens_Custom = 3,
             kLensUnknown = 100
         };
 
@@ -73,8 +75,6 @@ namespace golf_sim {
 		CameraOrientation camera_orientation_ = CameraOrientation::kCameraOrientationUnknown;
 
         float focal_length_ = 0;        // In millimeters
-        float horizontalFoV_ = 0;        // In degrees
-        float verticalFoV_ = 0;          // In degrees
         float sensor_width_ = 0;        // The physical size of the camera sensor, inclusive of all the pixels.  In mm
         float sensor_height_ = 0;       // In mm
 

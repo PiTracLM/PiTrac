@@ -6,16 +6,27 @@
 #include "onnx_runtime_detector.hpp"
 #include "logging_tools.h"
 #include <algorithm>
+#include <filesystem>
 #include <numeric>
+
+#ifdef __unix__
+
 #include <cstring>
+#include <stdexcept>
+
 #include <pthread.h>
 #include <sched.h>
-#include <stdexcept>
-#include <filesystem>
-
 #ifdef USE_ACL
 #include <onnxruntime_providers.h>
 #endif
+
+#else
+
+#define NOMINMAX // Don't use windows min/max macros
+#include <windows.h>
+
+#endif
+
 
 namespace golf_sim {
 
@@ -44,11 +55,21 @@ bool ONNXRuntimeDetector::Initialize() {
 
         ConfigureSessionOptions();
 
+#ifdef __unix__
         session_ = std::make_unique<Ort::Session>(
             *env_,
             config_.model_path.c_str(),
             *session_options_
         );
+#else
+		// Windows requires wide strings for file paths
+        session_ = std::make_unique<Ort::Session>(
+            *env_,
+            std::wstring(config_.model_path.begin(), config_.model_path.end()).c_str(),
+            *session_options_
+		);
+#endif
+
 
         allocator_ = std::make_unique<Ort::AllocatorWithDefaultOptions>();
         memory_info_ = std::make_unique<Ort::MemoryInfo>(
@@ -220,8 +241,15 @@ std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::Detect(
         return {};
     }
 
-    if (image.channels() != 3) {
-        GS_LOG_MSG(error, "Input image must have 3 channels (BGR), got: " + std::to_string(image.channels()));
+    int received_image_channels = image.channels();
+
+    // TBD - Hacky.  Need to send this via a function parameter if this monochrome/grayscale experiment continues.
+    // If we get the model retrained on mono pictures (or just a larger training set that more robustly handles mono), 
+    // we will probably remove all of this new channel stuff.
+    int expected_image_channels = 3;
+
+    if (received_image_channels != expected_image_channels) {
+        GS_LOG_MSG(error, "Input image should have " + std::to_string(expected_image_channels) + " channels(BGR), instead got: " + std::to_string(received_image_channels) + ". Exiting YOLO detection.");
         return {};
     }
 
@@ -234,7 +262,7 @@ std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::Detect(
 
     auto start_preproc = std::chrono::high_resolution_clock::now();
 
-    size_t input_buffer_size = 1 * 3 * config_.input_width * config_.input_height;
+    size_t input_buffer_size = 1 * received_image_channels * config_.input_width * config_.input_height;
     float* input_data = GetInputBuffer(input_buffer_size);
 
     if (!input_data) {
@@ -250,11 +278,11 @@ std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::Detect(
 
     auto end_preproc = std::chrono::high_resolution_clock::now();
 
-    std::vector<int64_t> input_shape = {1, 3, config_.input_height, config_.input_width};
+    std::vector<int64_t> input_shape = {1, received_image_channels, config_.input_height, config_.input_width};
     auto input_tensor = Ort::Value::CreateTensor<float>(
         *memory_info_,
         input_data,
-        1 * 3 * config_.input_width * config_.input_height,
+        1 * received_image_channels * config_.input_width * config_.input_height,
         input_shape.data(),
         input_shape.size()
     );
@@ -300,7 +328,7 @@ std::vector<ONNXRuntimeDetector::Detection> ONNXRuntimeDetector::Detect(
         return {};
     }
 
-    auto detections = PostprocessYOLO(output_data, output_size, letterbox_params_);
+    auto detections = PostprocessYOLO(output_data, static_cast<int>(output_size), letterbox_params_);
 
     auto end_postproc = std::chrono::high_resolution_clock::now();
 

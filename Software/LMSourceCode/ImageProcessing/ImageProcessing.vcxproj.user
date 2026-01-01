@@ -1,10 +1,16 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>--show_images 1  --base_image_logging_dir L:\ --lm_comparison_mode=1 --logging_level info  --artifact_save_level=all --wait_keys 0 --system_mode automated_testing  --search_center_x 800  --search_center_y 550</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>--show_images 1  --base_image_logging_dir L:\ --lm_comparison_mode=0 --logging_level trace  --artifact_save_level=all --wait_keys 1 --system_mode camera1  --search_center_x 800  --search_center_y 550</LocalDebuggerCommandArguments>
     <LocalDebuggerEnvironment>PITRAC_BASE_IMAGE_LOGGING_DIR=L:\
-PATH=%PATH%;E:\Dev_Libs\opencv\build\x64\vc16\bin;E:\Dev_Libs\boost_1_87_0\lib64-msvc-14.3</LocalDebuggerEnvironment>
+PATH=%PATH%;E:\Dev_Libs\opencv\build\x64\vc16\bin;E:\Dev_Libs\boost_1_87_0\lib64-msvc-14.3
+PITRAC_SLOT1_CAMERA_TYPE=5
+PITRAC_SLOT2_CAMERA_TYPE=5
+PITRAC_SLOT1_LENS_TYPE=1
+PITRAC_SLOT2_LENS_TYPE=1
+PITRAC_SLOT1_CAMERA_ORIENTATION =1
+PITRAC_SLOT2_CAMERA_ORIENTATION =1</LocalDebuggerEnvironment>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommandArgumentsHistory>--show_images 1  --base_image_logging_dir L:\ --lm_comparison_mode=1 --logging_level info  --artifact_save_level=all --wait_keys 0 --system_mode automated_testing  --search_center_x 800  --search_center_y 550|</LocalDebuggerCommandArgumentsHistory>
+    <LocalDebuggerCommandArgumentsHistory>--show_images 1  --base_image_logging_dir L:\ --lm_comparison_mode=1 --logging_level info  --artifact_save_level=all --wait_keys 0 --system_mode automated_testing  --search_center_x 800  --search_center_y 550|--show_images 1  --base_image_logging_dir L:\ --lm_comparison_mode=1 --logging_level info  --artifact_save_level=all --wait_keys 0 --system_mode camera1  --search_center_x 800  --search_center_y 550|--show_images 1  --base_image_logging_dir L:\ --lm_comparison_mode=1 --logging_level info  --artifact_save_level=all --wait_keys 1 --system_mode camera1  --search_center_x 800  --search_center_y 550|--show_images 1  --base_image_logging_dir L:\ --lm_comparison_mode=0 --logging_level info  --artifact_save_level=all --wait_keys 1 --system_mode camera1  --search_center_x 800  --search_center_y 550|--show_images 1  --base_image_logging_dir L:\ --lm_comparison_mode=0 --logging_level trace  --artifact_save_level=all --wait_keys 1 --system_mode camera1  --search_center_x 800  --search_center_y 550|</LocalDebuggerCommandArgumentsHistory>
   </PropertyGroup>
 </Project>

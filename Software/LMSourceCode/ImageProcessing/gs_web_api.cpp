@@ -9,6 +9,12 @@
 #include <sstream>
 #include <iomanip>
 
+#ifdef _WIN32
+#define popen _popen
+#define pclose _pclose
+#endif
+
+
 namespace golf_sim {
 
 bool WebApi::UpdateCalibration(const std::string& key, double value) {

@@ -44,7 +44,7 @@ class TestingToolsManager:
                 "category": "hardware",
                 "args": ["--pulse_test", "--system_mode", "camera1"],
                 "requires_sudo": False,
-                "timeout": 10,
+                "timeout": 60,
                 "continuous_test": True,
             },
             "camera1_still": {

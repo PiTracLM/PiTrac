@@ -174,9 +174,11 @@ bool GolfSimConfiguration::ReadValues() {
 	SetConstant("gs_config.image_capture.kMaxWatchingCropWidth", LibCameraInterface::kMaxWatchingCropWidth);
 	SetConstant("gs_config.image_capture.kMaxWatchingCropHeight", LibCameraInterface::kMaxWatchingCropHeight);
 	SetConstant("gs_config.cameras.kCamera1Gain", LibCameraInterface::kCamera1Gain);
+	SetConstant("gs_config.cameras.kCamera1Saturation", LibCameraInterface::kCamera1Saturation);
 	SetConstant("gs_config.cameras.kCamera1HighFPSGain", LibCameraInterface::kCamera1HighFPSGain);
 	SetConstant("gs_config.cameras.kCamera1Contrast", LibCameraInterface::kCamera1Contrast);
 	SetConstant("gs_config.cameras.kCamera2Gain", LibCameraInterface::kCamera2Gain);
+	SetConstant("gs_config.cameras.kCamera2Saturation", LibCameraInterface::kCamera2Saturation);
 
 	// Let the command-line gain parameter override the .json config file parameter 
 	// TBD - May want to have separate gain options?

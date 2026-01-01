@@ -1,592 +1,492 @@
 {
-    "gs_config": {
-        "logging": {
-            "kLogIntermediateExposureImagesToFile": "1",
-            "kLogIntermediateSpinImagesToFile": "1",
-            "kLogWebserverImagesToFile": "1",
-            "kLogDiagnosticImagesToUniqueFiles": "1",
-            "kLinuxBaseImageLoggingDir": ".\/",
-            "kPCBaseImageLoggingDir": "./Images/"
-        },
-        "modes": {
-            "kStartInPuttingMode": "0"
-        },
-        "ball_identification": {
-            "kDetectionMethod": "legacy",
-            "DETECTION_METHOD_OPTIONS": "legacy=HoughCircles(stable), experimental=ONNX/YOLO(fast), experimental_sahi=ONNX/YOLO+SAHI(accurate)",
-            "kBallPlacementDetectionMethod": "legacy",
-            "BALL_PLACEMENT_METHOD_OPTIONS": "legacy=GetCalibratedBall/HoughCircles, experimental=YOLO(fast+accurate)",
-            "kONNXModelPath": "../../Software/GroundTruthAnnotator/experiments/high_performance_300e2/weights/best.onnx",
-            "kONNXConfidenceThreshold": "0.5",
-            "kONNXNMSThreshold": "0.4", 
-            "kONNXInputSize": "1472",
-            "kSAHISliceHeight": "320",
-            "kSAHISliceWidth": "320",
-            "kSAHIOverlapRatio": "0.2",
-            "kONNXDeviceType": "CPU",
-            "kStrobedBallsCannyLower": "33",
-            "kStrobedBallsCannyUpper": "90",
-            "kStrobedBallsMinHoughReturnCircles": "6",
-            "kStrobedBallsMaxHoughReturnCircles": "20",
-            "NOTE-The following are NOT for externally-strobed (comparison-test)": "0",
-            "kStrobedBallsMinParam2": "18",
-            "kStrobedBallsMaxParam2": "140",
-            "kStrobedBallsStartingParam2": "60",
-            "kStrobedBallsParam2Increment": "4",
-            "kStrobedBallsCurrentParam1": "130",
-            "kStrobedBallsHoughDpParam1": "1.7",
-            "kStrobedBallsPreCannyBlurSize": "3",
-            "kStrobedBallsPreHoughBlurSize": "13",
-            "kStrobedBallsUseAltHoughAlgorithm": "1",
-            "kStrobedBallsAltCannyLower": "35",
-            "kStrobedBallsAltCannyUpper": "60",
-            "kStrobedBallsAltPreCannyBlurSize": "9",
-            "kStrobedBallsAltPreHoughBlurSize HAS TO BE ODD": "0",
-            "kStrobedBallsAltPreHoughBlurSize": "15",
-            "kStrobedBallsAltMinParam2": "0.5",
-            "kStrobedBallsAltMaxParam2": "1.0",
-            "kStrobedBallsAltStartingParam2": "0.65",
-            "kStrobedBallsAltParam2Increment": "0.05",
-            "kStrobedBallsAltCurrentParam1": "130.0",
-            "kStrobedBallsAltHoughDpParam1": "0.8",
-            "kUseCLAHEProcessing": "1",
-            "kCLAHEClipLimit": "8",
-            "kCLAHETilesGridSize": "6",
-            "kPuttingBallMinParam2": "0.8",
-            "kPuttingBallMaxParam2": "1.0",
-            "kPuttingBallStartingParam2": "0.9",
-            "kPuttingBallParam2Increment": "0.03",
-            "kPuttingBallCurrentParam1": "300.0",
-            "kPuttingMinHoughReturnCircles": "6",
-            "kPuttingMaxHoughReturnCircles": "25",
-            "kPuttingHoughDpParam1": "1.5",
-            "kPuttingPreHoughBlurSize": "9",
-            "kPlacedBallCannyLower": "35",
-            "kPlacedBallCannyUpper": "80",
-            "kPlacedBallMinParam2": "0.8",
-            "kPlacedBallMaxParam2": "1.0",
-            "kPlacedBallStartingParam2": "0.9",
-            "kPlacedBallParam2Increment": "0.03",
-            "kPlacedBallCurrentParam1": "130.0",
-            "kPlacedPreCannyBlurSize": "11",
-            "kPlacedPreHoughBlurSize": "13",
-            "kPlacedMinHoughReturnCircles": "1",
-            "kPlacedMaxHoughReturnCircles": "4",
-            "kPlacedBallHoughDpParam1": "1.5",
-            "kPlacedBallUseLargestBall": "0",
-            "kUseBestCircleRefinement": "0",
-            "kUseBestCircleLargestCircle": "0",
-            "kBestCircleCannyLower": "55",
-            "kBestCircleCannyUpper": "110",
-            "kBestCirclePreCannyBlurSize": "5",
-            "kBestCirclePreHoughBlurSize": "13",
-            "kBestCircleParam1": "300",
-            "kBestCircleParam2": "0.65",
-            "kBestCircleHoughDpParam1": "1.5",
-            "kBestCircleIdentificationMinRadiusRatio": "0.90",
-            "kBestCircleIdentificationMaxRadiusRatio": "1.2",
-            "kUseDynamicRadiiAdjustment": "0",
-            "kNumberRadiiToAverageForDynamicAdjustment": "2",
-            "kStrobedNarrowingRadiiMinRatio": "0.7",
-            "kStrobedNarrowingRadiiMaxRatio": "1.6",
-            "kStrobedNarrowingRadiiDpParam": "1.5",
-            "kStrobedNarrowingRadiiParam2": "0.8",
-            "kPlacedNarrowingRadiiMinRatio": "0.9",
-            "kPlacedNarrowingRadiiMaxRatio": "1.1",
-            "kPlacedNarrowingStartingParam2": "0.9",
-            "kPlacedNarrowingParam1": "300",
-            "kPlacedNarrowingRadiiDpParam": "1.5"
-        },
-        "ball_position": {
-            "kExpectedBallRadiusPixelsAt40cm": "87",
-            "kMinMovedBallRadiusRatio": "0.6",
-            "kMaxMovedBallRadiusRatio": "1.5",
-            "kMinRadiusRatio": "0.8",
-            "kMaxRadiusRatio": "1.7",
-            "kMinRadiusOffset": "20",
-            "kMaxRadiusOffset": "20",
-            "kTeedBallSearchAreaMaskRadiusRatio": "0.0",
-            "kMinBallRadiusPixelsForProximityWarning": "160"
-        },
-        "ball_exposure_selection": {
-            "kNumberHighQualityBallsToRetain": "2",
-            "kMaximumOffTrajectoryDistance": "8",
-            "kMaxStrobedBallColorDifferenceRelaxed": "70000",
-            "kMaxPuttingBallColorDifferenceRelaxed": "40000",
-            "kMaxStrobedBallColorDifferenceStrict": "30000",
-            "kBallProximityMarginPercentRelaxed": "65",
-            "kBallProximityMarginPercentStrict": "15",
-            "kColorDifferenceRgbPostMultiplierForDarker": "4.0",
-            "kColorDifferenceRgbPostMultiplierForLighter": "1.0",
-            "kColorDifferenceStdPostMultiplierForDarker": "3.0",
-            "kColorDifferenceStdPostMultiplierForLighter": "5.0",
-            "kMaxDistanceFromTrajectory": "30.0",
-            "kClosestBallPairEdgeBackoffPixels": "200",
-            "kEARLIERMaxIntermediateBallRadiusChangePercent": "12.0",
-            "kMaxRadiusDifferencePercentageFromBest": "35.0",
-            "kMaxIntermediateBallRadiusChangePercent": "5.0",
-            "kMaxPuttingIntermediateBallRadiusChangePercent": "8.0",
-            "kMaxOverlappedBallRadiusChangeRatio": "1.3",
-            "kUsePreImageSubtraction": "0",
-            "kPreImageWeightingOverall": "0.0",
-            "kPreImageWeightingBlue": "1.05",
-            "kPreImageWeightingGreen": "1.2",
-            "kPreImageWeightingRed": "1.0",
-            "kMaxBallsToRetain": "30",
-            "kUnlikelyAngleMinimumDistancePixels": "40",
-            "kMaxQualityExposureLaunchAngle": "35",
-            "kMinQualityExposureLaunchAngle": "-5",
-            "kMaxPuttingQualityExposureLaunchAngle": "8",
-            "kMinPuttingQualityExposureLaunchAngle": "-5",
-            "kNumberAngleCheckExposures": "4"
-        },
-        "spin_analysis": {
-            "kGaborMaxWhitePercent": "45",
-            "kGaborMinWhitePercent": "39",
-            "kCoarseXRotationDegreesIncrement": "4",
-            "kCoarseXRotationDegreesStart": "-36",
-            "kCoarseXRotationDegreesEnd": "36",
-            "kCoarseYRotationDegreesIncrement": "5",
-            "kCoarseYRotationDegreesStart": "-15",
-            "kCoarseYRotationDegreesEnd": "15",
-            "kCoarseZRotationDegreesIncrement": "4",
-            "kCoarseZRotationDegreesStart": "-10",
-            "kCoarseZRotationDegreesEnd": "110",
-            "kWriteSpinAnalysisCsvFiles": "1"
-        },
-        "ipc_interface": {
-            "kWebActiveMQHostAddress": "PITRAC_MSG_BROKER_FULL_ADDRESS",
-            "kMaxCam2ImageReceivedTimeMs": "40000"
-        },
-        "user_interface": {
-            "kWebServerTomcatShareDirectory": "WebShare",
-            "kWebServerShareDirectory": "USE CMD LINE - Example:  --web_server_share_dir \/home\/PiTracUser\/LM_Shares\/Images\/",
-            "kWebServerResultBallExposureCandidates": "ball_exposure_candidates",
-            "kWebServerResultSpinBall1Image": "spin_ball_1_gray_image1",
-            "kWebServerResultSpinBall2Image": "spin_ball_2_gray_image1",
-            "kWebServerResultBallRotatedByBestAngles": "ball1_rotated_by_best_angles",
-            "kWebServerCamera2Image": "log_cam2_last_strobed_img",
-            "kWebServerLastTeedBallImage": "log_ball_final_found_ball_img",
-            "kWebServerErrorExposuresImage": "log_cam2_last_strobed_img",
-            "kWebServerBallSearchAreaImage": "log_cam1_search_area_img",
-            "kRefreshTimeSeconds": "3"
-        },
-        "physical_constants": {
-            "kBallRadiusMeters": "0.021335"
-        },
-        "strobing": {
-            "number_bits_for_fast_on_pulse_": "1",
-            "number_bits_for_slow_on_pulse_": "8",
-            "kBaudRateForFastPulses": "115200",
-            "kBaudRateForSlowPulses": "115200",
-            "kLongerStrobePulseVectorDriver": [
-                "0.175",
-                "0.7",
-                "1.4",
-                "2.45",
-                "1.26",
-                "2.8",
-                "2.1",
-                "3.15",
-                "3.85",
-                "3.85",
-                "10.4",
-                "3.5",
-                "0"
-            ],
-            "kStrobePulseVectorDriver": [
-                "0.7",
-                "1.8",
-                "3.0",
-                "2.2",
-                "3.0",
-                "7.1",
-                "4.0",
-                "0"
-            ],
-            "kPuttingStrobeDelayMs": "50",
-            "SLOWkStrobePulseVectorDriver": [
-                "0.25",
-                "1",
-                "2",
-                "3.5",
-                "1.8",
-                "4",
-                "3",
-                "4.5",
-                "5.5",
-                "5.5",
-                "2",
-                "5.0",
-                "0"
-            ],
-            "kStrobePulseVectorPutter": [
-                "2.5",
-                "5.0",
-                "8.0",
-                "10.5",
-                "8.5",
-                "21.0",
-                "21.0",
-                "21.0",
-                "21.0",
-                "21.0",
-                "21.0",
-                "21.0",
-                "0"
-            ],
-            "kDynamicFollowOnPulseVectorPutter": [
-                "444.0"
-            ],
-            "kLastPulsePutterRepeats": "0",
-            "OLDkStrobePulseVectorDriver": [
-                "0.25",
-                "1",
-                "2",
-                "3.5",
-                "4.5",
-                "4",
-                "4.5",
-                "6.7",
-                "0"
-            ],
-            "OKkStrobePulseVectorPutter": [
-                "5.0",
-                "10.0",
-                "16.0",
-                "21.0",
-                "17.0",
-                "42.0",
-                "42.0",
-                "42.0",
-                "42.0",
-                "42.0",
-                "42.0",
-                "42.0",
-                "0"
-            ],
-            "kStandardBallSpeedSlowdownPercentage": "0.1",
-            "kPracticeBallSpeedSlowdownPercentage": "4.0",
-            "kPuttingBallSpeedSlowdownPercentage": "5.2",
-            "kBaudRatePulseMultiplier": "1.0",
-            "kCam2SetupPeriodMilliseconds": "2000",
-            "kNumberPrimingPulses": "12",
-            "kPrimingPulseFPS": "15",
-            "kPauseBeforeReadyForFinalPrimingPulseMs": "400",
-            "kPauseBeforeSendingPreImageTriggerMs": "300",
-            "kPauseAfterSendingPreImageTriggerMs": "2000",
-            "kPauseBeforeSendingImageFlushMs": "300",
-            "kPauseBeforeSendingFinalImageTriggerMs": "2000",
-            "kPauseToSetUpInnoMakerExternalTriggerMilliseconds": "500"
-        },
-        "image_capture": {
-            "kMaxWatchingCropWidth": "96",
-            "kMaxWatchingCropHeight": "88"
-        },
-        "cameras": {
-            "kCameraMotionDetectSettings": ".\/assets\/motion_detect.jsondd",
-            "kCamera1FocalLength": "5.8675451035986486",
-            "kCamera2FocalLength": "5.5107136256866491",
-            "comment - kCamera1Gain = 6 and kCamera1Contrast=1.3 is good for practice ball. For regular ball, 3 and 1.5": "0",
-            "kCamera1Gain": "1.0",
-            "kCamera1HighFPSGain": "15.0",
-            "kCamera1Contrast": "1.0",
-            "kCamera2Gain": "4.0",
-            "kCamera2ComparisonGain": "0.8",
-            "kCamera2CalibrateOrLocationGain": "1.0",
-            "kCamera2Contrast": "1.2",
-            "kCamera2PuttingGain": "1.5",
-            "kCamera2PuttingContrast": "1.2",
-            "kCamera1StillShutterTimeuS": "40000",
-            "kCamera2StillShutterTimeuS": "15000",
-            "kCamera1PositionsFromExpectedBallMeters": [
-                "-0.200",
-                "-0.234",
-                "0.54"
-            ],
-            "kCamera2PositionsFromExpectedBallMeters": [
-                "0.0",
-                "-0.051",
-                "0.45"
-            ],
-            "kCamera2OffsetFromCamera1OriginMeters": [
-                "0.00",
-                "-0.19",
-                "0.0"
-            ],
-            "kCamera1Angles": [
-                "2.1406460383579446",
-                "-26.426049413957287"
-            ],
-            "kCamera2Angles": [
-                "-3.9096762712853037",
-                "10.292573196795921"
-            ],
-            "kCamera1XOffsetForTilt": "0",
-            "kCamera1YOffsetForTilt": "0",
-            "kCamera2XOffsetForTilt": "0",
-            "kCamera2YOffsetForTilt": "0",
-            "kCamera1DistortionVector": [
-                "-0.5088115166383071",
-                "0.34039760498152727",
-                "-0.0020686673595964942",
-                "0.0025571075134913457",
-                "-0.13507994577035"
-            ],
-            "kCamera1CalibrationMatrix": [
-                [
-                    "1833.5291988027575",
-                    "0.0",
-                    "697.2791579239232"
-                ],
-                [
-                    "0.0",
-                    "1832.2499845181273",
-                    "513.0904087097207"
-                ],
-                [
-                    "0.0",
-                    "0.0",
-                    "1.0"
-                ]
-            ],
-            "kCamera2CalibrationMatrix": [
-                [
-                    "2340.2520648903665",
-                    "0.0",
-                    "698.4611375636877"
-                ],
-                [
-                    "0.0",
-                    "2318.2676880118993",
-                    "462.7245851119162"
-                ],
-                [
-                    "0.0",
-                    "0.0",
-                    "1.0"
-                ]
-            ],
-            "kCamera2DistortionVector": [
-                "-0.818067967818754",
-                "1.1642822122721734",
-                "0.03170748960585329",
-                "-0.000598495710701826",
-                "-1.9419896904560514"
-            ],
-            "3_6Lens_kCamera1DistortionVector": [
-                "-5.323350228082535107e-01",
-                "3.171607772519656199e-01",
-                "7.282375091653870043e-04",
-                "7.032344616124524064e-03",
-                "-9.732216388053896439e-02"
-            ],
-            "3_6Lens_kCamera1CalibrationMatrix": [
-                [
-                    "1.748506644661262953e+03",
-                    "0.000000000000000000e+00",
-                    "6.325374407393054526e+0"
-                ],
-                [
-                    "0.000000000000000000e+00",
-                    "1.743341748687922745e+03",
-                    "4.075677927449370941e+02"
-                ],
-                [
-                    "0.000000000000000000e+00",
-                    "0.000000000000000000e+00",
-                    "1.000000000000000000e+00"
-                ]
-            ],
-            "3_6Lens_kCamera2CalibrationMatrix": [
-                [
-                    "1.065366451276604266e+03",
-                    "0.000000000000000000e+00",
-                    "7.153187116996945178e+02"
-                ],
-                [
-                    "0.000000000000000000e+00",
-                    "1.068642040947899886e+03",
-                    "5.094612905764302582e+02"
-                ],
-                [
-                    "0.000000000000000000e+00",
-                    "0.000000000000000000e+00",
-                    "1.000000000000000000e+00"
-                ]
-            ],
-            "3_6Lens_kCamera2DistortionVector": [
-                "-4.854175692996230418e-01",
-                "2.637456313607589586e-01",
-                "2.679639341176350345e-03",
-                "9.249468729241077302e-04",
-                "-7.827088647488637807e-02"
-            ],
-            "NOT_USED_CURRENTLY_kExpectedBallRadiusPixelsAt40cmCamera1": "87",
-            "NOT_USED_CURRENTLY_kExpectedBallRadiusPixelsAt40cmCamera2": "87"
-        },
-        "calibration": {
-            "Looking out from cameras, positive X distance is to the right, positive y is up, and positive Z is outward": "0",
-            "kAutoCalibrationBallPositionFromCamera1Meters": [
-                "-0.120",
-                "-0.28",
-                "0.44"
-            ],
-            "kAutoCalibrationBallPositionFromCamera2Meters": [
-                "0.00",
-                "0.095",
-                "0.435"
-            ],
-            "k_VERSION_1_ENCLOSURE_AutoCalibrationBallPositionFromCamera1Meters": [
-                "-0.525",
-                "-0.275",
-                "0.45"
-            ],
-            "k_VERSION_1_ENCLOSURE_AutoCalibrationBallPositionFromCamera2Meters": [
-                "0.0",
-                "0.095",
-                "0.435"
-            ],
-            "k_VERSION_2_ENCLOSURE_AutoCalibrationBallPositionFromCamera1Meters": [
-                "-0.504",
-                "-0.234",
-                "0.491"
-            ],
-            "k_VERSION_2_ENCLOSURE_CENTER_BALL__AutoCalibrationBallPositionFromCamera1Meters": [
-                "-0.118",
-                "-0.234",
-                "0.491"
-            ],
-            "k_VERSION_2_ENCLOSURE_AutoCalibrationBallPositionFromCamera2Meters": [
-                "0.0",
-                "0.088",
-                "0.466"
-            ],
-            "kNumberPicturesForFocalLengthAverage": "6",
-            "kTestAutoCalibrationFileName": "M:\\Dev\\PiTrac\\Software\\LMSourceCode\\Images\\autocalibrate_cam1_still_picture_1.png"
-        },
-        "golf_simulator_interfaces": {
-            "kLaunchMonitorIdString": "PiTrac LM 0.1",
-            "kSkipSpinCalculation": "0",
-            "GSPro": {
-                "kGSProComment": "USE CMD LINE OPTION - Example:  --gspro_host_address 10.0.0.47",
-                "kGSProConnectAddress": "",
-                "ALTkGSProConnectPort": "49152",
-                "kGSProConnectPort": "0921"
-            },
-            "E6": {
-                "kE6Comment": "USE CMD LINE - Exampe:  --e6_host_address 10.0.0.29",
-                "kE6ConnectAddress": "",
-                "kE6ConnectPort": "2483",
-                "kE6InterMessageDelayMs": "50"
-            }
-        },
-        "club_data": {
-            "kEnableClubImages": "0",
-            "kClubImageOutputDir": "\/home\/PiTracUserName\/LM_Shares\/Images\/",
-            "kNumberFramesToSaveBeforeHit": "6",
-            "kNumberFramesToSaveAfterHit": "8",
-            "kClubImageWidthPixels": "340",
-            "kClubImageHeightPixels": "200",
-            "kClubImageCameraGain": "40",
-            "kClubImageShutterSpeedMultiplier": "0.4"
-        },
-        "motion_detect_stage": {
-            "kDifferenceM": "0.9",
-            "kDifferenceC": "3.0",
-            "kRegionThreshold": "0.05",
-            "kMaxRegionThreshold": "0.05",
-            "kFramePeriod": "0",
-            "kHSkip": "2",
-            "kVSkip": "2",
-            "kCroppedImagePixelOffsetLeft": "0",
-            "kCroppedImagePixelOffsetUp": "-3"
-        },
-        "testing": {
-            "kBaseTestImageDir": "./Images/",
-            "kTwoImageTestTeedBallImage": "gs_log_img__log_ball_final_found_ball_img.png",
-            "kTwoImageTestStrobedImage": "gs_log_img__log_cam2_last_strobed_img_Shot_2_2025-Aug-05_09.40.44.png",
-            "OLD_kTwoImageTestTeedBallImage": "log_ball_final_found_ball_img.png",
-            "OLD_kTwoImageTestStrobedImage": "log_cam2_last_strobed_img.png",
-            "kAutomatedTestSuiteDirectory": "\/home\/<PiTrac-Username>\/Dev\/PiTrac\/Software\/LMSourceCode\/Testing\/TestSuite_2025_02_07\/",
-            "OLDkAutomatedTestSuiteDirectory": "M:\/Dev\/PiTrac\/Software\/LMSourceCode\/Testing\/TestSuite_2025_02_07\/",
-            "kAutomatedTestExpectedResultsCSV": "Uneekor Comparison 2025-02-07_Small_Test.csv",
-            "kAutomatedTestResultsCSV": "PiTrac_Test_Results.csv",
-            "kAutomatedTestToleranceBallSpeedMPH": "4",
-            "kAutomatedTestToleranceHLA": "3",
-            "kAutomatedTestToleranceVLA": "2",
-            "kAutomatedTestToleranceBackSpin": "250",
-            "kAutomatedTestToleranceSideSpin": "300",
-            "Externally strobed means there is another strobing source (another LM) that is being used along with PiTrac": "1",
-            "kExternallyStrobedEnvNumber_bits_for_fast_on_pulse_": "5",
-            "kExternallyStrobedEnvFilterImage": "0",
-            "kExternallyStrobedEnvBottomIgnoreHeight": "110",
-            "kExternallyStrobedEnvFilterHsvLowerH": "14",
-            "kExternallyStrobedEnvFilterHsvUpperH": "48",
-            "kExternallyStrobedEnvFilterHsvLowerS": "26",
-            "kExternallyStrobedEnvFilterHsvUpperS": "255",
-            "kExternallyStrobedEnvFilterHsvLowerV": "114",
-            "kExternallyStrobedEnvFilterHsvUpperV": "255",
-            "kExternallyStrobedEnvHoughLineIntersections": "58",
-            "kExternallyStrobedEnvLinesAngleLower": "190",
-            "kExternallyStrobedEnvLinesAngleUpper": "290",
-            "kExternallyStrobedEnvMaximumHoughLineGap": "7",
-            "kExternallyStrobedEnvMinimumHoughLineLength": "23",
-            "kExternallyStrobedEnvCannyLower": "35",
-            "kExternallyStrobedEnvCannyUpper": "80",
-            "kExternallyStrobedEnvCurrentParam1": "300.0",
-            "kExternallyStrobedEnvMinParam2": "40",
-            "kExternallyStrobedEnvMaxParam2": "120",
-            "kExternallyStrobedEnvStartingParam2": "0.70",
-            "kExternallyStrobedEnvParam2Increment": "0.05",
-            "kExternallyStrobedEnvMinHoughReturnCircles": "3",
-            "kExternallyStrobedEnvMaxHoughReturnCircles": "15",
-            "kExternallyStrobedEnvPreCannyBlurSize": "7",
-            "kExternallyStrobedEnvPreHoughBlurSize": "9",
-            "kExternallyStrobedEnvHoughDpParam1": "1.3",
-            "kExternallyStrobedEnvMinimumSearchRadius": "55",
-            "kExternallyStrobedEnvMaximumSearchRadius": "95",
-            "kExternallyStrobedEnvNarrowingParam2": "0.7",
-            "kExternallyStrobedEnvNarrowingDpParam": "0.9",
-            "kExternallyStrobedEnvNarrowingPreCannyBlurSize": "1",
-            "kExternallyStrobedEnvNarrowingPreHoughBlurSize": "9",
-            "kExternallyStrobedBestCircleCannyLower": "35",
-            "kExternallyStrobedBestCircleCannyUpper": "70",
-            "kExternallyStrobedBestCirclePreCannyBlurSize": "1",
-            "kExternallyStrobedBestCirclePreHoughBlurSize": "9",
-            "kExternallyStrobedBestCircleParam1": "300",
-            "kExternallyStrobedBestCircleParam2": "0.7",
-            "kExternallyStrobedBestCircleHoughDpParam1": "0.8",
-            "The following controls the BestCircle algorithm when used with the ALT_GRADIENT mode": "55",
-            "kExternallyStrobedALTBestCircleCannyLower": "35",
-            "kExternallyStrobedALTBestCircleCannyUpper": "80",
-            "kExternallyStrobedALTBestCirclePreCannyBlurSize": "11",
-            "kExternallyStrobedALTBestCirclePreHoughBlurSize": "13",
-            "kExternallyStrobedALTBestCircleParam1": "130",
-            "kExternallyStrobedALTBestCircleParam2": "0.8",
-            "kExternallyStrobedALTBestCircleHoughDpParam1": "1.3",
-            "kExternallyStrobedUseCLAHEProcessing": "1",
-            "kExternallyStrobedCLAHEClipLimit": "3",
-            "kExternallyStrobedCLAHETilesGridSize": "3",
-            "kInterShotInjectionPauseSeconds": "30",
-            "test_shots_to_inject": {
-                "1": {
-                    "SHOT - PiTrac - 11:05:43 -- 7": "0",
-                    "Speed": "70.2",
-                    "BackSpin": "4097",
-                    "SideSpin": "-379.0",
-                    "HLA": "-1.9",
-                    "VLA": "19.6"
-                },
-                "2": {
-                    "SHOT - UNeekor XO - 11:05:43 -- 7": "0",
-                    "Speed": "75.3",
-                    "BackSpin": "4880",
-                    "SideSpin": "-85",
-                    "HLA": "-1.8",
-                    "VLA": "18.5"
-                }
-            }
-        }
+  "gs_config": {
+    "ball_exposure_selection": {
+      "kBallProximityMarginPercentRelaxed": "65",
+      "kBallProximityMarginPercentStrict": "15",
+      "kClosestBallPairEdgeBackoffPixels": "200",
+      "kColorDifferenceRgbPostMultiplierForDarker": "4.0",
+      "kColorDifferenceRgbPostMultiplierForLighter": "1.0",
+      "kColorDifferenceStdPostMultiplierForDarker": "3.0",
+      "kColorDifferenceStdPostMultiplierForLighter": "5.0",
+      "kMaxBallsToRetain": "30",
+      "kMaxDistanceFromTrajectory": "30",
+      "kMaxIntermediateBallRadiusChangePercent": "5",
+      "kMaxOverlappedBallRadiusChangeRatio": "1.3",
+      "kMaxPuttingBallColorDifferenceRelaxed": "40000",
+      "kMaxPuttingIntermediateBallRadiusChangePercent": "8",
+      "kMaxPuttingQualityExposureLaunchAngle": "8",
+      "kMaxQualityExposureLaunchAngle": "35",
+      "kMaxRadiusDifferencePercentageFromBest": "35",
+      "kMaxStrobedBallColorDifferenceRelaxed": "70000",
+      "kMaxStrobedBallColorDifferenceStrict": "30000",
+      "kMaximumOffTrajectoryDistance": "8",
+      "kMinPuttingQualityExposureLaunchAngle": "-5",
+      "kMinQualityExposureLaunchAngle": "-5",
+      "kNumberAngleCheckExposures": "4",
+      "kNumberHighQualityBallsToRetain": "2",
+      "kPreImageWeightingBlue": "1.05",
+      "kPreImageWeightingGreen": "1.2",
+      "kPreImageWeightingOverall": "0.0",
+      "kPreImageWeightingRed": "1.0",
+      "kUnlikelyAngleMinimumDistancePixels": "40",
+      "kUsePreImageSubtraction": "0"
+    },
+    "ball_identification": {
+      "kBallPlacementDetectionMethod": "legacy",
+      "kBestCircleCannyLower": "55",
+      "kBestCircleCannyUpper": "110",
+      "kBestCircleHoughDpParam1": "1.5",
+      "kBestCircleIdentificationMaxRadiusRatio": "1.2",
+      "kBestCircleIdentificationMinRadiusRatio": "0.9",
+      "kBestCircleParam1": "300",
+      "kBestCircleParam2": "0.65",
+      "kBestCirclePreCannyBlurSize": "5",
+      "kBestCirclePreHoughBlurSize": "13",
+      "kCLAHEClipLimit": "8",
+      "kCLAHETilesGridSize": "6",
+      "kStrobedBallDetectionMethod": "experimental",
+      "kInferenceBackend": "onnxruntime",
+      "kNumberRadiiToAverageForDynamicAdjustment": "2",
+      "kONNXConfidenceThreshold": "0.5",
+      "kONNXDeviceType": "CPU",
+      "kONNXInputSize": "1472",
+      "kONNXModelPath": "../ml_models/pitrac-ball-detection-09-25-25/weights/best.onnx",
+      "kONNXNMSThreshold": "0.4",
+      "kONNXRuntimeAutoFallback": "1",
+      "kONNXRuntimeMemoryPoolMB": "64",
+      "kONNXRuntimeThreads": "4",
+      "kONNXRuntimeUseNEON": "1",
+      "kPlacedBallCannyLower": "35",
+      "kPlacedBallCannyUpper": "80",
+      "kPlacedBallCurrentParam1": "130",
+      "kPlacedBallHoughDpParam1": "1.5",
+      "kPlacedBallMaxParam2": "1.0",
+      "kPlacedBallMinParam2": "0.8",
+      "kPlacedBallParam2Increment": "0.03",
+      "kPlacedBallStartingParam2": "0.9",
+      "kPlacedBallUseLargestBall": "0",
+      "kPlacedMaxHoughReturnCircles": "4",
+      "kPlacedMinHoughReturnCircles": "1",
+      "kPlacedNarrowingParam1": "300",
+      "kPlacedNarrowingRadiiDpParam": "1.5",
+      "kPlacedNarrowingRadiiMaxRatio": "1.1",
+      "kPlacedNarrowingRadiiMinRatio": "0.9",
+      "kPlacedNarrowingStartingParam2": "0.9",
+      "kPlacedPreCannyBlurSize": "11",
+      "kPlacedPreHoughBlurSize": "13",
+      "kPuttingBallCurrentParam1": "300",
+      "kPuttingBallMaxParam2": "1.0",
+      "kPuttingBallMinParam2": "0.8",
+      "kPuttingBallParam2Increment": "0.03",
+      "kPuttingBallStartingParam2": "0.9",
+      "kPuttingHoughDpParam1": "1.5",
+      "kPuttingMaxHoughReturnCircles": "25",
+      "kPuttingMinHoughReturnCircles": "6",
+      "kPuttingPreHoughBlurSize": "9",
+      "kSAHIOverlapRatio": "0.2",
+      "kSAHISliceHeight": "320",
+      "kSAHISliceWidth": "320",
+      "kStrobedBallsAltCannyLower": "35",
+      "kStrobedBallsAltCannyUpper": "70",
+      "kStrobedBallsAltCurrentParam1": "130",
+      "kStrobedBallsAltHoughDpParam1": "0.8",
+      "kStrobedBallsAltMaxParam2": "1.0",
+      "kStrobedBallsAltMinParam2": "0.5",
+      "kStrobedBallsAltParam2Increment": "0.05",
+      "kStrobedBallsAltPreCannyBlurSize": "9",
+      "kStrobedBallsAltPreHoughBlurSize": "15",
+      "kStrobedBallsAltPreHoughBlurSize HAS TO BE ODD": "0",
+      "kStrobedBallsAltStartingParam2": "0.65",
+      "kStrobedBallsCannyLower": "33",
+      "kStrobedBallsCannyUpper": "90",
+      "kStrobedBallsCurrentParam1": "120",
+      "kStrobedBallsHoughDpParam1": "1.5",
+      "kStrobedBallsMaxHoughReturnCircles": "20",
+      "kStrobedBallsMaxParam2": "140",
+      "kStrobedBallsMinHoughReturnCircles": "6",
+      "kStrobedBallsMinParam2": "18",
+      "kStrobedBallsParam2Increment": "4",
+      "kStrobedBallsPreCannyBlurSize": "3",
+      "kStrobedBallsPreHoughBlurSize": "13",
+      "kStrobedBallsStartingParam2": "60",
+      "kStrobedBallsUseAltHoughAlgorithm": "1",
+      "kStrobedNarrowingRadiiDpParam": "1.5",
+      "kStrobedNarrowingRadiiMaxRatio": "1.6",
+      "kStrobedNarrowingRadiiMinRatio": "0.7",
+      "kStrobedNarrowingRadiiParam2": "0.8",
+      "kUseBestCircleLargestCircle": "0",
+      "kUseBestCircleRefinement": "0",
+      "kUseCLAHEProcessing": "1",
+      "kUseDynamicRadiiAdjustment": "0",
+      "kImageTypeToProcessWithYOLO":  "1"
+    },
+    "ball_position": {
+      "kExpectedBallRadiusPixelsAt40cm": "87",
+      "kMaxMovedBallRadiusRatio": "1.5",
+      "kMaxRadiusOffset": "20",
+      "kMaxRadiusRatio": "1.7",
+      "kMinBallRadiusPixelsForProximityWarning": "160",
+      "kMinMovedBallRadiusRatio": "0.6",
+      "kMinRadiusOffset": "20",
+      "kMinRadiusRatio": "0.8",
+      "kTeedBallSearchAreaMaskRadiusRatio": "0.0"
+    },
+    "calibration": {
+      "kAutoCalibrationBaselineBallPositionFromCamera1MetersForSkewedCameras": [
+        "-0.52",
+        "-0.28",
+        "0.44"
+      ],
+      "kAutoCalibrationBaselineBallPositionFromCamera1MetersForStraightOutCameras": [
+        "-0.120",
+        "-0.28",
+        "0.44"
+      ],
+      "kAutoCalibrationBaselineBallPositionFromCamera2MetersForSkewedCameras": [
+        "0.00",
+        "0.095",
+        "0.435"
+      ],
+      "kAutoCalibrationBaselineBallPositionFromCamera2MetersForStraightOutCameras": [
+        "0.00",
+        "0.095",
+        "0.435"
+      ],
+      "kCalibrationRigType": "1",
+      "kCustomCalibrationRigPositionFromCamera1": [
+        -0.12,
+        -0.28,
+        0.44
+      ],
+      "kCustomCalibrationRigPositionFromCamera2": [
+        "0.00",
+        "0.095",
+        "0.435"
+      ],
+      "kNumberOfCalibrationFailuresToTolerate": "4",
+      "kNumberPicturesForFocalLengthAverage": "6",
+      "kTestAutoCalibrationFileName": "/usr/share/pitrac/calibration/checkerboard.png"
+    },
+    "cameras": {
+      "3_6Lens_kCamera1CalibrationMatrix": [
+        [
+          "1748.506644661262953",
+          "0.0",
+          "632.5374407393054526"
+        ],
+        [
+          "0.0",
+          "1743.341748687922745",
+          "407.5677927449370941"
+        ],
+        [
+          "0.0",
+          "0.0",
+          "1.0"
+        ]
+      ],
+      "3_6Lens_kCamera1DistortionVector": [
+        "-0.5323350228082535107",
+        "0.3171607772519656199",
+        "0.0007282375091653870043",
+        "-0.002130459534525419",
+        "0.0"
+      ],
+      "3_6Lens_kCamera2CalibrationMatrix": [
+        [
+          "1065.366451276604266",
+          "0.0",
+          "715.3187116996945178"
+        ],
+        [
+          "0.0",
+          "1068.642040947899886",
+          "509.4612905764302582"
+        ],
+        [
+          "0.0",
+          "0.0",
+          "1.0"
+        ]
+      ],
+      "3_6Lens_kCamera2DistortionVector": [
+        "-0.4854175692996230418",
+        "0.2637456313607589586",
+        "0.002679639341176350345",
+        "-0.001576282874523095",
+        "0.0"
+      ],
+      "kAutoCalibrationBallPositionFromCamera1Meters": [
+        "-0.120",
+        "-0.28",
+        "0.44"
+      ],
+      "kAutoCalibrationBallPositionFromCamera2Meters": [
+        "0.00",
+        "0.095",
+        "0.435"
+      ],
+      "kCamera1Angles": [
+        18.7191101,
+        -24.17996647
+      ],
+      "kCamera1CalibrationMatrix": [
+        [
+          "1833.5291988027575",
+          "0.0",
+          "697.2791579239232"
+        ],
+        [
+          "0.0",
+          "1832.2499845181273",
+          "513.0904087097207"
+        ],
+        [
+          "0.0",
+          "0.0",
+          "1.0"
+        ]
+      ],
+      "kCamera1Contrast": "1.0",
+      "kCamera1DistortionVector": [
+        "-0.5088115166383071",
+        "0.34039760498152727",
+        "-0.0020686673595964942",
+        "0.002439055918104065",
+        "-0.13439110453388348"
+      ],
+      "kCamera1FocalLength": "6.221814261",
+      "kCamera1Gain": "2",
+      "kCamera1Saturation": "1",
+      "kCamera1HighFPSGain": "15.0",
+      "kCamera1PositionsFromExpectedBallMeters": [
+        "-0.200",
+        "-0.234",
+        "0.54"
+      ],
+      "kCamera1StillShutterTimeuS": "40000",
+      "kCamera1XOffsetForTilt": "0",
+      "kCamera1YOffsetForTilt": "0",
+      "kCamera2Angles": [
+        -2.063732969,
+        3.830271852
+      ],
+      "kCamera2CalibrateOrLocationGain": "1.0",
+      "kCamera2CalibrationMatrix": [
+        [
+          "2340.2520648903665",
+          "0.0",
+          "698.4611375636877"
+        ],
+        [
+          "0.0",
+          "2318.2676880118993",
+          "462.7245851119162"
+        ],
+        [
+          "0.0",
+          "0.0",
+          "1.0"
+        ]
+      ],
+      "kCamera2ComparisonGain": "0.8",
+      "kCamera2Contrast": "1.2",
+      "kCamera2DistortionVector": [
+        "-0.818067967818754",
+        "1.1642822122721734",
+        "0.03170748960585329",
+        "-0.018850816925062076",
+        "-0.6959511125642447"
+      ],
+      "kCamera2FocalLength": "5.903208539",
+      "kCamera2Gain": "6.0",
+      "kCamera2Saturation": "1",
+      "kCamera2OffsetFromCamera1OriginMeters": [
+        "0.00",
+        "-0.19",
+        "0.0"
+      ],
+      "kCamera2PositionsFromExpectedBallMeters": [
+        "0.0",
+        "-0.051",
+        "0.45"
+      ],
+      "kCamera2PuttingContrast": "1.2",
+      "kCamera2PuttingGain": "4.0",
+      "kCamera2StillShutterTimeuS": "15000",
+      "kCamera2XOffsetForTilt": "0",
+      "kCamera2YOffsetForTilt": "0"
+    },
+    "club_data": {
+      "kClubImageCameraGain": "40",
+      "kClubImageHeightPixels": "200",
+      "kClubImageOutputDir": "/home/pitrac/LM_Shares/Images",
+      "kClubImageShutterSpeedMultiplier": "0.4",
+      "kClubImageWidthPixels": "340",
+      "kEnableClubImages": "0",
+      "kNumberFramesToSaveAfterHit": "8",
+      "kNumberFramesToSaveBeforeHit": "6"
+    },
+    "golf_simulator_interfaces": {
+      "E6": {
+        "kE6ConnectPort": "2483",
+        "kE6InterMessageDelayMs": "50"
+      },
+      "GSPro": {
+        "kGSProConnectPort": "921"
+      },
+      "kLaunchMonitorIdString": "PiTrac LM 0.1",
+      "kSkipSpinCalculation": "0",
+      "kWriteSpinAnalysisCsvFiles": "1"
+    },
+    "image_capture": {
+      "kMaxWatchingCropHeight": "88",
+      "kMaxWatchingCropWidth": "96"
+    },
+    "ipc_interface": {
+      "kMaxCam2ImageReceivedTimeMs": "40000",
+      "kRefreshTimeSeconds": "3",
+      "kWebServerShareDirectory": "/home/pitrac/LM_Shares/Images",
+      "kWebServerTomcatShareDirectory": "/home/pitrac/LM_Shares/WebShare"
+    },
+    "logging": {
+      "kLogDiagnosticImagesToUniqueFiles": "1",
+      "kLogIntermediateExposureImagesToFile": "0",
+      "kLogIntermediateSpinImagesToFile": "0",
+      "kLogWebserverImagesToFile": "1"
+    },
+    "modes": {
+      "kStartInPuttingMode": "0"
+    },
+    "motion_detect_stage": {
+      "kCroppedImagePixelOffsetLeft": "0",
+      "kCroppedImagePixelOffsetUp": "-3",
+      "kDifferenceC": "3.0",
+      "kDifferenceM": "0.9",
+      "kFramePeriod": "0",
+      "kHSkip": "2",
+      "kMaxRegionThreshold": "0.05",
+      "kRegionThreshold": "0.05",
+      "kVSkip": "2"
+    },
+    "physical_constants": {
+      "kBallRadiusMeters": "0.021335"
+    },
+    "spin_analysis": {
+      "kCoarseXRotationDegreesEnd": "36",
+      "kCoarseXRotationDegreesIncrement": "4",
+      "kCoarseXRotationDegreesStart": "-36",
+      "kCoarseYRotationDegreesEnd": "15",
+      "kCoarseYRotationDegreesIncrement": "5",
+      "kCoarseYRotationDegreesStart": "-15",
+      "kCoarseZRotationDegreesEnd": "110",
+      "kCoarseZRotationDegreesIncrement": "4",
+      "kCoarseZRotationDegreesStart": "-10",
+      "kGaborMaxWhitePercent": "45",
+      "kGaborMinWhitePercent": "39"
+    },
+    "strobing": {
+      "kBaudRateForFastPulses": "115200",
+      "kBaudRateForSlowPulses": "115200",
+      "kBaudRatePulseMultiplier": "1.0",
+      "kCam2SetupPeriodMilliseconds": "2000",
+      "kConnectionBoardVersion": "2",
+      "kDynamicFollowOnPulseVectorPutter": [
+        444.0
+      ],
+      "kLastPulsePutterRepeats": "0",
+      "kLongerStrobePulseVectorDriver": [
+        0.175,
+        0.7,
+        1.4,
+        2.45,
+        1.26,
+        2.8,
+        2.1,
+        3.15,
+        3.85,
+        3.85,
+        10.4,
+        3.5,
+        0
+      ],
+      "kNumberPrimingPulses": "12",
+      "kPauseAfterSendingPreImageTriggerMs": "2000",
+      "kPauseBeforeReadyForFinalPrimingPulseMs": "400",
+      "kPauseBeforeSendingFinalImageTriggerMs": "2000",
+      "kPauseBeforeSendingImageFlushMs": "300",
+      "kPauseBeforeSendingPreImageTriggerMs": "300",
+      "kPauseToSetUpInnoMakerExternalTriggerMilliseconds": "500",
+      "kPracticeBallSpeedSlowdownPercentage": "2",
+      "kPrimingPulseFPS": "15",
+      "kPuttingBallSpeedSlowdownPercentage": "5.2",
+      "kPuttingStrobeDelayMs": "50",
+      "kStandardBallSpeedSlowdownPercentage": "0.1",
+      "kStrobePulseVectorDriver": [
+        0.7,
+        1.8,
+        3.0,
+        2.2,
+        3.0,
+        7.1,
+        4.0,
+        4.0,
+        0
+      ],
+      "kStrobePulseVectorPutter": [
+        2.5,
+        5.0,
+        8.0,
+        10.5,
+        8.5,
+        21.0,
+        21.0,
+        21.0,
+        21.0,
+        21.0,
+        21.0,
+        21.0,
+        0
+      ],
+      "number_bits_for_fast_on_pulse_": "2",
+      "number_bits_for_slow_on_pulse_": "8"
+    },
+    "testing": {
+      "kAutomatedTestExpectedResultsCSV": "Uneekor Comparison 2025-02-07_Small_Test.csv",
+      "kAutomatedTestResultsCSV": "PiTrac_Test_Results.csv",
+      "kAutomatedTestSuiteDirectory": "/usr/share/pitrac/test-suites/TestSuite_2025_02_07/",
+      "kAutomatedTestToleranceBackSpin": "250",
+      "kAutomatedTestToleranceBallSpeedMPH": "4",
+      "kAutomatedTestToleranceHLA": "3",
+      "kAutomatedTestToleranceSideSpin": "300",
+      "kAutomatedTestToleranceVLA": "2",
+      "kBaseTestImageDir": "../Images/",
+      "kExternallyStrobedALTBestCircleCannyLower": "35",
+      "kExternallyStrobedALTBestCircleCannyUpper": "80",
+      "kExternallyStrobedALTBestCircleHoughDpParam1": "1.3",
+      "kExternallyStrobedALTBestCircleHoughParam2": "13",
+      "kExternallyStrobedALTBestCircleMaxIterations": "25",
+      "kExternallyStrobedALTBestCircleMinInliers": "25",
+      "kExternallyStrobedBallIdentificationCannyLower": "35",
+      "kExternallyStrobedBallIdentificationCannyUpper": "80",
+      "kExternallyStrobedEnvNumber_bits_for_fast_on_pulse_": 3,
+      "kTwoImageTestTeedBallImage": "gs_log_img__log_ball_final_found_ball_img.png",
+      "kTwoImageTestStrobedImage": "gs_log_img__log_cam2_last_strobed_img_Shot_4_2025-Feb-04_09.59.57.png"
+    },
+    "user_interface": {
+      "kRefreshTimeSeconds": "3",
+      "kWebServerBallSearchAreaImage": "log_cam1_search_area_img",
+      "kWebServerCamera2Image": "log_cam2_last_strobed_img",
+      "kWebServerErrorExposuresImage": "log_cam2_last_strobed_img",
+      "kWebServerLastTeedBallImage": "log_ball_final_found_ball_img",
+      "kWebServerResultBallExposureCandidates": "ball_exposure_candidates",
+      "kWebServerResultBallRotatedByBestAngles": "ball1_rotated_by_best_angles",
+      "kWebServerResultSpinBall1Image": "spin_ball_1_gray_image1",
+      "kWebServerResultSpinBall2Image": "spin_ball_2_gray_image1"
     }
+  },
+  "system": {
+    "camera_role": "camera1",
+    "mode": "single"
+  }
 }

@@ -165,10 +165,10 @@ namespace golf_sim {
 		std::string gspro_host_address_;
 		std::string config_file_;
 		std::string golfer_orientation_string_;
-		SystemMode system_mode_;
-		LoggingLevel logging_level_;
-		ArtifactSaveLevel artifact_save_level_;
-		GolferOrientation golfer_orientation_;
+		SystemMode system_mode_ = kTest;
+		LoggingLevel logging_level_ = kInfo;
+		ArtifactSaveLevel artifact_save_level_ = kNoArtifacts;
+		GolferOrientation golfer_orientation_ = kRightHanded;
 		bool wait_for_key_on_images_;
 		bool run_single_pi_;
 		bool show_images_;

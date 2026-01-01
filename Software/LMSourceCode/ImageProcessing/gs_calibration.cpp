@@ -69,8 +69,9 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.calibration.kAutoCalibrationBaselineBallPositionFromCamera2MetersForStraightOutCameras", kAutoCalibrationBaselineBallPositionFromCamera2MetersForStraightOutCameras);
         GolfSimConfiguration::SetConstant("gs_config.calibration.kAutoCalibrationBaselineBallPositionFromCamera1MetersForSkewedCameras", kAutoCalibrationBaselineBallPositionFromCamera1MetersForSkewedCameras);
         GolfSimConfiguration::SetConstant("gs_config.calibration.kAutoCalibrationBaselineBallPositionFromCamera2MetersForSkewedCameras", kAutoCalibrationBaselineBallPositionFromCamera2MetersForSkewedCameras);
-		GolfSimConfiguration::SetConstant("gs_config.calibration.kCalibrationRigType", reinterpret_cast<int&>(kCalibrationRigType));
-
+        int rig_type = 0;
+        GolfSimConfiguration::SetConstant("gs_config.calibration.kCalibrationRigType", rig_type); 
+        kCalibrationRigType = (GolfSimCalibration::CalibrationRigType)rig_type;
     }
 
     GolfSimCalibration::~GolfSimCalibration() {

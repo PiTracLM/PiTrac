@@ -1157,7 +1157,7 @@ void run_main(int argc, char* argv[])
 
         while (true) {
             PulseStrobe::SendExternalTrigger();
-            sleep(3);
+            sleep(2);
         }
         return;
     }

@@ -285,6 +285,12 @@
     <ClCompile Include="gs_calibration.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="onnx_runtime_detector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_web_api.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="golf_ball.h">
@@ -552,6 +558,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gs_calibration.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="onnx_runtime_detector.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -203,7 +203,7 @@ namespace golf_sim {
 
     // ONNX Detection Configuration
     // TODO: Fix defaults or remove these entirely
-    std::string BallImageProc::kDetectionMethod = "legacy";
+    std::string BallImageProc::kStrobedBallDetectionMethod = "legacy";
     std::string BallImageProc::kBallPlacementDetectionMethod = "legacy";
     // Default ONNX model path - can be overridden by config file or (more likely) the PITRAC_ROOT environment variable
     #ifdef _WIN32
@@ -241,6 +241,8 @@ namespace golf_sim {
     std::vector<cv::Rect> BallImageProc::yolo_detection_boxes_;
     std::vector<float> BallImageProc::yolo_detection_confidences_;
     std::vector<cv::Mat> BallImageProc::yolo_outputs_;
+
+    BallImageProc::YOLOImageTypeToUse BallImageProc::kImageTypeToProcessWithYOLO = BallImageProc::YOLOImageTypeToUse::kUseYOLOWithColorImages;
 
     BallImageProc* BallImageProc::get_ball_image_processor() {
         static BallImageProc* ip = nullptr;
@@ -387,15 +389,20 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingStartingParam2", kPlacedNarrowingStartingParam2);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingRadiiDpParam", kPlacedNarrowingRadiiDpParam);
 
+        int kImageTypeToProcessWithYOLOAsInt;
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kImageTypeToProcessWithYOLO", kImageTypeToProcessWithYOLOAsInt);
+        kImageTypeToProcessWithYOLO= static_cast<YOLOImageTypeToUse>(kImageTypeToProcessWithYOLOAsInt);
+
+
         // ONNX Detection Configuration values will be loaded later via LoadConfigurationValues()
         // which is called after the JSON config file has been loaded in main()
 
         GolfSimConfiguration::SetConstant("gs_config.logging.kLogIntermediateSpinImagesToFile", kLogIntermediateSpinImagesToFile);
         
         // Preload model at startup if using experimental detection for either ball placement or flight
-        if (kDetectionMethod == "experimental" || kDetectionMethod == "experimental_sahi" ||
+        if (kStrobedBallDetectionMethod == "experimental" || kStrobedBallDetectionMethod == "experimental_sahi" ||
             kBallPlacementDetectionMethod == "experimental") {
-            GS_LOG_MSG(info, "Detection method is '" + kDetectionMethod + "' / Placement method is '" + kBallPlacementDetectionMethod + "', preloading YOLO model at startup...");
+            GS_LOG_MSG(info, "Detection method is '" + kStrobedBallDetectionMethod + "' / Placement method is '" + kBallPlacementDetectionMethod + "', preloading YOLO model at startup...");
 
             // Try ONNX Runtime first if configured
             if (kONNXBackend == "onnxruntime") {
@@ -560,7 +567,7 @@ namespace golf_sim {
         LoggingTools::DebugShowImage(image_name_ + "  Strobed Ball Image - Ready for Edge Detection", search_image);
 
         cv::Mat cannyOutput_for_balls;
-        if (search_mode == kExternallyStrobed && pre_canny_blur_size == 0) {
+        if (search_mode == kExternallyStrobed || pre_canny_blur_size == 0) {
             // Don't do the Canny at all if the blur size is zero and we're in comparison mode
             cannyOutput_for_balls = search_image.clone();
         }
@@ -571,7 +578,9 @@ namespace golf_sim {
         LoggingTools::DebugShowImage(image_name_ + "  cannyOutput_for_balls", cannyOutput_for_balls);
 
         // Blur the lines-only image back to the search_image that the code below uses
-        cv::GaussianBlur(cannyOutput_for_balls, search_image, cv::Size(pre_hough_blur_size, pre_hough_blur_size), 0);   // Nominal is 7x7
+        if (pre_hough_blur_size > 0) {
+            cv::GaussianBlur(cannyOutput_for_balls, search_image, cv::Size(pre_hough_blur_size, pre_hough_blur_size), 0);   // Nominal is 7x7
+        }
 
         return true;
     }
@@ -597,8 +606,13 @@ namespace golf_sim {
             return false;
         }
 
+		// The detection method may vary based on whether we're looking for a placed ball or a strobed ball
+        std::string detection_method = (search_mode == BallSearchMode::kFindPlacedBall) ? kBallPlacementDetectionMethod : kStrobedBallDetectionMethod;
+
+        GS_LOG_TRACE_MSG(trace, "Using detection method: " + detection_method);
+
         // *** ONNX DETECTION INTEGRATION - Process through full trajectory analysis pipeline ***
-        if (kDetectionMethod == "experimental" || kDetectionMethod == "experimental_sahi") {
+        if (detection_method == "experimental" || detection_method == "experimental_sahi") {
             std::vector<GsCircle> onnx_circles;
             if (DetectBallsONNX(rgbImg, search_mode, onnx_circles)) {
                 // Convert GsCircle results to GolfBall objects for trajectory analysis
@@ -1114,7 +1128,7 @@ namespace golf_sim {
         }
 
         // NEW: ONNX detection bypass - skip adaptive parameter tuning for ONNX
-        if (kDetectionMethod == "experimental" || kDetectionMethod == "experimental_sahi") {
+        if (detection_method == "experimental" || detection_method == "experimental_sahi") {
             GS_LOG_TRACE_MSG(trace, "Using ONNX detection - bypassing adaptive parameter tuning");
             
             std::vector<GsCircle> test_circles;
@@ -1548,6 +1562,15 @@ namespace golf_sim {
             // TBD - refactor so that the x & y are set from the circle for the ball instead of having to keep separate
             b.quality_ranking = index;  // Rankings start at 0
             b.set_circle(c.circle);
+
+            // The detection method may vary based on whether we're looking for a placed ball or a strobed ball
+            std::string detection_method = (search_mode == BallSearchMode::kFindPlacedBall) ? kBallPlacementDetectionMethod : kStrobedBallDetectionMethod;
+
+            // Specially mark the color of the ball to allow downstream stages to effectively ignore color-related filtering.
+            if (detection_method == "experimental" || detection_method == "experimental_sahi") {
+                b.ball_color_ = GolfBall::BallColor::kONNXDetected; // Mark as ONNX-detected
+            }
+
             return_balls.push_back(b);
 
             // Record the candidate graphically for later analysis
@@ -4127,18 +4150,20 @@ namespace golf_sim {
 
     /**
      * Detection Algorithm Dispatcher
-     * Routes detection to HoughCircles or ONNX based on kDetectionMethod configuration
+     * Routes detection to HoughCircles or ONNX based on kStrobedBallDetectionMethod configuration
      */
     bool BallImageProc::DetectBalls(const cv::Mat& preprocessed_img, BallSearchMode search_mode, 
                                    std::vector<GsCircle>& detected_circles) {
-        GS_LOG_TRACE_MSG(trace, "BallImageProc::DetectBalls - Method: " + kDetectionMethod);
+        GS_LOG_TRACE_MSG(trace, "BallImageProc::DetectBalls - Method: " + kStrobedBallDetectionMethod);
+
+		std::string detection_method = (search_mode == BallSearchMode::kFindPlacedBall) ? kBallPlacementDetectionMethod : kStrobedBallDetectionMethod;
         
-        if (kDetectionMethod == "legacy") {
+        if (detection_method == "legacy") {
             return DetectBallsHoughCircles(preprocessed_img, search_mode, detected_circles);
-        } else if (kDetectionMethod == "experimental" || kDetectionMethod == "experimental_sahi") {
+        } else if (detection_method == "experimental" || detection_method == "experimental_sahi") {
             return DetectBallsONNX(preprocessed_img, search_mode, detected_circles);
         } else {
-            GS_LOG_MSG(error, "Unknown detection method: " + kDetectionMethod + ". Falling back to legacy.");
+            GS_LOG_MSG(error, "Unknown detection method: " + detection_method + ". Falling back to legacy.");
             return DetectBallsHoughCircles(preprocessed_img, search_mode, detected_circles);
         }
     }
@@ -4238,7 +4263,7 @@ namespace golf_sim {
                 return true;
             }
 
-            GS_LOG_MSG(info, "Preloading YOLO model at startup for detection method: " + kDetectionMethod);
+            GS_LOG_MSG(info, "Preloading YOLO model at startup for detection method: " + kStrobedBallDetectionMethod);
             GS_LOG_MSG(trace, "Loading YOLO model from: " + kONNXModelPath);
             auto start_time = std::chrono::high_resolution_clock::now();
             
@@ -4341,16 +4366,42 @@ namespace golf_sim {
                 }
             }
 
-            // Convert to RGB if needed (minimal overhead)
+            // Convert to RGB if needed (minimal overhead) and/or desired
+
+
             cv::Mat input_image;
-            if (preprocessed_img.channels() == 1) {
-                cv::cvtColor(preprocessed_img, input_image, cv::COLOR_GRAY2RGB);
-            } else {
-                input_image = preprocessed_img;  // Use directly (no copy)
+
+			if (kImageTypeToProcessWithYOLO == BallImageProc::YOLOImageTypeToUse::kUseYOLOWithMonochromeImages) {
+
+				// NOTE - This convert-to-gray option is temporary.  The preferred approach is to retrain the model to accept a wider range of images directly.
+                // However, this code is here to experiment with (and hopefully learn something from!)
+                if (preprocessed_img.channels() == 3) {
+                    GS_LOG_MSG(info, "ONNX Runtime detector switching to use monochrome input image.");
+
+                    // We want to use a monochrome image for detection, but we have an RGB input
+					// For now, ONNX detection still requires a 3-channel image, so we convert to gray and then back to BGR
+                    cv::Mat gray_image;
+                    cv::cvtColor(preprocessed_img, gray_image, cv::COLOR_BGR2GRAY);
+                    cv::cvtColor(gray_image, input_image, cv::COLOR_GRAY2BGR);
+
+                    LoggingTools::DebugShowImage("Grayscaled Ball Image for YOLO processing", input_image);
+                }
+            } 
+            else {
+				// We want to use an RGB image for YOLO detection
+                if (preprocessed_img.channels() == 1) {
+                    cv::cvtColor(preprocessed_img, input_image, cv::COLOR_GRAY2RGB);
+                }
+                else {
+                    input_image = preprocessed_img;  // Use directly (no copy)
+                }
             }
 
+            // The detection method may vary based on whether we're looking for a placed ball or a strobed ball
+            std::string detection_method = (search_mode == BallSearchMode::kFindPlacedBall) ? kBallPlacementDetectionMethod : kStrobedBallDetectionMethod;
+
             // Handle SAHI slicing if enabled
-            if (kDetectionMethod == "experimental_sahi") {
+            if (detection_method == "experimental_sahi") {
                 std::vector<cv::Mat> slices;
                 slices.reserve(16);  // Pre-allocate for typical slice count
 
@@ -4471,8 +4522,11 @@ namespace golf_sim {
                 return false;
             }
 
+            // The detection method may vary based on whether we're looking for a placed ball or a strobed ball
+            std::string detection_method = (search_mode == BallSearchMode::kFindPlacedBall) ? kBallPlacementDetectionMethod : kStrobedBallDetectionMethod;
+
             // SAHI slicing
-            bool use_sahi = (kDetectionMethod == "experimental_sahi");
+            bool use_sahi = (detection_method == "experimental_sahi");
             std::vector<cv::Rect> slices;
 
             if (use_sahi) {
@@ -4675,7 +4729,7 @@ namespace golf_sim {
 
         // Read ONNX/AI Detection configuration values
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXModelPath", kONNXModelPath);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kDetectionMethod", kDetectionMethod);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallDetectionMethod", kStrobedBallDetectionMethod);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBallPlacementDetectionMethod", kBallPlacementDetectionMethod);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXConfidenceThreshold", kONNXConfidenceThreshold);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXNMSThreshold", kONNXNMSThreshold);
@@ -4685,7 +4739,7 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXRuntimeThreads", kONNXRuntimeThreads);
 
         GS_LOG_MSG(info, "Loaded ONNX Model Path: " + kONNXModelPath);
-        GS_LOG_MSG(info, "Loaded Detection Method: " + kDetectionMethod);
+        GS_LOG_MSG(info, "Loaded Detection Method: " + kStrobedBallDetectionMethod);
         GS_LOG_MSG(info, "Loaded Backend: " + kONNXBackend);
 
         if (!kONNXModelPath.empty()) {

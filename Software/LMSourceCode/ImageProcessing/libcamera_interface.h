@@ -52,9 +52,11 @@ namespace golf_sim {
 		static uint kMaxWatchingCropWidth;
 		static uint kMaxWatchingCropHeight;
 		static double kCamera1Gain;  // 0.0 to TBD??
+		static double kCamera1Saturation;
 		static double kCamera1HighFPSGain;  // 15.0 to TBD??
 		static double kCamera1Contrast; // 0.0 to 32.0
 		static double kCamera2Gain;  // 0.0 to TBD??
+		static double kCamera2Saturation;
 		static double kCamera2ComparisonGain;  // 0.0 to TBD??
 		static double kCamera2CalibrateOrLocationGain;
 		static double kCamera2StrobedEnvironmentGain;

@@ -368,13 +368,24 @@
       "type": "select",
       "options": {
         "1": "6mm - Standard lens",
-        "2": "3.6mm M12 - Wide angle lens"
+        "2": "3.6mm M12 - Wide angle lens",
+        "3": "Custom - Use custom lens setting (below)"
       },
       "default": "1",
       "requiresRestart": true,
       "passedVia": "environment",
       "passedTo": "camera1",
       "envVariable": "PITRAC_SLOT1_LENS_TYPE"
+    },
+    "cameras.kSlot1CustomLensFocalLength": {
+      "category": "Cameras",
+      "type": "float",
+      "default": 4.0,
+      "description": "Focal length when using custom lens in Slot 1 (mm)",
+      "ui_name": "Custom Lens Focal Length Slot 1",
+      "passedVia": "json",
+      "passedTo": "both",
+      "requiresRestart": true
     },
     "cameras.slot1.orientation": {
       "category": "Cameras",
@@ -426,13 +437,24 @@
       "type": "select",
       "options": {
         "1": "6mm - Standard lens",
-        "2": "3.6mm M12 - Wide angle lens"
+        "2": "3.6mm M12 - Wide angle lens",
+        "3": "Custom - Use custom lens setting (below)"
       },
       "default": "1",
       "requiresRestart": true,
       "passedVia": "environment",
       "passedTo": "camera2",
       "envVariable": "PITRAC_SLOT2_LENS_TYPE"
+    },
+    "cameras.kSlot2CustomLensFocalLength": {
+      "category": "Cameras",
+      "type": "float",
+      "default": 4.0,
+      "description": "Focal length when using custom lens in Slot 2 (mm)",
+      "ui_name": "Custom Lens Focal Length Slot 2",
+      "passedVia": "json",
+      "passedTo": "both",
+      "requiresRestart": true
     },
     "cameras.slot2.orientation": {
       "category": "Cameras",
@@ -512,12 +534,12 @@
       "passedTo": "both",
       "cliArgument": "--wait_keys"
     },
-    "gs_config.ball_identification.kDetectionMethod": {
+    "gs_config.ball_identification.kStrobedBallDetectionMethod": {
       "category": "Ball Detection",
       "subcategory": "basic",
       "basicSubcategory": "Detection Methods",
-      "displayName": "Ball Detection Method",
-      "description": "Algorithm for detecting balls in flight",
+      "displayName": "Strobed Ball Detection Method",
+      "description": "Algorithm for detecting strobed balls in flight",
       "type": "select",
       "options": {
         "legacy": "HoughCircles (Most Stable)",
@@ -537,7 +559,7 @@
       "description": "Algorithm for detecting ball placement on tee",
       "type": "select",
       "options": {
-        "legacy": "GetCalibratedBall/HoughCircles",
+        "legacy": "HoughCircles (GetCalibratedBall process)",
         "experimental": "YOLO (Fast & Accurate)"
       },
       "default": "experimental",
@@ -554,6 +576,22 @@
       "type": "select",
       "options": {},
       "default": "/etc/pitrac/models/pitrac-ball-detection-09-25-25/best.onnx",
+      "requiresRestart": true,
+      "passedVia": "json",
+      "passedTo": "both"
+    },
+    "gs_config.ball_identification.kImageTypeToProcessWithYOLO": {
+      "category": "Ball Detection",
+      "subcategory": "advanced",
+      "basicSubcategory": "Detection Methods",
+      "displayName": "Image Type To Use In YOLO Processing",
+      "description": "Image Type To Use In YOLO Processing (color/mono)",
+      "type": "select",
+      "options": {
+        "0": "YOLO will process full color images (if available) (default)",
+        "1": "YOLO will process monochrome images (and convert as necessary)"
+      },
+      "default": "0",
       "requiresRestart": true,
       "passedVia": "json",
       "passedTo": "both"
@@ -587,6 +625,36 @@
       "max": 16.0,
       "step": 0.1,
       "default": 6.0,
+      "requiresRestart": true,
+      "passedVia": "json",
+      "passedTo": "both"
+    },
+    "gs_config.cameras.kCamera1Saturation": {
+      "category": "Cameras",
+      "subcategory": "advanced",
+      "advancedSubcategory": "Cameras",
+      "displayName": "Camera 1 Saturation",
+      "description": "Brightness/gain setting for Camera 1",
+      "type": "float",
+      "min": 0.0,
+      "max": 2.0,
+      "step": 0.1,
+      "default": 1.0,
+      "requiresRestart": true,
+      "passedVia": "json",
+      "passedTo": "both"
+    },
+    "gs_config.cameras.kCamera2Saturation": {
+      "category": "Cameras",
+      "subcategory": "advanced",
+      "advancedSubcategory": "Cameras",
+      "displayName": "Camera 2 Saturation",
+      "description": "Brightness/gain setting for Camera 2",
+      "type": "float",
+      "min": 0.0,
+      "max": 2.0,
+      "step": 0.1,
+      "default": 1.0,
       "requiresRestart": true,
       "passedVia": "json",
       "passedTo": "both"

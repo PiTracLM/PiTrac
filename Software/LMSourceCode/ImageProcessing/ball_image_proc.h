@@ -55,6 +55,11 @@ class BallImageProc
 {
 public:
 
+    enum YOLOImageTypeToUse {
+        kUseYOLOWithColorImages = 0,
+        kUseYOLOWithMonochromeImages = 1
+    };
+
     // The following are constants that control how the ball spin algorithm and the
     // ball (circle) identification works.  They are set from the configuration .json file
 
@@ -191,7 +196,7 @@ public:
     static int kGaborMinWhitePercent;
 
     // ONNX Detection Configuration
-    static std::string kDetectionMethod;
+    static std::string kStrobedBallDetectionMethod;
     static std::string kBallPlacementDetectionMethod;
     static std::string kONNXModelPath;
     static float kONNXConfidenceThreshold;
@@ -374,6 +379,9 @@ private:
     static std::vector<cv::Rect> yolo_detection_boxes_;     // Detection results
     static std::vector<float> yolo_detection_confidences_;  // Detection confidences
     static std::vector<cv::Mat> yolo_outputs_;              // Network outputs
+
+    // Experimental flag to have YOLO process either monochrome or color images
+    static YOLOImageTypeToUse kImageTypeToProcessWithYOLO;
 
     // When we create a candidate ball list, the elements of that list include not only 
     // the ball, but also the ball identifier(e.g., 1, 2...),

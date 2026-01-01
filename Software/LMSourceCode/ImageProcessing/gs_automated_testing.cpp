@@ -489,7 +489,7 @@ bool GsAutomatedTesting::ReadTestImages(const std::string& img_1_base_filename, 
     cv::Mat unDistortedBall2Img;
 
     if (undistort) {
-        // TBD - Parametersize the lens_type later
+		// Parametersize the lens_type later.  For now, assume all images are with a 6mm lens.
         unDistortedBall1Img = GsAutomatedTesting::UndistortImage(ball1Img, camera_model, CameraHardware::LensType::Lens_6mm, CameraHardware::CameraOrientation::kUpsideUp);
         unDistortedBall2Img = GsAutomatedTesting::UndistortImage(ball2Img, camera_model, CameraHardware::LensType::Lens_6mm, CameraHardware::CameraOrientation::kUpsideUp);
 
