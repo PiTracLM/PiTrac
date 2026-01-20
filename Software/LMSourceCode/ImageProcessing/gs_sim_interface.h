@@ -24,7 +24,8 @@ namespace golf_sim {
         enum GolfSimulatorType {
             kNone = 0,
             kGSPro = 1,
-            kE6 = 2
+            kE6 = 2,
+            kOpenGolfSim = 3
         };
 
         GsSimInterface();

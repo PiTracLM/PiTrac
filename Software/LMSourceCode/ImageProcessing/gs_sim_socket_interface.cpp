@@ -50,6 +50,18 @@ namespace golf_sim {
         // that we don't have to repeatedly do so.  May also want to
         // setup a keep-alive ping to the SimSocket system.
         GS_LOG_TRACE_MSG(trace, "GsSimSocketInterface Initialize called.");
+        
+        // Treat empty/disabled config as disabled
+        if (socket_connect_address_.empty() || socket_connect_address_ == "disabled" ||
+            socket_connect_port_.empty() || socket_connect_port_ == "0")
+        {
+            SetConnectionState(SimConnState::kDisabled, "No sim host/port configured");
+            GS_LOG_MSG(info, "Sim socket disabled (no host/port configured).");
+            return false; // InterfaceIsPresent() should prevent this being called anyway
+        }
+
+SetConnectionState(SimConnState::kConnecting);
+GS_LOG_MSG(info, "Connecting to SimSocketServer at: " + socket_connect_address_ + ":" + socket_connect_port_);
 
         try
         {
@@ -76,6 +88,9 @@ namespace golf_sim {
 
 
             boost::asio::connect(*socket_, endpoints);
+            
+            SetConnectionState(SimConnState::kConnected);
+            GS_LOG_MSG(info, "Connected to SimSocketServer at: " + socket_connect_address_ + ":" + socket_connect_port_);
 
             receiver_thread_ = std::unique_ptr<std::thread>(new std::thread(&GsSimSocketInterface::ReceiveSocketData, this));
 
@@ -85,6 +100,7 @@ namespace golf_sim {
         }
         catch (std::exception& e)
         {
+            SetConnectionState(SimConnState::kError, e.what());
             GS_LOG_MSG(error, "Failed TestSimSocketMessage - Error was: " + std::string(e.what()));
             return false;
         }
@@ -105,72 +121,74 @@ namespace golf_sim {
         return true;
     }
 
-    void GsSimSocketInterface::ReceiveSocketData() {
+void GsSimSocketInterface::ReceiveSocketData()
+{
+    receive_thread_exited_ = false;
 
-        receive_thread_exited_ = false;
+    std::array<char, 2001> buf{};   // 2000 bytes payload + null terminator
+    boost::system::error_code error;
+    std::string received_data_string;
 
-        static std::array<char, 2000> buf;
-        boost::system::error_code error;
-        std::string received_data_string;
+    while (GolfSimGlobals::golf_sim_running_)
+    {
+        GS_LOG_TRACE_MSG(trace, "Waiting to receive data from SimSocketserver.");
 
-        while (GolfSimGlobals::golf_sim_running_)
+        size_t len = 0;
+
+        try {
+            // IMPORTANT: read at most (size-1) so we can always null-terminate
+            len = socket_->read_some(boost::asio::buffer(buf.data(), buf.size() - 1), error);
+        }
+        catch (const std::exception& e)
         {
-            // We don't want to re-enter this while we're processing
-            // a received message
-            // boost::lock_guard<boost::mutex> lock(sim_socket_receive_mutex_);
-
-            GS_LOG_TRACE_MSG(trace, "Waiting to receive data from SimSocketserver.");
-
-            size_t len = 0;
-
-            try {
-                // Read_some should be blocking, but if the socket has closed, it will return immediately
-                len = socket_->read_some(boost::asio::buffer(buf), error);
-            }
-            catch (std::exception& e)
-            {
-                GS_LOG_MSG(error, "GsSimSocketInterface::ReceiveSocketData failed to read from socket - Error was: " + std::string(e.what()));
-            }
-
-            if (len == 0) {
-                GS_LOG_MSG(warning, "Received 0-length message from server. Will attempt to re-initialize");
-                /// TBD - Are we sure we want to exit?
-                receive_thread_exited_ = true;
-                return; 
-            }
-
-            // Null-terminate the string
-            buf[len] = (char)0;
-            received_data_string = std::string(buf.data());
-            GS_LOG_TRACE_MSG(trace, "   Read some data (" + std::to_string(len) + " bytes) : " + received_data_string);
-
-            if (error == boost::asio::error::eof) {
-                // Connection closed cleanly by peer.  
-                // In this case, we may want to de-initialize
-                GS_LOG_TRACE_MSG(trace, "GsSimSocketInterface::ReceiveSocketData Received EOF");
-                receive_thread_exited_ = true;
-                return;
-            }
-            else if (error) {
-                GS_LOG_TRACE_MSG(trace, "GsSimSocketInterface::ReceiveSocketData Received Error");
-                throw boost::system::system_error(error); // Some other error.
-            }
-            // Derived classes will, for example, parse the message and inject any
-            // relevant events into the FSM.
-
-            GS_LOG_TRACE_MSG(trace, "Received SimSocket message of: \n" + received_data_string);
-
-            if (!ProcessReceivedData(received_data_string)) {
-                GS_LOG_MSG(error, "Failed GsSimSocketInterface::ReceiveSocketData - Could process data: " + received_data_string);
-                return;
-            }
+            GS_LOG_MSG(error, "GsSimSocketInterface::ReceiveSocketData failed to read from socket - Error was: " + std::string(e.what()));
+            SetConnectionState(SimConnState::kError, e.what());
+            receive_thread_exited_ = true;
+            return;
         }
 
-        GS_LOG_MSG(error, "GsSimSocketInterface::ReceiveSocketData Exiting");
+        if (error == boost::asio::error::eof) {
+            GS_LOG_TRACE_MSG(trace, "GsSimSocketInterface::ReceiveSocketData Received EOF");
+            SetConnectionState(SimConnState::kDisconnected, "EOF");
+            receive_thread_exited_ = true;
+            return;
+        }
+
+        if (error) {
+            GS_LOG_MSG(error, "Sim socket receive error: " + error.message());
+            SetConnectionState(SimConnState::kError, error.message());
+            receive_thread_exited_ = true;
+            return;
+        }
+
+        if (len == 0) {
+            GS_LOG_MSG(warning, "Received 0-length message from server.");
+            SetConnectionState(SimConnState::kDisconnected, "0-length read");
+            receive_thread_exited_ = true;
+            return;
+        }
+
+        // Null-terminate and build string
+        buf[len] = '\0';
+        received_data_string.assign(buf.data(), len);
+
+        GS_LOG_TRACE_MSG(trace, "   Read some data (" + std::to_string(len) + " bytes) : " + received_data_string);
+        GS_LOG_TRACE_MSG(trace, "Received SimSocket message of: \n" + received_data_string);
+
+        if (!ProcessReceivedData(received_data_string)) {
+            GS_LOG_MSG(error, "ProcessReceivedData failed");
+            SetConnectionState(SimConnState::kError, "ProcessReceivedData failed");
+            receive_thread_exited_ = true;
+            return;
+        }
     }
 
-    void GsSimSocketInterface::DeInitialize() {
+    GS_LOG_MSG(info, "GsSimSocketInterface::ReceiveSocketData Exiting");
+}
 
+
+    void GsSimSocketInterface::DeInitialize() {
+        SetConnectionState(SimConnState::kDisconnected, "DeInitialize()");
         GS_LOG_TRACE_MSG(trace, "GsSimSocketInterface::DeInitialize() called.");
         try {
 
@@ -209,6 +227,11 @@ namespace golf_sim {
         size_t write_length = 0;
         boost::system::error_code error;
 
+        if (!socket_) {
+            SetConnectionState(SimConnState::kDisconnected, "socket_ was null on write");
+        return -1;
+        }
+
         GS_LOG_TRACE_MSG(trace, "GsSimSocketInterface::SendSimMessage - Message was: " + message);
 
         // We don't want to re-enter this while we're processing
@@ -219,9 +242,18 @@ namespace golf_sim {
         try {
 
             write_length = socket_->write_some(boost::asio::buffer(message), error);
+
+            if (error) {
+                SetConnectionState(SimConnState::kError, error.message());
+                receive_thread_exited_ = true; // forces reconnect path in SendResults
+                GS_LOG_MSG(error, "Sim socket write failed: " + error.message());
+                return -2;
+            }
         }
         catch (std::exception& e)
         {
+            SetConnectionState(SimConnState::kError, e.what());
+            receive_thread_exited_ = true;
             GS_LOG_MSG(error, "Failed TestE6Message - Error was: " + std::string(e.what()) + ". Error code was:" + std::to_string(error.value()) );
             return -2;
         }

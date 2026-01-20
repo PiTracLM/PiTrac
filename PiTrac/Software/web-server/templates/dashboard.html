@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}PiTrac Launch Monitor{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/dashboard.css">
+{% endblock %}
+
+{% block content %}
+<div class="ball-ready-indicator" id="ball-ready-indicator">
+    <div class="ball-status-icon" id="ball-status-icon">
+        <div class="ball-icon"></div>
+    </div>
+    <div class="ball-status-text">
+        <div class="ball-status-title" id="ball-status-title">System Status</div>
+        <div class="ball-status-message" id="ball-status-message">Initializing...</div>
+
+        <!-- OpenGolfSim connection badge -->
+    <div class="sim-badge" id="ogs-badge"
+         data-connected="{{ 'true' if ogs_connected else 'false' }}">
+      OpenGolfSim:
+      <span class="sim-badge__state">
+        {{ 'Connected' if ogs_connected else 'Disconnected' }}
+      </span>
+    </div>
+
+    </div>
+</div>
+
+<div class="metrics-grid">
+    <div class="metric-card">
+        <div class="metric-header">Ball Speed</div>
+        <div class="metric-value">
+            <span id="speed">{{ shot.speed }}</span>
+            <span class="metric-unit">mph</span>
+        </div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-header">Carry Distance</div>
+        <div class="metric-value">
+            <span id="carry">{{ shot.carry }}</span>
+            <span class="metric-unit">yds</span>
+        </div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-header">Launch Angle</div>
+        <div class="metric-value">
+            <span id="launch_angle">{{ shot.launch_angle }}</span>
+            <span class="metric-unit">°</span>
+        </div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-header">Side Angle</div>
+        <div class="metric-value">
+            <span id="side_angle">{{ shot.side_angle }}</span>
+            <span class="metric-unit">°</span>
+        </div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-header">Back Spin</div>
+        <div class="metric-value">
+            <span id="back_spin">{{ shot.back_spin }}</span>
+            <span class="metric-unit">rpm</span>
+        </div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-header">Side Spin</div>
+        <div class="metric-value">
+            <span id="side_spin">{{ shot.side_spin }}</span>
+            <span class="metric-unit">rpm</span>
+        </div>
+    </div>
+</div>
+
+<!-- <div class="message-section">
+    <div class="result-type" id="result_type">{{ shot.result_type }}</div>
+    <div class="message" id="message">{{ shot.message }}</div>
+</div> -->
+
+<!-- NEW: OpenGolfSim Controls -->
+{% if ogs_connected %}
+<div class="ogs-controls" id="ogs-controls">
+  <h2>OpenGolfSim Controls</h2>
+
+  <div class="ogs-controls-grid">
+    <!-- Aim pad (supports hold) -->
+    <button class="ogs-btn hold" data-command="up">▲</button>
+    <div></div>
+    <button class="ogs-btn hold" data-command="club-up">Club +</button>
+
+    <button class="ogs-btn hold" data-command="left">◀</button>
+    <button class="ogs-btn press" data-command="drop">Drop</button>
+    <button class="ogs-btn hold" data-command="right">▶</button>
+
+    <button class="ogs-btn hold" data-command="down">▼</button>
+    <button class="ogs-btn press" data-command="mulligan">Mulligan</button>
+    <button class="ogs-btn press" data-command="rehit">Rehit</button>
+
+    <div></div>
+    <button class="ogs-btn press" data-command="club-down">Club -</button>
+    <div></div>
+  </div>
+
+  <div class="ogs-controls-hint">
+    Tip: arrows support hold (down/up). Most other buttons use press.
+  </div>
+</div>
+{% endif %}
+
+<div class="image-gallery">
+    <h2>Shot Images</h2>
+    <div class="image-grid" id="image-grid">
+        {% for image in shot.images %}
+        <img src="/images/{{ image }}" alt="Shot {{ loop.index }}" class="shot-image" loading="lazy">
+        {% endfor %}
+    </div>
+</div>
+
+<div class="controls">
+    <button class="btn btn-primary" onclick="resetShot()">Reset</button>
+    <button class="btn btn-secondary" onclick="location.reload()">Refresh</button>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/dashboard.js"></script>
+{% endblock %}

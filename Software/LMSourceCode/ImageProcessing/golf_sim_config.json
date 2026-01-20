@@ -295,6 +295,7 @@
             "kCamera2ComparisonGain": "0.8",
             "kCamera2CalibrateOrLocationGain": "1.0",
             "kCamera2Contrast": "1.2",
+            "kCamera2Saturation": "0.0",
             "kCamera2PuttingGain": "1.5",
             "kCamera2PuttingContrast": "1.2",
             "kCamera1StillShutterTimeuS": "40000",
@@ -475,10 +476,15 @@
                 "kGSProConnectPort": "0921"
             },
             "E6": {
-                "kE6Comment": "USE CMD LINE - Exampe:  --e6_host_address 10.0.0.29",
+                "kE6Comment": "USE CMD LINE - Example:  --e6_host_address 10.0.0.29",
                 "kE6ConnectAddress": "",
                 "kE6ConnectPort": "2483",
                 "kE6InterMessageDelayMs": "50"
+            },
+            "OpenGolfSim":{
+                "kOGSComment":"USE CMD LINE OPTION - Example:  --open_golf_sim_host_address 10.0.0.25",
+                "kOGSConnectAddress": "",
+                "kOGSConnectPort": "3111"
             }
         },
         "club_data": {

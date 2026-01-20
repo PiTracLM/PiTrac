@@ -11,6 +11,7 @@
 #include "gs_sim_interface.h"
 #include "gs_gspro_interface.h"
 #include "gs_e6_interface.h"
+#include "gs_opengolfsim_interface.h"
 
 namespace golf_sim {
 
@@ -80,6 +81,27 @@ namespace golf_sim {
                 return false;
             }
         }
+
+        if (GsOpenGolfSimInterface::InterfaceIsPresent()) {
+    GS_LOG_TRACE_MSG(trace, "OpenGolfSim simulator interface detected.");
+
+    GsOpenGolfSimInterface* ogs_sim = new GsOpenGolfSimInterface();
+    if (ogs_sim == nullptr) {
+        GS_LOG_MSG(error, "Could not create an OpenGolfSim simulator interface.");
+        return false;
+    }
+
+    // You’ll probably want to add this enum value (see note below)
+    ogs_sim->simulator_type_ = GolfSimulatorType::kOpenGolfSim;
+
+    interfaces_.push_back(ogs_sim);
+
+    if (!ogs_sim->Initialize()) {
+        GS_LOG_MSG(error, "OpenGolfSim simulator interface could not be initialized.");
+        return false;
+    }
+}
+
 
         if (interfaces_.size() == 0) {
             GS_LOG_TRACE_MSG(trace, "No simulator interface detected.");

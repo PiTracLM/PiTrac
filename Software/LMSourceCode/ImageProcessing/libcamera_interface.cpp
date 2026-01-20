@@ -60,6 +60,7 @@ namespace golf_sim {
     double LibCameraInterface::kCamera2ComparisonGain = 0.8;
     double LibCameraInterface::kCamera2StrobedEnvironmentGain = 0.8;
     double LibCameraInterface::kCamera2Contrast = 1.0;
+    double LibCameraInterface::kCamera2Saturation = 0.0;  
     double LibCameraInterface::kCamera2CalibrateOrLocationGain = 1.0;
     double LibCameraInterface::kCamera2PuttingGain = 4.0;
     double LibCameraInterface::kCamera2PuttingContrast = 1.0;
@@ -1432,6 +1433,8 @@ bool WaitForCam2Trigger(cv::Mat& return_image) {
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2AutoCalibrate) {
 
             options->gain = LibCameraInterface::kCamera2CalibrateOrLocationGain;
+            options->saturation = (float)LibCameraInterface::kCamera2Saturation;
+
         }
         else if (GolfSimClubs::GetCurrentClubType() == GolfSimClubs::kPutter) {
             options->gain = LibCameraInterface::kCamera2PuttingGain;
@@ -1440,9 +1443,11 @@ bool WaitForCam2Trigger(cv::Mat& return_image) {
         else {
             if (!GolfSimOptions::GetCommandLineOptions().lm_comparison_mode_) {
                 options->gain = LibCameraInterface::kCamera2Gain;
+               options->saturation = (float)LibCameraInterface::kCamera2Saturation;
             }
             else {
                 options->gain = LibCameraInterface::kCamera2ComparisonGain;
+                options->saturation = (float)LibCameraInterface::kCamera2Saturation;
             }
 
             options->contrast = LibCameraInterface::kCamera2Contrast;

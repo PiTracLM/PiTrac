@@ -5,6 +5,10 @@
 
 #pragma once
 
+#include <atomic>
+#include <string>
+#include <thread>
+#include <memory>
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
 
@@ -17,6 +21,14 @@ using ip::tcp;
 // Base class for representing and transferring Golf Sim results over sockets
 
 namespace golf_sim {
+
+    enum class SimConnState {
+    kDisabled = 0,
+    kDisconnected,
+    kConnecting,
+    kConnected,
+    kError
+    };
 
     class GsSimSocketInterface : public GsSimInterface {
 
@@ -37,6 +49,20 @@ namespace golf_sim {
 
         virtual void ReceiveSocketData();
 
+        // ---- connection state API ----
+    SimConnState GetConnectionState() const {
+        return connection_state_.load(std::memory_order_relaxed);
+    }
+
+    bool IsConnected() const {
+        return GetConnectionState() == SimConnState::kConnected;
+    }
+
+    std::string GetLastConnectionError() const {
+        boost::lock_guard<boost::mutex> lock(conn_state_mutex_);
+        return last_connection_error_;
+    }
+
     public:
 
         std::string socket_connect_address_;
@@ -52,6 +78,33 @@ namespace golf_sim {
         // return the number of bytes written
         virtual int SendSimMessage(const std::string& message);
 
+         // ---- state transition helper + hook ----
+    void SetConnectionState(SimConnState s, const std::string& reason = "") {
+    SimConnState prev = connection_state_.exchange(s, std::memory_order_relaxed);
+
+    {
+        boost::lock_guard<boost::mutex> lock(conn_state_mutex_);
+
+        // Clear stale error when we move into healthy-ish states
+        if (s == SimConnState::kConnected || s == SimConnState::kConnecting) {
+            last_connection_error_.clear();
+        }
+
+        // Store reason when provided (works for any state)
+        if (!reason.empty()) {
+            last_connection_error_ = reason;
+        }
+    }
+
+    if (prev != s || !reason.empty()) {
+        OnConnectionStateChanged(prev, s, reason);
+    }
+}
+
+
+    // Derived classes can override to publish to ActiveMQ / UI / logs
+    virtual void OnConnectionStateChanged(SimConnState /*from*/, SimConnState /*to*/, const std::string& /*reason*/) {}
+
     protected:
 
         tcp::socket* socket_ = nullptr;
@@ -64,6 +117,11 @@ namespace golf_sim {
 
         boost::mutex sim_socket_receive_mutex_;
         boost::mutex sim_socket_send_mutex_;
+
+        // ---- state storage ----
+    std::atomic<SimConnState> connection_state_{SimConnState::kDisconnected};
+    mutable boost::mutex conn_state_mutex_;
+    std::string last_connection_error_;
     };
 
 }

@@ -242,6 +242,37 @@
     background-color: var(--error);
 }
 
+/* Open Golf Sim Controls */
+.sim-badge { margin-top: 6px; font-size: 12px; opacity: 0.9; }
+.sim-badge__state { font-weight: 700; margin-left: 6px; }
+
+.ogs-controls { margin-top: 18px; padding: 14px; border-radius: 10px; background: rgba(255,255,255,0.03); }
+.ogs-controls h2 { margin: 0 0 12px 0; font-size: 16px; }
+
+.ogs-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(90px, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+
+.ogs-btn {
+  padding: 14px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.ogs-btn:active { transform: scale(0.98); }
+
+.ogs-controls-hint { margin-top: 10px; font-size: 12px; opacity: 0.75; }
+/* Open Golf Sim Controls */
+
 @media (max-width: 768px) {
     .metrics-grid {
         grid-template-columns: 1fr;

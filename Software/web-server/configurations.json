@@ -591,6 +591,24 @@
       "passedVia": "json",
       "passedTo": "both"
     },
+        "gs_config.cameras.kCamera2Saturation": {
+      "category": "Cameras",
+      "subcategory": "basic",
+      "basicSubcategory": "Cameras",
+      "displayName": "Camera 2 Saturation",
+      "description": "Saturation setting for Camera 2 - 0.0 for black and white images",
+      "visibleWhen": {
+        "system.mode": "single"
+      },
+      "type": "number",
+      "min": 0.0,
+      "max": 2.0,
+      "step": 0.1,
+      "default": 0.0,
+      "requiresRestart": true,
+      "passedVia": "json",
+      "passedTo": "both"
+    },
     "gs_config.cameras.kCamera1SearchCenterX": {
       "category": "Cameras",
       "subcategory": "advanced",
@@ -671,6 +689,33 @@
       "min": 1,
       "max": 65535,
       "default": 921,
+      "requiresRestart": true,
+      "passedVia": "json",
+      "passedTo": "both"
+    },
+    "gs_config.golf_simulator_interfaces.OpenGolfSim.kOGSConnectAddress": {
+      "category": "Simulators",
+      "subcategory": "basic",
+      "basicSubcategory": "Simulators",
+      "displayName": "Open Golf Sim Address",
+      "description": "IP address of Open Golf Sim simulator (e.g., 192.168.1.100)",
+      "type": "ip_address",
+      "default": "",
+      "requiresRestart": false,
+      "passedVia": "json",
+      "passedTo": "both",
+      "cliArgument": "--gspro_host_address"
+    },
+    "gs_config.golf_simulator_interfaces.OpenGolfSim.kOGSConnectPort": {
+      "category": "Simulators",
+      "subcategory": "basic",
+      "basicSubcategory": "Simulators",
+      "displayName": "Open Golf Sim Port",
+      "description": "Port number for Open Golf simulator",
+      "type": "number",
+      "min": 1,
+      "max": 65535,
+      "default": 3111,
       "requiresRestart": true,
       "passedVia": "json",
       "passedTo": "both"

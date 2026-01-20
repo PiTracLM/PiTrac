@@ -177,7 +177,8 @@ bool GolfSimConfiguration::ReadValues() {
 	SetConstant("gs_config.cameras.kCamera1HighFPSGain", LibCameraInterface::kCamera1HighFPSGain);
 	SetConstant("gs_config.cameras.kCamera1Contrast", LibCameraInterface::kCamera1Contrast);
 	SetConstant("gs_config.cameras.kCamera2Gain", LibCameraInterface::kCamera2Gain);
-
+    SetConstant("gs_config.comeras.kCamera2Saturations", LibCameraInterface::kCamera2Saturation);
+	
 	// Let the command-line gain parameter override the .json config file parameter 
 	// TBD - May want to have separate gain options?
 	if (GolfSimOptions::GetCommandLineOptions().camera_gain_ > 0.0) {
