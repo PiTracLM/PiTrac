@@ -300,6 +300,17 @@ class ConfigurationManager:
             default_value = self.get_default(key)
             is_calibration = self._is_calibration_field(key)
 
+            # Auto-convert JSON string to array if setting type is array
+            metadata = self.load_configurations_metadata()
+            settings_metadata = metadata.get("settings", {})
+            if key in settings_metadata:
+                setting_type = settings_metadata[key].get("type", "")
+                if setting_type == "array" and isinstance(value, str):
+                    try:
+                        value = json.loads(value)
+                    except json.JSONDecodeError:
+                        return False, "Invalid JSON array format", False
+
             if value == default_value:
                 if is_calibration:
                     calibration_copy = copy.deepcopy(self.calibration_data)
@@ -501,6 +512,18 @@ class ConfigurationManager:
                         return False, f"Must be at most {setting_info['max']}"
                 except (TypeError, ValueError):
                     return False, "Must be a number"
+
+            elif setting_type == "array":
+                # Handle JSON string representation of arrays
+                if isinstance(value, str):
+                    try:
+                        parsed = json.loads(value)
+                        if not isinstance(parsed, list):
+                            return False, "Must be a valid array"
+                    except json.JSONDecodeError:
+                        return False, "Must be a valid JSON array"
+                elif not isinstance(value, list):
+                    return False, "Must be an array"
 
             return True, ""
 

@@ -576,11 +576,25 @@ async function handleValueChange(key, currentValue, originalValue) {
         if (current === 'true') current = true;
         else if (current === 'false') current = false;
         else if (!isNaN(current) && current !== '') current = Number(current);
+        else if (typeof current === 'string' && (current.trim().startsWith('[') || current.trim().startsWith('{'))) {
+            try {
+                current = JSON.parse(current);
+            } catch (e) {
+                // Keep as string if invalid JSON
+            }
+        }
 
         if (original === 'true') original = true;
         else if (original === 'false') original = false;
         else if (!isNaN(original) && original !== '') original = Number(original);
-        
+        else if (typeof original === 'string' && (original.trim().startsWith('[') || original.trim().startsWith('{'))) {
+            try {
+                original = JSON.parse(original);
+            } catch (e) {
+                // Keep as string if invalid JSON
+            }
+        }
+
         let defaultVal = defaultValue;
         if (defaultVal === 'true' || defaultVal === '1') defaultVal = true;
         else if (defaultVal === 'false' || defaultVal === '0') defaultVal = false;
@@ -590,7 +604,7 @@ async function handleValueChange(key, currentValue, originalValue) {
         const isDifferentFromDefault = current !== defaultVal;
 
         setNestedValue(currentConfig, key, current);
-        
+
         if (isDifferentFromDefault) {
             setNestedValue(userSettings, key, current);
         } else {
@@ -694,7 +708,14 @@ async function saveChanges() {
         if (value === 'true') value = true;
         else if (value === 'false') value = false;
         else if (!isNaN(value) && value !== '') value = Number(value);
-        
+        else if (typeof value === 'string' && (value.trim().startsWith('[') || value.trim().startsWith('{'))) {
+            try {
+                value = JSON.parse(value);
+            } catch (e) {
+                // Keep as string if invalid JSON
+            }
+        }
+
         let defaultVal = defaultValue;
         if (defaultVal === 'true' || defaultVal === '1') defaultVal = true;
         else if (defaultVal === 'false' || defaultVal === '0') defaultVal = false;
