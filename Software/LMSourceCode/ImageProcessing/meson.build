@@ -216,6 +216,8 @@ pitrac_lm_sources += ([
                         'gs_ipc_system.cpp',
                         'gs_message_consumer.cpp',
                         'gs_message_producer.cpp',
+			'gs_opengolfsim_interface.cpp',
+			'gs_opengolfsim_results.cpp'
 ])
 
 pitrac_lm_sources += ([

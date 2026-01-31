@@ -2,293 +2,349 @@
 
 /* Metrics Grid */
 .metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1.25rem;
-    margin-bottom: 2rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
 }
 
 /* Metric Cards */
 .metric-card {
-    background: var(--bg-card);
-    border-radius: 1rem;
-    overflow: hidden;
-    box-shadow: var(--shadow-md);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid var(--border-color);
 }
 
 .metric-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-xl);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
 }
 
 .metric-header {
-    background: var(--accent-gradient);
-    color: white;
-    padding: 0.875rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    text-align: center;
+  background: var(--accent-gradient);
+  color: white;
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
 }
 
 .metric-value {
-    padding: 1.5rem 1rem;
-    text-align: center;
-    background: var(--bg-card);
-    position: relative;
-    overflow: hidden;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  background: var(--bg-card);
+  position: relative;
+  overflow: hidden;
 }
 
 .metric-value::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: var(--accent-gradient);
-    opacity: 0.2;
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--accent-gradient);
+  opacity: 0.2;
 }
 
 .metric-value span:first-child {
-    font-size: clamp(2rem, 5vw, 3rem);
-    font-weight: 700;
-    color: var(--text-primary);
-    display: inline-block;
-    transition: all 0.3s ease;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 700;
+  color: var(--text-primary);
+  display: inline-block;
+  transition: all 0.3s ease;
 }
 
 .metric-value.updated span:first-child {
-    animation: bounce 0.5s ease-out;
-    color: var(--accent-primary);
+  animation: bounce 0.5s ease-out;
+  color: var(--accent-primary);
 }
 
 .metric-unit {
-    font-size: clamp(0.875rem, 2vw, 1.25rem);
-    color: var(--text-muted);
-    font-weight: 400;
-    margin-left: 0.25rem;
+  font-size: clamp(0.875rem, 2vw, 1.25rem);
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 0.25rem;
 }
 
 /* Message Section */
 .message-section {
-    background: var(--bg-card);
-    border-radius: 1rem;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
 }
 
 .result-type {
-    font-size: clamp(1.25rem, 3vw, 1.75rem);
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 0.5rem;
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
 }
 
 .message {
-    color: var(--text-secondary);
-    font-size: clamp(0.875rem, 2vw, 1rem);
-    line-height: 1.5;
+  color: var(--text-secondary);
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  line-height: 1.5;
 }
 
 /* Image Gallery */
 .image-gallery {
-    background: var(--bg-card);
-    border-radius: 1rem;
-    padding: 1.5rem;
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
 }
 
 .image-gallery h2 {
-    color: var(--text-primary);
-    margin-bottom: 1rem;
-    font-size: clamp(1.25rem, 3vw, 1.5rem);
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  font-size: clamp(1.25rem, 3vw, 1.5rem);
 }
 
 .image-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
 }
 
 .shot-image {
-    width: 100%;
-    height: auto;
-    border-radius: 0.5rem;
-    box-shadow: var(--shadow-sm);
-    transition: transform 0.3s ease;
-    cursor: pointer;
+  width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.3s ease;
+  cursor: pointer;
 }
 
 .shot-image:hover {
-    transform: scale(1.02);
+  transform: scale(1.02);
 }
 
 /* Ball Ready Indicator */
 .ball-ready-indicator {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-    background: var(--bg-card);
-    border-radius: 1rem;
-    box-shadow: var(--shadow-lg);
-    transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  background: var(--bg-card);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-lg);
+  transition: all 0.3s ease;
 }
 
 .ball-status-icon {
-    width: 80px;
-    height: 80px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
 }
 
 .ball-icon {
-    width: 100%;
-    height: 100%;
-    background-color: var(--text-muted);
-    -webkit-mask-image: url('/static/golf_ball.svg');
-    -webkit-mask-size: contain;
-    -webkit-mask-repeat: no-repeat;
-    -webkit-mask-position: center;
-    mask-image: url('/static/golf_ball.svg');
-    mask-size: contain;
-    mask-repeat: no-repeat;
-    mask-position: center;
-    transition: all 0.3s ease;
+  width: 100%;
+  height: 100%;
+  background-color: var(--text-muted);
+  -webkit-mask-image: url("/static/golf_ball.svg");
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-image: url("/static/golf_ball.svg");
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  transition: all 0.3s ease;
 }
 
 .ball-status-text {
-    flex: 1;
+  flex: 1;
 }
 
 .ball-status-title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
 }
 
 .ball-status-message {
-    font-size: 1rem;
-    color: var(--text-secondary);
+  font-size: 1rem;
+  color: var(--text-secondary);
 }
 
 /* Ball Status States */
 .ball-ready-indicator.initializing {
-    border-left: 4px solid var(--info);
+  border-left: 4px solid var(--info);
 }
 
 .ball-ready-indicator.initializing .ball-icon {
-    background-color: var(--info);
-    animation: pulse 2s infinite;
+  background-color: var(--info);
+  animation: pulse 2s infinite;
 }
 
 .ball-ready-indicator.waiting {
-    border-left: 4px solid var(--warning);
+  border-left: 4px solid var(--warning);
 }
 
 .ball-ready-indicator.waiting .ball-icon {
-    background-color: var(--warning);
-    animation: pulse 2s infinite;
+  background-color: var(--warning);
+  animation: pulse 2s infinite;
 }
 
 .ball-ready-indicator.stabilizing {
-    border-left: 4px solid #fbbf24;
+  border-left: 4px solid #fbbf24;
 }
 
 .ball-ready-indicator.stabilizing .ball-icon {
-    background-color: #fbbf24;
-    animation: bounce 1s infinite;
+  background-color: #fbbf24;
+  animation: bounce 1s infinite;
 }
 
 .ball-ready-indicator.ready {
-    border-left: 4px solid var(--success);
-    background: linear-gradient(135deg, var(--bg-card) 0%, rgba(72, 187, 120, 0.1) 100%);
+  border-left: 4px solid var(--success);
+  background: linear-gradient(
+    135deg,
+    var(--bg-card) 0%,
+    rgba(72, 187, 120, 0.1) 100%
+  );
 }
 
 .ball-ready-indicator.ready .ball-icon {
-    background-color: var(--success);
-    transform: scale(1.1);
+  background-color: var(--success);
+  transform: scale(1.1);
 }
 
 .ball-ready-indicator.ready .ball-status-title {
-    color: var(--success);
+  color: var(--success);
 }
 
 .ball-ready-indicator.hit {
-    border-left: 4px solid var(--accent-primary);
+  border-left: 4px solid var(--accent-primary);
 }
 
 .ball-ready-indicator.hit .ball-icon {
-    background-color: var(--accent-primary);
-    animation: none;
+  background-color: var(--accent-primary);
+  animation: none;
 }
 
 .ball-ready-indicator.error {
-    border-left: 4px solid var(--error);
+  border-left: 4px solid var(--error);
 }
 
 .ball-ready-indicator.error .ball-icon {
-    background-color: var(--error);
+  background-color: var(--error);
 }
 
-@media (max-width: 768px) {
-    .metrics-grid {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
+/* Open Golf Sim Controls */
+.sim-badge {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+.sim-badge__state {
+  font-weight: 700;
+  margin-left: 6px;
+}
 
-    .metric-value {
-        padding: 1.25rem 0.75rem;
-    }
+.ogs-controls {
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.ogs-controls h2 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+}
+
+.ogs-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(90px, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+
+.ogs-btn {
+  padding: 14px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.ogs-btn:active {
+  transform: scale(0.98);
+}
+
+.ogs-controls-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+/* Open Golf Sim Controls */
+
+@media (max-width: 768px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .metric-value {
+    padding: 1.25rem 0.75rem;
+  }
 }
 
 @media (min-width: 769px) and (max-width: 1024px) {
-    .metrics-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (min-width: 481px) and (max-width: 768px) {
-    .metrics-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 
-    .image-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
+  .image-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 480px) {
-    .ball-ready-indicator {
-        flex-direction: column;
-        text-align: center;
-        gap: 1rem;
-        padding: 1rem;
-    }
-    
-    .ball-status-icon {
-        width: 60px;
-        height: 60px;
-    }
+  .ball-ready-indicator {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .ball-status-icon {
+    width: 60px;
+    height: 60px;
+  }
 }
 
 @media (min-width: 1400px) {
-    .metrics-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
+  .metrics-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 
-    .metric-value span:first-child {
-        font-size: 3.5rem;
-    }
+  .metric-value span:first-child {
+    font-size: 3.5rem;
+  }
 }

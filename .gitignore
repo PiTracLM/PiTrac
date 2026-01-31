@@ -98,3 +98,4 @@ Software/GroundTruthAnnotator/yolo/labels/*.cache
 # Dev scripts cache
 Dev/scripts/__pycache__
 packaging/pitrac
+*.save

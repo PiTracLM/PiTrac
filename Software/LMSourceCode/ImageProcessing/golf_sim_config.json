@@ -118,7 +118,7 @@
       "kUseBestCircleRefinement": "0",
       "kUseCLAHEProcessing": "1",
       "kUseDynamicRadiiAdjustment": "0",
-      "kImageTypeToProcessWithYOLO":  "1"
+      "kImageTypeToProcessWithYOLO": "1"
     },
     "ball_position": {
       "kExpectedBallRadiusPixelsAt40cm": "87",
@@ -173,37 +173,17 @@
         "0.481"
       ],
       "kCalibrationRigType": "1",
-      "kCustomCalibrationRigPositionFromCamera1": [
-        -0.12,
-        -0.28,
-        0.44
-      ],
-      "kCustomCalibrationRigPositionFromCamera2": [
-        "0.00",
-        "0.095",
-        "0.435"
-      ],
+      "kCustomCalibrationRigPositionFromCamera1": [-0.12, -0.28, 0.44],
+      "kCustomCalibrationRigPositionFromCamera2": ["0.00", "0.095", "0.435"],
       "kNumberOfCalibrationFailuresToTolerate": "4",
       "kNumberPicturesForFocalLengthAverage": "6",
       "kTestAutoCalibrationFileName": "/usr/share/pitrac/calibration/checkerboard.png"
     },
     "cameras": {
       "3_6Lens_kCamera1CalibrationMatrix": [
-        [
-          "1748.506644661262953",
-          "0.0",
-          "632.5374407393054526"
-        ],
-        [
-          "0.0",
-          "1743.341748687922745",
-          "407.5677927449370941"
-        ],
-        [
-          "0.0",
-          "0.0",
-          "1.0"
-        ]
+        ["1748.506644661262953", "0.0", "632.5374407393054526"],
+        ["0.0", "1743.341748687922745", "407.5677927449370941"],
+        ["0.0", "0.0", "1.0"]
       ],
       "3_6Lens_kCamera1DistortionVector": [
         "-0.5323350228082535107",
@@ -213,21 +193,9 @@
         "0.0"
       ],
       "3_6Lens_kCamera2CalibrationMatrix": [
-        [
-          "1065.366451276604266",
-          "0.0",
-          "715.3187116996945178"
-        ],
-        [
-          "0.0",
-          "1068.642040947899886",
-          "509.4612905764302582"
-        ],
-        [
-          "0.0",
-          "0.0",
-          "1.0"
-        ]
+        ["1065.366451276604266", "0.0", "715.3187116996945178"],
+        ["0.0", "1068.642040947899886", "509.4612905764302582"],
+        ["0.0", "0.0", "1.0"]
       ],
       "3_6Lens_kCamera2DistortionVector": [
         "-0.4854175692996230418",
@@ -246,26 +214,11 @@
         "0.095",
         "0.435"
       ],
-      "kCamera1Angles": [
-        18.7191101,
-        -24.17996647
-      ],
+      "kCamera1Angles": [18.7191101, -24.17996647],
       "kCamera1CalibrationMatrix": [
-        [
-          "1833.5291988027575",
-          "0.0",
-          "697.2791579239232"
-        ],
-        [
-          "0.0",
-          "1832.2499845181273",
-          "513.0904087097207"
-        ],
-        [
-          "0.0",
-          "0.0",
-          "1.0"
-        ]
+        ["1833.5291988027575", "0.0", "697.2791579239232"],
+        ["0.0", "1832.2499845181273", "513.0904087097207"],
+        ["0.0", "0.0", "1.0"]
       ],
       "kCamera1Contrast": "1.0",
       "kCamera1DistortionVector": [
@@ -279,35 +232,16 @@
       "kCamera1Gain": "2",
       "kCamera1Saturation": "1",
       "kCamera1HighFPSGain": "15.0",
-      "kCamera1PositionsFromExpectedBallMeters": [
-        "-0.200",
-        "-0.234",
-        "0.54"
-      ],
+      "kCamera1PositionsFromExpectedBallMeters": ["-0.200", "-0.234", "0.54"],
       "kCamera1StillShutterTimeuS": "40000",
       "kCamera1XOffsetForTilt": "0",
       "kCamera1YOffsetForTilt": "0",
-      "kCamera2Angles": [
-        -2.063732969,
-        3.830271852
-      ],
+      "kCamera2Angles": [-2.063732969, 3.830271852],
       "kCamera2CalibrateOrLocationGain": "1.0",
       "kCamera2CalibrationMatrix": [
-        [
-          "2340.2520648903665",
-          "0.0",
-          "698.4611375636877"
-        ],
-        [
-          "0.0",
-          "2318.2676880118993",
-          "462.7245851119162"
-        ],
-        [
-          "0.0",
-          "0.0",
-          "1.0"
-        ]
+        ["2340.2520648903665", "0.0", "698.4611375636877"],
+        ["0.0", "2318.2676880118993", "462.7245851119162"],
+        ["0.0", "0.0", "1.0"]
       ],
       "kCamera2ComparisonGain": "0.8",
       "kCamera2Contrast": "1.2",
@@ -321,16 +255,8 @@
       "kCamera2FocalLength": "5.903208539",
       "kCamera2Gain": "6.0",
       "kCamera2Saturation": "1",
-      "kCamera2OffsetFromCamera1OriginMeters": [
-        "0.00",
-        "-0.19",
-        "0.0"
-      ],
-      "kCamera2PositionsFromExpectedBallMeters": [
-        "0.0",
-        "-0.051",
-        "0.45"
-      ],
+      "kCamera2OffsetFromCamera1OriginMeters": ["0.00", "-0.19", "0.0"],
+      "kCamera2PositionsFromExpectedBallMeters": ["0.0", "-0.051", "0.45"],
       "kCamera2PuttingContrast": "1.2",
       "kCamera2PuttingGain": "4.0",
       "kCamera2StillShutterTimeuS": "15000",
@@ -354,6 +280,10 @@
       },
       "GSPro": {
         "kGSProConnectPort": "921"
+      },
+      "OpenGolfSim": {
+        "kOGSConnectAddress": "",
+        "kOGSConnectPort": "3111"
       },
       "kLaunchMonitorIdString": "PiTrac LM 0.1",
       "kSkipSpinCalculation": "0",
@@ -412,24 +342,10 @@
       "kCam2SetupPeriodMilliseconds": "2000",
       "kConnectionBoardVersion": "2",
       "kEnclosureVersion": "2",
-      "kDynamicFollowOnPulseVectorPutter": [
-        444.0
-      ],
+      "kDynamicFollowOnPulseVectorPutter": [444.0],
       "kLastPulsePutterRepeats": "0",
       "kLongerStrobePulseVectorDriver": [
-        0.175,
-        0.7,
-        1.4,
-        2.45,
-        1.26,
-        2.8,
-        2.1,
-        3.15,
-        3.85,
-        3.85,
-        10.4,
-        3.5,
-        0
+        0.175, 0.7, 1.4, 2.45, 1.26, 2.8, 2.1, 3.15, 3.85, 3.85, 10.4, 3.5, 0
       ],
       "kNumberPrimingPulses": "12",
       "kPauseAfterSendingPreImageTriggerMs": "2000",
@@ -443,31 +359,9 @@
       "kPuttingBallSpeedSlowdownPercentage": "5.2",
       "kPuttingStrobeDelayMs": "50",
       "kStandardBallSpeedSlowdownPercentage": "0.1",
-      "kStrobePulseVectorDriver": [
-        0.7,
-        1.8,
-        3.0,
-        2.2,
-        3.0,
-        7.1,
-        4.0,
-        4.0,
-        0
-      ],
+      "kStrobePulseVectorDriver": [0.7, 1.8, 3.0, 2.2, 3.0, 7.1, 4.0, 4.0, 0],
       "kStrobePulseVectorPutter": [
-        2.5,
-        5.0,
-        8.0,
-        10.5,
-        8.5,
-        21.0,
-        21.0,
-        21.0,
-        21.0,
-        21.0,
-        21.0,
-        21.0,
-        0
+        2.5, 5.0, 8.0, 10.5, 8.5, 21.0, 21.0, 21.0, 21.0, 21.0, 21.0, 21.0, 0
       ],
       "number_bits_for_fast_on_pulse_": "2",
       "number_bits_for_slow_on_pulse_": "8"
