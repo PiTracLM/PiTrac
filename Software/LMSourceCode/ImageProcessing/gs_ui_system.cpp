@@ -169,7 +169,7 @@ namespace golf_sim {
             // over-written.  A unque timestamp will be added to the file name
             std::string fname(file_name);
 
-            LoggingTools::LogImage(file_name + "_Shot_" + std::to_string(GsSimInterface::GetShotCounter()) + "_", img, std::vector < cv::Point >{});
+            LoggingTools::LogImage(file_name + "_", img, std::vector < cv::Point >{}, false, "", "_Shot_" + std::to_string(GsSimInterface::GetShotCounter()));
         }
 
         if (!GolfSimCamera::kLogWebserverImagesToFile) {

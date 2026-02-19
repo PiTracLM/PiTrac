@@ -455,7 +455,8 @@ namespace golf_sim {
         const cv::Mat& img,
         const std::vector < GsCircle >& circles,
         bool forceFixedFileName,
-        const std::string& fixedFileName) {
+        const std::string& fixedFileName,
+        const std::string& suffix) {
 
         cv::Mat imgToLog = img.clone();
 
@@ -487,7 +488,8 @@ namespace golf_sim {
         const cv::Mat& img,
         const std::vector < cv::Point >& pointFeatures,
         bool forceFixedFileName,
-        const std::string& fixedFileName) {
+        const std::string& fixedFileName,
+        const std::string& suffix) {
 
         if (img.empty()) {
             InternalLog(warning, "LogImage: image was empty - ignoring.");
@@ -495,8 +497,8 @@ namespace golf_sim {
         }
         std::string fname;
 
-        // To ensure that the GUI has a fixed file name to use to display for the user, we may with to later save both
-        // a fixed AND (if requested) dynamic, time-stamped file name.
+        // To ensure that the GUI has a fixed file name to use to display for the user, we may later save both
+        // a fixed AND (if requested) a dynamic, time-stamped file name.
 
         if (forceFixedFileName && !fixedFileName.empty()) {
             fname = kBaseImageLoggingDir + fixedFileName;

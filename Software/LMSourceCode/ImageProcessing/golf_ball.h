@@ -15,6 +15,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/core/matx.hpp>
 
+#include "gs_shot_parameters.h"
 #include "gs_globals.h"
 
 namespace golf_sim {
@@ -139,6 +140,9 @@ public:
     long time_between_ball_positions_for_velocity_uS_ = 0;
     long time_between_angle_measures_for_rpm_uS_ = 0;
 
+    // The uses to which this ball will be put when computing (including averaging) results.
+	GsShotParameters shot_parameters_;
+
     // This next variable may be important to help create a good colorMask that will remove unwanted parts
     // of the image while still preserving the likely ball portion of the iamge
     // If set to kCalibrated, the ball_hsv_range_ must be set
@@ -176,6 +180,7 @@ public:
 
     double PixelDistanceFromBall(const GolfBall& ball2) const;
 
+    // Balls that have shot_parameter_ values other than kShotParameterAll will only be used for the purposes that the shot_parameters_ specify.
     static void AverageBalls(const std::vector<GolfBall>& ball_vector, GolfBall& averaged_ball);
 
     bool PointIsInsideBall(const double x, const double y) const;
@@ -190,4 +195,9 @@ private:
     void DeInitMembers();
 
 };
+
+
+// Non-member function overload
+bool operator==(const GolfBall& lhs, const GolfBall& rhs);
+
 }

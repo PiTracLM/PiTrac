@@ -1,0 +1,19 @@
+{
+  "gs_config": {
+    "calibration": {
+      "kCalibrationRigType": 2
+    },
+    "cameras": {
+      "kCamera1Angles": [
+        34.00554424,
+        -16.99189377
+      ],
+      "kCamera1FocalLength": 6.737108272,
+      "kCamera2Angles": [
+        -2.800248717,
+        4.149558845
+      ],
+      "kCamera2FocalLength": 5.846163232
+    }
+  }
+}

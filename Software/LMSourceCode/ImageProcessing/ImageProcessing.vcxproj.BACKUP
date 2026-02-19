@@ -133,7 +133,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;BOOST_BIND_GLOBAL_PLACEHOLDERS;BOOST_ALL_DYN_LINK;BOOST_USE_WINAPI_VERSION=0x0A00;YAML_CPP_STATIC_DEFINE;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>E:\Dev_Libs\opencv\build\include;E:\Dev_Libs\yaml-cpp\include;E:\Dev_Libs\boost_1_90_0\boost;../packages/Microsoft.ML.OnnxRuntime.1.23.2/build/native/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Dev_Libs\opencv\build\include;E:\Dev_Libs\yaml-cpp\include;..\packages\Microsoft.ML.OnnxRuntime.1.23.2\build\native\include;E:\Dev_Libs\boost_1_90_0\boost</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
     </ClCompile>
@@ -141,7 +141,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>E:\Dev_Libs\opencv\build\x64\vc16\lib;E:\Dev_Libs\boost_1_90_0\lib64-msvc-14.3</AdditionalLibraryDirectories>
-      <AdditionalDependencies>E:\Dev_Libs\opencv\build\x64\vc16\lib\opencv_world4120d.lib;E:\dev_libs\yaml-cpp\build\Debug\yaml-cppd.lib;../packages/Microsoft.ML.OnnxRuntime.1.23.2/runtimes/win-x64/native/onnxruntime.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>E:\Dev_Libs\opencv\build\x64\vc16\lib\opencv_world4120d.lib;E:\dev_libs\yaml-cpp\build\Debug\yaml-cppd.lib;..\packages\Microsoft.ML.OnnxRuntime.1.23.2\runtimes\win-x64\native\onnxruntime.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
@@ -263,6 +263,7 @@
     <ClCompile Include="gs_e6_response.cpp" />
     <ClCompile Include="gs_e6_results.cpp" />
     <ClCompile Include="gs_events.cpp" />
+    <ClCompile Include="gs_events.h" />
     <ClCompile Include="gs_fsm.cpp" />
     <ClCompile Include="gs_gspro_interface.cpp" />
     <ClCompile Include="gs_gspro_response.cpp" />
@@ -273,7 +274,6 @@
     <ClCompile Include="gs_ipc_result.cpp" />
     <ClCompile Include="gs_ipc_test.cpp" />
     <ClCompile Include="gs_results.cpp" />
-    <ClCompile Include="gs_shot_parameters.cpp" />
     <ClCompile Include="gs_sim_interface.cpp" />
     <ClCompile Include="gs_sim_socket_interface.cpp" />
     <ClCompile Include="gs_web_api.cpp" />
@@ -452,7 +452,6 @@
     <ClInclude Include="gs_message_producer.h" />
     <ClInclude Include="gs_options.h" />
     <ClInclude Include="gs_results.h" />
-    <ClInclude Include="gs_shot_parameters.h" />
     <ClInclude Include="gs_sim_interface.h" />
     <ClInclude Include="gs_sim_socket_interface.h" />
     <ClInclude Include="gs_ui_system.h" />
@@ -549,6 +548,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\packages\Microsoft.ML.OnnxRuntime.1.23.2\build\native\Microsoft.ML.OnnxRuntime.targets" Condition="Exists('..\packages\Microsoft.ML.OnnxRuntime.1.23.2\build\native\Microsoft.ML.OnnxRuntime.targets')" />
+    <Import Project="..\packages\boost.1.87.0\build\boost.targets" Condition="Exists('..\packages\boost.1.87.0\build\boost.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -556,7 +556,6 @@
     </PropertyGroup>
     <Error Condition="!Exists('..\packages\Microsoft.ML.OnnxRuntime.1.23.2\build\native\Microsoft.ML.OnnxRuntime.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.ML.OnnxRuntime.1.23.2\build\native\Microsoft.ML.OnnxRuntime.props'))" />
     <Error Condition="!Exists('..\packages\Microsoft.ML.OnnxRuntime.1.23.2\build\native\Microsoft.ML.OnnxRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.ML.OnnxRuntime.1.23.2\build\native\Microsoft.ML.OnnxRuntime.targets'))" />
-    <Error Condition="!Exists('..\packages\Microsoft.ML.OnnxRuntime.1.23.2\build\native\Microsoft.ML.OnnxRuntime.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.ML.OnnxRuntime.1.23.2\build\native\Microsoft.ML.OnnxRuntime.props'))" />
-    <Error Condition="!Exists('..\packages\Microsoft.ML.OnnxRuntime.1.23.2\build\native\Microsoft.ML.OnnxRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.ML.OnnxRuntime.1.23.2\build\native\Microsoft.ML.OnnxRuntime.targets'))" />
+    <Error Condition="!Exists('..\packages\boost.1.87.0\build\boost.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\boost.1.87.0\build\boost.targets'))" />
   </Target>
 </Project>

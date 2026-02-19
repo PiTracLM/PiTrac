@@ -1,0 +1,503 @@
+{
+  "cameras": {
+    "kSlot1CustomLensFocalLength": "4.0",
+    "kSlot2CustomLensFocalLength": "4.0"
+  },
+  "gs_config": {
+    "ball_exposure_selection": {
+      "kBallProximityMarginPercentRelaxed": "65",
+      "kBallProximityMarginPercentStrict": "15",
+      "kClosestBallPairEdgeBackoffPixels": "200",
+      "kColorDifferenceRgbPostMultiplierForDarker": "4.0",
+      "kColorDifferenceRgbPostMultiplierForLighter": "1.0",
+      "kColorDifferenceStdPostMultiplierForDarker": "3.0",
+      "kColorDifferenceStdPostMultiplierForLighter": "5.0",
+      "kMaxBallsToRetain": "30",
+      "kMaxDistanceFromTrajectory": "30",
+      "kMaxIntermediateBallRadiusChangePercent": "5",
+      "kMaxOverlappedBallRadiusChangeRatio": "1.3",
+      "kMaxPuttingBallColorDifferenceRelaxed": "40000",
+      "kMaxPuttingIntermediateBallRadiusChangePercent": "8",
+      "kMaxPuttingQualityExposureLaunchAngle": "8",
+      "kMaxQualityExposureLaunchAngle": "35",
+      "kMaxRadiusDifferencePercentageFromBest": "35",
+      "kMaxStrobedBallColorDifferenceRelaxed": "70000",
+      "kMaxStrobedBallColorDifferenceStrict": "30000",
+      "kMaximumOffTrajectoryDistance": "8",
+      "kMinPuttingQualityExposureLaunchAngle": "-5",
+      "kMinQualityExposureLaunchAngle": "-5",
+      "kNumberAngleCheckExposures": "4",
+      "kNumberHighQualityBallsToRetain": "2",
+      "kPreImageWeightingBlue": "1.05",
+      "kPreImageWeightingGreen": "1.2",
+      "kPreImageWeightingOverall": "0.0",
+      "kPreImageWeightingRed": "1.0",
+      "kUnlikelyAngleMinimumDistancePixels": "40",
+      "kUseOnlyHighQualityBallImagesForHLA": "1",
+      "kUsePreImageSubtraction": "0"
+    },
+    "ball_identification": {
+      "kBallPlacementDetectionMethod": "experimental",
+      "kBestCircleCannyLower": "55",
+      "kBestCircleCannyUpper": "110",
+      "kBestCircleHoughDpParam1": "1.5",
+      "kBestCircleIdentificationMaxRadiusRatio": "1.2",
+      "kBestCircleIdentificationMinRadiusRatio": "0.9",
+      "kBestCircleParam1": "300",
+      "kBestCircleParam2": "0.65",
+      "kBestCirclePreCannyBlurSize": "5",
+      "kBestCirclePreHoughBlurSize": "13",
+      "kCLAHEClipLimit": "8",
+      "kCLAHETilesGridSize": "6",
+      "kImageTypeToProcessWithYOLO": "0",
+      "kInferenceBackend": "onnxruntime",
+      "kNumberRadiiToAverageForDynamicAdjustment": "2",
+      "kONNXConfidenceThreshold": "0.5",
+      "kONNXDeviceType": "CPU",
+      "kONNXInputSize": "1472",
+      "kONNXModelPath": "/etc/pitrac/models/pitrac-ball-detection-09-25-25/best.onnx",
+      "kONNXNMSThreshold": "0.4",
+      "kONNXRuntimeAutoFallback": "1",
+      "kONNXRuntimeMemoryPoolMB": "64",
+      "kONNXRuntimeThreads": "4",
+      "kONNXRuntimeUseNEON": "1",
+      "kPlacedBallCannyLower": "35",
+      "kPlacedBallCannyUpper": "80",
+      "kPlacedBallCurrentParam1": "130",
+      "kPlacedBallHoughDpParam1": "1.5",
+      "kPlacedBallMaxParam2": "1.0",
+      "kPlacedBallMinParam2": "0.8",
+      "kPlacedBallParam2Increment": "0.03",
+      "kPlacedBallStartingParam2": "0.9",
+      "kPlacedBallUseLargestBall": "0",
+      "kPlacedMaxHoughReturnCircles": "4",
+      "kPlacedMinHoughReturnCircles": "1",
+      "kPlacedNarrowingParam1": "300",
+      "kPlacedNarrowingRadiiDpParam": "1.5",
+      "kPlacedNarrowingRadiiMaxRatio": "1.1",
+      "kPlacedNarrowingRadiiMinRatio": "0.9",
+      "kPlacedNarrowingStartingParam2": "0.9",
+      "kPlacedPreCannyBlurSize": "11",
+      "kPlacedPreHoughBlurSize": "13",
+      "kPuttingBallCurrentParam1": "300",
+      "kPuttingBallMaxParam2": "1.0",
+      "kPuttingBallMinParam2": "0.8",
+      "kPuttingBallParam2Increment": "0.03",
+      "kPuttingBallStartingParam2": "0.9",
+      "kPuttingHoughDpParam1": "1.5",
+      "kPuttingMaxHoughReturnCircles": "25",
+      "kPuttingMinHoughReturnCircles": "6",
+      "kPuttingPreHoughBlurSize": "9",
+      "kSAHIOverlapRatio": "0.2",
+      "kSAHISliceHeight": "320",
+      "kSAHISliceWidth": "320",
+      "kStrobedBallDetectionMethod": "experimental",
+      "kStrobedBallsAltCannyLower": "35",
+      "kStrobedBallsAltCannyUpper": "70",
+      "kStrobedBallsAltCurrentParam1": "130",
+      "kStrobedBallsAltHoughDpParam1": "0.8",
+      "kStrobedBallsAltMaxParam2": "1.0",
+      "kStrobedBallsAltMinParam2": "0.5",
+      "kStrobedBallsAltParam2Increment": "0.05",
+      "kStrobedBallsAltPreCannyBlurSize": "9",
+      "kStrobedBallsAltPreHoughBlurSize": "15",
+      "kStrobedBallsAltPreHoughBlurSize HAS TO BE ODD": "0",
+      "kStrobedBallsAltStartingParam2": "0.65",
+      "kStrobedBallsCannyLower": "33",
+      "kStrobedBallsCannyUpper": "90",
+      "kStrobedBallsCurrentParam1": "120",
+      "kStrobedBallsHoughDpParam1": "1.5",
+      "kStrobedBallsMaxHoughReturnCircles": "20",
+      "kStrobedBallsMaxParam2": "140",
+      "kStrobedBallsMinHoughReturnCircles": "6",
+      "kStrobedBallsMinParam2": "18",
+      "kStrobedBallsParam2Increment": "4",
+      "kStrobedBallsPreCannyBlurSize": "3",
+      "kStrobedBallsPreHoughBlurSize": "13",
+      "kStrobedBallsStartingParam2": "60",
+      "kStrobedBallsUseAltHoughAlgorithm": "1",
+      "kStrobedNarrowingRadiiDpParam": "1.5",
+      "kStrobedNarrowingRadiiMaxRatio": "1.6",
+      "kStrobedNarrowingRadiiMinRatio": "0.7",
+      "kStrobedNarrowingRadiiParam2": "0.8",
+      "kUseBestCircleLargestCircle": "0",
+      "kUseBestCircleRefinement": "0",
+      "kUseCLAHEProcessing": "1",
+      "kUseDynamicRadiiAdjustment": "0"
+    },
+    "ball_position": {
+      "kExpectedBallRadiusPixelsAt40cm": "87",
+      "kMaxMovedBallRadiusRatio": "1.5",
+      "kMaxRadiusOffset": "20",
+      "kMaxRadiusRatio": "1.7",
+      "kMinBallRadiusPixelsForProximityWarning": "160",
+      "kMinMovedBallRadiusRatio": "0.6",
+      "kMinRadiusOffset": "20",
+      "kMinRadiusRatio": "0.8",
+      "kTeedBallSearchAreaMaskRadiusRatio": "0.0"
+    },
+    "calibration": {
+      "kAutoCalibrationBallPositionFromCam1MetersForSkewedCamerasV2Enclosure": [
+        "-0.52",
+        "-0.28",
+        "0.44"
+      ],
+      "kAutoCalibrationBallPositionFromCam1MetersForSkewedCamerasV3Enclosure": [
+        "-0.521",
+        "-0.243",
+        "0.481"
+      ],
+      "kAutoCalibrationBallPositionFromCam1MetersForStraightOutCamerasV2Enclosure": [
+        "-0.12",
+        "-0.28",
+        "0.44"
+      ],
+      "kAutoCalibrationBallPositionFromCam1MetersForStraightOutCamerasV3Enclosure": [
+        "-0.12",
+        "-0.243",
+        "0.481"
+      ],
+      "kAutoCalibrationBallPositionFromCam2MetersForSkewedCamerasV2Enclosure": [
+        "0.00",
+        "0.095",
+        "0.435"
+      ],
+      "kAutoCalibrationBallPositionFromCam2MetersForSkewedCamerasV3Enclosure": [
+        "0.00",
+        "0.109",
+        "0.472"
+      ],
+      "kAutoCalibrationBallPositionFromCam2MetersForStraightOutCamerasV2Enclosure": [
+        "0.00",
+        "0.095",
+        "0.435"
+      ],
+      "kAutoCalibrationBallPositionFromCam2MetersForStraightOutCamerasV3Enclosure": [
+        "0.00",
+        "0.109",
+        "0.481"
+      ],
+      "kCalibrationRigType": "1",
+      "kCustomCalibrationRigPositionFromCamera1": [
+        -0.12,
+        -0.28,
+        0.44
+      ],
+      "kCustomCalibrationRigPositionFromCamera2": [
+        "0.00",
+        "0.095",
+        "0.435"
+      ],
+      "kNumberOfCalibrationFailuresToTolerate": "4",
+      "kNumberPicturesForFocalLengthAverage": "6",
+      "kTestAutoCalibrationFileName": "/usr/share/pitrac/calibration/checkerboard.png"
+    },
+    "cameras": {
+      "3_6Lens_kCamera1CalibrationMatrix": [
+        [
+          "1748.506644661262953",
+          "0.0",
+          "632.5374407393054526"
+        ],
+        [
+          "0.0",
+          "1743.341748687922745",
+          "407.5677927449370941"
+        ],
+        [
+          "0.0",
+          "0.0",
+          "1.0"
+        ]
+      ],
+      "3_6Lens_kCamera1DistortionVector": [
+        "-0.5323350228082535107",
+        "0.3171607772519656199",
+        "0.0007282375091653870043",
+        "-0.002130459534525419",
+        "0.0"
+      ],
+      "3_6Lens_kCamera2CalibrationMatrix": [
+        [
+          "1065.366451276604266",
+          "0.0",
+          "715.3187116996945178"
+        ],
+        [
+          "0.0",
+          "1068.642040947899886",
+          "509.4612905764302582"
+        ],
+        [
+          "0.0",
+          "0.0",
+          "1.0"
+        ]
+      ],
+      "3_6Lens_kCamera2DistortionVector": [
+        "-0.4854175692996230418",
+        "0.2637456313607589586",
+        "0.002679639341176350345",
+        "-0.001576282874523095",
+        "0.0"
+      ],
+      "kCamera1Angles": [
+        "2.1406460383579446",
+        "-26.426049413957287"
+      ],
+      "kCamera1CalibrationMatrix": [
+        [
+          "1833.5291988027575",
+          "0.0",
+          "697.2791579239232"
+        ],
+        [
+          "0.0",
+          "1832.2499845181273",
+          "513.0904087097207"
+        ],
+        [
+          "0.0",
+          "0.0",
+          "1.0"
+        ]
+      ],
+      "kCamera1Contrast": "1.0",
+      "kCamera1DistortionVector": [
+        "-0.5088115166383071",
+        "0.34039760498152727",
+        "-0.0020686673595964942",
+        "0.002439055918104065",
+        "-0.13439110453388348"
+      ],
+      "kCamera1FocalLength": "5.868",
+      "kCamera1Gain": "5",
+      "kCamera1HighFPSGain": "15.0",
+      "kCamera1PositionsFromExpectedBallMeters": [
+        "-0.200",
+        "-0.234",
+        "0.54"
+      ],
+      "kCamera1Saturation": "1.0",
+      "kCamera1StillShutterTimeuS": "40000",
+      "kCamera1XOffsetForTilt": "0",
+      "kCamera1YOffsetForTilt": "0",
+      "kCamera2Angles": [
+        "-3.9096762712853037",
+        "10.292573196795921"
+      ],
+      "kCamera2CalibrateOrLocationGain": "1.0",
+      "kCamera2CalibrationMatrix": [
+        [
+          "2340.2520648903665",
+          "0.0",
+          "698.4611375636877"
+        ],
+        [
+          "0.0",
+          "2318.2676880118993",
+          "462.7245851119162"
+        ],
+        [
+          "0.0",
+          "0.0",
+          "1.0"
+        ]
+      ],
+      "kCamera2ComparisonGain": "0.8",
+      "kCamera2Contrast": "1.2",
+      "kCamera2DistortionVector": [
+        "-0.818067967818754",
+        "1.1642822122721734",
+        "0.03170748960585329",
+        "-0.018850816925062076",
+        "-0.6959511125642447"
+      ],
+      "kCamera2FocalLength": "5.511",
+      "kCamera2Gain": "3.0",
+      "kCamera2OffsetFromCamera1OriginMeters": [
+        "0.00",
+        "-0.19",
+        "0.0"
+      ],
+      "kCamera2PositionsFromExpectedBallMeters": [
+        "0.0",
+        "-0.051",
+        "0.45"
+      ],
+      "kCamera2PuttingContrast": "1.2",
+      "kCamera2PuttingGain": "4.0",
+      "kCamera2Saturation": "1.0",
+      "kCamera2StillShutterTimeuS": "15000",
+      "kCamera2XOffsetForTilt": "0",
+      "kCamera2YOffsetForTilt": "0",
+      "kHLAOffset": "0.0",
+      "kVLAOffset": "0.0"
+    },
+    "club_data": {
+      "kClubImageCameraGain": "40",
+      "kClubImageHeightPixels": "200",
+      "kClubImageOutputDir": "/home/pitrac/LM_Shares/Images",
+      "kClubImageShutterSpeedMultiplier": "0.4",
+      "kClubImageWidthPixels": "340",
+      "kEnableClubImages": "0",
+      "kNumberFramesToSaveAfterHit": "8",
+      "kNumberFramesToSaveBeforeHit": "6"
+    },
+    "golf_simulator_interfaces": {
+      "E6": {
+        "kE6ConnectPort": "2483",
+        "kE6InterMessageDelayMs": "50"
+      },
+      "GSPro": {
+        "kGSProConnectPort": "921"
+      },
+      "kLaunchMonitorIdString": "PiTrac LM 0.1",
+      "kSkipSpinCalculation": "0",
+      "kWriteSpinAnalysisCsvFiles": "1"
+    },
+    "image_capture": {
+      "kMaxWatchingCropHeight": "88",
+      "kMaxWatchingCropWidth": "96"
+    },
+    "ipc_interface": {
+      "kMaxCam2ImageReceivedTimeMs": "40000",
+      "kRefreshTimeSeconds": "3",
+      "kWebServerShareDirectory": "/home/pitrac/LM_Shares/Images",
+      "kWebServerTomcatShareDirectory": "/home/pitrac/LM_Shares/WebShare"
+    },
+    "logging": {
+      "kLogDiagnosticImagesToUniqueFiles": "1",
+      "kLogIntermediateExposureImagesToFile": "0",
+      "kLogIntermediateSpinImagesToFile": "0",
+      "kLogWebserverImagesToFile": "1"
+    },
+    "modes": {
+      "kStartInPuttingMode": "0"
+    },
+    "motion_detect_stage": {
+      "kCroppedImagePixelOffsetLeft": "0",
+      "kCroppedImagePixelOffsetUp": "-3",
+      "kDifferenceC": "3.0",
+      "kDifferenceM": "0.6",
+      "kFramePeriod": "0",
+      "kHSkip": "2",
+      "kMaxRegionThreshold": "0.05",
+      "kRegionThreshold": "0.05",
+      "kVSkip": "2"
+    },
+    "physical_constants": {
+      "kBallRadiusMeters": "0.021335"
+    },
+    "spin_analysis": {
+      "kCoarseXRotationDegreesEnd": "36",
+      "kCoarseXRotationDegreesIncrement": "4",
+      "kCoarseXRotationDegreesStart": "-36",
+      "kCoarseYRotationDegreesEnd": "15",
+      "kCoarseYRotationDegreesIncrement": "5",
+      "kCoarseYRotationDegreesStart": "-15",
+      "kCoarseZRotationDegreesEnd": "110",
+      "kCoarseZRotationDegreesIncrement": "4",
+      "kCoarseZRotationDegreesStart": "-10",
+      "kGaborMaxWhitePercent": "45",
+      "kGaborMinWhitePercent": "39"
+    },
+    "strobing": {
+      "kBaudRateForFastPulses": "115200",
+      "kBaudRateForSlowPulses": "115200",
+      "kBaudRatePulseMultiplier": "1.0",
+      "kCam2SetupPeriodMilliseconds": "2000",
+      "kConnectionBoardVersion": "1",
+      "kDynamicFollowOnPulseVectorPutter": [
+        444.0
+      ],
+      "kLastPulsePutterRepeats": "0",
+      "kLongerStrobePulseVectorDriver": [
+        0.175,
+        0.7,
+        1.4,
+        2.45,
+        1.26,
+        2.8,
+        2.1,
+        3.15,
+        3.85,
+        3.85,
+        10.4,
+        3.5,
+        0
+      ],
+      "kNumberPrimingPulses": "12",
+      "kPauseAfterSendingPreImageTriggerMs": "2000",
+      "kPauseBeforeReadyForFinalPrimingPulseMs": "400",
+      "kPauseBeforeSendingFinalImageTriggerMs": "2000",
+      "kPauseBeforeSendingImageFlushMs": "300",
+      "kPauseBeforeSendingPreImageTriggerMs": "300",
+      "kPauseToSetUpInnoMakerExternalTriggerMilliseconds": "500",
+      "kPracticeBallSpeedSlowdownPercentage": "4.0",
+      "kPrimingPulseFPS": "15",
+      "kPuttingBallSpeedSlowdownPercentage": "5.2",
+      "kPuttingStrobeDelayMs": "50",
+      "kStandardBallSpeedSlowdownPercentage": "0.1",
+      "kStrobePulseVectorDriver": [
+        0.7,
+        1.8,
+        3.0,
+        2.2,
+        3.0,
+        7.1,
+        4.0,
+        0
+      ],
+      "kStrobePulseVectorPutter": [
+        5.0,
+        30.0,
+        30.0,
+        30.0,
+        50.0,
+        0
+      ],
+      "number_bits_for_fast_on_pulse_": "2",
+      "number_bits_for_slow_on_pulse_": "1"
+    },
+    "system": {
+      "kEnclosureVersion": "2"
+    },
+    "testing": {
+      "kAutomatedTestExpectedResultsCSV": "Uneekor Comparison 2025-02-07_Small_Test.csv",
+      "kAutomatedTestResultsCSV": "PiTrac_Test_Results.csv",
+      "kAutomatedTestSuiteDirectory": "/usr/share/pitrac/test-suites/TestSuite_2025_02_07/",
+      "kAutomatedTestToleranceBackSpin": "250",
+      "kAutomatedTestToleranceBallSpeedMPH": "4",
+      "kAutomatedTestToleranceHLA": "3",
+      "kAutomatedTestToleranceSideSpin": "300",
+      "kAutomatedTestToleranceVLA": "2",
+      "kBaseTestImageDir": "../Images/",
+      "kExternallyStrobedALTBestCircleCannyLower": "35",
+      "kExternallyStrobedALTBestCircleCannyUpper": "80",
+      "kExternallyStrobedALTBestCircleHoughDpParam1": "1.3",
+      "kExternallyStrobedALTBestCircleHoughParam2": "13",
+      "kExternallyStrobedALTBestCircleMaxIterations": "25",
+      "kExternallyStrobedALTBestCircleMinInliers": "25",
+      "kExternallyStrobedBallIdentificationCannyLower": "35",
+      "kExternallyStrobedBallIdentificationCannyUpper": "80",
+      "kTwoImageTestStrobedBallImage": "log_cam2_last_strobed_img.png",
+      "kTwoImageTestTeedBallImage": "log_ball_final_found_ball_img.png"
+    },
+    "user_interface": {
+      "kRefreshTimeSeconds": "3",
+      "kWebServerBallSearchAreaImage": "log_cam1_search_area_img",
+      "kWebServerCamera2Image": "log_cam2_last_strobed_img",
+      "kWebServerErrorExposuresImage": "log_cam2_last_strobed_img",
+      "kWebServerLastTeedBallImage": "log_ball_final_found_ball_img",
+      "kWebServerResultBallExposureCandidates": "ball_exposure_candidates",
+      "kWebServerResultBallRotatedByBestAngles": "ball1_rotated_by_best_angles",
+      "kWebServerResultSpinBall1Image": "spin_ball_1_gray_image1",
+      "kWebServerResultSpinBall2Image": "spin_ball_2_gray_image1"
+    }
+  },
+  "system": {
+    "camera_role": "camera1",
+    "mode": "single"
+  }
+}

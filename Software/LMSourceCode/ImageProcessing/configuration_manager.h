@@ -14,6 +14,8 @@
 #include <optional>
 #include <mutex>
 
+#include "logging_tools.h"
+
 namespace golf_sim {
 
 /**
@@ -44,7 +46,7 @@ public:
      * @return true if initialization successful
      */
     bool Initialize(
-        const std::string& json_config_file = "golf_sim_config.json",
+        const std::string& json_config_file = ".pitrac/config/generated_golf_sim_config.json",
         const std::string& yaml_config_file = "",
         const std::map<std::string, std::string>& cli_overrides = {}
     );
@@ -295,6 +297,7 @@ std::optional<T> ConfigurationManager::GetFromTree(const boost::property_tree::p
     try {
         return tree.get<T>(path);
     } catch (const boost::property_tree::ptree_error&) {
+        // Too Noise - Turn OFF - GS_LOG_MSG(trace, "GetFromTree failed for path: " + path);
         return std::nullopt;
     }
 }

@@ -88,13 +88,15 @@ struct LoggingTools
 							const cv::Mat& img,
 							const std::vector < cv::Point >& pointFeatures,
 							bool forceFixedFileName = false,
-							const std::string& fixedFileName = std::string("") );
+							const std::string& fixedFileName = std::string(""),
+							const std::string& suffix = std::string(""));
 
 	static bool LogImageWithCircles(const std::string& fileNameTag,
 								    const cv::Mat& img,
 									const std::vector < GsCircle >& circles,
 									bool forceFixedFileName = false,
-									const std::string& fixedFileName = std::string(""));
+									const std::string& fixedFileName = std::string(""),
+									const std::string& suffix = std::string(""));
 
 	// Create a unique, seconds-based date-time string
 	static std::string GetUniqueLogName();

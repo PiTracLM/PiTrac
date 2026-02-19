@@ -469,7 +469,7 @@ bool testAnalyzeStrobedBalls() {
     std::string kTwoImageTestPreImage;
 
     GolfSimConfiguration::SetConstant("gs_config.testing.kTwoImageTestTeedBallImage", kTwoImageTestTeedBallImage);
-    GolfSimConfiguration::SetConstant("gs_config.testing.kTwoImageTestStrobedImage", kTwoImageTestStrobedImage);
+    GolfSimConfiguration::SetConstant("gs_config.testing.kTwoImageTestStrobedBallImage", kTwoImageTestStrobedImage);
     GolfSimConfiguration::SetConstant("gs_config.testing.kTwoImageTestPreImage", kTwoImageTestPreImage);
 
     const std::string kTestCamImageFileName_00 = kTwoImageTestTeedBallImage;
@@ -1574,7 +1574,7 @@ int main(int argc, char *argv[])
 
         GolfSimOptions::GetCommandLineOptions().Print();
 
-        std::string config_file_name = "golf_sim_config.json";
+        std::string config_file_name = ".pitrac/config/generated_golf_sim_config.json";
 
         if (!GolfSimOptions::GetCommandLineOptions().config_file_.empty()) {
             config_file_name = GolfSimOptions::GetCommandLineOptions().config_file_;

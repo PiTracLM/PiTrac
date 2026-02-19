@@ -1,0 +1,31 @@
+{
+  "cameras": {
+    "slot1": {
+      "type": 4
+    },
+    "slot2": {
+      "type": 4
+    }
+  },
+  "cameras.slot1.lens": "1",
+  "cameras.slot1.type": "4",
+  "cameras.slot2.lens": "1",
+  "cameras.slot2.type": "4",
+  "modelSearchPaths": [
+    "./models/"
+  ],
+  "gs_config": {
+    "cameras": {
+      "kCamera1Gain": 5
+    },
+    "strobing": {
+      "kConnectionBoardVersion": 1,
+      "number_bits_for_fast_on_pulse_": 2
+    },
+    "ball_identification": {
+      "kONNXModelPath": "./models/best.onnx"
+    },
+    "testing.kTwoImageTestTeedBallImage": "gs_log_img__log_ball_final_found_ball_img_Shot_77_2026-Jan-22_16.38.31.png",
+    "testing.kTwoImageTestStrobedBallImage": "gs_log_img__log_cam2_last_strobed_img_Shot_153_2026-Jan-23_13.32.04.png"
+  }
+  }

@@ -226,6 +226,16 @@ void GolfBall::PrintBallFlightResults() const {
 void GolfBall::AverageBalls(const std::vector<GolfBall>& ball_vector, GolfBall& averaged_ball) {
     double number_balls = (double)ball_vector.size();
 
+    // Certain properties may not be averaged for every ball, so we need to
+    // track separate divisors for each.
+	// All other properties will be averaged for all balls, so they will use the number_balls divisor
+    // and will be computed using a running average.
+
+    int number_balls_averaged_for_velocity = 0;
+    int number_balls_averaged_for_HLA = 0;
+    int number_balls_averaged_for_VLA = 0;
+
+    // Initialize the averaging counters
     averaged_ball.set_x(0.0F);
     averaged_ball.set_y(0.0F);
     averaged_ball.velocity_ = 0;
@@ -235,7 +245,11 @@ void GolfBall::AverageBalls(const std::vector<GolfBall>& ball_vector, GolfBall& 
     averaged_ball.rotation_speeds_RPM_ = { 0, 0, 0 };
 
     for (const GolfBall& b: ball_vector) {
-        averaged_ball.velocity_ += b.velocity_ / number_balls;
+
+        if (b.shot_parameters_.ParameterIsPresent(GsShotParameters::ShotParameter::kBallVelocity)) {
+            averaged_ball.velocity_ += b.velocity_;
+            number_balls_averaged_for_velocity++;
+		}
 
         long x = averaged_ball.x();
         x += (long)(b.x() / number_balls);
@@ -246,12 +260,22 @@ void GolfBall::AverageBalls(const std::vector<GolfBall>& ball_vector, GolfBall& 
         averaged_ball.set_y(y);
 
         // NOTE - Not clear how often the position deltas should be averaged?
+        // These values are mostly deprecated.
         averaged_ball.position_deltas_ball_perspective_[0] += b.position_deltas_ball_perspective_[0] / number_balls;
         averaged_ball.position_deltas_ball_perspective_[1] += b.position_deltas_ball_perspective_[1] / number_balls;
         averaged_ball.position_deltas_ball_perspective_[2] += b.position_deltas_ball_perspective_[2] / number_balls;
 
-        averaged_ball.angles_ball_perspective_[0] += b.angles_ball_perspective_[0] / number_balls;
-        averaged_ball.angles_ball_perspective_[1] += b.angles_ball_perspective_[1] / number_balls;
+        // HLA
+        if (b.shot_parameters_.ParameterIsPresent(GsShotParameters::ShotParameter::kHLA)) {
+            averaged_ball.angles_ball_perspective_[0] += b.angles_ball_perspective_[0];
+            number_balls_averaged_for_HLA++;
+        }
+
+        // VLA
+        if (b.shot_parameters_.ParameterIsPresent(GsShotParameters::ShotParameter::kVLA)) {
+            averaged_ball.angles_ball_perspective_[1] += b.angles_ball_perspective_[1];
+            number_balls_averaged_for_VLA++;
+        }
 
         averaged_ball.angles_camera_ortho_perspective_[0] += b.angles_camera_ortho_perspective_[0] / number_balls;
         averaged_ball.angles_camera_ortho_perspective_[1] += b.angles_camera_ortho_perspective_[1] / number_balls;
@@ -264,6 +288,11 @@ void GolfBall::AverageBalls(const std::vector<GolfBall>& ball_vector, GolfBall& 
         averaged_ball.rotation_speeds_RPM_[1] += b.rotation_speeds_RPM_[1] / number_balls;
         averaged_ball.rotation_speeds_RPM_[2] += b.rotation_speeds_RPM_[2] / number_balls;
     }
+
+    // Now finalize the averages for those properties that we may not have assessed for every ball.
+    averaged_ball.velocity_ /= number_balls_averaged_for_velocity;
+    averaged_ball.angles_ball_perspective_[0] /= number_balls_averaged_for_HLA;
+    averaged_ball.angles_ball_perspective_[1] /= number_balls_averaged_for_VLA;
 }
 
 bool GolfBall::CheckIfBallMoved(const GolfBall& ball_to_compare, const int max_center_move_pixels, const int max_radius_change_percent) {
@@ -299,5 +328,17 @@ bool GolfBall::PointIsInsideBall(double x, double y) const {
     return (distance < ball_circle_[2] * 0.85);
 }
 
+bool operator==(const GolfBall& lhs, const GolfBall& rhs) {
+    bool is_equal = true;
+
+    if (lhs.x() != rhs.y() ||
+        lhs.y() != rhs.y() ||
+        lhs.measured_radius_pixels_ != rhs.measured_radius_pixels_)
+    {
+        is_equal = false;
+    }
+
+    return is_equal;
+}
 
 }

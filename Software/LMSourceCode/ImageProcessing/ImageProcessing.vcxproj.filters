@@ -51,9 +51,6 @@
     <ClCompile Include="libcamera_interface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="gs_events.h">
-      <Filter>Header Files</Filter>
-    </ClCompile>
     <ClCompile Include="gs_events.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -289,6 +286,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gs_web_api.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gs_shot_parameters.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -563,6 +563,9 @@
     <ClInclude Include="onnx_runtime_detector.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="gs_shot_parameters.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="golf_sim_config.json">
@@ -637,7 +640,6 @@
     <None Include="RunScripts\runTestSpin.sh" />
     <None Include="RunScripts\shutdown_gs.sh" />
     <None Include="create_closed_source_objects.sh" />
-    <None Include="packages.config" />
     <None Include="..\..\web-server\calibration_manager.py">
       <Filter>Resource Files</Filter>
     </None>
@@ -650,6 +652,9 @@
     <None Include="..\..\web-server\configurations.json">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="packages.config" />
+    <None Include="$(MSBuildThisFileDirectory)..\..\runtimes\win-x64\native\onnxruntime.dll" />
+    <None Include="$(MSBuildThisFileDirectory)..\..\runtimes\win-x64\native\onnxruntime_providers_shared.dll" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="core\CMakeLists.txt">

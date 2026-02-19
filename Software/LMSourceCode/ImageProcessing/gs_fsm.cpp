@@ -307,7 +307,8 @@ namespace golf_sim {
             if (GolfSimCamera::kLogDiagnosticImagesToUniqueFiles) {
                 // Save a unique version of the webserver image into a directory that will not get
                 // over-written.  A unique timestamp will be added to the file name
-                LoggingTools::LogImage(kWebServerLastTeedBallImage + "_Shot_" + std::to_string(GsSimInterface::GetShotCounter()) + "_", img, std::vector < cv::Point >{});
+                LoggingTools::LogImage(kWebServerLastTeedBallImage + "_", img, std::vector < cv::Point >{}, false, "", "_Shot_" + std::to_string(GsSimInterface::GetShotCounter()));
+
             }
 
             // In any case, save the image with a non-unique name that will be overwritten on the next show, but that the GUI
@@ -592,8 +593,9 @@ namespace golf_sim {
                 // over-written.  A unique timestamp will be added to the file name
                 // The camera2 system isn't sending message to the simulator system, so we need to update 
                 // the shot counter here manually
+                // We want the shot number toward the end so that we can more easily sort by the type of image we are lookingg for 
                 GsSimInterface::IncrementShotCounter();
-                LoggingTools::LogImage(kWebServerCamera2Image + "_Shot_" + std::to_string(GsSimInterface::GetShotCounter()) + "_", image, std::vector < cv::Point >{});
+                LoggingTools::LogImage(kWebServerCamera2Image + "_", image, std::vector < cv::Point >{}, false, "", "_Shot_" + std::to_string(GsSimInterface::GetShotCounter()));
             }
 
             // In any case, also save the image with a non-unique name that will be overwritten on the next show, but that the GUI
