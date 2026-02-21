@@ -6,7 +6,7 @@ parent: Hardware
 description: Complete guide to ordering and assembling the PiTrac Connector Board PCB, including manufacturing options, component sourcing, and assembly instructions for the custom circuit board.
 keywords: PCB assembly launch monitor, custom golf PCB, raspberry pi PCB, DIY circuit board, launch monitor electronics, JLCPCB assembly
 og_image: /assets/images/logos/PiTrac_Square.png
-last_modified_date: 2025-01-04
+last_modified_date: 2026-02-20
 ---
 
 # Connector Board
@@ -15,7 +15,16 @@ The Connector Board is the central hub of your PiTrac. It handles connections be
 
 ## Board Versions
 
-### V2 - Dual Pi5 Connector Board (Current)
+### V3 - (Current)
+
+V3 Connector further refines what we learned with V2 while also moving to a thru-hole design.
+
+**What changed from V2:**
+- All thru hole construction.
+- Remove ineffective 555 timer circuit.
+- Full control of LED current including ADC for calibration.
+
+### V2 - Dual Pi5 Connector Board (Deprecated)
 
 The V2 board is a complete redesign focused on simplification and cost reduction.
 
@@ -37,6 +46,16 @@ V2 moves to a single AC/DC supply, eliminating the need for opto-couplers by saf
 
 If you have a V1 board, it works fine. Just follow V1-specific instructions. If you're building new, use V2.
 
+# IRLED
+
+Original LED array is becoming expensive and challenging to source, this provides a custom replacement using LEDs available in distrobution.
+
+## Board Versions
+
+### IRLED - (Current)
+
+Uses 10 LEDs in a 5S2P configuration to provide substantial illumination.
+
 ## Ordering the PCB
 
 ### Where to Order
@@ -51,13 +70,52 @@ Both have easy file upload and offer assembly services.
 {: .tip }
 **Save Money:** Check Discord #pitrac-stuff-for-sale before ordering. Community members often have spare boards at cost.
 
-### Fabrication Files
+### Fabrication and Assembly Files
 
-Everything the fab house needs is in one zip:
+There are three different PCBs filesets, the combined PCB has two BOM variants determining how much of the assembly you want done by the vendor.
+
+# V3 Connector + IRLED (Recommended for complete system)
+
+There are two BOM variants due to it being a panel of two PCBs. It is recommended that you only use an assembler for the surface mount IR LEDs.
+It is more cost effective generally to purchase the components and assemble the entirely thru-hole connector by yourself.
 
 ```
-Hardware/Connector Board v2/Fabrication Files/Gerbers.zip
+Hardware/Fabrication Files/V3 Connector + IRLED Gerbers.zip
 ```
+
+**Assemble IRLED (Recommended)**
+```
+Hardware/Assembly Files/V3 Connector + IRLED/IRLED Assembly/*
+```
+
+**Assemble V3 Connector + IRLED**
+**Assembly of V3 Connector with vendor not recommended**
+```
+Hardware/Assembly Files/V3 Connector + IRLED/V3 Connector + IRLED Assembly/*
+```
+
+# V3 Connector Only (Useful if you have LED array already)
+
+```
+Hardware/Fabrication Files/V3 Connector Only Gerbers.zip
+```
+
+**Assembly of V3 Connector with vendor not recommended**
+
+```
+Hardware/Assembly Files/V3 Connector Only/V3 Connector Only Assembly/*
+```
+
+# IRLED Only (Need to replace a broken LED array?)
+
+```
+Hardware/Fabrication Files/IRLED Only Gerbers.zip
+```
+
+```
+Hardware/Assembly Files/IRLED Only/IRLED Only Assembly/*
+```
+
 
 ### Ordering Process
 
@@ -66,36 +124,22 @@ Hardware/Connector Board v2/Fabrication Files/Gerbers.zip
    ![Upload Gerber Files]({{ '/assets/images/hardware/upload-gerber-files.png' | relative_url }})
    ![Upload Gerber Files]({{ '/assets/images/hardware/upload-gerber-files-step-2.png' | relative_url }})
    
-2. **Board specs** - Leave defaults, they're fine:
-   - Material: FR4
-   - Thickness: 1.6mm
-   - Layers: 2
-   - Copper: 1oz
-   - Min trace/space: 5mil/5mil
-   - Min hole: 0.25mm
+2. **Board specs** - Update the following attribute:
+   - Thickness: 0.8mm
 
-3. **Surface Finish** - **Change to Lead-Free**
-
-   Switch from "HASL with Lead" to "HASL Lead-Free"
+3. **Surface Finish** - 
+	- Ensure set to "HASL Lead-Free"
 
    ![Surface Finish Selection]({{ '/assets/images/hardware/surface-finish.png' | relative_url }})
 
    Use lead-free solder for assembly, so get a lead-free board finish.
 
-4. **Quantity** - Minimum order is usually 5 boards. You only need 1.
+4. **Quantity** - Minimum order is usually 5 boards. Only 1 V3 Connector and 1 IRLED are required for a PiTrac build.
 
-**Cost:** ~$40 shipped for 5 boards ($8/board) from PCBway
 
 ### Assembly Service (Optional)
 
 Don't want to solder? Both JLCPCB and PCBway offer assembly services.
-
-**Assembly files needed:**
-```
-Hardware/Connector Board v2/Assembly Files/
-├── PiTrac Pi Connector Bill of Materials.csv
-└── PiTrac Pi Connector Top Position.csv
-```
 
 Select Assembly Service:
 
@@ -107,8 +151,6 @@ Once you have added the board with assembly to your cart you will need to provid
 
 ![Shopping Cart]({{ '/assets/images/hardware/shopping-cart.png' | relative_url }})
 
-**Top Position is the "Centroid" File**
-
 ![Upload Gerber Files]({{ '/assets/images/hardware/gerber-files.png' | relative_url }})
 
 ## Component Sourcing
@@ -117,107 +159,45 @@ Once you have added the board with assembly to your cart you will need to provid
 
 Complete BOM with Digikey links: [Parts List]({% link hardware/parts-list.md %})
 
-**Cost:** ~$23 on Digikey (at time of writing)
-
-### Out of Stock Parts?
-
-If a part is unavailable, check the "Important Parameters" column in the parts list. Match those parameters when selecting alternates:
-
-![Important Parameters]({{ '/assets/images/hardware/important-parameters.png' | relative_url }})
-
-**Don't substitute these:**
-- U1 - Boost controller (TI UCC2813DTR-3)
-- L1 - Power inductor (Bourns RLB0914-330KL)
-- Q2, Q4 - Power NMOS (Diodes DMT616MLSS-13)
-- RV1, RV2 - Adjustment pots (Bourns 3362W-1-501LF)
-
-**Can substitute if specs match:**
-- Most capacitors and resistors
-- Small transistors and diodes
-- Logic ICs (if same function)
-
-Unfortunately, some parts are challenging to find alternates for. Don't waste time hunting for alternatives to the critical components.
-
 ## Assembly
 
 ### Difficulty Assessment
 
-**Skill Level:** Intermediate soldering required
-
-The board was designed to be as approachable as possible, but it's still SMD work:
-
-**What helps:**
-- Oversized footprints (easier iron contact)
-- All passives are 0603 or larger (still tiny, but not impossible)
-- All SMD parts have external leads (no BGA or QFN nightmares)
-- Works with or without flux
-
-**What's challenging:**
-- **Ground connections** - Most of the copper is ground, acting like a massive heatsink. Be patient. Let the heat soak in. The solder will stick.
-- **Component size** - 0603 parts are small. Use a magnifying lamp.
-- **Lead-free solder** - Higher temps, more patience than leaded.
-
-![Component Size]({{ '/assets/images/hardware/0805.png' | relative_url }})
+**Skill Level:** Beginner / Intermediate
 
 **Time estimate:**
 - First build: 2-4 hours
 - With experience: 1-2 hours
 
-If you're a true novice at soldering, some of it will take time, especially ground connections. Be patient and let the heat soak in. You'll get the solder to stick.
+If you're a true novice at soldering, some of it will take time.
 
 ### Assembly Tips
 
 1. **Order matters:**
-   - SMD components first (smallest to largest)
-   - Through-hole components second
-   - Connectors last
+   - DIP-8 Packages first (U1, U3, U5, U6)
+   - Resistors
+   - Capacitors
+   - MOSFETs, LDO etc.
+   - Connectors
 
-2. **For ground pads:**
-   - Use 40W+ iron if available
-   - Add extra solder to build thermal mass
-   - Touch pad and component lead simultaneously
-   - Wait 3-5 seconds for heat to soak
-
-3. **Before power-up:**
+2. **Before power-up:**
    - Check for solder bridges with multimeter
    - Verify no shorts between power and ground
    - Double-check component orientation (ICs, diodes, polarized caps)
 
 ## Board Configuration
 
-After assembly, adjust voltage and current before use.
+After assembly, must run current calibration before you will be able to capture shots.
 
 ### Test Points
 
-**TP4** - Ground reference (use for all DC measurements)
+**TP2** - Ground reference (use for all DC measurements)
 
-**TP5** - Voltage output measurement
-**TP11** - Current sense measurement
-
-{: .warning }
-**Silkscreen Error:** On unlabeled V1 boards, CC+/- and VIR+/- symbols are backwards. Meaning if you turn the knob towards +, it will actually decrease.
-
-### Adjusting Current (RV2)
-
-Sets maximum current to IR LED array.
-
-1. Multimeter between **TP11** and **TP4 (GND)**
-2. Adjust **RV2** potentiometer
-3. Target: **100mV (0.1V)**
-4. This equals 0.1V / 0.033Ω = **~3.03A**
-
-### Adjusting Voltage (RV1)
-
-Sets boost converter output voltage.
-
-1. Multimeter between **TP5** and **TP4 (GND)**
-2. Adjust **RV1** potentiometer
-3. Target: **~36V** (typical, adjust for your LED requirements)
-4. Don't worry about hitting it exactly - close is fine
-
-### Thermal Protection
-
-The dual 555 timer circuit forces a 10% duty cycle on the strobe line, preventing LED thermal runaway. The duty cycle limiting is adjustable by changing passive components per the schematic.
+**TP1** - +5V Input
+**TP3** - LDO Output
+**TP4** - Current Sense
+**TP5** - Gate Drive / Strobe Input
+**TP6** - DAC Output Voltage
 
 ## Connections
 
@@ -227,18 +207,16 @@ The dual 555 timer circuit forces a 10% duty cycle on the strobe line, preventin
 
 ### Power Output
 
-- **J3/J4:** USB-C ports for Pi power (5V)
+- **J2/J5:** USB-C ports for Pi power (5V)
 
 ### Pi GPIO
 
-- **J7:** 3-pin GPIO header for control signals (see assembly guide for pinout)
+- **J3:** 8-pin GPIO header for control signals (see assembly guide for pinout)
 
 ### LED Output
 
-- **J2:** Regulated high-voltage output to IR LED array (screw terminals)
-- Adjustable voltage via RV1
-- Current limiting via RV2
-- 10% max duty cycle (hardware enforced)
+- **J4:** Regulated high-voltage output to IR LED array (screw terminals)
+- Current adjustable with DAC (U5)
 
 ### Optional
 
@@ -257,20 +235,7 @@ Note that the current default value is for the Version 1.0 board.
 
 Full design documentation:
 ```
-Hardware/Connector Board v2/
-├── PiTrac Pi Connector Schematic.pdf
-├── PiTrac Pi Connector.kicad_pcb
-├── Design/                    (Excel calculations)
-└── Fabrication Files/         (Production files)
+Hardware/KiCad Source Files/*
 ```
 
 KiCAD files are editable if you want to modify the design.
-
-## Next Steps
-
-Once assembled and configured:
-
-1. Adjust voltage and current per above
-2. Test with multimeter before connecting LEDs
-3. Connect to Pi units and LED array
-4. See [Assembly Guide]({% link hardware/assembly-guide.md %}) for system integration

@@ -1,0 +1,45 @@
+Reference,Qty,Manufacturer,Part Number,Footprint
+C1,1,KEMET,A750BK107M1AAAE024,Capacitor_THT:CP_Radial_D5.0mm_P2.00mm
+"C2,C11",2,Vishay Beyschlag/Draloric/BC Components,K105K20X7RF5TH5,Capacitor_THT:C_Disc_D5.1mm_W3.2mm_P5.00mm
+"C3,C8,C10,C12,C14,C15",6,Vishay Beyschlag/Draloric/BC Components,K104K10X7RF5UH5,Capacitor_THT:C_Disc_D4.3mm_W1.9mm_P5.00mm
+C4,1,Vishay Beyschlag/Draloric/BC Components,K471J15C0GF5UH5,Capacitor_THT:C_Disc_D4.7mm_W2.5mm_P5.00mm
+C5,1,Murata Electronics,RDER72A105K2M1H03A,Capacitor_THT:C_Disc_D5.1mm_W3.2mm_P5.00mm
+C6,1,KEMET,A750MW337M1HAAE020,Capacitor_THT:CP_Radial_D10.0mm_P5.00mm
+C7,1,Vishay Beyschlag/Draloric/BC Components,K104K20X7RH5UH5,Capacitor_THT:C_Disc_D5.1mm_W3.2mm_P5.00mm
+C9,1,Murata Electronics,RCER71H475K3K1H03B,Capacitor_THT:C_Disc_D6.0mm_W4.4mm_P5.00mm
+D1,1,Vishay General Semiconductor - Diodes Division,SB150-E3/73,Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal
+D2,1,Lite-On Inc.,LTL-307G,LED_THT:LED_D5.0mm
+"D3,D4",2,Vishay General Semiconductor - Diodes Division,SD103A-TR,Diode_THT:D_DO-35_SOD27_P7.62mm_Horizontal
+D5,1,Lite-On Inc.,LTL-307E,LED_THT:LED_D5.0mm
+"D6,D7,D8,D9,D10,D11,D12,D13,D14,D15",10,Vishay Semiconductor Opto Division,VSMA1085400,Pi Connector Parts:VSMA1085400
+"J1,J4",2,Amphenol Anytek,YK3210203000G,Pi Connector Parts:YK3210203000G
+"J2,J5",2,GCT,USB4085-GF-A,Pi Connector Parts:USB4085-GF-A
+J3,1,Adam Tech,PH1-08-UA,Connector_PinHeader_2.54mm:PinHeader_1x08_P2.54mm_Vertical
+J6,1,GCT,USB1125-GF-B,Pi Connector Parts:USB1125-GF-B
+L1,1,Bourns Inc.,RLB0914-330KL,Inductor_THT:L_Radial_D8.7mm_P5.00mm_Fastron_07HCP
+"Q1,Q2",2,Infineon Technologies,IRLU024NPBF,Package_TO_SOT_THT:TO-251-3_Vertical
+Q3,1,Microchip Technology,TN2106N3-G,Package_TO_SOT_THT:TO-92_Inline_Wide
+Q4,1,onsemi,2N3904TFR,Package_TO_SOT_THT:TO-92_Inline_Wide
+R1,1,Yageo,PNP300JR-73-0R15,Resistor_THT:R_Axial_DIN0516_L15.5mm_D5.0mm_P20.32mm_Horizontal
+R2,1,Yageo,KNP1WSJT-52-180R,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal
+R3,1,Yageo,MFR-25FRF52-60K4,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
+R4,1,Yageo,MFR-25FRF52-2K2,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
+R5,1,Yageo,MFR-25FTE52-2K49,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
+"R6,R9",2,Yageo,MFR-25FTE52-120R,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
+R7,1,Yageo,MFR-25FRF52-75K,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
+"R8,R22",2,Yageo,MFR-25FRF52-1K,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
+R10,1,Yageo,KNP100JR-73-0R1,Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P15.24mm_Horizontal
+R11,1,Yageo,MFR-25FRF52-604R,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
+R12,1,Yageo,MFR-25FBF52-6K04,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
+"R13,R21",2,Yageo,MFR-25FRF52-2K,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
+R14,1,Yageo,MFR-25FRF52-3K,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
+R15,1,Yageo,MFR-25FRF52-10K,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P15.24mm_Horizontal
+"R16,R20",2,Yageo,ZOR-25-R-52-0R,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
+R17,1,Yageo,MFR-25FRF52-200R,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
+R18,1,Yageo,MFR-25FRF52-10K,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
+"R19,R23",2,Yageo,ZOR-25-R-52-0R,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P15.24mm_Horizontal
+U1,1,Texas Instruments,MC33063AP,Package_DIP:DIP-8_W7.62mm
+U2,1,onsemi,LM317LBZRAG,Package_TO_SOT_THT:TO-92_Inline_Wide
+U3,1,Microchip Technology,MCP1407-E/P,Package_DIP:DIP-8_W7.62mm
+U5,1,Microchip Technology,MCP4801-E/P,Package_DIP:DIP-8_W7.62mm
+U6,1,Microchip Technology,MCP3202-CI/P,Package_DIP:DIP-8_W7.62mm

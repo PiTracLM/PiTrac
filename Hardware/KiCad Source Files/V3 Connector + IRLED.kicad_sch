@@ -1,0 +1,1317 @@
+(kicad_sch
+	(version 20250114)
+	(generator "eeschema")
+	(generator_version "9.0")
+	(uuid "39826c84-4d4b-44ca-a2d0-3c4c9a9a22bc")
+	(paper "A4")
+	(title_block
+		(title "V3 Connector + IRLED")
+		(date "2026-02-12")
+		(rev "V1")
+		(company "PiTrac")
+	)
+	(lib_symbols
+		(symbol "Mechanical:MountingHole"
+			(pin_names
+				(offset 1.016)
+			)
+			(exclude_from_sim no)
+			(in_bom no)
+			(on_board yes)
+			(property "Reference" "H"
+				(at 0 5.08 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "MountingHole"
+				(at 0 3.175 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "~"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "Mounting Hole without connection"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "mounting hole"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "MountingHole*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "MountingHole_0_1"
+				(circle
+					(center 0 0)
+					(radius 1.27)
+					(stroke
+						(width 1.27)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+	)
+	(junction
+		(at 92.71 81.28)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "d22fe444-b007-4320-8887-ccead097a7dc")
+	)
+	(junction
+		(at 90.17 78.74)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "e0e9e751-e796-4736-a692-e6445dff8520")
+	)
+	(junction
+		(at 97.79 81.28)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "eb0b31a8-9bc0-499b-a3f2-513a14444ca6")
+	)
+	(wire
+		(pts
+			(xy 90.17 154.94) (xy 102.87 154.94)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "00801a78-10c8-4cab-8a03-4bf2c0292847")
+	)
+	(wire
+		(pts
+			(xy 157.48 78.74) (xy 160.02 78.74)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "07b81df0-70cc-4e30-9ec5-ab8cee05e947")
+	)
+	(wire
+		(pts
+			(xy 87.63 88.9) (xy 100.33 88.9)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "08d58440-692b-466e-803d-4ce0e664fe47")
+	)
+	(wire
+		(pts
+			(xy 90.17 63.5) (xy 157.48 63.5)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "12bc06f4-e1b9-40b8-a8a6-9bab37cbc82e")
+	)
+	(wire
+		(pts
+			(xy 157.48 63.5) (xy 157.48 78.74)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "12be0568-8ad0-4f3e-a4c5-dc400f9c8b37")
+	)
+	(wire
+		(pts
+			(xy 147.32 86.36) (xy 160.02 86.36)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1f42c4f8-c868-4197-a4f3-7ba220af8bb5")
+	)
+	(wire
+		(pts
+			(xy 147.32 72.39) (xy 147.32 86.36)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "20f03c1e-eac7-482d-b640-004d3a3694b4")
+	)
+	(wire
+		(pts
+			(xy 144.78 124.46) (xy 140.97 124.46)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "33f292e8-88e1-4bc1-ab4f-857c79b26692")
+	)
+	(wire
+		(pts
+			(xy 90.17 78.74) (xy 102.87 78.74)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "36f81e50-c059-4704-92ba-32e34f3a648f")
+	)
+	(wire
+		(pts
+			(xy 144.78 109.22) (xy 144.78 124.46)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3d1f4d9d-c444-4f26-8d1e-41ab1c27414f")
+	)
+	(wire
+		(pts
+			(xy 90.17 109.22) (xy 90.17 154.94)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3eed9aac-f0e4-49d6-b0c2-32c7337514f5")
+	)
+	(wire
+		(pts
+			(xy 87.63 109.22) (xy 90.17 109.22)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3f3d52d5-5f07-4cad-8693-3237706bd49a")
+	)
+	(wire
+		(pts
+			(xy 198.12 104.14) (xy 208.28 104.14)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4f9ab445-74ae-4b30-9be6-d73cfef99186")
+	)
+	(wire
+		(pts
+			(xy 140.97 109.22) (xy 144.78 109.22)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "624bd3c2-4daa-496f-8190-2d8af89ccdfc")
+	)
+	(wire
+		(pts
+			(xy 154.94 66.04) (xy 154.94 81.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "625293d1-c03d-41fa-931f-5e59bf60bcff")
+	)
+	(wire
+		(pts
+			(xy 151.13 83.82) (xy 160.02 83.82)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "63970d64-dd0b-429c-be67-939087ffdf83")
+	)
+	(wire
+		(pts
+			(xy 97.79 81.28) (xy 102.87 81.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "64051dd0-d9c2-4678-808f-4ecb1f5871af")
+	)
+	(wire
+		(pts
+			(xy 151.13 68.58) (xy 151.13 83.82)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "66204ae7-117b-403a-a7a0-0420f806210d")
+	)
+	(polyline
+		(pts
+			(xy 213.36 15.24) (xy 213.36 162.56)
+		)
+		(stroke
+			(width 0.0508)
+			(type dash)
+			(color 73 131 86 1)
+		)
+		(uuid "77d5e292-7b2c-4121-9d82-7b4d54e06e8a")
+	)
+	(wire
+		(pts
+			(xy 87.63 83.82) (xy 96.52 83.82)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7c43aea4-12f7-449c-b51f-b431e231204a")
+	)
+	(wire
+		(pts
+			(xy 96.52 68.58) (xy 151.13 68.58)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "80265323-d96c-4365-9d66-8d42a24c762f")
+	)
+	(wire
+		(pts
+			(xy 87.63 86.36) (xy 102.87 86.36)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "815b30b6-9d39-4abc-b70c-4e07e2e0fdf2")
+	)
+	(wire
+		(pts
+			(xy 203.2 109.22) (xy 198.12 109.22)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "8ec90415-0b00-42fb-8b06-520d709fac3b")
+	)
+	(wire
+		(pts
+			(xy 140.97 134.62) (xy 203.2 134.62)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9c60a401-c9ca-4cd8-a6dc-53f74660f0ae")
+	)
+	(wire
+		(pts
+			(xy 102.87 124.46) (xy 97.79 124.46)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a06682be-b5f5-4384-b16c-18092e11d240")
+	)
+	(wire
+		(pts
+			(xy 100.33 88.9) (xy 100.33 72.39)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a86b4b81-98dd-4965-a13b-fff06aeee356")
+	)
+	(wire
+		(pts
+			(xy 208.28 104.14) (xy 208.28 139.7)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "abd1a6b4-bee4-40e8-9bde-e4d6db34d003")
+	)
+	(wire
+		(pts
+			(xy 203.2 134.62) (xy 203.2 109.22)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b9831f47-8d65-4af3-b055-c6b834122c86")
+	)
+	(wire
+		(pts
+			(xy 93.98 128.27) (xy 93.98 93.98)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bb448f35-1b42-40ea-8db1-863acddc1558")
+	)
+	(wire
+		(pts
+			(xy 87.63 81.28) (xy 92.71 81.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bb454805-75cb-4e2b-b266-41d6ee43bb84")
+	)
+	(wire
+		(pts
+			(xy 87.63 78.74) (xy 90.17 78.74)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bc1a29de-f67a-4955-8899-da893b331cbb")
+	)
+	(wire
+		(pts
+			(xy 90.17 78.74) (xy 90.17 63.5)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c097fcf8-3a17-4f25-916d-ab2050606413")
+	)
+	(wire
+		(pts
+			(xy 93.98 93.98) (xy 87.63 93.98)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c610a0ed-402b-4bb1-b403-adeaa8c7746c")
+	)
+	(wire
+		(pts
+			(xy 92.71 66.04) (xy 154.94 66.04)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ca62ed2b-4e71-4b3f-bc4f-4d84367cc5b9")
+	)
+	(wire
+		(pts
+			(xy 154.94 81.28) (xy 160.02 81.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "cd31d136-12e7-4213-9663-105a9dff7606")
+	)
+	(wire
+		(pts
+			(xy 102.87 128.27) (xy 93.98 128.27)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d3bb13b7-9edf-4ca6-8046-d45f9c24a84a")
+	)
+	(wire
+		(pts
+			(xy 97.79 124.46) (xy 97.79 81.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d9428f35-826a-4d76-8193-cf470322af83")
+	)
+	(wire
+		(pts
+			(xy 92.71 81.28) (xy 92.71 66.04)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e31a366e-2c20-445a-ad8d-d148dca73a5c")
+	)
+	(wire
+		(pts
+			(xy 92.71 81.28) (xy 97.79 81.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e582438b-d95e-42b3-a006-598d91139fbe")
+	)
+	(wire
+		(pts
+			(xy 96.52 83.82) (xy 96.52 68.58)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ee011a59-f5e5-4042-8f1b-a55b9667b3d1")
+	)
+	(wire
+		(pts
+			(xy 100.33 72.39) (xy 147.32 72.39)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fa057833-2016-40ac-92a2-a8b366b63832")
+	)
+	(wire
+		(pts
+			(xy 208.28 139.7) (xy 140.97 139.7)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fe5e6f6e-e38b-4ea9-837f-c9933aca46b3")
+	)
+	(symbol
+		(lib_id "Mechanical:MountingHole")
+		(at 25.4 25.4 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(dnp yes)
+		(fields_autoplaced yes)
+		(uuid "8739e019-ec63-4b65-97fc-2b178cf92489")
+		(property "Reference" "H1"
+			(at 27.94 24.1299 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MountingHole"
+			(at 27.94 26.6699 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "MountingHole:MountingHole_3.5mm"
+			(at 25.4 25.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 25.4 25.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Mounting Hole without connection"
+			(at 25.4 25.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacutrer" ""
+			(at 25.4 25.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(instances
+			(project ""
+				(path "/39826c84-4d4b-44ca-a2d0-3c4c9a9a22bc"
+					(reference "H1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Mechanical:MountingHole")
+		(at 254 25.4 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(dnp yes)
+		(fields_autoplaced yes)
+		(uuid "f245feba-d2c6-46a2-bf83-d338d7a1c1e9")
+		(property "Reference" "H2"
+			(at 256.54 24.1299 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MountingHole"
+			(at 256.54 26.6699 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "MountingHole:MountingHole_3.5mm"
+			(at 254 25.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 254 25.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Mounting Hole without connection"
+			(at 254 25.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacutrer" ""
+			(at 254 25.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(instances
+			(project "PiTrac Pi Connector"
+				(path "/39826c84-4d4b-44ca-a2d0-3c4c9a9a22bc"
+					(reference "H2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Mechanical:MountingHole")
+		(at 25.4 152.4 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(dnp yes)
+		(fields_autoplaced yes)
+		(uuid "f89e8b3b-e59b-4051-a12e-f0e261b1dc47")
+		(property "Reference" "H3"
+			(at 27.94 151.1299 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MountingHole"
+			(at 27.94 153.6699 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "MountingHole:MountingHole_3.5mm"
+			(at 25.4 152.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 25.4 152.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Mounting Hole without connection"
+			(at 25.4 152.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacutrer" ""
+			(at 25.4 152.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(instances
+			(project "PiTrac Pi Connector"
+				(path "/39826c84-4d4b-44ca-a2d0-3c4c9a9a22bc"
+					(reference "H3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Mechanical:MountingHole")
+		(at 254 152.4 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(dnp yes)
+		(fields_autoplaced yes)
+		(uuid "fcf0f057-8353-407e-8dab-c2befa11d6ae")
+		(property "Reference" "H4"
+			(at 256.54 151.1299 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MountingHole"
+			(at 256.54 153.6699 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "MountingHole:MountingHole_3.5mm"
+			(at 254 152.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 254 152.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Mounting Hole without connection"
+			(at 254 152.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacutrer" ""
+			(at 254 152.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(instances
+			(project "PiTrac Pi Connector"
+				(path "/39826c84-4d4b-44ca-a2d0-3c4c9a9a22bc"
+					(reference "H4")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(sheet
+		(at 102.87 76.2)
+		(size 38.1 35.56)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "059f4d93-a1e1-4515-8bd9-0c925832e143")
+		(property "Sheetname" "DAC"
+			(at 102.87 75.4884 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "DAC.kicad_sch"
+			(at 102.87 112.3446 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "CLK" input
+			(at 102.87 78.74 180)
+			(uuid "e65c53f9-2dfd-49c9-aae5-8d531a108a22")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "CURRENT-ADJUST" input
+			(at 140.97 109.22 0)
+			(uuid "3f7a33e6-03c4-4aa0-8023-c64970fee668")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "MOSI" input
+			(at 102.87 81.28 180)
+			(uuid "3fd34372-a1ba-472d-ae67-02842411b647")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "CS0" input
+			(at 102.87 86.36 180)
+			(uuid "17de9242-a584-4dce-9733-9dbf8bc777ea")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(instances
+			(project "V3 Connector + IRLED"
+				(path "/39826c84-4d4b-44ca-a2d0-3c4c9a9a22bc"
+					(page "5")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 50.8 76.2)
+		(size 36.83 35.56)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "0bd15bed-199a-4e45-8bce-f6f8039d8937")
+		(property "Sheetname" "Connectors"
+			(at 50.8 75.4884 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "Connectors.kicad_sch"
+			(at 50.8 112.3446 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "VIR-RTN" output
+			(at 87.63 109.22 0)
+			(uuid "807b74ab-a40d-46e1-bdfc-3e7a094bfdfb")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "CLK" output
+			(at 87.63 78.74 0)
+			(uuid "97d603f5-4825-4955-9675-f6f4ee89dc59")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "MOSI" output
+			(at 87.63 81.28 0)
+			(uuid "d537db15-b6e4-4bb8-a1bb-902b9d9dcec7")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "DIAG" output
+			(at 87.63 93.98 0)
+			(uuid "522ee7bd-f2ab-4d49-a906-1c7ec4f5fb83")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "MISO" input
+			(at 87.63 83.82 0)
+			(uuid "39dc8d1f-7aae-4545-8076-99dd093470be")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "CS0" output
+			(at 87.63 86.36 0)
+			(uuid "ba7e2eed-1216-4714-8ae8-700c9429e466")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "CS1" output
+			(at 87.63 88.9 0)
+			(uuid "e53a7a5a-7b08-4bf9-819f-4a4cff051ee4")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(instances
+			(project "V3 Connector + IRLED"
+				(path "/39826c84-4d4b-44ca-a2d0-3c4c9a9a22bc"
+					(page "2")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 228.6 76.2)
+		(size 36.83 35.56)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "222ea167-69a4-4c2a-962f-7683bbd63ff6")
+		(property "Sheetname" "LED"
+			(at 228.6 75.4884 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "IRLED.kicad_sch"
+			(at 228.6 112.3446 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "V3 Connector + IRLED"
+				(path "/39826c84-4d4b-44ca-a2d0-3c4c9a9a22bc"
+					(page "7")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 102.87 121.92)
+		(size 38.1 35.56)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "432d835a-88ba-42dd-bb70-090557c34607")
+		(property "Sheetname" "CC Sink"
+			(at 102.87 121.2084 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "Strobe Generation.kicad_sch"
+			(at 102.87 158.0646 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "VIR-RTN" input
+			(at 102.87 154.94 180)
+			(uuid "31a19e4f-1784-449e-9f24-ea0df8c25d7b")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "CURRENT-ADJUST" output
+			(at 140.97 124.46 0)
+			(uuid "1c8be52b-f12e-4471-ad97-8aef23033db4")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "MOSI" input
+			(at 102.87 124.46 180)
+			(uuid "ecdabc4b-39f4-4415-92e6-78501da1da6f")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "DIAG" input
+			(at 102.87 128.27 180)
+			(uuid "4fac6217-e4a2-4f0d-a624-5b4d81665392")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "LDO-SENSE" output
+			(at 140.97 139.7 0)
+			(uuid "c39176ff-3795-4225-9a66-bebf646292d9")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "CUR-SENSE" output
+			(at 140.97 134.62 0)
+			(uuid "9f109e04-72a3-44cf-833f-a731e2aede71")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(instances
+			(project "V3 Connector + IRLED"
+				(path "/39826c84-4d4b-44ca-a2d0-3c4c9a9a22bc"
+					(page "4")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 160.02 76.2)
+		(size 38.1 35.56)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "44b0b1a6-76b7-46a3-bc9a-28de56594a94")
+		(property "Sheetname" "ADC"
+			(at 160.02 75.4884 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "ADC.kicad_sch"
+			(at 160.02 112.3446 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "CLK" input
+			(at 160.02 78.74 180)
+			(uuid "f95a4e9e-112c-4de2-a7f2-7f906dd1c036")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "MISO" output
+			(at 160.02 83.82 180)
+			(uuid "6c922866-42d4-4db5-92d0-68b02c5782af")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "MOSI" input
+			(at 160.02 81.28 180)
+			(uuid "96f84307-29bf-4e34-a899-47580e4628fe")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "CS1" input
+			(at 160.02 86.36 180)
+			(uuid "7e461831-21ac-4a28-92c3-25c2744a0689")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "CUR-SENSE" input
+			(at 198.12 109.22 0)
+			(uuid "6a178b30-ded3-4026-8da9-f40c95d4d9f1")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "LDO-SENSE" input
+			(at 198.12 104.14 0)
+			(uuid "b5692a05-665c-4a7f-ae92-1a29c29d0a57")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(instances
+			(project "V3 Connector + IRLED"
+				(path "/39826c84-4d4b-44ca-a2d0-3c4c9a9a22bc"
+					(page "6")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 102.87 19.05)
+		(size 36.83 35.56)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "ccdb7f4b-2227-4b3b-ae8d-d985fe5b737e")
+		(property "Sheetname" "Power"
+			(at 102.87 18.3384 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "Power.kicad_sch"
+			(at 102.87 55.1946 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "V3 Connector + IRLED"
+				(path "/39826c84-4d4b-44ca-a2d0-3c4c9a9a22bc"
+					(page "3")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)
