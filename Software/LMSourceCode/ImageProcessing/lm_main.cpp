@@ -1613,6 +1613,28 @@ int main(int argc, char *argv[])
         // Load BallImageProc configuration values after JSON config is loaded
         BallImageProc::LoadConfigurationValues();
 
+	// If we have a version 3 Connector Board, then we want to ensure
+	// that it has been properly calibrated before we let the system
+	// run.
+        int kConnectionBoardVersionIntValue = 0;
+        GolfSimConfiguration::SetConstant("gs_config.strobing.kConnectionBoardVersion", kConnectionBoardVersionIntValue);
+        GolfSimConfiguration::ConnectionBoardType kConnectionBoardVersion = (GolfSimConfiguration::ConnectionBoardType)kConnectionBoardVersionIntValue;
+
+	if (kConnectionBoardVersion == GolfSimConfiguration::ConnectionBoardType::kVersion3_0) {
+            	GS_LOG_MSG(trace, "PiTrac is using a Version 3 Control Board, checking calibration.");
+
+		// If the board has been calibrated, there will be a value
+		// in the user_settings.json file
+
+        	int connector_board_dac_setting = -1;
+	        GolfSimConfiguration::SetConstant("gs_config.strobing.kDAC_setting", connector_board_dac_setting);
+
+		if (connector_board_dac_setting < 0) {
+            		GS_LOG_MSG(error, "PiTrac is using a Version 3 Control Board, but the board does not appear to have been calibrated.  Shutting down.");
+            		return 0;
+		}
+	}
+
         run_main(argc, argv);
 
         GS_LOG_MSG(info, "PiTrac Launch Monitor shutting down normally...");

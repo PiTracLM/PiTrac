@@ -23,15 +23,16 @@ namespace golf_sim {
 
 		enum ConnectionBoardType {
 			kVersion1_0 = 1,
-			kVersion1_2 = 2,
-			kRConnectionBoardTypeUnknown
+			kVersion2_0 = 2,
+			kVersion3_0 = 3,
+			kRConnectionBoardTypeUnknown = 0
 		};
 
 		enum EnclosureType {
 			kEnclosureVersion_1 = 1,
 			kEnclosureVersion_2 = 2,
 			kEnclosureVersion_3 = 3,
-			kEnclosureVersion_Unknown
+			kEnclosureVersion_Unknown = 0
 		};
 
 		// The type of the physical enclosure (e.g., tower) that the PiTrac system is installed in
