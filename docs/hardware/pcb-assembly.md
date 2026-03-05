@@ -52,8 +52,13 @@ Original LED array is becoming expensive and challenging to source, this provide
 
 ## Board Versions
 
-### IRLED - (Current)
+### IRLED2 - (Current)
 
+**What changed from OG:**
+Fixed footprint mistake for last minute LED change.
+
+### IRLED - (Depreciated)
+Only work with more expensive LED PN SST-10-IRD-B90H-S810 [https://www.digikey.com/en/products/detail/luminus-devices-inc/SST-10-IRD-B90H-S810/13557593]
 Uses 10 LEDs in a 5S2P configuration to provide substantial illumination.
 
 ## Ordering the PCB
@@ -73,28 +78,9 @@ Both have easy file upload and offer assembly services.
 ### Fabrication and Assembly Files
 
 There are three different PCBs filesets, the combined PCB has two BOM variants determining how much of the assembly you want done by the vendor.
+For smaller order quantities (without assembly) the seperate PCB files is likely to be cheaper.
 
-# V3 Connector + IRLED (Recommended for complete system)
-
-There are two BOM variants due to it being a panel of two PCBs. It is recommended that you only use an assembler for the surface mount IR LEDs.
-It is more cost effective generally to purchase the components and assemble the entirely thru-hole connector by yourself.
-
-```
-Hardware/Fabrication Files/V3 Connector + IRLED Gerbers.zip
-```
-
-**Assemble IRLED (Recommended)**
-```
-Hardware/Assembly Files/V3 Connector + IRLED/IRLED Assembly/*
-```
-
-**Assemble V3 Connector + IRLED**
-**Assembly of V3 Connector with vendor not recommended**
-```
-Hardware/Assembly Files/V3 Connector + IRLED/V3 Connector + IRLED Assembly/*
-```
-
-# V3 Connector Only (Useful if you have LED array already)
+# V3 Connector Only
 
 ```
 Hardware/Fabrication Files/V3 Connector Only Gerbers.zip
@@ -106,14 +92,34 @@ Hardware/Fabrication Files/V3 Connector Only Gerbers.zip
 Hardware/Assembly Files/V3 Connector Only/V3 Connector Only Assembly/*
 ```
 
-# IRLED Only (Need to replace a broken LED array?)
+# IRLED2 Only
 
 ```
-Hardware/Fabrication Files/IRLED Only Gerbers.zip
+Hardware/Fabrication Files/IRLED2 Only Gerbers.zip
 ```
 
 ```
-Hardware/Assembly Files/IRLED Only/IRLED Only Assembly/*
+Hardware/Assembly Files/IRLED2 Only/IRLED2 Only Assembly/*
+```
+
+# V3 Connector + IRLED2
+
+There are two BOM variants due to it being a panel of two PCBs. It is recommended that you only use an assembler for the surface mount IR LEDs.
+It is more cost effective generally to purchase the components and assemble the entirely thru-hole V3 connector by yourself.
+
+```
+Hardware/Fabrication Files/V3 Connector + IRLED2 Gerbers.zip
+```
+
+**Assemble IRLED2 (Recommended)**
+```
+Hardware/Assembly Files/V3 Connector + IRLED2/IRLED2 Assembly/*
+```
+
+**Assemble V3 Connector + IRLED2**
+**Assembly of V3 Connector with vendor not recommended**
+```
+Hardware/Assembly Files/V3 Connector + IRLED2/V3 Connector + IRLED2 Assembly/*
 ```
 
 
