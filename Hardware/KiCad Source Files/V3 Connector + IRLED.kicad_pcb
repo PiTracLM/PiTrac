@@ -9743,7 +9743,7 @@
 		(path "/432d835a-88ba-42dd-bb70-090557c34607/92541fbf-87b2-493e-bc81-3239d007bf32")
 		(sheetname "/CC Sink/")
 		(sheetfile "Strobe Generation.kicad_sch")
-		(attr through_hole)
+		(attr through_hole dnp)
 		(fp_line
 			(start 7.08 -1.37)
 			(end 7.08 -1.04)

@@ -24,9 +24,9 @@ R2,1,Yageo,KNP1WSJT-52-180R,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_
 R3,1,Yageo,MFR-25FRF52-60K4,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
 R4,1,Yageo,MFR-25FRF52-2K2,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
 R5,1,Yageo,MFR-25FTE52-2K49,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
-"R6,R9",2,Yageo,MFR-25FTE52-120R,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
 R7,1,Yageo,MFR-25FRF52-75K,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
 "R8,R22",2,Yageo,MFR-25FRF52-1K,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
+R9,1,Yageo,MFR-25FTE52-120R,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
 R10,1,Yageo,KNP100JR-73-0R1,Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P15.24mm_Horizontal
 R11,1,Yageo,MFR-25FRF52-604R,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal
 R12,1,Yageo,MFR-25FBF52-6K04,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal

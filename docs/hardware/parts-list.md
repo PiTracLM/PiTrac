@@ -73,7 +73,7 @@ This document provides a comprehensive list of all components needed to build a 
 | 1 | R3 | Yageo | MFR-25FRF52-60K4 | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-60K4/15056
 | 1 | R4 | Yageo | MFR-25FRF52-2K2 | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-2K2/9138953
 | 1 | R5 | Yageo | MFR-25FTE52-2K49 | https://www.digikey.com/en/products/detail/yageo/MFR-25FTE52-2K49/9140029
-| 2 | R6,R9 | Yageo | MFR-25FTE52-120R | https://www.digikey.com/en/products/detail/yageo/MFR-25FTE52-120R/9139747
+| 1 | R9 | Yageo | MFR-25FTE52-120R | https://www.digikey.com/en/products/detail/yageo/MFR-25FTE52-120R/9139747
 | 1 | R7 | Yageo | MFR-25FRF52-75K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-75K/15065
 | 2 | R8,R22 | Yageo | MFR-25FRF52-1K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-1K/14891
 | 1 | R10 | Yageo | KNP100JR-73-0R1 | https://www.digikey.com/en/products/detail/yageo/KNP100JR-73-0R1/9119173

@@ -3106,7 +3106,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp no)
+		(dnp yes)
 		(uuid "72960c08-09e2-4c9b-b846-fde007ae23cf")
 		(property "Reference" "TP2"
 			(at 127.762 47.244 0)

@@ -37,9 +37,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 0.4,
-          "height": 0.1,
-          "width": 0.1
+          "drill": 0.0,
+          "height": 1.0,
+          "width": 2.8
         },
         "silk_line_width": 0.1,
         "silk_text_italic": false,
@@ -464,7 +464,7 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "V3 Connector + IRLED.kicad_pro",
+    "filename": "IRLED Only.kicad_pro",
     "version": 3
   },
   "net_settings": {
@@ -500,8 +500,8 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "V3 Connector + IRLED Files/",
-      "pos_files": "V3 Connector + IRLED Files/",
+      "plot": "IRLED Only Files/",
+      "pos_files": "IRLED Only Files/",
       "specctra_dsn": "",
       "step": "",
       "svg": "",
@@ -511,7 +511,7 @@
   },
   "schematic": {
     "annotate_start_num": 0,
-    "bom_export_filename": "V3 Connector + IRLED Files\\V3 Connector + IRLED2 Bill of Materials.csv",
+    "bom_export_filename": "V3 Connector + IRLED Files\\V3 Connector + IRLED.csv",
     "bom_fmt_presets": [],
     "bom_fmt_settings": {
       "field_delimiter": ",",
@@ -653,7 +653,7 @@
     },
     "net_format_name": "",
     "page_layout_descr_file": "",
-    "plot_directory": "./",
+    "plot_directory": "V3 Connector + IRLED Files/IRLED Only/",
     "space_save_all_events": true,
     "spice_current_sheet_as_root": false,
     "spice_external_command": "spice \"%I\"",
