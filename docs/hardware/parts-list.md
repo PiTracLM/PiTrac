@@ -29,8 +29,8 @@ This document provides a comprehensive list of all components needed to build a 
 |----------|----------|---------|------|
 | 2 | Innomaker GS Camera Module with IMX296 Mono Sensor| RPi compatible GS cameras | https://www.inno-maker.com/product/cam-mipi296raw-trigger/
 | 2 | Pi 5 FPC Camera Cable – 22-pin 0.5 mm to 15-pin 1 mm – 300 mm | Conversion cables for RPi5’s smaller CSI ports | https://www.adafruit.com/product/5819
-| 1 | 6 mm 3 MP Wide Angle Lens | For GS camera | https://www.adafruit.com/product/4563
-| 1 | 1″ × 1″ IR Longpass Filter | Must be a **longpass filter**, allowing >= 700nm light to pass | https://www.edmundoptics.com/p/1quot-x-1quot-optical-cast-plastic-ir-longpass-filter/5421/
+| 2 | 6 mm 3 MP Wide Angle Lens | For GS camera | https://www.adafruit.com/product/4563
+| 1-2 | 1″ × 1″ IR Longpass Filter | Must be a **longpass filter**, allowing >= 700nm light to pass | https://www.edmundoptics.com/p/1quot-x-1quot-optical-cast-plastic-ir-longpass-filter/5421/
 | 1 | USB COB LED Strip Lights – 6.56 ft | For lighting the teed-up ball. **Must produce no infrared light** | https://www.amazon.com/Aclorol-Powered-Daylight-Flexible-Backlight/dp/B0D1FYV3LM/
 
 ## Power Components
@@ -58,7 +58,7 @@ This document provides a comprehensive list of all components needed to build a 
 | 1 | C9 | Murata | RCER71H475K3K1H03B | https://www.digikey.com/en/products/detail/murata-electronics/RCER71H475K3K1H03B/4277828
 | 3 | D1 | Vishay General Semiconductor - Diodes Division | SB150-E3/73 | https://www.digikey.com/en/products/detail/vishay-general-semiconductor-diodes-division/SB150-E3-73/2142188
 | 1 | D2 | Lite-On Inc. | LTL-307G | https://www.digikey.com/en/products/detail/liteon/LTL-307G/669998
-| 2 | D3,D4 | Vishay General Semiconductor - Diodes Division | SD103A-TR | https://www.digikey.com/en/products/detail/vishay-general-semiconductor-diodes-division/SD103A-TR/3104157
+| 1 | D4 | Vishay General Semiconductor - Diodes Division | SD103A-TR | https://www.digikey.com/en/products/detail/vishay-general-semiconductor-diodes-division/SD103A-TR/3104157
 | 1 | D5 | Lite-On Inc. | LTL-307E | https://www.digikey.com/en/products/detail/liteon/LTL-307E/669997
 | 2 | J1,J4 | Amphenol Anytek | YK3210203000G | https://www.digikey.com/en/products/detail/amphenol-anytek/YK3210203000G/4961227
 | 2 | J2,J5 | GCT | USB4085-GF-A | https://www.digikey.com/en/products/detail/gct/USB4085-GF-A/9859662
@@ -73,17 +73,16 @@ This document provides a comprehensive list of all components needed to build a 
 | 1 | R3 | Yageo | MFR-25FRF52-60K4 | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-60K4/15056
 | 1 | R4 | Yageo | MFR-25FRF52-2K2 | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-2K2/9138953
 | 1 | R5 | Yageo | MFR-25FTE52-2K49 | https://www.digikey.com/en/products/detail/yageo/MFR-25FTE52-2K49/9140029
-| 1 | R9 | Yageo | MFR-25FTE52-120R | https://www.digikey.com/en/products/detail/yageo/MFR-25FTE52-120R/9139747
+| 4 | R6,R8,R17,R22 | Yageo | MFR-25FRF52-1K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-1K/14891
 | 1 | R7 | Yageo | MFR-25FRF52-75K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-75K/15065
-| 2 | R8,R22 | Yageo | MFR-25FRF52-1K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-1K/14891
+| 1 | R9 | Yageo | MFR-25FTE52-120R | https://www.digikey.com/en/products/detail/yageo/MFR-25FTE52-120R/9139747
 | 1 | R10 | Yageo | KNP100JR-73-0R1 | https://www.digikey.com/en/products/detail/yageo/KNP100JR-73-0R1/9119173
 | 1 | R11 | Yageo | MFR-25FRF52-604R | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-604R/14870
 | 1 | R12 | Yageo | MFR-25FBF52-6K04 | https://www.digikey.com/en/products/detail/yageo/MFR-25FBF52-6K04/13177
 | 2 | R13,R21 | Yageo | MFR-25FRF52-2K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-2K/14920
 | 1 | R14 | Yageo | MFR-25FRF52-3K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-3K/9139012
 | 1 | R15 | Yageo | MFR-25FRF52-10K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-10K/14626
-| 4 | R16,R19,R20,R23 | Yageo | ZOR-25-R-52-0R | https://www.digikey.com/en/products/detail/yageo/ZOR-25-R-52-0R/18795
-| 1 | R17 | Yageo | MFR-25FRF52-200R | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-200R/14824
+| 3 | R16,R19,R23 | Yageo | ZOR-25-R-52-0R | https://www.digikey.com/en/products/detail/yageo/ZOR-25-R-52-0R/18795
 | 1 | R18 | Yageo | MFR-25FRF52-10K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-10K/14626
 | 1 | TP2 | Keystone Electronics | 5011 | https://www.digikey.com/en/products/detail/keystone-electronics/5011/255333
 | 1 | U1 | Texas Instruments | MC33063AP | https://www.digikey.com/en/products/detail/texas-instruments/MC33063AP/717430

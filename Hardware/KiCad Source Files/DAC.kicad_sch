@@ -2893,7 +2893,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "200R"
+		(property "Value" "1K"
 			(at 203.2 126.9999 0)
 			(effects
 				(font
@@ -2929,7 +2929,7 @@
 				(hide yes)
 			)
 		)
-		(property "Part Number" "MFR-25FRF52-200R"
+		(property "Part Number" "MFR-25FRF52-1K"
 			(at 200.66 125.73 90)
 			(effects
 				(font

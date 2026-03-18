@@ -4716,7 +4716,7 @@
 				)
 			)
 		)
-		(property "Value" "200R"
+		(property "Value" "1K"
 			(at 3.81 2.37 0)
 			(layer "F.Fab")
 			(uuid "b6d388a0-8383-4aac-9eda-8e62872194ae")
@@ -4751,7 +4751,7 @@
 				)
 			)
 		)
-		(property "Part Number" "MFR-25FRF52-200R"
+		(property "Part Number" "MFR-25FRF52-1K"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -9652,7 +9652,7 @@
 				)
 			)
 		)
-		(property "Value" "120R"
+		(property "Value" "1K"
 			(at 3.81 2.37 90)
 			(layer "F.Fab")
 			(uuid "47c1828a-004f-4d8b-b4e2-ecaed7f922c7")
@@ -9687,7 +9687,7 @@
 				)
 			)
 		)
-		(property "Part Number" "MFR-25FTE52-120R"
+		(property "Part Number" "MFR-25FRF52-1K"
 			(at 0 0 90)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -9743,7 +9743,7 @@
 		(path "/432d835a-88ba-42dd-bb70-090557c34607/92541fbf-87b2-493e-bc81-3239d007bf32")
 		(sheetname "/CC Sink/")
 		(sheetfile "Strobe Generation.kicad_sch")
-		(attr through_hole dnp)
+		(attr through_hole)
 		(fp_line
 			(start 7.08 -1.37)
 			(end 7.08 -1.04)
@@ -15340,7 +15340,7 @@
 		(path "/432d835a-88ba-42dd-bb70-090557c34607/c902616c-3aa1-44ec-818c-041b32dcaa9f")
 		(sheetname "/CC Sink/")
 		(sheetfile "Strobe Generation.kicad_sch")
-		(attr through_hole)
+		(attr through_hole dnp)
 		(fp_line
 			(start 7.08 1.37)
 			(end 7.08 1.04)
@@ -21273,7 +21273,7 @@
 		(path "/432d835a-88ba-42dd-bb70-090557c34607/591cfdd4-6b68-4ded-b62d-29816c96c4a4")
 		(sheetname "/CC Sink/")
 		(sheetfile "Strobe Generation.kicad_sch")
-		(attr through_hole)
+		(attr through_hole dnp)
 		(fp_line
 			(start 6.580001 0)
 			(end 5.93 0)

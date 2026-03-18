@@ -3615,7 +3615,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp no)
+		(dnp yes)
 		(uuid "591cfdd4-6b68-4ded-b62d-29816c96c4a4")
 		(property "Reference" "D3"
 			(at 127 104.14 0)
@@ -4201,7 +4201,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "92541fbf-87b2-493e-bc81-3239d007bf32")
 		(property "Reference" "R6"
 			(at 83.82 58.4199 0)
@@ -4212,7 +4212,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "120R"
+		(property "Value" "1K"
 			(at 83.82 60.9599 0)
 			(effects
 				(font
@@ -4248,7 +4248,7 @@
 				(hide yes)
 			)
 		)
-		(property "Part Number" "MFR-25FTE52-120R"
+		(property "Part Number" "MFR-25FRF52-1K"
 			(at 81.28 59.69 90)
 			(effects
 				(font
@@ -5088,7 +5088,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp no)
+		(dnp yes)
 		(uuid "c902616c-3aa1-44ec-818c-041b32dcaa9f")
 		(property "Reference" "R20"
 			(at 114.3 104.648 90)
