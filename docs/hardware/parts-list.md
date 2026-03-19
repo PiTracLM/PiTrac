@@ -18,10 +18,10 @@ This document provides a comprehensive list of all components needed to build a 
 
 | Quantity | Hardware | Purpose | Link |
 |----------|----------|---------|------|
-| 1-2 | Raspberry Pi 5 (8 GB recommended) | Main embedded computer | https://vilros.com/products/raspberry-pi-5?variant=40065551302750
-| 1-2 | Active Cooler Kit | Required to keep temps low and timing consistent | https://a.co/d/dsl7saU
-| 1-2 | MicroSD card (64 GB recommended) | For RPi5 filesystem | https://www.amazon.com/Amazon-Basics-microSDXC-Memory-Adapter/dp/B08TJTB8XS
-| 1-2 | 1ft USB-C to USB-C Cable | For powering RPi5 from connector board | https://www.amazon.com/Anker-Charging-MacBook-Samsung-Nintendo/dp/B09H2DMR4K
+| 1 | Raspberry Pi 5 (8 GB recommended) | Main embedded computer | https://vilros.com/products/raspberry-pi-5?variant=40065551302750
+| 1 | Active Cooler Kit | Required to keep temps low and timing consistent | https://a.co/d/dsl7saU
+| 1 | MicroSD card (64 GB recommended) | For RPi5 filesystem | https://www.amazon.com/Amazon-Basics-microSDXC-Memory-Adapter/dp/B08TJTB8XS
+| 1 | 1ft USB-C to USB-C Cable | For powering RPi5 from connector board | https://www.amazon.com/Anker-Charging-MacBook-Samsung-Nintendo/dp/B09H2DMR4K
 
 ## Camera and Lighting Hardware
 
