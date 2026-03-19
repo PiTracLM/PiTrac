@@ -217,7 +217,7 @@ After assembly, must run current calibration before you will be able to capture 
 
 ### Pi GPIO
 
-- **J3:** 8-pin GPIO header for control signals (see assembly guide for pinout)
+- **J3:** 8-pin GPIO header for control signals (see below for Connection Guide for Raspberry Pi 5)
 
 ### LED Output
 
@@ -227,6 +227,31 @@ After assembly, must run current calibration before you will be able to capture 
 ### Optional
 
 - **J6 (USB-A):** Originally for LED strip, but Pi5 has USB 2.0 ports already - this is redundant
+
+## Connection Guide for Raspberry Pi 5
+
+| V3 Connector Board | Raspberry Pi 5 |
+|----------|----------|
+| GND | GND (Pin 39) |
+| DIAG | GPIO 20 (Pin 38) |
+| CS0 | GPIO 8 (Pin 24) |
+| MOSI | GPIO 10 (Pin 19) |
+| MISO | GPIO 9 (Pin 21) |
+| CLK | GPIO 11 (Pin 23) |
+| CS1 | GPIO 7 (Pin 26) |
+| V3P3 | 3V3 (Pin 1) |
+
+| Global Shutter Camera 2 | Raspberry Pi 5 |
+|----------|----------|
+| Trig+ | GPIO 25 (Pin 22) |
+| Trig- | GND (Pin 20) |
+
+| V3 Connector Board | V3 IRLED Board |
+|----------|----------|
+| VIR+ | VIR+ |
+| VIR- | VIR- |
+
+   ![PiTrac V3 Connection Guide]({{ '/assets/images/hardware/PiTrac_V3_Connection_Guide.svg' | relative_url }})
 
 ## Configuring PiTrac
 
