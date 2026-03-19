@@ -64,7 +64,9 @@ class StrobeOutputCalibrator:
     DIAG_GPIO_PIN = 20
 
     # This is the maximum safe strobe current for the V3 LED
-    DEFAULT_TARGET_LED_CURRENT_SETTING = 7.0 # amps
+    V3_TARGET_LED_CURRENT_SETTING = 10.0 # amps
+    # This is the maximum safe strobe current for the old 100W LED
+    OLD_TARGET_LED_CURRENT_SETTING = 7.0 # amps
 
 
     # We should NEVER go below this LDO voltage
@@ -471,6 +473,7 @@ def main():
     calibrator = StrobeOutputCalibrator()
 
     parser = argparse.ArgumentParser(description="PiTrac Controller Board Strobe Output Calibrator.  This tool iteratively adjusts the board's DAC in order to find the right setting for the desired LED current for the strobe LED circuit.\nWARNING - Setting the LDO voltage below 4.5v can break your Control Board.")
+    parser.add_argument("-o", "--old_LED", action="store_true", help="PiTrac is using old 100W LED. Default behavior is V3 LED")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
     parser.add_argument("-q", "--quiet", action="store_true", help="Quiet output")
     parser.add_argument("-w", "--overwrite", action="store_true", help="Overwrites any existing strobe setting in user_settings.json")
@@ -602,10 +605,13 @@ def main():
                 logger.error(f"The controller board is the wrong version ({control_board_version_value}) for this calibration utility.  Must be using a Verison 3 board.")
                 return 1
 
-            target_LED_current = calibrator.DEFAULT_TARGET_LED_CURRENT_SETTING
-
             if (args.target_output > 0.0):
                 target_LED_current = args.target_output
+            elif (args.old_LED):
+                target_LED_current = calibrator.OLD_TARGET_LED_CURRENT_SETTING
+            else:
+                target_LED_current = calibrator.V3_TARGET_LED_CURRENT_SETTING
+
 
             logger.debug(f"target_LED_current = {target_LED_current}")
 
