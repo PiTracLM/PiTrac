@@ -63,7 +63,7 @@ class StrobeOutputCalibrator:
     # This is the maximum safe strobe current for the V3 LED
     V3_TARGET_LED_CURRENT_SETTING = 10.0 # amps
     # This is the maximum safe strobe current for the old 100W LED
-    OLD_TARGET_LED_CURRENT_SETTING = 7.0 # amps
+    OLD_TARGET_LED_CURRENT_SETTING = 9.0 # amps
 
 
     # We should NEVER go below this LDO voltage
