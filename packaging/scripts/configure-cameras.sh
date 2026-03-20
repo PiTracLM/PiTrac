@@ -148,10 +148,9 @@ configure_boot_config() {
     log_info "  Slot 2 type: ${slot2_type:-none}"
     log_info "  Has InnoMaker: $has_innomaker"
 
-    # Skip if no cameras detected
+    # Issue warning if no cameras detected, but continue to configure base system parameters
     if [[ "$num_cameras" -eq 0 ]]; then
-        log_warn "No cameras detected, skipping config.txt configuration"
-        return 0
+        log_warn "No cameras detected. Camera-specific overlays will be skipped, but base system parameters will be configured."
     fi
 
     backup_config_txt "$config_path"
@@ -186,6 +185,13 @@ camera_auto_detect=0"
 dtparam=spi=on"
     else
         log_info "  dtparam=spi=on already exists, skipping"
+    fi
+
+    if ! grep -q "^dtoverlay=spi1-2cs" "$config_path"; then
+        config_block="$config_block
+dtoverlay=spi1-2cs"
+    else
+        log_info "  dtoverlay=spi1-2cs already exists, skipping"
     fi
 
     if ! grep -q "^force_turbo=" "$config_path"; then
