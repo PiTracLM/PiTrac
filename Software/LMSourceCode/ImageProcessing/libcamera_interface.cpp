@@ -806,7 +806,7 @@ bool ConfigureLibCameraOptions(const GolfSimCamera& camera, RPiCamEncoder& app, 
 
     if (camera_orientation == CameraHardware::CameraOrientation::kUpsideDown) {
      // Tell libcamera to flip the image vertically back to where it should be
-        options->Set().transform = libcamera::Transform::VFlip | libcamera::Transform::HFlip;
+        options->Set().transform = libcamera::Transform::VFlip;
         GS_LOG_MSG(trace, "Flipping still picture upside down.");
     }
     else {
@@ -1174,7 +1174,7 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
 
         if (camera_orientation == CameraHardware::CameraOrientation::kUpsideDown) {
     	    // Tell libcamera to flip the image vertically back to where it should be
-            options->Set().transform = libcamera::Transform::VFlip | libcamera::Transform::HFlip;
+            options->Set().transform = libcamera::Transform::VFlip;
             GS_LOG_MSG(trace, "Flipping still picture upside down.");
         }
 	else {
@@ -1321,9 +1321,10 @@ bool CheckForBallEnhanced(GolfBall& ball, cv::Mat& img) {
             GS_LOG_MSG(warning, "YOLO model not available, using legacy detection");
         } else {
             std::vector<GsCircle> detected_circles;
+            // Don't worry if there is no ball.  We're not certain there would be.
             bool detected = golf_sim::BallImageProc::DetectBallsONNX(img, 
                                                           golf_sim::BallImageProc::BallSearchMode::kFindPlacedBall,
-                                                          detected_circles);
+                                                          detected_circles, false);
             
             if (detected && !detected_circles.empty()) {
                 GsCircle best_circle;
@@ -1352,6 +1353,7 @@ bool CheckForBallEnhanced(GolfBall& ball, cv::Mat& img) {
         }
     }
 
+    // We don't necessarily expect a ball so don't create any warnings if we don't find one.
     bool expectBall = false;
     return camera.GetCalibratedBall(camera, img, ball, search_center, expectBall);
 }
@@ -1376,7 +1378,6 @@ bool CheckForBallLegacy(GolfBall& ball, cv::Mat& img) {
     camera.camera_hardware_.firstCannedImageFileName = std::string("/mnt/VerdantShare/dev/GolfSim/LM/Images/") + "FirstWaitingImage";
     camera.camera_hardware_.firstCannedImage = img;
 
-    // If we are checking to see if a ball
     if (!TakeRawPicture(camera, img)) {
         GS_LOG_MSG(error, "Failed to TakeRawPicture.");
         return false;
@@ -1384,6 +1385,7 @@ bool CheckForBallLegacy(GolfBall& ball, cv::Mat& img) {
 
     cv::Vec2i search_area_center = camera.GetExpectedBallCenter();
 
+    // We don't necessarily expect a ball so don't create any warnings if we don't find one.
     bool expectBall = false;
     bool success = camera.GetCalibratedBall(camera, img, ball, search_area_center, expectBall);
 
@@ -1482,7 +1484,7 @@ bool WaitForCam2Trigger(cv::Mat& return_image) {
 	// We know we are using camera 2
         if (GolfSimCamera::kSystemSlot2CameraOrientation == CameraHardware::CameraOrientation::kUpsideDown) {
     	    // Tell libcamera to flip the image vertically back to where it should be
-            options->Set().transform = libcamera::Transform::VFlip | libcamera::Transform::HFlip;
+            options->Set().transform = libcamera::Transform::VFlip;
             GS_LOG_MSG(trace, "Flipping still picture upside down.");
         }
 	else {

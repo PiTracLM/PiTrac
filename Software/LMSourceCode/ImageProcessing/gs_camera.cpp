@@ -1,3 +1,4 @@
+
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (C) 2022-2025, Verdant Consultants, LLC.
@@ -841,7 +842,7 @@ namespace golf_sim {
                                                 const cv::Vec2i& expectedBallCenter) {
 
             if (timeDelayuS == 0) {
-                GS_LOG_MSG(error, "In analyzeShotImages, timeDelayuS was 0.");
+                GS_LOG_MSG(error, "In analyzeShotImages, timeDelayuS was " + std::to_string(timeDelayuS) + ".");
             }
 
             GolfBall ball1;
@@ -3421,7 +3422,7 @@ namespace golf_sim {
             GolfBall calibrated_ball;
 
             /*****************************  Get the first (teed) ball  ***************************/
-            bool success = camera_1.GetCalibratedBall(camera_1, ball1_mat, calibrated_ball, expectedBallCenter);
+            bool success = camera_1.GetCalibratedBall(camera_1, ball1_mat, calibrated_ball, expectedBallCenter, true /* We expect the ball*/);
 
             if (!success) {
                 GS_LOG_TRACE_MSG(trace, "ProcessReceivedCam2Image - Failed to GetCalibratedBall.");

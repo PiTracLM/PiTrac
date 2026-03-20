@@ -599,7 +599,8 @@ namespace golf_sim {
 
         auto getball_start = std::chrono::high_resolution_clock::now();
         GS_LOG_TRACE_MSG(trace, "GetBall called with PREBLUR_IMAGE = " + std::to_string(PREBLUR_IMAGE) + " IS_COLOR_MASKING = " +
-                    std::to_string(IS_COLOR_MASKING) + " FINAL_BLUR = " + std::to_string(FINAL_BLUR) + " search_mode = " + std::to_string(search_mode));
+                    std::to_string(IS_COLOR_MASKING) + " FINAL_BLUR = " + std::to_string(FINAL_BLUR) + " search_mode = " + std::to_string(search_mode) 
+                    + ", report_find_failures = " + std::string((report_find_failures ? "True" : "False")));
 
         if (rgbImg.empty()) {
             GS_LOG_MSG(error, "GetBall called with no image to work with (rgbImg)");
@@ -614,7 +615,7 @@ namespace golf_sim {
         // *** ONNX DETECTION INTEGRATION - Process through full trajectory analysis pipeline ***
         if (detection_method == "experimental" || detection_method == "experimental_sahi") {
             std::vector<GsCircle> onnx_circles;
-            if (DetectBallsONNX(rgbImg, search_mode, onnx_circles)) {
+            if (DetectBallsONNX(rgbImg, search_mode, onnx_circles, report_find_failures)) {
                 // Convert GsCircle results to GolfBall objects for trajectory analysis
                 return_balls.clear();
                 for (size_t i = 0; i < onnx_circles.size(); ++i) {
@@ -634,8 +635,13 @@ namespace golf_sim {
                 }
 
                 return !return_balls.empty();
-            } else {
-                GS_LOG_MSG(warning, "ONNX detection failed - no balls found");
+            }
+            else {
+                if (report_find_failures) {
+                    // We might be waiting for a ball to appear.  In that case,
+		    // the failure to find one is nothing to worry about.
+                    GS_LOG_MSG(warning, "ONNX detection failed - no balls found");
+                }
                 return false;
             }
         }
@@ -1132,7 +1138,7 @@ namespace golf_sim {
             GS_LOG_TRACE_MSG(trace, "Using ONNX detection - bypassing adaptive parameter tuning");
             
             std::vector<GsCircle> test_circles;
-            if (DetectBalls(final_search_image, search_mode, test_circles)) {
+            if (DetectBalls(final_search_image, search_mode, test_circles, report_find_failures)) {
 
                 GS_LOG_MSG(trace, "DetectBalls succeeded - initially found " + std::to_string(test_circles.size()) + " circles.");
 
@@ -4153,7 +4159,8 @@ namespace golf_sim {
      * Routes detection to HoughCircles or ONNX based on kStrobedBallDetectionMethod configuration
      */
     bool BallImageProc::DetectBalls(const cv::Mat& preprocessed_img, BallSearchMode search_mode, 
-                                   std::vector<GsCircle>& detected_circles) {
+                                   std::vector<GsCircle>& detected_circles,
+                                    bool report_find_failures) {
         GS_LOG_TRACE_MSG(trace, "BallImageProc::DetectBalls - Method: " + kStrobedBallDetectionMethod);
 
 		std::string detection_method = (search_mode == BallSearchMode::kFindPlacedBall) ? kBallPlacementDetectionMethod : kStrobedBallDetectionMethod;
@@ -4161,7 +4168,7 @@ namespace golf_sim {
         if (detection_method == "legacy") {
             return DetectBallsHoughCircles(preprocessed_img, search_mode, detected_circles);
         } else if (detection_method == "experimental" || detection_method == "experimental_sahi") {
-            return DetectBallsONNX(preprocessed_img, search_mode, detected_circles);
+            return DetectBallsONNX(preprocessed_img, search_mode, detected_circles, report_find_failures);
         } else {
             GS_LOG_MSG(error, "Unknown detection method: " + detection_method + ". Falling back to legacy.");
             return DetectBallsHoughCircles(preprocessed_img, search_mode, detected_circles);
@@ -4306,8 +4313,10 @@ namespace golf_sim {
         }
     }
 
-    bool BallImageProc::DetectBallsONNX(const cv::Mat& preprocessed_img, BallSearchMode search_mode,
-                                       std::vector<GsCircle>& detected_circles) {
+    bool BallImageProc::DetectBallsONNX(const cv::Mat& preprocessed_img, 
+                                        BallSearchMode search_mode,
+                                        std::vector<GsCircle>& detected_circles,
+                                        bool report_find_failures) {
         GS_LOG_TRACE_MSG(trace, "BallImageProc::DetectBallsONNX - Dispatching to backend: " + kONNXBackend);
 
         // Dual-Backend Dispatcher: Try ONNX Runtime first, fallback to OpenCV DNN if needed
@@ -4315,8 +4324,15 @@ namespace golf_sim {
             if (DetectBallsONNXRuntime(preprocessed_img, search_mode, detected_circles)) {
                 return true;
             } else if (kONNXRuntimeAutoFallback) {
-                GS_LOG_MSG(warning, "ONNX Runtime detection failed, falling back to OpenCV DNN");
-                return DetectBallsOpenCVDNN(preprocessed_img, search_mode, detected_circles);
+                if (!report_find_failures) {
+                    // We are probably waiting for a ball to get teed up, so don't sweat it
+                    // if we don't find one.
+                    return false;
+                }
+                else {
+                    GS_LOG_MSG(warning, "ONNX Runtime detection failed, falling back to OpenCV DNN");
+                    return DetectBallsOpenCVDNN(preprocessed_img, search_mode, detected_circles);
+                }
             } else {
                 return false;
             }

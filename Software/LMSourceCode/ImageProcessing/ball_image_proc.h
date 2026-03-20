@@ -273,15 +273,16 @@ public:
     // The returned balls will have at least the following ball information accurately set:
     //      circle
     // If chooseLargestFinalBall is set true, then even a poorer-matching final ball candidate will be chosen over a smaller, better-scored candidate.
-    // If expectingBall is true, then the system will not be as picky when trying to find a ball.  Otherwise, if false (when the system does not
+    // If report_find_failures is true, then the system will not be as picky when trying to find a ball.
+    // and will not log warnings or errors if the ball is not found.  Otherwise, if false (when the system does not
     // know if a ball will be present), the system will require a more perfect ball in order to reduce false positives.
     bool GetBall(  const cv::Mat& img, 
                    const GolfBall& baseBallWithSearchParams, 
                    std::vector<GolfBall> &return_balls, 
                    cv::Rect& expectedBallArea, 
                    BallSearchMode search_mode,
-                   bool chooseLargestFinalBall=false,
-                   bool report_find_failures =true );
+                   bool chooseLargestFinalBall = false,
+                   bool report_find_failures = true );
 
     bool BallIsPresent(const cv::Mat& img);
 
@@ -342,9 +343,15 @@ public:
     bool PreProcessStrobedImage(cv::Mat& search_image, BallSearchMode search_mode);
 
     // ONNX Detection Methods
-    static bool DetectBalls(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
+    static bool DetectBalls(const cv::Mat& preprocessed_img, 
+                            BallSearchMode search_mode, 
+                            std::vector<GsCircle>& detected_circles, 
+                            bool report_find_failures);
     static bool DetectBallsHoughCircles(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
-    static bool DetectBallsONNX(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
+    static bool DetectBallsONNX(const cv::Mat& preprocessed_img, 
+                                BallSearchMode search_mode, 
+                                std::vector<GsCircle>& detected_circles,
+                                bool report_find_failures);
 
     static bool DetectBallsONNXRuntime(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
     static bool DetectBallsOpenCVDNN(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
