@@ -16,9 +16,6 @@ WARNING ------  This code has not been tested against actual hardware yet, so it
 
 """
 import spidev
-# Will need to run 
-# sudo apt install python3-rpi.gpio
-# sudo apt install python3-lgpio
 from gpiozero import LED
 import time
 import sys
@@ -48,8 +45,8 @@ class StrobeOutputCalibrator:
     # so we can read them later if needed.  These are the search keys for those values in the JSON file.
     DAC_SETTING_JSON_PATH = "gs_config.strobing.kDAC_setting"
 
-    # These are the more-or-less standard SPI bus and device numbers for the Raspberry Pi. 
-    SPI_BUS = 0
+    # SPI bus 1 (SPI1/auxiliary SPI) and device numbers for the Raspberry Pi.
+    SPI_BUS = 1
     SPI_DAC_DEVICE = 0 # DAC is on CS0
     SPI_ADC_DEVICE = 1 # ADC is on CS1 
 
@@ -59,9 +56,9 @@ class StrobeOutputCalibrator:
     # This is the pin that we will use to toggle the strobe output on and off through the DIAG pin 
     # on the Connector Board.  The strobe needs to be on for the ADC to read the LED current, 
     # so we will toggle this pin on just before reading the ADC, and then toggle it off just after.  
-    # Note - this corresponds to the BCM pin number, not the physical pin number.  
-    # So this is physical pin 38 on the Raspberry Pi header.
-    DIAG_GPIO_PIN = 20
+    # Note - this corresponds to the BCM pin number, not the physical pin number.
+    # So this is physical pin 19 on the Raspberry Pi header.
+    DIAG_GPIO_PIN = 10
 
     # This is the maximum safe strobe current for the V3 LED
     V3_TARGET_LED_CURRENT_SETTING = 10.0 # amps
