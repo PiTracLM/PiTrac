@@ -276,7 +276,7 @@
         "2": "Version 2.0",
         "3": "Version 3.0"
       },
-      "default": "1",
+      "default": "3",
       "requiresRestart": true,
       "passedVia": "json",
       "passedTo": "both"
