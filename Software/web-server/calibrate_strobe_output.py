@@ -5,9 +5,9 @@ Copyright (C) 2022-2025, Verdant Consultants, LLC.
 
 PiTrac Controller Board Strobe Output Calibration Module
 
-Adjusts the strobe output to a default (or selected) current output by sending a range of values to the digital 
-potentiometer on the board (via SPI) and then repeatedly checking the ADC to see if the desired output has been
-reached (as the LED current iteratively goes down as up DAC output goes down).
+Adjusts the strobe output to a default (or selected) current output by sending a range of values to the DAC
+on the board (via SPI) and then repeatedly checking the ADC to see if the desired output has been
+reached (as the LED current iteratively goes down as the DAC output goes down).
 
 WARNING ------  This code has not been tested against actual hardware yet, so it could still be harmful
                 to whatever hardware you are running on.  Caveat emptor!
@@ -71,7 +71,7 @@ class StrobeOutputCalibrator:
     ABSOLUTE_HIGHEST_LDO_VOLTAGE = 11 # volts
 
     MAX_DAC_SETTING = 0xFF # 255  # It's an 8-bit DAC, so max value is 2^8 - 1
-    MIN_DAC_SETTING = 0 # Note - 
+    MIN_DAC_SETTING = 0
 
     # This value is just a guess for now and works on 1 board.  It should be high enough so that the LDO voltage in all devices
     # (even accounting for variations) will be low enough not to hurt our standard strobe, but high enough to be above the minimum LDO voltage.
@@ -82,7 +82,7 @@ class StrobeOutputCalibrator:
     # For the MCP4801 commands, see: https://ww1.microchip.com/downloads/en/DeviceDoc/22244B.pdf
     MCP4801_BASE_WRITE_CMD_SET_OUTPUT = 0b00110000  # Standard (1x) gain (bit 13) (Vout=Vref*D/4096), VREF buffered, active, no shutdown, D4-D7 are 0 
 
-    # For the MCP3202 commands, see: https://www.google.com/aclk?sa=L&ai=DChsSEwj3ncmJqIKTAxWQK60GHXKrGJQYACICCAEQABoCcHY&ae=2&co=1&ase=2&gclid=CjwKCAiAh5XNBhAAEiwA_Bu8Fae9UWeNq0dHjoQ9N4wHFrRnEvETyzrYVl5xmGvUyNR0uFNVP5IlQRoCaAcQAvD_BwE&cid=CAASWeRo2UUWEQuONJENmHLbquopI4y29-vAFb0frx7hQM6bjuRo_TZk1PIihnFuJO8jpNwTGiEFOnOQWgmJHHFTivCGeaaKvgUk8x67yLoRpN_bIoGgiweiu6Vk&cce=2&category=acrcp_v1_71&sig=AOD64_3LJYqvTzD3ozkW0pkVDNgovi6vvA&q&nis=4&adurl&ved=2ahUKEwi1w8KJqIKTAxXKFDQIHVsXEX8Q0Qx6BAgPEAE
+    # For the MCP3202 commands, see: https://ww1.microchip.com/downloads/en/DeviceDoc/21034F.pdf
     MCP3202_READ_CH0_SINGLE_ENDED_CMD = 0 | 0x80  # Channel 0, single-ended - LED Current Sense Resistor Voltage
     MCP3202_READ_CH1_SINGLE_ENDED_CMD = 0 | 0xc0  # Channel 1, single-ended - LDO Gate Voltage
 
@@ -110,7 +110,7 @@ class StrobeOutputCalibrator:
             # Set SPI speed
             self.spi_dac.max_speed_hz = self.SPI_MAX_SPEED_HZ
 
-            # Set SPI mode common modes are 0 or 3)
+            # Set SPI mode (common modes are 0 or 3)
             self.spi_dac.mode = 0b00 # Mode 0
 
 
@@ -121,7 +121,7 @@ class StrobeOutputCalibrator:
             # Set SPI speed
             self.spi_adc.max_speed_hz = self.SPI_MAX_SPEED_HZ
 
-            # Set SPI mode common modes are 0 or 3)
+            # Set SPI mode (common modes are 0 or 3)
             self.spi_adc.mode = 0b00 # Mode 0
 
 
@@ -163,43 +163,30 @@ class StrobeOutputCalibrator:
         if self.diag_pin is not None:
             self.diag_pin.close()
 
-    def get_ADC_value_CH0(self):
-        # Start bit is always the first byte, then the channel and mode bits are combined into the second byte, 
+    def _get_ADC_value(self, channel_cmd):
+        # Start bit is always the first byte, then the channel and mode bits are combined into the second byte,
         # and the third byte is just a timing placeholder for the response, because we need the last 2 of 3 bytes of response,
         # but our command is only 2 bytes
-        message_to_send = [0x01, self.MCP3202_READ_CH0_SINGLE_ENDED_CMD, 0x00]
+        message_to_send = [0x01, channel_cmd, 0x00]
         logger.debug(f"Message to send to ADC (to get value): {[format(b, '02x') for b in message_to_send]}")
 
         response_bytes = self.spi_adc.xfer2(message_to_send)
 
-        # The result is 12-bits.  The first byte returned is just random - the MISO line is null 
-        # when the command is sent, so nothing was really sent.  
+        # The result is 12-bits.  The first byte returned is just random - the MISO line is null
+        # when the command is sent, so nothing was really sent.
         # The second byte contains the top 4 bits (masked with 0x0F as some bits may be null)
         # The third byte contains the least-significant 8 bits
-    
+
         # Put the top 4 bits and lower 8 bits together to get the full 12-bit ADC value
         adc_value = (response_bytes[1] & 0x0F) << 8 | response_bytes[2]
 
         return adc_value
+
+    def get_ADC_value_CH0(self):
+        return self._get_ADC_value(self.MCP3202_READ_CH0_SINGLE_ENDED_CMD)
 
     def get_ADC_value_CH1(self):
-        # Start bit is always the first byte, then the channel and mode bits are combined into the second byte, 
-        # and the third byte is just a timing placeholder for the response, because we need the last 2 of 3 bytes of response,
-        # but our command is only 2 bytes
-        message_to_send = [0x01, self.MCP3202_READ_CH1_SINGLE_ENDED_CMD, 0x00]
-        logger.debug(f"Message to send to ADC (to get value): {[format(b, '02x') for b in message_to_send]}")
-
-        response_bytes = self.spi_adc.xfer2(message_to_send)
-
-        # The result is 12-bits.  The first byte returned is just random - the MISO line is null 
-        # when the command is sent, so nothing was really sent.  
-        # The second byte contains the top 4 bits (masked with 0x0F as some bits may be null)
-        # The third byte contains the least-significant 8 bits
-    
-        # Put the top 4 bits and lower 8 bits together to get the full 12-bit ADC value
-        adc_value = (response_bytes[1] & 0x0F) << 8 | response_bytes[2]
-
-        return adc_value
+        return self._get_ADC_value(self.MCP3202_READ_CH1_SINGLE_ENDED_CMD)
 
 
     def get_LDO_voltage(self):
@@ -241,19 +228,21 @@ class StrobeOutputCalibrator:
             # --- BEGIN DETERMINISTIC HARDWARE BLOCK ---
             diag.on()
             response_bytes = spi.xfer2(message_to_send)
-            diag.off()
             # --- END DETERMINISTIC HARDWARE BLOCK ---
 
         finally:
             # --- RETURN TO NORMAL OS BEHAVIOR ---
-        
+
+            # Always turn off DIAG first — leaving it HIGH means the strobe stays on
+            diag.off()
+
             # Give up real-time priority (return to normal scheduler)
             try:
                 param = os.sched_param(0)
                 os.sched_setscheduler(0, os.SCHED_OTHER, param)
             except (PermissionError, AttributeError):
                 pass
-                
+
             # Turn memory management back on
             gc.enable() 
         
@@ -332,125 +321,127 @@ class StrobeOutputCalibrator:
 
     def calibrate_board(self, target_LED_current):
 
-            # find the minimum safe LDO voltage to supply the MCP1407 gate driver
-            DAC_start_setting, LDO_voltage = self.find_DAC_start_setting()
-            
-            # If even a DAC value of 0 was below the ABSOLUTE_LOWEST_LDO_VOLTAGE then fail calibration
-            if DAC_start_setting < 0:
-                logger.debug(f"DAC value of 0 is below minimum LDO voltage ({format(self.ABSOLUTE_LOWEST_LDO_VOLTAGE, '0.2f')}): {format(LDO_voltage, '0.2f')}")
-                return False, -1, -1
+        # find the minimum safe LDO voltage to supply the MCP1407 gate driver
+        DAC_start_setting, LDO_voltage = self.find_DAC_start_setting()
 
+        # If even a DAC value of 0 was below the ABSOLUTE_LOWEST_LDO_VOLTAGE then fail calibration
+        if DAC_start_setting < 0:
+            logger.debug(f"DAC value of 0 is below minimum LDO voltage ({format(self.ABSOLUTE_LOWEST_LDO_VOLTAGE, '0.2f')}): {format(LDO_voltage, '0.2f')}")
+            return False, -1, -1
 
-            logger.debug(f"calibrate_board called with target_LED_current = {target_LED_current}, DAC_start_setting = 0x{format(DAC_start_setting, '02x')}")
+        logger.debug(f"calibrate_board called with target_LED_current = {target_LED_current}, DAC_start_setting = 0x{format(DAC_start_setting, '02x')}")
 
-            # Now, starting at the max DAC value (0xFF)
-            # we will iteratively decrease the DAC setting until we get to 
-            # the desired ADC output (or just under it)
+        # Now, starting at the max DAC value (0xFF)
+        # we will iteratively decrease the DAC setting until we get to
+        # the desired ADC output (or just under it)
 
-            current_DAC_setting = DAC_start_setting
-            final_DAC_setting = self.MIN_DAC_SETTING
+        current_DAC_setting = DAC_start_setting
+        final_DAC_setting = self.MIN_DAC_SETTING
 
-            # just picking a number that we should always be above at the start of the loop, 
-            # so that we can save the first reading as the best one so far even if it's not 
-            # above the target
-            max_LED_current_so_far = 0.0  
+        # just picking a number that we should always be above at the start of the loop,
+        # so that we can save the first reading as the best one so far even if it's not
+        # above the target
+        max_LED_current_so_far = 0.0
 
-            # We will start at the max DAC setting and then count down while 
-            # looking for the point where the corresponding LED current goes just above the target_LED_current, 
-            # then increase 1 value to ensure we are <= target_LED_current.  
+        # We will start at the max DAC setting and then count down while
+        # looking for the point where the corresponding LED current goes just above the target_LED_current,
+        # then increase 1 value to ensure we are <= target_LED_current.
 
-            logger.debug(f"calibrate_board starting loop.  Desired output is {target_LED_current}")
+        logger.debug(f"calibrate_board starting loop.  Desired output is {target_LED_current}")
 
-            # Stop immediately if we ever have an error
-            while (current_DAC_setting >= self.MIN_DAC_SETTING):
+        # Stop immediately if we ever have an error
+        while (current_DAC_setting >= self.MIN_DAC_SETTING):
 
-                self.set_DAC(current_DAC_setting)
+            self.set_DAC(current_DAC_setting)
 
-                # Wait a moment for the setting to take effect
-                self.short_pause()
+            # Wait a moment for the setting to take effect
+            self.short_pause()
 
-                # check the LDO voltage to ensure that we are within the safe bounds
-                LDO_voltage = self.get_LDO_voltage()
-                # if we are below the ABSOLUTE_LOWEST_LDO_VOLTAGE, it is unsafe to pulse the DIAG pin. Decrease DAC value and continue
-                if LDO_voltage < self.ABSOLUTE_LOWEST_LDO_VOLTAGE:
-                    logger.debug(f"Measured LDO_voltage ({LDO_voltage}) was below ABSOLUTE_LOWEST_LDO_VOLTAGE of {self.ABSOLUTE_LOWEST_LDO_VOLTAGE} volts.  Trying next DAC value.")
-                    # Continue counting down
-                    final_DAC_setting = current_DAC_setting
-                    current_DAC_setting -= 1
-                    continue
-                
-                # if we are above the ABSOLUTE_HIGHEST_LDO_VOLTAGE, then we have to stop and fail the calibration
-                if LDO_voltage > self.ABSOLUTE_HIGHEST_LDO_VOLTAGE:
-                    logger.debug(f"Measured LDO_voltage ({LDO_voltage}) was above ABSOLUTE_HIGHEST_LDO_VOLTAGE of {self.ABSOLUTE_HIGHEST_LDO_VOLTAGE} volts.  Stopping calibration, as something is wrong.")
-                    return False, -1, -1
-                
-                # Note reading the LED current also pulses the strobe through the DIAG pin,
-                # which is necessary to get a valid reading, but also means that we are toggling 
-                # the strobe on and off repeatedly during this calibration process, which is not ideal.  
-                # But we need to do it in order to get accurate LED current readings.
-                LED_current = self.get_LED_current()
-                logger.debug(f"current_DAC_setting: {format(current_DAC_setting, '02x')}, LED_current: {LED_current}")
-
-                # As we are slowly increasing the LED current, have we reached our desired set-point for the LED current yet?
-                if LED_current > target_LED_current:
-                    logger.debug(f"    ---> Reached above the target_LED_current ({target_LED_current}). LED_current is: {LED_current}.  Stopping calibration here...")
-                    final_DAC_setting = current_DAC_setting + 1  # Step back to the last setting that was just before we reached our target
-                    break
-
-                # We have not yet reached the target.  TBD - This is a little redundant, maybe change
-                # Keep track of where we were.
-                if LED_current > max_LED_current_so_far:
-
-                    # Save the current output as the best one so far, even if it's not over the target, 
-                    # because we want to get as close as possible without going over
-                    max_LED_current_so_far = LED_current
-
+            # check the LDO voltage to ensure that we are within the safe bounds
+            LDO_voltage = self.get_LDO_voltage()
+            # if we are below the ABSOLUTE_LOWEST_LDO_VOLTAGE, it is unsafe to pulse the DIAG pin. Decrease DAC value and continue
+            if LDO_voltage < self.ABSOLUTE_LOWEST_LDO_VOLTAGE:
+                logger.debug(f"Measured LDO_voltage ({LDO_voltage}) was below ABSOLUTE_LOWEST_LDO_VOLTAGE of {self.ABSOLUTE_LOWEST_LDO_VOLTAGE} volts.  Trying next DAC value.")
                 # Continue counting down
                 final_DAC_setting = current_DAC_setting
                 current_DAC_setting -= 1
+                continue
 
-            # There are a couple of possible edge cases here.  And either of them indicate that something probably went wrong somewhere even if we
-            # thought we had a success.
-            # If so, err on the safe side and consider this a failure
-            if current_DAC_setting <= self.MIN_DAC_SETTING:
-                logger.debug(f"Reached MIN_DAC_SETTING ({self.MIN_DAC_SETTING}) without ever reaching target_LED_current ({target_LED_current}).  This generally indicates a problem.  Failing calibration.")
-                return False, -1, -1
-            if current_DAC_setting >= self.MAX_DAC_SETTING:
-                logger.debug(f"The MAX_DAC_SETTING resulted in an LED current above the target.  This generally indicates a problem.  Failing calibration.")
+            # if we are above the ABSOLUTE_HIGHEST_LDO_VOLTAGE, then we have to stop and fail the calibration
+            if LDO_voltage > self.ABSOLUTE_HIGHEST_LDO_VOLTAGE:
+                logger.debug(f"Measured LDO_voltage ({LDO_voltage}) was above ABSOLUTE_HIGHEST_LDO_VOLTAGE of {self.ABSOLUTE_HIGHEST_LDO_VOLTAGE} volts.  Stopping calibration, as something is wrong.")
                 return False, -1, -1
 
-            # Now, using the best DAC setting we found, average the output voltage a few times to 
-            # get a more accurate reading of the output voltage at that setting
-            # take an average of n pulses
-            n = 10
-            while True:
-                self.set_DAC(final_DAC_setting)
+            # Note reading the LED current also pulses the strobe through the DIAG pin,
+            # which is necessary to get a valid reading, but also means that we are toggling
+            # the strobe on and off repeatedly during this calibration process, which is not ideal.
+            # But we need to do it in order to get accurate LED current readings.
+            LED_current = self.get_LED_current()
+            logger.debug(f"current_DAC_setting: {format(current_DAC_setting, '02x')}, LED_current: {LED_current}")
+
+            # As we are slowly increasing the LED current, have we reached our desired set-point for the LED current yet?
+            if LED_current > target_LED_current:
+                logger.debug(f"    ---> Reached above the target_LED_current ({target_LED_current}). LED_current is: {LED_current}.  Stopping calibration here...")
+                final_DAC_setting = current_DAC_setting + 1  # Step back to the last setting that was just before we reached our target
+                break
+
+            # We have not yet reached the target.  TBD - This is a little redundant, maybe change
+            # Keep track of where we were.
+            if LED_current > max_LED_current_so_far:
+
+                # Save the current output as the best one so far, even if it's not over the target,
+                # because we want to get as close as possible without going over
+                max_LED_current_so_far = LED_current
+
+            # Continue counting down
+            final_DAC_setting = current_DAC_setting
+            current_DAC_setting -= 1
+
+        # There are a couple of possible edge cases here.  And either of them indicate that something probably went wrong somewhere even if we
+        # thought we had a success.
+        # If so, err on the safe side and consider this a failure
+        if current_DAC_setting <= self.MIN_DAC_SETTING:
+            logger.debug(f"Reached MIN_DAC_SETTING ({self.MIN_DAC_SETTING}) without ever reaching target_LED_current ({target_LED_current}).  This generally indicates a problem.  Failing calibration.")
+            return False, -1, -1
+        if current_DAC_setting >= self.MAX_DAC_SETTING:
+            logger.debug(f"The MAX_DAC_SETTING resulted in an LED current above the target.  This generally indicates a problem.  Failing calibration.")
+            return False, -1, -1
+
+        # Now, using the best DAC setting we found, average the output voltage a few times to
+        # get a more accurate reading of the output voltage at that setting
+        # take an average of n pulses
+        n = 10
+        while True:
+            self.set_DAC(final_DAC_setting)
+            self.short_pause()
+
+            # check if LDO voltage is above the minimum
+            LDO_voltage = self.get_LDO_voltage()
+            if LDO_voltage < self.ABSOLUTE_LOWEST_LDO_VOLTAGE:
+                # Fallback to the last known good measurement
+                final_DAC_setting -= 1
+                break
+
+            # Take an average of n pulses
+            LED_current_sum = 0
+            for _ in range(n):
+                LED_current_sum += self.get_LED_current()
                 self.short_pause()
-                
-                # check if LDO voltage is above the minimum
-                LDO_voltage = self.get_LDO_voltage()
-                if LDO_voltage < self.ABSOLUTE_LOWEST_LDO_VOLTAGE:
-                    # Fallback to the last known good measurement
-                    final_DAC_setting -= 1
-                    break
+            LED_current = LED_current_sum / n
 
-                # Take an average of n pulses
-                LED_current_sum = 0
-                for _ in range(n):
-                    LED_current_sum += self.get_LED_current()
-                    self.short_pause()
-                LED_current = LED_current_sum / n
-                
-                if LED_current > target_LED_current:
-                    # Current is still slightly too high, step the DAC setting
-                    final_DAC_setting += 1
-                else:                    
-                    # We are at or below the target current, we're done
-                    break
+            if LED_current > target_LED_current:
+                # Current is still slightly too high, step the DAC setting
+                final_DAC_setting += 1
+                if final_DAC_setting > self.MAX_DAC_SETTING:
+                    logger.error(f"Averaging loop exceeded MAX_DAC_SETTING ({self.MAX_DAC_SETTING}) without reaching target current. Failing calibration.")
+                    return False, -1, -1
+            else:
+                # We are at or below the target current, we're done
+                break
 
-            logger.debug(f"calibrate_board -- final_DAC_setting: {format(final_DAC_setting, '02x')}, LED_current: {LED_current}")
+        logger.debug(f"calibrate_board -- final_DAC_setting: {format(final_DAC_setting, '02x')}, LED_current: {LED_current}")
 
-            return True, final_DAC_setting, LED_current
+        return True, final_DAC_setting, LED_current
 
 
     def cleanup_for_exit(self):
@@ -474,7 +465,7 @@ def main():
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
     parser.add_argument("-q", "--quiet", action="store_true", help="Quiet output")
     parser.add_argument("-w", "--overwrite", action="store_true", help="Overwrites any existing strobe setting in user_settings.json")
-    parser.add_argument("--target_output", default=0,type=float, help="Set target LED current output (in volts) (ADVANCED)")
+    parser.add_argument("--target_output", default=0,type=float, help="Set target LED current output (in amps) (ADVANCED)")
     parser.add_argument("--ignore", action="store_true", help="Attempt calibration even if the Controller Board version is not 3.0 (ADVANCED)")
     action_group = parser.add_mutually_exclusive_group()
     action_group.add_argument("-p", "--print_settings", action="store_true", help="Print the current DAC setting and last ADC measurement from the user_settings.json file")
@@ -497,11 +488,11 @@ def main():
 
     logger.debug(f"Calibrator initialized")
 
-    if calibrator.setup_spi_channels() == False:
+    if not calibrator.setup_spi_channels():
         logger.error(f"SPI initialization failed.  Cannot proceed with calibration.")
         return 1
 
-    if calibrator.open_gpio_system() == False:
+    if not calibrator.open_gpio_system():
         logger.error(f"GPIO initialization failed.  Cannot proceed with calibration.")
         calibrator.close_gpio_system()
         return 1
@@ -632,11 +623,9 @@ def main():
 
     except KeyboardInterrupt:
         print("\nCtrl+C pressed. Performing cleanup...")
-        # Add your cleanup code here (e.g., closing files, releasing resources)
-        calibrator.cleanup_for_exit()
 
     except Exception as e:
-        logger.debug(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}")
         calibrator.set_DAC_to_safest_level()
 
         return 1 # Failure
