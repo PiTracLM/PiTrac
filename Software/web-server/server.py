@@ -29,6 +29,7 @@ from listeners import ActiveMQListener
 from managers import ConnectionManager, ShotDataStore
 from parsers import ShotDataParser
 from pitrac_manager import PiTracProcessManager
+from strobe_calibration_manager import StrobeCalibrationManager
 from testing_tools_manager import TestingToolsManager
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ class PiTracServer:
         self.pitrac_manager = PiTracProcessManager(self.config_manager)
         self.calibration_manager = CalibrationManager(self.config_manager)
         self.testing_manager = TestingToolsManager(self.config_manager)
+        self.strobe_calibration_manager = StrobeCalibrationManager(self.config_manager)
         self.mq_conn: Optional[stomp.Connection] = None
         self.listener: Optional[ActiveMQListener] = None
         self.reconnect_task: Optional[asyncio.Task] = None
@@ -435,6 +437,62 @@ class PiTracServer:
             except Exception as e:
                 logger.error(f"Error uploading test image: {e}")
                 return {"status": "error", "message": str(e)}
+
+        # Strobe calibration endpoints
+        @self.app.get("/api/strobe-calibration/status")
+        async def strobe_calibration_status() -> Dict[str, Any]:
+            """Get current strobe calibration status"""
+            return self.strobe_calibration_manager.get_status()
+
+        @self.app.get("/api/strobe-calibration/settings")
+        async def strobe_calibration_settings() -> Dict[str, Any]:
+            """Get saved strobe calibration settings"""
+            return await self.strobe_calibration_manager.get_saved_settings()
+
+        @self.app.post("/api/strobe-calibration/start")
+        async def start_strobe_calibration(request: Request) -> Dict[str, Any]:
+            """Start strobe calibration as a background task"""
+            body = await request.json()
+            led_type = body.get("led_type", "v3")
+            target_current = body.get("target_current")
+            overwrite = body.get("overwrite", False)
+
+            task = asyncio.create_task(
+                self.strobe_calibration_manager.start_calibration(
+                    led_type=led_type,
+                    target_current=target_current,
+                    overwrite=overwrite,
+                )
+            )
+            self.background_tasks.add(task)
+            task.add_done_callback(self.background_tasks.discard)
+
+            return {"status": "started"}
+
+        @self.app.post("/api/strobe-calibration/cancel")
+        async def cancel_strobe_calibration() -> Dict[str, Any]:
+            """Cancel a running strobe calibration"""
+            self.strobe_calibration_manager.cancel()
+            return {"status": "ok"}
+
+        @self.app.get("/api/strobe-calibration/diagnostics")
+        async def strobe_calibration_diagnostics() -> Dict[str, Any]:
+            """Read strobe hardware diagnostics"""
+            return await self.strobe_calibration_manager.read_diagnostics()
+
+        @self.app.post("/api/strobe-calibration/set-dac")
+        async def strobe_set_dac(request: Request) -> Dict[str, Any]:
+            """Manually set the DAC value"""
+            body = await request.json()
+            value = body.get("value")
+            if value is None or not isinstance(value, int):
+                return {"status": "error", "message": "Integer 'value' is required"}
+            return await self.strobe_calibration_manager.set_dac_manual(value)
+
+        @self.app.get("/api/strobe-calibration/dac-start")
+        async def strobe_dac_start() -> Dict[str, Any]:
+            """Get the safe DAC starting value"""
+            return await self.strobe_calibration_manager.get_dac_start()
 
         @self.app.get("/api/cameras/detect")
         async def detect_cameras() -> Dict[str, Any]:
