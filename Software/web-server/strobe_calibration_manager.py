@@ -291,3 +291,176 @@ class StrobeCalibrationManager:
         self.status["progress"] = 90
         logger.debug(f"Calibration result: DAC={final_dac:#04x}, current={led_current:.2f}A")
         return True, final_dac, led_current
+
+    # ------------------------------------------------------------------
+    # Public async API (called from web server endpoints)
+    # ------------------------------------------------------------------
+
+    async def start_calibration(self, led_type: str = "v3",
+                                target_current: Optional[float] = None,
+                                overwrite: bool = False) -> Dict[str, Any]:
+        """Run full strobe calibration. Blocking I/O is offloaded to a thread."""
+
+        # Validate board version
+        board_version = self.config_manager.get_config("gs_config.strobing.kConnectionBoardVersion")
+        if board_version is None or int(board_version) != 3:
+            return {"status": "error",
+                    "message": f"Board version must be V3 (got {board_version})"}
+
+        # Check for existing calibration
+        existing = self.config_manager.get_config(self.DAC_CONFIG_KEY)
+        if existing is not None and not overwrite:
+            return {"status": "error",
+                    "message": "Calibration already exists. Set overwrite=true to replace."}
+
+        # Resolve target
+        if target_current is not None:
+            target = target_current
+        elif led_type == "legacy":
+            target = self.LEGACY_TARGET_CURRENT
+        else:
+            target = self.V3_TARGET_CURRENT
+
+        self._cancel_requested = False
+        self.status = {"state": "calibrating", "progress": 0, "message": "Starting calibration"}
+
+        loop = asyncio.get_event_loop()
+        try:
+            result = await loop.run_in_executor(None, self._run_calibration_sync, target)
+            return result
+        except Exception as e:
+            logger.error(f"Calibration error: {e}")
+            self.status = {"state": "error", "progress": 0, "message": str(e)}
+            return {"status": "error", "message": str(e)}
+
+    def _run_calibration_sync(self, target: float) -> Dict[str, Any]:
+        """Synchronous calibration wrapper — runs in executor thread."""
+        try:
+            self._open_hardware()
+
+            success, final_dac, led_current = self._calibrate(target)
+
+            if success and final_dac > 0:
+                self.config_manager.set_config(self.DAC_CONFIG_KEY, final_dac)
+                self.status = {"state": "complete", "progress": 100,
+                               "message": f"DAC={final_dac:#04x}, current={led_current:.2f}A"}
+                return {"status": "success", "dac_setting": final_dac,
+                        "led_current": round(led_current, 2)}
+            else:
+                self._set_dac(self.SAFE_DAC_VALUE)
+                self.status = {"state": "failed", "progress": 0,
+                               "message": "Calibration failed — DAC set to safe fallback"}
+                return {"status": "failed",
+                        "message": "Calibration failed. DAC set to safe fallback."}
+
+        except Exception as e:
+            logger.error(f"Calibration exception: {e}")
+            self.status = {"state": "error", "progress": 0, "message": str(e)}
+            return {"status": "error", "message": str(e)}
+        finally:
+            self._close_hardware()
+
+    def cancel(self):
+        """Request cancellation of a running calibration."""
+        self._cancel_requested = True
+
+    def get_status(self) -> Dict[str, Any]:
+        """Return a snapshot of the current calibration status."""
+        return dict(self.status)
+
+    async def read_diagnostics(self) -> Dict[str, Any]:
+        """Read LDO voltage, LED current, and raw ADC values."""
+        loop = asyncio.get_event_loop()
+        try:
+            return await loop.run_in_executor(None, self._read_diagnostics_sync)
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def _read_diagnostics_sync(self) -> Dict[str, Any]:
+        try:
+            self._open_hardware()
+
+            ldo = self.get_ldo_voltage()
+            adc_ch0 = self._read_adc(self.ADC_CH0_CMD)
+            adc_ch1 = self._read_adc(self.ADC_CH1_CMD)
+
+            result: Dict[str, Any] = {
+                "ldo_voltage": round(ldo, 2),
+                "adc_ch0_raw": adc_ch0,
+                "adc_ch1_raw": adc_ch1,
+            }
+
+            if ldo >= self.LDO_MIN_V:
+                led_current = self.get_led_current()
+                result["led_current"] = round(led_current, 2)
+            else:
+                result["led_current"] = None
+                result["warning"] = f"LDO unsafe ({ldo:.2f}V) — skipped LED current read"
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Diagnostics error: {e}")
+            return {"status": "error", "message": str(e)}
+        finally:
+            self._close_hardware()
+
+    async def set_dac_manual(self, value: int) -> Dict[str, Any]:
+        """Set DAC to a specific value and report LDO voltage."""
+        if value < self.DAC_MIN or value > self.DAC_MAX:
+            return {"status": "error",
+                    "message": f"DAC value must be {self.DAC_MIN}-{self.DAC_MAX}"}
+
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._set_dac_manual_sync, value)
+
+    def _set_dac_manual_sync(self, value: int) -> Dict[str, Any]:
+        try:
+            self._open_hardware()
+            self._set_dac(value)
+            time.sleep(0.1)
+            ldo = self.get_ldo_voltage()
+
+            result: Dict[str, Any] = {
+                "status": "success",
+                "dac_value": value,
+                "ldo_voltage": round(ldo, 2),
+            }
+
+            if ldo < self.LDO_MIN_V:
+                result["warning"] = f"LDO voltage {ldo:.2f}V is below minimum {self.LDO_MIN_V}V"
+
+            return result
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+        finally:
+            self._close_hardware()
+
+    async def get_dac_start(self) -> Dict[str, Any]:
+        """Run the safe-start sweep and return the boundary DAC value."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._get_dac_start_sync)
+
+    def _get_dac_start_sync(self) -> Dict[str, Any]:
+        try:
+            self._open_hardware()
+            dac_start, ldo = self._find_dac_start()
+
+            if dac_start >= 0:
+                self._set_dac(dac_start)
+                time.sleep(0.1)
+                ldo = self.get_ldo_voltage()
+
+            return {
+                "dac_start": dac_start,
+                "ldo_voltage": round(ldo, 2),
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+        finally:
+            self._close_hardware()
+
+    async def get_saved_settings(self) -> Dict[str, Any]:
+        """Read the saved kDAC_setting from config."""
+        value = self.config_manager.get_config(self.DAC_CONFIG_KEY)
+        return {"dac_setting": value}

@@ -563,3 +563,410 @@ class TestCalibrate:
         mgr._calibrate(10.0)
         # Should have updated progress at least once
         assert len(progress_values) > 0
+
+
+# ---------------------------------------------------------------------------
+# Increment 4: Async public API
+# ---------------------------------------------------------------------------
+
+class TestStartCalibration:
+    """start_calibration validates inputs, checks board version, runs _calibrate"""
+
+    @pytest.mark.asyncio
+    @patch("strobe_calibration_manager.time.sleep")
+    async def test_rejects_non_v3_board(self, _sleep):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        cm = Mock()
+        cm.get_config.side_effect = lambda key=None: {
+            "gs_config.strobing.kConnectionBoardVersion": "2",
+            "gs_config.strobing.kDAC_setting": None,
+        }.get(key)
+
+        mgr = StrobeCalibrationManager(cm)
+
+        result = await mgr.start_calibration(led_type="v3")
+        assert result["status"] == "error"
+        assert "version" in result["message"].lower() or "V3" in result["message"]
+
+    @pytest.mark.asyncio
+    @patch("strobe_calibration_manager.time.sleep")
+    async def test_rejects_overwrite_without_flag(self, _sleep):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        cm = Mock()
+        cm.get_config.side_effect = lambda key=None: {
+            "gs_config.strobing.kConnectionBoardVersion": "3",
+            "gs_config.strobing.kDAC_setting": 150,
+        }.get(key)
+
+        mgr = StrobeCalibrationManager(cm)
+
+        result = await mgr.start_calibration(led_type="v3", overwrite=False)
+        assert result["status"] == "error"
+        assert "exist" in result["message"].lower() or "overwrite" in result["message"].lower()
+
+    @pytest.mark.asyncio
+    @patch("strobe_calibration_manager.time.sleep")
+    async def test_allows_overwrite_with_flag(self, _sleep):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        cm = Mock()
+        cm.get_config.side_effect = lambda key=None: {
+            "gs_config.strobing.kConnectionBoardVersion": "3",
+            "gs_config.strobing.kDAC_setting": 150,
+        }.get(key)
+        cm.set_config.return_value = (True, "ok", False)
+
+        mgr = StrobeCalibrationManager(cm)
+
+        # Mock out the hardware and calibration
+        mgr._open_hardware = Mock()
+        mgr._close_hardware = Mock()
+        mgr._calibrate = Mock(return_value=(True, 0x80, 9.5))
+
+        result = await mgr.start_calibration(led_type="v3", overwrite=True)
+        assert result["status"] == "success"
+
+    @pytest.mark.asyncio
+    @patch("strobe_calibration_manager.time.sleep")
+    async def test_uses_v3_target_current(self, _sleep):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        cm = Mock()
+        cm.get_config.side_effect = lambda key=None: {
+            "gs_config.strobing.kConnectionBoardVersion": "3",
+            "gs_config.strobing.kDAC_setting": None,
+        }.get(key)
+        cm.set_config.return_value = (True, "ok", False)
+
+        mgr = StrobeCalibrationManager(cm)
+        mgr._open_hardware = Mock()
+        mgr._close_hardware = Mock()
+
+        captured_target = []
+        def fake_calibrate(target):
+            captured_target.append(target)
+            return (True, 0x80, 9.5)
+        mgr._calibrate = fake_calibrate
+
+        await mgr.start_calibration(led_type="v3")
+        assert captured_target[0] == 10.0
+
+    @pytest.mark.asyncio
+    @patch("strobe_calibration_manager.time.sleep")
+    async def test_uses_legacy_target_current(self, _sleep):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        cm = Mock()
+        cm.get_config.side_effect = lambda key=None: {
+            "gs_config.strobing.kConnectionBoardVersion": "3",
+            "gs_config.strobing.kDAC_setting": None,
+        }.get(key)
+        cm.set_config.return_value = (True, "ok", False)
+
+        mgr = StrobeCalibrationManager(cm)
+        mgr._open_hardware = Mock()
+        mgr._close_hardware = Mock()
+
+        captured_target = []
+        def fake_calibrate(target):
+            captured_target.append(target)
+            return (True, 0x80, 8.5)
+        mgr._calibrate = fake_calibrate
+
+        await mgr.start_calibration(led_type="legacy")
+        assert captured_target[0] == 9.0
+
+    @pytest.mark.asyncio
+    @patch("strobe_calibration_manager.time.sleep")
+    async def test_uses_custom_target(self, _sleep):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        cm = Mock()
+        cm.get_config.side_effect = lambda key=None: {
+            "gs_config.strobing.kConnectionBoardVersion": "3",
+            "gs_config.strobing.kDAC_setting": None,
+        }.get(key)
+        cm.set_config.return_value = (True, "ok", False)
+
+        mgr = StrobeCalibrationManager(cm)
+        mgr._open_hardware = Mock()
+        mgr._close_hardware = Mock()
+
+        captured_target = []
+        def fake_calibrate(target):
+            captured_target.append(target)
+            return (True, 0x80, 7.5)
+        mgr._calibrate = fake_calibrate
+
+        await mgr.start_calibration(led_type="v3", target_current=7.5)
+        assert captured_target[0] == 7.5
+
+    @pytest.mark.asyncio
+    @patch("strobe_calibration_manager.time.sleep")
+    async def test_saves_result_on_success(self, _sleep):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        cm = Mock()
+        cm.get_config.side_effect = lambda key=None: {
+            "gs_config.strobing.kConnectionBoardVersion": "3",
+            "gs_config.strobing.kDAC_setting": None,
+        }.get(key)
+        cm.set_config.return_value = (True, "ok", False)
+
+        mgr = StrobeCalibrationManager(cm)
+        mgr._open_hardware = Mock()
+        mgr._close_hardware = Mock()
+        mgr._calibrate = Mock(return_value=(True, 0x80, 9.5))
+
+        await mgr.start_calibration(led_type="v3")
+        cm.set_config.assert_called_once_with("gs_config.strobing.kDAC_setting", 0x80)
+
+    @pytest.mark.asyncio
+    @patch("strobe_calibration_manager.time.sleep")
+    async def test_sets_safe_dac_on_failure(self, _sleep):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        cm = Mock()
+        cm.get_config.side_effect = lambda key=None: {
+            "gs_config.strobing.kConnectionBoardVersion": "3",
+            "gs_config.strobing.kDAC_setting": None,
+        }.get(key)
+
+        mgr = StrobeCalibrationManager(cm)
+        mgr._open_hardware = Mock()
+        mgr._close_hardware = Mock()
+        mgr._calibrate = Mock(return_value=(False, -1, -1))
+        dac_calls = []
+        mgr._set_dac = lambda v: dac_calls.append(v)
+
+        result = await mgr.start_calibration(led_type="v3")
+        assert result["status"] == "failed"
+        assert 0x96 in dac_calls
+
+    @pytest.mark.asyncio
+    @patch("strobe_calibration_manager.time.sleep")
+    async def test_always_closes_hardware(self, _sleep):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        cm = Mock()
+        cm.get_config.side_effect = lambda key=None: {
+            "gs_config.strobing.kConnectionBoardVersion": "3",
+            "gs_config.strobing.kDAC_setting": None,
+        }.get(key)
+
+        mgr = StrobeCalibrationManager(cm)
+        mgr._open_hardware = Mock()
+        mgr._close_hardware = Mock()
+        mgr._calibrate = Mock(side_effect=RuntimeError("kaboom"))
+
+        result = await mgr.start_calibration(led_type="v3")
+        assert result["status"] == "error"
+        mgr._close_hardware.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch("strobe_calibration_manager.time.sleep")
+    async def test_status_transitions(self, _sleep):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        cm = Mock()
+        cm.get_config.side_effect = lambda key=None: {
+            "gs_config.strobing.kConnectionBoardVersion": "3",
+            "gs_config.strobing.kDAC_setting": None,
+        }.get(key)
+        cm.set_config.return_value = (True, "ok", False)
+
+        mgr = StrobeCalibrationManager(cm)
+        mgr._open_hardware = Mock()
+        mgr._close_hardware = Mock()
+        mgr._calibrate = Mock(return_value=(True, 0x80, 9.5))
+
+        assert mgr.status["state"] == "idle"
+        await mgr.start_calibration(led_type="v3")
+        assert mgr.status["state"] == "complete"
+        assert mgr.status["progress"] == 100
+
+
+class TestCancel:
+    """cancel sets the flag and resets status"""
+
+    def test_cancel_sets_flag(self):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        mgr = StrobeCalibrationManager(Mock())
+        mgr.status["state"] = "calibrating"
+        mgr.cancel()
+        assert mgr._cancel_requested is True
+
+    def test_cancel_when_idle(self):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        mgr = StrobeCalibrationManager(Mock())
+        mgr.cancel()
+        # should not error, just a no-op
+        assert mgr._cancel_requested is True
+
+
+class TestGetStatus:
+    """get_status returns a copy of the status dict"""
+
+    def test_returns_status_copy(self):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        mgr = StrobeCalibrationManager(Mock())
+        mgr.status["state"] = "calibrating"
+        mgr.status["progress"] = 42
+        mgr.status["message"] = "sweeping"
+
+        result = mgr.get_status()
+        assert result["state"] == "calibrating"
+        assert result["progress"] == 42
+        assert result["message"] == "sweeping"
+        # should be a copy
+        result["state"] = "mutated"
+        assert mgr.status["state"] == "calibrating"
+
+
+class TestReadDiagnostics:
+    """read_diagnostics bundles LDO + current + raw ADC reads"""
+
+    @pytest.mark.asyncio
+    async def test_returns_all_readings(self):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        mgr = StrobeCalibrationManager(Mock())
+        mgr._open_hardware = Mock()
+        mgr._close_hardware = Mock()
+        mgr.get_ldo_voltage = Mock(return_value=7.5)
+        mgr.get_led_current = Mock(return_value=9.2)
+        mgr._read_adc = Mock(side_effect=[1234, 2345])
+
+        result = await mgr.read_diagnostics()
+
+        assert result["ldo_voltage"] == 7.5
+        assert result["led_current"] == 9.2
+        assert result["adc_ch0_raw"] == 1234
+        assert result["adc_ch1_raw"] == 2345
+
+    @pytest.mark.asyncio
+    async def test_skips_current_when_ldo_unsafe(self):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        mgr = StrobeCalibrationManager(Mock())
+        mgr._open_hardware = Mock()
+        mgr._close_hardware = Mock()
+        mgr.get_ldo_voltage = Mock(return_value=3.0)
+        mgr._read_adc = Mock(side_effect=[100, 200])
+
+        result = await mgr.read_diagnostics()
+
+        assert result["ldo_voltage"] == 3.0
+        assert result["led_current"] is None
+        assert "unsafe" in result.get("warning", "").lower()
+
+    @pytest.mark.asyncio
+    async def test_closes_hardware_on_error(self):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        mgr = StrobeCalibrationManager(Mock())
+        mgr._open_hardware = Mock()
+        mgr._close_hardware = Mock()
+        mgr.get_ldo_voltage = Mock(side_effect=RuntimeError("SPI gone"))
+
+        result = await mgr.read_diagnostics()
+        assert result["status"] == "error"
+        mgr._close_hardware.assert_called_once()
+
+
+class TestSetDacManual:
+    """set_dac_manual validates range and returns LDO check"""
+
+    @pytest.mark.asyncio
+    async def test_rejects_out_of_range(self):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        mgr = StrobeCalibrationManager(Mock())
+
+        result = await mgr.set_dac_manual(256)
+        assert result["status"] == "error"
+
+        result = await mgr.set_dac_manual(-1)
+        assert result["status"] == "error"
+
+    @pytest.mark.asyncio
+    @patch("strobe_calibration_manager.time.sleep")
+    async def test_sets_dac_and_checks_ldo(self, _sleep):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        mgr = StrobeCalibrationManager(Mock())
+        mgr._open_hardware = Mock()
+        mgr._close_hardware = Mock()
+        dac_calls = []
+        mgr._set_dac = lambda v: dac_calls.append(v)
+        mgr.get_ldo_voltage = Mock(return_value=7.5)
+
+        result = await mgr.set_dac_manual(0x80)
+        assert result["status"] == "success"
+        assert 0x80 in dac_calls
+        assert result["ldo_voltage"] == 7.5
+
+    @pytest.mark.asyncio
+    @patch("strobe_calibration_manager.time.sleep")
+    async def test_warns_when_ldo_below_min(self, _sleep):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        mgr = StrobeCalibrationManager(Mock())
+        mgr._open_hardware = Mock()
+        mgr._close_hardware = Mock()
+        mgr._set_dac = lambda v: None
+        mgr.get_ldo_voltage = Mock(return_value=3.5)
+
+        result = await mgr.set_dac_manual(0x10)
+        assert "warning" in result
+
+
+class TestGetDacStart:
+    """get_dac_start runs the safe-start sweep"""
+
+    @pytest.mark.asyncio
+    @patch("strobe_calibration_manager.time.sleep")
+    async def test_returns_start_and_ldo(self, _sleep):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        mgr = StrobeCalibrationManager(Mock())
+        mgr._open_hardware = Mock()
+        mgr._close_hardware = Mock()
+        mgr._find_dac_start = Mock(return_value=(99, 7.0))
+        mgr._set_dac = Mock()
+        mgr.get_ldo_voltage = Mock(return_value=7.0)
+
+        result = await mgr.get_dac_start()
+        assert result["dac_start"] == 99
+        assert result["ldo_voltage"] == 7.0
+
+
+class TestGetSavedSettings:
+    """get_saved_settings reads kDAC_setting from config"""
+
+    @pytest.mark.asyncio
+    async def test_returns_saved_value(self):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        cm = Mock()
+        cm.get_config.return_value = 150
+
+        mgr = StrobeCalibrationManager(cm)
+        result = await mgr.get_saved_settings()
+        assert result["dac_setting"] == 150
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_unset(self):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        cm = Mock()
+        cm.get_config.return_value = None
+
+        mgr = StrobeCalibrationManager(cm)
+        result = await mgr.get_saved_settings()
+        assert result["dac_setting"] is None
