@@ -582,29 +582,121 @@
     color: var(--error);
 }
 
+/* Strobe Calibration */
+.strobe-calibration {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-md);
+}
+
+.strobe-header {
+    margin-bottom: 1.5rem;
+}
+
+.strobe-header h3 {
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+}
+
+.strobe-status-bar {
+    display: flex;
+    gap: 2rem;
+    background: var(--bg-hover);
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.strobe-controls {
+    margin-bottom: 1.5rem;
+}
+
+.strobe-control-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.strobe-label {
+    color: var(--text-secondary);
+    font-weight: 600;
+    min-width: 80px;
+}
+
+.strobe-select {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+.strobe-calibration .progress-bar {
+    margin-bottom: 0.5rem;
+}
+
+.strobe-calibration h4 {
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+}
+
+#strobe-result-area .result-card {
+    border-width: 2px;
+    border-style: solid;
+    border-color: var(--border-color);
+    transition: border-color 0.3s ease;
+}
+
+#strobe-diagnostics-area {
+    margin-top: 1.5rem;
+}
+
+#strobe-diagnostics-area h4 {
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+}
+
+#strobe-diagnostics-warning {
+    margin-top: 1rem;
+}
+
 /* Mobile Responsive */
 @media (max-width: 768px) {
     .main-content {
         padding: 1rem;
     }
-    
+
     .calibration-wizard {
         padding: 1rem;
     }
-    
+
     .wizard-steps {
         margin-bottom: 2rem;
     }
-    
+
     .step-label {
         font-size: 0.8rem;
     }
-    
+
     .camera-options {
         grid-template-columns: 1fr;
     }
-    
+
     .result-cards {
         grid-template-columns: 1fr;
+    }
+
+    .strobe-status-bar {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .strobe-control-row {
+        flex-wrap: wrap;
     }
 }

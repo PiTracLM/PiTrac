@@ -285,6 +285,82 @@
         </div>
     </div>
 
+    <div class="strobe-calibration">
+        <div class="strobe-header">
+            <h3>Strobe Calibration</h3>
+            <div class="strobe-status-bar">
+                <div class="status-item">
+                    <span class="status-label">Board:</span>
+                    <span id="strobe-board-version" class="status-value">Loading...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Saved DAC:</span>
+                    <span id="strobe-saved-dac" class="status-value">Loading...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">State:</span>
+                    <span id="strobe-state" class="status-value">Idle</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="strobe-controls">
+            <div class="strobe-control-row">
+                <label for="strobe-led-type" class="strobe-label">LED Type:</label>
+                <select id="strobe-led-type" class="strobe-select">
+                    <option value="v3" selected>V3 LED Board (10A)</option>
+                    <option value="legacy">Legacy 100W LED (9A)</option>
+                </select>
+            </div>
+            <div class="strobe-control-row">
+                <button id="strobe-calibrate-btn" class="btn btn-primary" onclick="calibration.startStrobeCalibration()">
+                    Calibrate
+                </button>
+                <button id="strobe-cancel-btn" class="btn btn-danger" onclick="calibration.cancelStrobeCalibration()" style="display: none;">
+                    Cancel
+                </button>
+                <button id="strobe-diagnostics-btn" class="btn btn-secondary" onclick="calibration.readStrobeDiagnostics()">
+                    Read Diagnostics
+                </button>
+            </div>
+        </div>
+
+        <div id="strobe-progress-area" style="display: none;">
+            <h4>Calibration Progress</h4>
+            <div class="progress-bar">
+                <div class="progress-fill" id="strobe-progress-fill"></div>
+            </div>
+            <div class="progress-status" id="strobe-progress-message">Starting...</div>
+        </div>
+
+        <div id="strobe-result-area" style="display: none;">
+            <div class="result-card" id="strobe-result-card">
+                <h4 id="strobe-result-title">Calibration Result</h4>
+                <div class="result-data">
+                    <div class="result-item">
+                        <span class="result-label">DAC Setting:</span>
+                        <span class="result-value" id="strobe-result-dac">--</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">LED Current:</span>
+                        <span class="result-value" id="strobe-result-current">--</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">LDO Voltage:</span>
+                        <span class="result-value" id="strobe-result-ldo">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="strobe-diagnostics-area" style="display: none;">
+            <h4>Hardware Diagnostics</h4>
+            <div class="calibration-data-grid" id="strobe-diagnostics-grid">
+            </div>
+            <div id="strobe-diagnostics-warning" class="alert alert-error" style="display: none;"></div>
+        </div>
+    </div>
+
     <div class="current-calibration">
         <h3>Current Calibration Data</h3>
         <div id="current-calibration-data" class="calibration-data-grid">

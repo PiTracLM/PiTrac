@@ -25,6 +25,8 @@ class CalibrationManager {
 
         await this.loadCalibrationData();
 
+        await this.loadStrobeSettings();
+
         this.setupEventListeners();
 
         this.startStatusPolling();
@@ -50,6 +52,11 @@ class CalibrationManager {
         if (this.statusPollInterval) {
             clearInterval(this.statusPollInterval);
             this.statusPollInterval = null;
+        }
+
+        if (this.strobePollingTimer) {
+            clearTimeout(this.strobePollingTimer);
+            this.strobePollingTimer = null;
         }
 
         this.cameraPollIntervals.forEach((intervalId) => {
@@ -633,6 +640,247 @@ class CalibrationManager {
                 this.loadSystemStatus();
             }
         }, 5000);
+    }
+
+    // -- Strobe Calibration --
+
+    async loadStrobeSettings() {
+        try {
+            const [settingsRes, configRes] = await Promise.all([
+                fetch('/api/strobe-calibration/settings'),
+                fetch('/api/config')
+            ]);
+
+            if (settingsRes.ok) {
+                const settings = await settingsRes.json();
+                const dacEl = document.getElementById('strobe-saved-dac');
+                if (settings.dac_setting !== null && settings.dac_setting !== undefined) {
+                    dacEl.textContent = '0x' + settings.dac_setting.toString(16).toUpperCase().padStart(4, '0');
+                } else {
+                    dacEl.textContent = 'Not calibrated';
+                }
+            }
+
+            if (configRes.ok) {
+                const config = await configRes.json();
+                const boardEl = document.getElementById('strobe-board-version');
+                const boardVersion = config.hardware?.board_version || config.system?.board_version;
+                boardEl.textContent = boardVersion || 'Unknown';
+            }
+        } catch (error) {
+            console.error('Error loading strobe settings:', error);
+        }
+    }
+
+    async startStrobeCalibration() {
+        const btn = document.getElementById('strobe-calibrate-btn');
+        const cancelBtn = document.getElementById('strobe-cancel-btn');
+        const originalText = btn.textContent;
+
+        const ledType = document.getElementById('strobe-led-type').value;
+        const targetCurrent = ledType === 'v3' ? 10.0 : 9.0;
+
+        try {
+            btn.disabled = true;
+            btn.textContent = 'Starting...';
+            cancelBtn.style.display = '';
+
+            // Reset and show progress area, hide stale results
+            document.getElementById('strobe-progress-area').style.display = 'block';
+            document.getElementById('strobe-result-area').style.display = 'none';
+            document.getElementById('strobe-progress-fill').style.width = '0%';
+            document.getElementById('strobe-progress-fill').style.background = '';
+            document.getElementById('strobe-progress-message').textContent = 'Starting...';
+            document.getElementById('strobe-state').textContent = 'Running';
+
+            const response = await fetch('/api/strobe-calibration/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    led_type: ledType,
+                    target_current: targetCurrent,
+                    overwrite: true
+                })
+            });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || 'Failed to start calibration');
+            }
+
+            btn.textContent = 'Calibrating...';
+            this.pollStrobeStatus();
+        } catch (error) {
+            console.error('Error starting strobe calibration:', error);
+            btn.disabled = false;
+            btn.textContent = originalText;
+            cancelBtn.style.display = 'none';
+            document.getElementById('strobe-state').textContent = 'Failed';
+            document.getElementById('strobe-progress-message').textContent = error.message;
+        }
+    }
+
+    pollStrobeStatus() {
+        this.strobePollingTimer = setTimeout(async () => {
+            try {
+                const response = await fetch('/api/strobe-calibration/status');
+                if (!response.ok) {
+                    this.pollStrobeStatus();
+                    return;
+                }
+
+                const status = await response.json();
+                const progressFill = document.getElementById('strobe-progress-fill');
+                const progressMsg = document.getElementById('strobe-progress-message');
+
+                if (status.progress !== undefined) {
+                    progressFill.style.width = status.progress + '%';
+                }
+                if (status.message) {
+                    progressMsg.textContent = status.message;
+                }
+
+                if (status.state === 'complete' || status.state === 'completed') {
+                    this.onStrobeCalibrationDone(status);
+                } else if (status.state === 'failed' || status.state === 'error') {
+                    this.onStrobeCalibrationFailed(status);
+                } else if (status.state === 'cancelled') {
+                    this.onStrobeCalibrationCancelled();
+                } else {
+                    this.pollStrobeStatus();
+                }
+            } catch (error) {
+                console.error('Error polling strobe status:', error);
+                this.pollStrobeStatus();
+            }
+        }, 500);
+    }
+
+    onStrobeCalibrationDone(status) {
+        const btn = document.getElementById('strobe-calibrate-btn');
+        const cancelBtn = document.getElementById('strobe-cancel-btn');
+        btn.disabled = false;
+        btn.textContent = 'Calibrate';
+        cancelBtn.style.display = 'none';
+
+        document.getElementById('strobe-progress-fill').style.width = '100%';
+        document.getElementById('strobe-state').textContent = 'Complete';
+
+        // Show results
+        const resultArea = document.getElementById('strobe-result-area');
+        const resultCard = document.getElementById('strobe-result-card');
+        resultCard.style.borderColor = 'var(--success)';
+        document.getElementById('strobe-result-title').textContent = 'Calibration Successful';
+
+        if (status.dac_setting !== undefined) {
+            document.getElementById('strobe-result-dac').textContent =
+                '0x' + status.dac_setting.toString(16).toUpperCase().padStart(4, '0');
+        }
+        if (status.led_current !== undefined) {
+            document.getElementById('strobe-result-current').textContent = status.led_current.toFixed(2) + ' A';
+        }
+        if (status.ldo_voltage !== undefined) {
+            document.getElementById('strobe-result-ldo').textContent = status.ldo_voltage.toFixed(2) + ' V';
+        }
+
+        resultArea.style.display = 'block';
+
+        // Refresh the saved DAC display
+        this.loadStrobeSettings();
+    }
+
+    onStrobeCalibrationFailed(status) {
+        const btn = document.getElementById('strobe-calibrate-btn');
+        const cancelBtn = document.getElementById('strobe-cancel-btn');
+        btn.disabled = false;
+        btn.textContent = 'Calibrate';
+        cancelBtn.style.display = 'none';
+
+        document.getElementById('strobe-progress-fill').style.width = '100%';
+        document.getElementById('strobe-progress-fill').style.background = 'var(--error)';
+        document.getElementById('strobe-state').textContent = 'Failed';
+        document.getElementById('strobe-progress-message').textContent =
+            status.message || 'Calibration failed';
+
+        // Show failure in result area
+        const resultArea = document.getElementById('strobe-result-area');
+        const resultCard = document.getElementById('strobe-result-card');
+        resultCard.style.borderColor = 'var(--error)';
+        document.getElementById('strobe-result-title').textContent = 'Calibration Failed';
+        document.getElementById('strobe-result-dac').textContent = '--';
+        document.getElementById('strobe-result-current').textContent = '--';
+        document.getElementById('strobe-result-ldo').textContent = '--';
+        resultArea.style.display = 'block';
+    }
+
+    onStrobeCalibrationCancelled() {
+        const btn = document.getElementById('strobe-calibrate-btn');
+        const cancelBtn = document.getElementById('strobe-cancel-btn');
+        btn.disabled = false;
+        btn.textContent = 'Calibrate';
+        cancelBtn.style.display = 'none';
+
+        document.getElementById('strobe-state').textContent = 'Idle';
+        document.getElementById('strobe-progress-message').textContent = 'Cancelled by user';
+    }
+
+    async cancelStrobeCalibration() {
+        try {
+            const cancelBtn = document.getElementById('strobe-cancel-btn');
+            cancelBtn.disabled = true;
+            cancelBtn.textContent = 'Cancelling...';
+
+            await fetch('/api/strobe-calibration/cancel', { method: 'POST' });
+            // Polling loop will pick up the cancelled state
+        } catch (error) {
+            console.error('Error cancelling strobe calibration:', error);
+        }
+    }
+
+    async readStrobeDiagnostics() {
+        const btn = document.getElementById('strobe-diagnostics-btn');
+        const originalText = btn.textContent;
+
+        try {
+            btn.disabled = true;
+            btn.textContent = 'Reading...';
+
+            const response = await fetch('/api/strobe-calibration/diagnostics');
+            if (!response.ok) {
+                throw new Error('Failed to read diagnostics');
+            }
+
+            const data = await response.json();
+            const grid = document.getElementById('strobe-diagnostics-grid');
+            grid.innerHTML = '';
+
+            const items = [
+                { label: 'LDO Voltage', value: data.ldo_voltage !== undefined ? data.ldo_voltage.toFixed(3) + ' V' : '--' },
+                { label: 'LED Current', value: data.led_current !== undefined ? data.led_current.toFixed(3) + ' A' : '--' },
+                { label: 'ADC CH0 Raw', value: data.adc_ch0_raw !== undefined ? data.adc_ch0_raw.toString() : '--' },
+                { label: 'ADC CH1 Raw', value: data.adc_ch1_raw !== undefined ? data.adc_ch1_raw.toString() : '--' }
+            ];
+
+            items.forEach(item => {
+                this.addCalibrationDataItem(grid, item.label, item.value);
+            });
+
+            // Handle warnings
+            const warningEl = document.getElementById('strobe-diagnostics-warning');
+            if (data.warning) {
+                warningEl.textContent = data.warning;
+                warningEl.style.display = 'block';
+            } else {
+                warningEl.style.display = 'none';
+            }
+
+            document.getElementById('strobe-diagnostics-area').style.display = 'block';
+        } catch (error) {
+            console.error('Error reading strobe diagnostics:', error);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
     }
 }
 
