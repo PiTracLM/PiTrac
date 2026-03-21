@@ -829,6 +829,7 @@ class ConfigurationManager:
             "calibration.",
             "kAutoCalibration",
             "_ENCLOSURE_",
+            "kDAC_setting",
         ]
         return any(pattern in key for pattern in calibration_patterns)
 
