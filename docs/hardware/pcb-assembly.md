@@ -251,7 +251,7 @@ After assembly, must run current calibration before you will be able to capture 
 | VIR+ | VIR+ |
 | VIR- | VIR- |
 
-   ![PiTrac V3 Connection Guide]({{ '/assets/images/hardware/PiTrac_V3_Connection_Guide.svg' | relative_url }})
+   ![PiTrac V3 Connection Guide]({{ '/assets/images/enclosure_assembly/PiTrac_V3_Connection_Guide.svg' | relative_url }})
 
 ## Configuring PiTrac
 
