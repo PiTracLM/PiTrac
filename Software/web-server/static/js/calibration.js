@@ -14,7 +14,8 @@ class CalibrationManager {
             camera1: false,
             camera2: false
         };
-        this.calibrationResults = {};  // Store results from calibration API
+        this.calibrationResults = {};
+        this.strobePollingTimer = null;
 
         this.init();
         this.setupPageCleanup();
@@ -796,7 +797,7 @@ class CalibrationManager {
 
         if (status.dac_setting !== undefined) {
             document.getElementById('strobe-result-dac').textContent =
-                '0x' + status.dac_setting.toString(16).toUpperCase().padStart(4, '0');
+                '0x' + status.dac_setting.toString(16).toUpperCase().padStart(2, '0');
         }
         if (status.led_current !== undefined) {
             document.getElementById('strobe-result-current').textContent = status.led_current.toFixed(2) + ' A';
@@ -873,10 +874,10 @@ class CalibrationManager {
             grid.innerHTML = '';
 
             const items = [
-                { label: 'LDO Voltage', value: data.ldo_voltage !== undefined ? data.ldo_voltage.toFixed(3) + ' V' : '--' },
-                { label: 'LED Current', value: data.led_current !== undefined ? data.led_current.toFixed(3) + ' A' : '--' },
-                { label: 'ADC CH0 Raw', value: data.adc_ch0_raw !== undefined ? data.adc_ch0_raw.toString() : '--' },
-                { label: 'ADC CH1 Raw', value: data.adc_ch1_raw !== undefined ? data.adc_ch1_raw.toString() : '--' }
+                { label: 'LDO Voltage', value: data.ldo_voltage != null ? data.ldo_voltage.toFixed(2) + ' V' : '--' },
+                { label: 'LED Current', value: data.led_current != null ? data.led_current.toFixed(2) + ' A' : '--' },
+                { label: 'ADC CH0 Raw', value: data.adc_ch0_raw != null ? data.adc_ch0_raw : '--' },
+                { label: 'ADC CH1 Raw', value: data.adc_ch1_raw != null ? data.adc_ch1_raw : '--' }
             ];
 
             items.forEach(item => {

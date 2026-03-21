@@ -632,7 +632,7 @@ class TestStartCalibration:
         mgr._calibrate = Mock(return_value=(True, 0x80, 9.5))
 
         result = await mgr.start_calibration(led_type="v3", overwrite=True)
-        assert result["status"] == "success"
+        assert result["state"] == "complete"
 
     @pytest.mark.asyncio
     @patch("strobe_calibration_manager.time.sleep")
@@ -748,7 +748,7 @@ class TestStartCalibration:
         mgr._set_dac = lambda v: dac_calls.append(v)
 
         result = await mgr.start_calibration(led_type="v3")
-        assert result["status"] == "failed"
+        assert result["state"] == "failed"
         assert 0x96 in dac_calls
 
     @pytest.mark.asyncio

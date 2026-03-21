@@ -108,6 +108,7 @@ class StrobeCalibrationManager:
             try:
                 if name == "diag":
                     resource.off()
+                    time.sleep(0.1)
                 resource.close()
             except Exception:
                 logger.debug(f"Error closing {name}", exc_info=True)
@@ -260,7 +261,7 @@ class StrobeCalibrationManager:
             current_dac -= 1
 
         # Edge cases — sweep ran off either end
-        if current_dac < self.DAC_MIN:
+        if current_dac <= self.DAC_MIN:
             logger.debug(f"Reached DAC_MIN without crossing target")
             return False, -1, -1
         if current_dac >= self.DAC_MAX:
@@ -310,6 +311,9 @@ class StrobeCalibrationManager:
                                 overwrite: bool = False) -> Dict[str, Any]:
         """Run full strobe calibration. Blocking I/O is offloaded to a thread."""
 
+        if self.status.get("state") == "calibrating":
+            return {"status": "error", "message": "Calibration already in progress"}
+
         # Validate board version
         board_version = self.config_manager.get_config("gs_config.strobing.kConnectionBoardVersion")
         if board_version is None or int(board_version) != 3:
@@ -353,16 +357,22 @@ class StrobeCalibrationManager:
 
             if success and final_dac > 0:
                 self.config_manager.set_config(self.DAC_CONFIG_KEY, final_dac)
-                self.status = {"state": "complete", "progress": 100,
-                               "message": f"DAC={final_dac:#04x}, current={led_current:.2f}A"}
-                return {"status": "success", "dac_setting": final_dac,
-                        "led_current": round(led_current, 2)}
+                self.status = {
+                    "state": "complete", "progress": 100,
+                    "message": f"DAC=0x{final_dac:02X}, current={led_current:.2f}A",
+                    "dac_setting": final_dac,
+                    "led_current": round(led_current, 2),
+                }
+                return self.status
+            elif self._cancel_requested:
+                self.status = {"state": "cancelled", "progress": 0,
+                               "message": "Calibration cancelled by user"}
+                return self.status
             else:
                 self._set_dac(self.SAFE_DAC_VALUE)
                 self.status = {"state": "failed", "progress": 0,
                                "message": "Calibration failed — DAC set to safe fallback"}
-                return {"status": "failed",
-                        "message": "Calibration failed. DAC set to safe fallback."}
+                return self.status
 
         except Exception as e:
             logger.error(f"Calibration exception: {e}")
