@@ -266,7 +266,7 @@
     },
     "gs_config.strobing.kConnectionBoardVersion": {
       "category": "System",
-      "subcategory": "advanced",
+      "subcategory": "basic",
       "basicSubcategory": "System",
       "displayName": "Connection Board Version",
       "description": "The original Ver. 1.0 board inverts the external shutter signal, so this setting tells the system whether to pre-invert the signal or not.",
@@ -294,7 +294,7 @@
     },
     "gs_config.system.kEnclosureVersion": {
       "category": "System",
-      "subcategory": "advanced",
+      "subcategory": "basic",
       "basicSubcategory": "System",
       "displayName": "Enclosure Version",
       "description": "The enclosure version (type) can affect various aspects of the system.  For example, the distance of the reference ball in the calibration rig, as different enclosures position the cameras at different locations.",

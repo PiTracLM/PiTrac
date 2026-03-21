@@ -304,7 +304,13 @@
             </div>
         </div>
 
-        <div class="strobe-controls">
+        <div id="strobe-board-warning" class="alert alert-error" style="display: none;">
+            Strobe calibration requires a V3 Connector Board.
+            <a href="/config" style="color: inherit; text-decoration: underline;">Set your board version</a>
+            in Configuration &gt; System &gt; Connection Board Version.
+        </div>
+
+        <div class="strobe-controls" id="strobe-controls">
             <div class="strobe-control-row">
                 <label for="strobe-led-type" class="strobe-label">LED Type:</label>
                 <select id="strobe-led-type" class="strobe-select">

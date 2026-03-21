@@ -648,24 +648,46 @@ class CalibrationManager {
         try {
             const [settingsRes, configRes] = await Promise.all([
                 fetch('/api/strobe-calibration/settings'),
-                fetch('/api/config')
+                fetch('/api/config?key=gs_config.strobing.kConnectionBoardVersion')
             ]);
+
+            const calBtn = document.getElementById('strobe-calibrate-btn');
+            const diagBtn = document.getElementById('strobe-diagnostics-btn');
+            const controls = document.getElementById('strobe-controls');
+            const warning = document.getElementById('strobe-board-warning');
+
+            let boardVersion = null;
+            if (configRes.ok) {
+                const config = await configRes.json();
+                boardVersion = config.data;
+            }
+
+            const boardEl = document.getElementById('strobe-board-version');
+            boardEl.textContent = boardVersion ? 'V' + boardVersion : 'Not set';
+
+            const isV3 = boardVersion !== null && parseInt(boardVersion) === 3;
+            if (!isV3) {
+                calBtn.disabled = true;
+                diagBtn.disabled = true;
+                controls.style.opacity = '0.5';
+                warning.style.display = 'block';
+            } else {
+                calBtn.disabled = false;
+                diagBtn.disabled = false;
+                controls.style.opacity = '1';
+                warning.style.display = 'none';
+            }
 
             if (settingsRes.ok) {
                 const settings = await settingsRes.json();
                 const dacEl = document.getElementById('strobe-saved-dac');
                 if (settings.dac_setting !== null && settings.dac_setting !== undefined) {
-                    dacEl.textContent = '0x' + settings.dac_setting.toString(16).toUpperCase().padStart(4, '0');
+                    dacEl.textContent = '0x' + parseInt(settings.dac_setting).toString(16).toUpperCase().padStart(2, '0');
+                    if (isV3) calBtn.textContent = 'Recalibrate';
                 } else {
                     dacEl.textContent = 'Not calibrated';
+                    if (isV3) calBtn.textContent = 'Calibrate';
                 }
-            }
-
-            if (configRes.ok) {
-                const config = await configRes.json();
-                const boardEl = document.getElementById('strobe-board-version');
-                const boardVersion = config.hardware?.board_version || config.system?.board_version;
-                boardEl.textContent = boardVersion || 'Unknown';
             }
         } catch (error) {
             console.error('Error loading strobe settings:', error);
@@ -760,7 +782,7 @@ class CalibrationManager {
         const btn = document.getElementById('strobe-calibrate-btn');
         const cancelBtn = document.getElementById('strobe-cancel-btn');
         btn.disabled = false;
-        btn.textContent = 'Calibrate';
+        btn.textContent = 'Recalibrate';
         cancelBtn.style.display = 'none';
 
         document.getElementById('strobe-progress-fill').style.width = '100%';
@@ -790,11 +812,9 @@ class CalibrationManager {
     }
 
     onStrobeCalibrationFailed(status) {
-        const btn = document.getElementById('strobe-calibrate-btn');
         const cancelBtn = document.getElementById('strobe-cancel-btn');
-        btn.disabled = false;
-        btn.textContent = 'Calibrate';
         cancelBtn.style.display = 'none';
+        this.loadStrobeSettings();
 
         document.getElementById('strobe-progress-fill').style.width = '100%';
         document.getElementById('strobe-progress-fill').style.background = 'var(--error)';
@@ -814,14 +834,12 @@ class CalibrationManager {
     }
 
     onStrobeCalibrationCancelled() {
-        const btn = document.getElementById('strobe-calibrate-btn');
         const cancelBtn = document.getElementById('strobe-cancel-btn');
-        btn.disabled = false;
-        btn.textContent = 'Calibrate';
         cancelBtn.style.display = 'none';
 
         document.getElementById('strobe-state').textContent = 'Idle';
         document.getElementById('strobe-progress-message').textContent = 'Cancelled by user';
+        this.loadStrobeSettings();
     }
 
     async cancelStrobeCalibration() {

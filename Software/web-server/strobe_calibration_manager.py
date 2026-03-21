@@ -313,14 +313,16 @@ class StrobeCalibrationManager:
         # Validate board version
         board_version = self.config_manager.get_config("gs_config.strobing.kConnectionBoardVersion")
         if board_version is None or int(board_version) != 3:
-            return {"status": "error",
-                    "message": f"Board version must be V3 (got {board_version})"}
+            msg = f"Board version must be V3 (got {board_version})"
+            self.status = {"state": "error", "progress": 0, "message": msg}
+            return {"status": "error", "message": msg}
 
         # Check for existing calibration
         existing = self.config_manager.get_config(self.DAC_CONFIG_KEY)
         if existing is not None and not overwrite:
-            return {"status": "error",
-                    "message": "Calibration already exists. Set overwrite=true to replace."}
+            msg = "Calibration already exists. Set overwrite=true to replace."
+            self.status = {"state": "error", "progress": 0, "message": msg}
+            return {"status": "error", "message": msg}
 
         # Resolve target
         if target_current is not None:
