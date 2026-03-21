@@ -608,7 +608,16 @@ install_python_dependencies() {
     fi
     
     log_info "Installing Python dependencies for web server..."
-    
+
+    # gpiozero (in requirements.txt) needs these system GPIO backends on Raspberry Pi OS.
+    # They're not available on PyPI so we install them via apt.
+    for pkg in python3-lgpio python3-rpi-lgpio; do
+        if ! dpkg -l | grep -q "^ii  $pkg"; then
+            log_info "Installing system GPIO backend: $pkg"
+            INITRD=No apt-get install -y "$pkg" 2>/dev/null || log_warn "Could not install $pkg"
+        fi
+    done
+
     if [[ $EUID -eq 0 ]]; then
         if pip3 install -r "$web_server_dir/requirements.txt" --break-system-packages --ignore-installed 2>/dev/null; then
             log_success "Python dependencies installed successfully"

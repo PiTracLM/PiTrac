@@ -348,8 +348,8 @@ build_dev() {
         fi
     done
 
-    # Python runtime dependencies for CLI tool
-    for pkg in python3 python3-pip python3-yaml python3-opencv python3-numpy python3-lgpio python3-rpi-lgpio python3-gpiozero; do
+    # Python runtime dependencies
+    for pkg in python3 python3-pip python3-yaml python3-opencv python3-numpy; do
         if ! dpkg -l | grep -q "^ii  $pkg"; then
             missing_deps+=("$pkg")
         fi

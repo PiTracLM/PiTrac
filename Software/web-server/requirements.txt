@@ -8,3 +8,5 @@ pillow==11.3.0
 pyyaml==6.0.3
 aiofiles==25.1.0
 websockets==15.0.1
+spidev>=3.6
+gpiozero>=2.0
