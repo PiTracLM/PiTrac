@@ -281,6 +281,17 @@
       "passedVia": "json",
       "passedTo": "both"
     },
+    "gs_config.strobing.kDAC_setting": {
+      "category": "Strobing",
+      "subcategory": "advanced",
+      "displayName": "Strobe DAC Setting",
+      "description": "Calibrated DAC value for strobe LED current control. Set by the strobe calibration tool.",
+      "type": "number",
+      "min": 0,
+      "max": 255,
+      "default": null,
+      "internal": true
+    },
     "gs_config.system.kEnclosureVersion": {
       "category": "System",
       "subcategory": "advanced",
