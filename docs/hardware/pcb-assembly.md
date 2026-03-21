@@ -233,12 +233,12 @@ After assembly, must run current calibration before you will be able to capture 
 | V3 Connector Board | Raspberry Pi 5 |
 |----------|----------|
 | GND | GND (Pin 39) |
-| DIAG | GPIO 20 (Pin 38) |
-| CS0 | GPIO 8 (Pin 24) |
-| MOSI | GPIO 10 (Pin 19) |
-| MISO | GPIO 9 (Pin 21) |
-| CLK | GPIO 11 (Pin 23) |
-| CS1 | GPIO 7 (Pin 26) |
+| DIAG | GPIO 10 (Pin 19) |
+| CS0 | GPIO 18 (Pin 12) |
+| MOSI | GPIO 20 (Pin 38) |
+| MISO | GPIO 19 (Pin 35) |
+| CLK | GPIO 21 (Pin 40) |
+| CS1 | GPIO 17 (Pin 11) |
 | V3P3 | 3V3 (Pin 1) |
 
 | Global Shutter Camera 2 | Raspberry Pi 5 |
