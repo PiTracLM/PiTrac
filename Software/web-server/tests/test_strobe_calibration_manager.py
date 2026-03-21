@@ -49,7 +49,7 @@ class TestOpenHardware:
     """_open_hardware sets up SPI and GPIO"""
 
     @patch("strobe_calibration_manager.spidev")
-    @patch("strobe_calibration_manager.LED")
+    @patch("strobe_calibration_manager.DigitalOutputDevice")
     def test_open_creates_spi_and_gpio(self, mock_led_cls, mock_spidev_mod):
         from strobe_calibration_manager import StrobeCalibrationManager
 
@@ -89,15 +89,21 @@ class TestCloseHardware:
         from strobe_calibration_manager import StrobeCalibrationManager
 
         mgr = StrobeCalibrationManager(Mock())
-        mgr._spi_dac = MagicMock()
-        mgr._spi_adc = MagicMock()
-        mgr._diag_pin = MagicMock()
+        mock_dac = MagicMock()
+        mock_adc = MagicMock()
+        mock_diag = MagicMock()
+        mgr._spi_dac = mock_dac
+        mgr._spi_adc = mock_adc
+        mgr._diag_pin = mock_diag
 
         mgr._close_hardware()
 
-        mgr._spi_dac.close.assert_called_once()
-        mgr._spi_adc.close.assert_called_once()
-        mgr._diag_pin.close.assert_called_once()
+        mock_dac.close.assert_called_once()
+        mock_adc.close.assert_called_once()
+        mock_diag.close.assert_called_once()
+        assert mgr._spi_dac is None
+        assert mgr._spi_adc is None
+        assert mgr._diag_pin is None
 
     def test_close_tolerates_none_refs(self):
         from strobe_calibration_manager import StrobeCalibrationManager

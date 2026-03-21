@@ -19,9 +19,9 @@ except ImportError:
     spidev = None
 
 try:
-    from gpiozero import LED
+    from gpiozero import DigitalOutputDevice
 except ImportError:
-    LED = None
+    DigitalOutputDevice = None
 
 
 class StrobeCalibrationManager:
@@ -84,7 +84,7 @@ class StrobeCalibrationManager:
     def _open_hardware(self):
         if spidev is None:
             raise RuntimeError("spidev library not available -- not running on a Raspberry Pi?")
-        if LED is None:
+        if DigitalOutputDevice is None:
             raise RuntimeError("gpiozero library not available -- not running on a Raspberry Pi?")
 
         self._spi_dac = spidev.SpiDev()
@@ -97,16 +97,24 @@ class StrobeCalibrationManager:
         self._spi_adc.max_speed_hz = self.SPI_MAX_SPEED_HZ
         self._spi_adc.mode = 0
 
-        self._diag_pin = LED(self.DIAG_GPIO_PIN)
+        self._diag_pin = DigitalOutputDevice(self.DIAG_GPIO_PIN)
 
     def _close_hardware(self):
-        if self._diag_pin is not None:
-            self._diag_pin.off()
-            self._diag_pin.close()
-        if self._spi_dac is not None:
-            self._spi_dac.close()
-        if self._spi_adc is not None:
-            self._spi_adc.close()
+        for name, resource in [("diag", self._diag_pin),
+                               ("dac", self._spi_dac),
+                               ("adc", self._spi_adc)]:
+            if resource is None:
+                continue
+            try:
+                if name == "diag":
+                    resource.off()
+                resource.close()
+            except Exception:
+                logger.debug(f"Error closing {name}", exc_info=True)
+
+        self._diag_pin = None
+        self._spi_dac = None
+        self._spi_adc = None
 
     # ------------------------------------------------------------------
     # DAC / ADC primitives
@@ -140,23 +148,24 @@ class StrobeCalibrationManager:
 
         gc.disable()
         try:
-            param = os.sched_param(os.sched_get_priority_max(os.SCHED_FIFO))
-            os.sched_setscheduler(0, os.SCHED_FIFO, param)
-        except (PermissionError, AttributeError, OSError):
-            pass
-
-        time.sleep(0)
-
-        try:
-            diag.on()
-            response = spi.xfer2(msg)
-        finally:
-            diag.off()
             try:
-                param = os.sched_param(0)
-                os.sched_setscheduler(0, os.SCHED_OTHER, param)
+                param = os.sched_param(os.sched_get_priority_max(os.SCHED_FIFO))
+                os.sched_setscheduler(0, os.SCHED_FIFO, param)
             except (PermissionError, AttributeError, OSError):
                 pass
+
+            time.sleep(0)
+
+            try:
+                diag.on()
+                response = spi.xfer2(msg)
+            finally:
+                diag.off()
+                try:
+                    os.sched_setscheduler(0, os.SCHED_OTHER, os.sched_param(0))
+                except (PermissionError, AttributeError, OSError):
+                    pass
+        finally:
             gc.enable()
 
         adc_value = ((response[1] & 0x0F) << 8) | response[2]
