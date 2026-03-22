@@ -295,6 +295,7 @@ def _make_mgr_with_hw():
     mgr = StrobeCalibrationManager(Mock())
     mgr._spi_dac = MagicMock()
     mgr._spi_adc = MagicMock()
+    mgr._spi_adc.xfer2.return_value = [0x00, 0x00, 0x00]
     mgr._diag_pin = MagicMock()
     return mgr
 
@@ -353,6 +354,14 @@ class TestFindDacStart:
 
 class TestCalibrate:
     """_calibrate runs all 3 phases: find_start, main sweep, averaging"""
+
+    @patch("strobe_calibration_manager.time.sleep")
+    def test_preflight_fails_when_current_detected_with_strobe_off(self, _sleep):
+        mgr = _make_mgr_with_hw()
+        mgr._spi_adc.xfer2.return_value = [0x00, 0x00, 0x10]  # ADC=16, above threshold of 6
+
+        success, dac, current = mgr._calibrate(10.0)
+        assert success is False
 
     @patch("strobe_calibration_manager.time.sleep")
     def test_succeeds_with_realistic_data(self, _sleep):

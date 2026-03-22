@@ -50,6 +50,9 @@ class StrobeCalibrationManager:
     # Safe fallback DAC value if calibration fails
     SAFE_DAC_VALUE = 0x96
 
+    # If ADC CH0 reads above this with strobe off, something is wrong (blown MOSFET, shorted gate driver)
+    PREFLIGHT_CURRENT_THRESHOLD = 6
+
     # LDO voltage bounds
     LDO_MIN_V = 4.5
     LDO_MAX_V = 11.0
@@ -205,67 +208,69 @@ class StrobeCalibrationManager:
         Returns:
             (success, final_dac, led_current)
         """
+        # Pre-flight: check for current with strobe off — indicates blown MOSFET or gate driver
+        idle_adc = self._read_adc(self.ADC_CH0_CMD)
+        if idle_adc > self.PREFLIGHT_CURRENT_THRESHOLD:
+            self.status["message"] = f"Current detected with strobe off (ADC CH0={idle_adc}). Likely blown MOSFET or gate driver — check V3 Connector Board."
+            return False, -1, -1
+
         # Phase 1: find safe starting DAC
         dac_start, ldo = self._find_dac_start()
 
         if dac_start < 0:
-            logger.debug(f"DAC 0 already below LDO minimum ({ldo:.2f}V)")
+            self.status["message"] = f"DAC value of 0 is below minimum LDO voltage ({self.LDO_MIN_V:.2f}V): {ldo:.2f}V. This indicates a problem with the controller board."
             return False, -1, -1
 
         logger.debug(f"Calibrating: target={target_current}A, dac_start={dac_start:#04x}")
 
         # Phase 2: sweep from dac_start downward, looking for target crossing
-        current_dac = dac_start
         final_dac = self.DAC_MIN
-        total_steps = dac_start - self.DAC_MIN + 1
+        crossed = False
 
-        while current_dac >= self.DAC_MIN:
+        for dac in range(dac_start, self.DAC_MIN - 1, -1):
             if self._cancel_requested:
                 logger.info("Calibration cancelled by user")
                 return False, -1, -1
 
-            self._set_dac(current_dac)
+            self._set_dac(dac)
             time.sleep(0.1)
 
-            # Update progress for UI polling
-            steps_done = dac_start - current_dac
+            steps_done = dac_start - dac
+            total_steps = dac_start - self.DAC_MIN + 1
             if total_steps > 0:
                 self.status["progress"] = int(20 + (steps_done / total_steps) * 60)
 
             ldo = self.get_ldo_voltage()
 
             if ldo < self.LDO_MIN_V:
-                logger.debug(f"LDO {ldo:.2f}V below min at DAC={current_dac:#04x}, skipping")
-                final_dac = current_dac
-                current_dac -= 1
+                logger.debug(f"LDO {ldo:.2f}V below min at DAC={dac:#04x}, skipping")
+                final_dac = dac
                 continue
 
             if ldo > self.LDO_MAX_V:
-                logger.debug(f"LDO {ldo:.2f}V above max — something is wrong")
+                self.status["message"] = f"LDO voltage ({ldo:.2f}V) above maximum ({self.LDO_MAX_V}V). Stopping calibration, as something is wrong."
                 return False, -1, -1
 
             led_current = self.get_led_current()
-            logger.debug(f"DAC={current_dac:#04x}, current={led_current:.2f}A")
+            logger.debug(f"DAC={dac:#04x}, current={led_current:.2f}A")
 
-            # Hard safety cap (bug fix over original script)
             if led_current > self.HARD_CAP_CURRENT:
-                logger.error(f"LED current {led_current:.2f}A exceeds hard cap {self.HARD_CAP_CURRENT}A")
+                self.status["message"] = f"LED current ({led_current:.2f}A) exceeds hard cap ({self.HARD_CAP_CURRENT}A). This strongly indicates the LED is shorted."
                 return False, -1, -1
 
             if led_current > target_current:
-                logger.debug(f"Crossed target at DAC={current_dac:#04x} ({led_current:.2f}A)")
-                final_dac = current_dac + 1
+                logger.debug(f"Crossed target at DAC={dac:#04x} ({led_current:.2f}A)")
+                final_dac = dac + 1
+                crossed = True
                 break
 
-            final_dac = current_dac
-            current_dac -= 1
+            final_dac = dac
 
-        # Edge cases — sweep ran off either end
-        if current_dac <= self.DAC_MIN:
-            logger.debug(f"Reached DAC_MIN without crossing target")
+        if not crossed:
+            self.status["message"] = f"Reached MIN_DAC without reaching target ({target_current}A). This generally indicates a problem."
             return False, -1, -1
-        if current_dac >= self.DAC_MAX:
-            logger.debug(f"DAC_MAX still above target — hardware problem")
+        if final_dac >= self.DAC_MAX:
+            self.status["message"] = "MAX_DAC resulted in current above target. This generally indicates a problem."
             return False, -1, -1
 
         # Phase 3: average readings at the final setting to refine
@@ -370,8 +375,9 @@ class StrobeCalibrationManager:
                 return self.status
             else:
                 self._set_dac(self.SAFE_DAC_VALUE)
+                reason = self.status.get("message", "Calibration failed")
                 self.status = {"state": "failed", "progress": 0,
-                               "message": "Calibration failed — DAC set to safe fallback"}
+                               "message": f"{reason} DAC set to safe fallback."}
                 return self.status
 
         except Exception as e:
