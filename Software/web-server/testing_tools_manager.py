@@ -169,11 +169,32 @@ class TestingToolsManager:
                 # Set the base directory to where our test images are
                 config_json["gs_config"]["testing"]["kBaseTestImageDir"] = str(self.test_images_dir) + "/"
                 config_json["gs_config"]["testing"]["kTwoImageTestTeedBallImage"] = image_filename
-                config_json["gs_config"]["testing"]["kTwoImageTestStrobedImage"] = image_filename
+                config_json["gs_config"]["testing"]["kTwoImageTestStrobedBallImage"] = image_filename
                 config_json["gs_config"]["testing"]["kTwoImageTestPreImage"] = ""  # Optional
 
                 with open(config_path, "w") as f:
                     json.dump(config_json, f, indent=2)
+
+            # For sample image test, use pre-installed test images
+            if tool_id == "test_images":
+                import json
+
+                system_images_dir = Path("/usr/share/pitrac/test-images")
+                if system_images_dir.exists():
+                    with open(config_path, "r") as f:
+                        config_json = json.load(f)
+
+                    if "gs_config" not in config_json:
+                        config_json["gs_config"] = {}
+                    if "testing" not in config_json["gs_config"]:
+                        config_json["gs_config"]["testing"] = {}
+
+                    config_json["gs_config"]["testing"]["kBaseTestImageDir"] = str(system_images_dir) + "/"
+                    config_json["gs_config"]["testing"]["kTwoImageTestTeedBallImage"] = "teed-ball.png"
+                    config_json["gs_config"]["testing"]["kTwoImageTestStrobedBallImage"] = "strobed.png"
+
+                    with open(config_path, "w") as f:
+                        json.dump(config_json, f, indent=2)
 
             cmd = [self.pitrac_binary]
 
