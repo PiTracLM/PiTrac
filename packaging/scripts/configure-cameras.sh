@@ -353,50 +353,43 @@ main() {
 
     log_info "Detecting connected cameras..."
     local camera_json
+    local num_cameras=0
 
-    if camera_json=$(sudo python3 /usr/lib/pitrac/web-server/camera_detector.py --json 2>/dev/null); then
-        if echo "$camera_json" | python3 -c "import sys, json; data=json.load(sys.stdin); sys.exit(0 if data.get('success', False) else 1)" 2>/dev/null; then
-            local num_cameras=$(echo "$camera_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(len(data.get('cameras', [])))")
+    # camera_detector.py exits non-zero when no cameras found, so ignore exit code
+    camera_json=$(sudo python3 /usr/lib/pitrac/web-server/camera_detector.py --json 2>/dev/null) || true
 
-            if [[ "$num_cameras" -eq 0 ]]; then
-                log_warn "No cameras detected - camera overlays will be skipped"
-            else
-                log_success "Successfully detected ${num_cameras} camera(s)"
+    if echo "$camera_json" | python3 -c "import sys, json; json.load(sys.stdin)" 2>/dev/null; then
+        num_cameras=$(echo "$camera_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(len(data.get('cameras', [])))")
 
-                echo "$camera_json" | python3 -c "
+        if [[ "$num_cameras" -gt 0 ]]; then
+            log_success "Detected ${num_cameras} camera(s)"
+            echo "$camera_json" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 for cam in data.get('cameras', []):
     print(f\"  Camera {cam['index']}: {cam['description']} on {cam['port']} (Type {cam['pitrac_type']})\")
 "
-            fi
-
-            # Always configure base system params (force_turbo, spi, etc.)
-            # Camera-specific overlays are skipped when num_cameras == 0
-            configure_boot_config "$camera_json"
-
-            if [[ "$num_cameras" -gt 0 ]]; then
-                if [[ -n "${SUDO_USER:-}" ]]; then
-                    user_home=$(eval echo ~${SUDO_USER})
-                else
-                    user_home="${HOME}"
-                fi
-                configure_user_settings "$camera_json" "${user_home}/.pitrac/config/user_settings.json"
-            fi
-
-            log_success "Configuration completed successfully"
-            log_warn "Please reboot the system for changes to take effect"
-
         else
-            log_error "Camera detection failed"
-            log_info "You can manually configure cameras later if needed"
-            exit 0
+            log_warn "No cameras detected - camera overlays will be skipped"
         fi
     else
-        log_warn "Could not run camera detection - skipping camera configuration"
-        log_info "This may be normal on non-Pi systems or if cameras are not connected"
-        exit 0
+        log_warn "Camera detection returned no usable output"
+        camera_json='{"cameras":[]}'
     fi
+
+    configure_boot_config "$camera_json"
+
+    if [[ "$num_cameras" -gt 0 ]]; then
+        if [[ -n "${SUDO_USER:-}" ]]; then
+            user_home=$(eval echo ~${SUDO_USER})
+        else
+            user_home="${HOME}"
+        fi
+        configure_user_settings "$camera_json" "${user_home}/.pitrac/config/user_settings.json"
+    fi
+
+    log_success "Configuration completed successfully"
+    log_warn "Please reboot the system for changes to take effect"
 }
 
 main "$@"
