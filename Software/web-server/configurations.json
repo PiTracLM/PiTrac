@@ -74,7 +74,9 @@
       "description": "File patterns to match when searching for models",
       "type": "array",
       "default": [
+        "best.ncnn.param",
         "best.onnx",
+        "weights/best.ncnn.param",
         "weights/best.onnx"
       ],
       "internal": true
@@ -570,9 +572,8 @@
       "description": "Algorithm for detecting strobed balls in flight",
       "type": "select",
       "options": {
-        "legacy": "HoughCircles (Most Stable)",
-        "experimental": "YOLO Neural Network (Fast)",
-        "experimental_sahi": "YOLO + SAHI Slicing (Most Accurate)"
+        "legacy": "HoughCircles (Legacy)",
+        "experimental": "YOLO Neural Network"
       },
       "default": "experimental",
       "requiresRestart": true,
@@ -595,15 +596,15 @@
       "passedVia": "json",
       "passedTo": "both"
     },
-    "gs_config.ball_identification.kONNXModelPath": {
+    "gs_config.ball_identification.kModelPath": {
       "category": "AI Detection",
       "subcategory": "basic",
       "basicSubcategory": "Detection Methods",
       "displayName": "AI Model",
-      "description": "Select YOLO model for AI-based ball detection",
+      "description": "Model directory — backend loads the right format (NCNN/ONNX) automatically",
       "type": "select",
       "options": {},
-      "default": "/etc/pitrac/models/pitrac-ball-detection-09-25-25/best.onnx",
+      "default": "/etc/pitrac/models/yolo26-ball-detector",
       "requiresRestart": true,
       "passedVia": "json",
       "passedTo": "both"
@@ -1061,7 +1062,7 @@
       "passedVia": "json",
       "passedTo": "both"
     },
-    "gs_config.ball_identification.kONNXConfidenceThreshold": {
+    "gs_config.ball_identification.kModelConfidenceThreshold": {
       "category": "AI Detection",
       "subcategory": "advanced",
       "displayName": "ONNX Confidence Threshold",
@@ -1075,7 +1076,7 @@
       "passedVia": "json",
       "passedTo": "both"
     },
-    "gs_config.ball_identification.kONNXNMSThreshold": {
+    "gs_config.ball_identification.kModelNMSThreshold": {
       "category": "AI Detection",
       "subcategory": "advanced",
       "displayName": "ONNX NMS Threshold",
@@ -1089,7 +1090,7 @@
       "passedVia": "json",
       "passedTo": "both"
     },
-    "gs_config.ball_identification.kONNXInputSize": {
+    "gs_config.ball_identification.kModelInputSize": {
       "category": "AI Detection",
       "subcategory": "advanced",
       "displayName": "ONNX Input Size",
@@ -1103,114 +1104,48 @@
       "passedVia": "json",
       "passedTo": "both"
     },
-    "gs_config.ball_identification.kSAHISliceHeight": {
-      "category": "AI Detection",
-      "subcategory": "advanced",
-      "displayName": "SAHI Slice Height",
-      "description": "Height of slices for SAHI (Slicing Aided Hyper Inference)",
-      "type": "number",
-      "min": 160,
-      "max": 1024,
-      "step": 32,
-      "default": 320,
-      "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
-    },
-    "gs_config.ball_identification.kSAHISliceWidth": {
-      "category": "AI Detection",
-      "subcategory": "advanced",
-      "displayName": "SAHI Slice Width",
-      "description": "Width of slices for SAHI (Slicing Aided Hyper Inference)",
-      "type": "number",
-      "min": 160,
-      "max": 1024,
-      "step": 32,
-      "default": 320,
-      "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
-    },
-    "gs_config.ball_identification.kSAHIOverlapRatio": {
-      "category": "AI Detection",
-      "subcategory": "advanced",
-      "displayName": "SAHI Overlap Ratio",
-      "description": "Overlap ratio between SAHI slices",
-      "type": "number",
-      "min": 0.0,
-      "max": 0.5,
-      "step": 0.05,
-      "default": 0.2,
-      "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
-    },
     "gs_config.ball_identification.kInferenceBackend": {
       "category": "AI Detection",
       "subcategory": "advanced",
       "displayName": "Inference Backend",
-      "description": "Neural network inference backend for YOLO model",
+      "description": "Neural network inference backend",
       "type": "select",
       "options": {
-        "onnxruntime": "ONNX Runtime (Faster)",
+        "ncnn": "NCNN (Fastest on Pi 5)",
+        "onnxruntime": "ONNX Runtime (Legacy)",
         "opencv_dnn": "OpenCV DNN (Fallback)"
       },
-      "default": "onnxruntime",
+      "default": "ncnn",
       "requiresRestart": true,
       "passedVia": "json",
       "passedTo": "both"
     },
-    "gs_config.ball_identification.kONNXRuntimeAutoFallback": {
+    "gs_config.ball_identification.kAutoFallback": {
       "category": "AI Detection",
       "subcategory": "advanced",
       "displayName": "Auto Fallback to OpenCV",
-      "description": "Automatically fallback to OpenCV DNN if ONNX Runtime fails",
+      "description": "Automatically fallback to OpenCV DNN if primary backend fails",
       "type": "boolean",
       "default": true,
       "requiresRestart": false,
       "passedVia": "json",
       "passedTo": "both"
     },
-    "gs_config.ball_identification.kONNXRuntimeThreads": {
+    "gs_config.ball_identification.kInferenceThreads": {
       "category": "AI Detection",
       "subcategory": "advanced",
-      "displayName": "ONNX Runtime Threads",
-      "description": "Number of threads for ONNX Runtime inference (0 = auto)",
+      "displayName": "Inference Threads",
+      "description": "Number of threads for inference (0 = auto)",
       "type": "number",
       "min": 0,
       "max": 8,
       "step": 1,
-      "default": 4,
+      "default": 3,
       "requiresRestart": true,
       "passedVia": "json",
       "passedTo": "both"
     },
-    "gs_config.ball_identification.kONNXRuntimeMemoryPoolMB": {
-      "category": "AI Detection",
-      "subcategory": "advanced",
-      "displayName": "ONNX Memory Pool (MB)",
-      "description": "Memory pool size for ONNX Runtime (reduces allocation overhead)",
-      "type": "number",
-      "min": 32,
-      "max": 256,
-      "step": 32,
-      "default": 64,
-      "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
-    },
-    "gs_config.ball_identification.kONNXRuntimeUseNEON": {
-      "category": "AI Detection",
-      "subcategory": "advanced",
-      "displayName": "Use NEON Optimization",
-      "description": "Enable ARM NEON SIMD optimizations for preprocessing",
-      "type": "boolean",
-      "default": true,
-      "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
-    },
-    "gs_config.ball_identification.kONNXDeviceType": {
+    "gs_config.ball_identification.kModelDeviceType": {
       "category": "AI Detection",
       "subcategory": "advanced",
       "displayName": "ONNX Device Type",

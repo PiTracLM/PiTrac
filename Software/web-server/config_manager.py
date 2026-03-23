@@ -485,7 +485,7 @@ class ConfigurationManager:
             setting_type = setting_info.get("type", "")
 
             if setting_type == "select" and "options" in setting_info:
-                if key == "gs_config.ball_identification.kONNXModelPath":
+                if key == "gs_config.ball_identification.kModelPath":
                     available_models = self.get_available_models()
                     if available_models:
                         valid_options = list(available_models.values())
@@ -634,7 +634,8 @@ class ConfigurationManager:
     def get_available_models(self) -> Dict[str, str]:
         """
         Discover available YOLO models from the models directory.
-        Returns a dict of {display_name: path} for dropdown options.
+        Returns a dict of {display_name: model_dir_path} for dropdown options.
+        The C++ backend appends the correct file extension based on kInferenceBackend.
         """
         models = {}
         metadata = self._raw_metadata if hasattr(self, "_raw_metadata") else self._load_raw_metadata()
@@ -654,16 +655,11 @@ class ConfigurationManager:
 
             for model_dir in base_dir.iterdir():
                 if model_dir.is_dir():
-                    onnx_paths = []
                     for pattern in model_file_patterns:
-                        onnx_paths.append(model_dir / pattern)
-
-                    for onnx_path in onnx_paths:
-                        if onnx_path.exists():
+                        if (model_dir / pattern).exists():
                             display_name = model_dir.name
                             if display_name not in models:
-                                path_str = str(onnx_path.resolve())
-                                models[display_name] = path_str
+                                models[display_name] = str(model_dir.resolve())
                             break
 
         return dict(sorted(models.items()))
@@ -679,7 +675,7 @@ class ConfigurationManager:
 
             model_options = self.get_available_models()
             if model_options and "settings" in metadata:
-                model_key = "gs_config.ball_identification.kONNXModelPath"
+                model_key = "gs_config.ball_identification.kModelPath"
                 if model_key in metadata["settings"]:
                     metadata["settings"][model_key]["options"] = model_options
 
