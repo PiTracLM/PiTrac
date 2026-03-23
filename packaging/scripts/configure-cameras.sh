@@ -359,31 +359,33 @@ main() {
             local num_cameras=$(echo "$camera_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(len(data.get('cameras', [])))")
 
             if [[ "$num_cameras" -eq 0 ]]; then
-                log_warn "No cameras detected - skipping camera configuration"
-                log_info "Camera configuration can be done manually later if needed"
-                exit 0
-            fi
+                log_warn "No cameras detected - camera overlays will be skipped"
+            else
+                log_success "Successfully detected ${num_cameras} camera(s)"
 
-            log_success "Successfully detected ${num_cameras} camera(s)"
-
-            echo "$camera_json" | python3 -c "
+                echo "$camera_json" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 for cam in data.get('cameras', []):
     print(f\"  Camera {cam['index']}: {cam['description']} on {cam['port']} (Type {cam['pitrac_type']})\")
 "
+            fi
 
+            # Always configure base system params (force_turbo, spi, etc.)
+            # Camera-specific overlays are skipped when num_cameras == 0
             configure_boot_config "$camera_json"
 
-            if [[ -n "${SUDO_USER:-}" ]]; then
-                user_home=$(eval echo ~${SUDO_USER})
-            else
-                user_home="${HOME}"
+            if [[ "$num_cameras" -gt 0 ]]; then
+                if [[ -n "${SUDO_USER:-}" ]]; then
+                    user_home=$(eval echo ~${SUDO_USER})
+                else
+                    user_home="${HOME}"
+                fi
+                configure_user_settings "$camera_json" "${user_home}/.pitrac/config/user_settings.json"
             fi
-            configure_user_settings "$camera_json" "${user_home}/.pitrac/config/user_settings.json"
 
-            log_success "Camera configuration completed successfully"
-            log_warn "Please reboot the system for camera configuration to take effect"
+            log_success "Configuration completed successfully"
+            log_warn "Please reboot the system for changes to take effect"
 
         else
             log_error "Camera detection failed"
