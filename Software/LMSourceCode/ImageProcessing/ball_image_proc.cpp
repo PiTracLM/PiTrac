@@ -612,24 +612,23 @@ namespace golf_sim {
 
         GS_LOG_TRACE_MSG(trace, "Using detection method: " + detection_method);
 
-        // *** ONNX DETECTION INTEGRATION - Process through full trajectory analysis pipeline ***
+        // *** ML DETECTION - Route through backend dispatcher (ncnn, onnxruntime, or opencv dnn) ***
         if (detection_method == "experimental") {
-            std::vector<GsCircle> onnx_circles;
-            if (DetectBallsONNX(rgbImg, search_mode, onnx_circles, report_find_failures)) {
+            std::vector<GsCircle> detected_circles;
+            if (DetectBalls(rgbImg, search_mode, detected_circles, report_find_failures)) {
                 // Convert GsCircle results to GolfBall objects for trajectory analysis
                 return_balls.clear();
-                for (size_t i = 0; i < onnx_circles.size(); ++i) {
+                for (size_t i = 0; i < detected_circles.size(); ++i) {
                     GolfBall ball;
-                    ball.quality_ranking = static_cast<int>(i); // ONNX confidence-based ranking
-                    ball.set_circle(onnx_circles[i]);
-                    ball.ball_color_ = GolfBall::BallColor::kModelDetected; // Mark as ONNX-detected
-                    ball.measured_radius_pixels_ = onnx_circles[i][2];
+                    ball.quality_ranking = static_cast<int>(i);
+                    ball.set_circle(detected_circles[i]);
+                    ball.ball_color_ = GolfBall::BallColor::kModelDetected;
+                    ball.measured_radius_pixels_ = detected_circles[i][2];
                     ball.radius_at_calibration_pixels_ = baseBallWithSearchParams.radius_at_calibration_pixels_;
 
-                    // Set color info - ONNX doesn't analyze color but we need placeholders
                     ball.average_color_ = baseBallWithSearchParams.average_color_;
                     ball.median_color_ = baseBallWithSearchParams.average_color_;
-                    ball.std_color_ = GsColorTriplet(0, 0, 0); // Zero std indicates no color analysis
+                    ball.std_color_ = GsColorTriplet(0, 0, 0);
 
                     return_balls.push_back(ball);
                 }
@@ -638,9 +637,7 @@ namespace golf_sim {
             }
             else {
                 if (report_find_failures) {
-                    // We might be waiting for a ball to appear.  In that case,
-		    // the failure to find one is nothing to worry about.
-                    GS_LOG_MSG(warning, "ONNX detection failed - no balls found");
+                    GS_LOG_MSG(warning, "ML detection failed - no balls found");
                 }
                 return false;
             }
