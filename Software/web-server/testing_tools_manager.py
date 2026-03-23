@@ -175,26 +175,34 @@ class TestingToolsManager:
                 with open(config_path, "w") as f:
                     json.dump(config_json, f, indent=2)
 
-            # For sample image test, use pre-installed test images
-            if tool_id == "test_images":
+            # For sample image test or automated testing, set up test suite paths
+            if tool_id in ("test_images", "automated_testing"):
                 import json
 
-                system_images_dir = Path("/usr/share/pitrac/test-images")
-                if system_images_dir.exists():
-                    with open(config_path, "r") as f:
-                        config_json = json.load(f)
+                test_suite_dir = Path("/usr/share/pitrac/test-suites/TestSuite_2025_02_07")
+                with open(config_path, "r") as f:
+                    config_json = json.load(f)
 
-                    if "gs_config" not in config_json:
-                        config_json["gs_config"] = {}
-                    if "testing" not in config_json["gs_config"]:
-                        config_json["gs_config"]["testing"] = {}
+                if "gs_config" not in config_json:
+                    config_json["gs_config"] = {}
+                if "testing" not in config_json["gs_config"]:
+                    config_json["gs_config"]["testing"] = {}
 
-                    config_json["gs_config"]["testing"]["kBaseTestImageDir"] = str(system_images_dir) + "/"
-                    config_json["gs_config"]["testing"]["kTwoImageTestTeedBallImage"] = "teed-ball.png"
-                    config_json["gs_config"]["testing"]["kTwoImageTestStrobedBallImage"] = "strobed.png"
+                if tool_id == "test_images" and test_suite_dir.exists():
+                    # Use a matched pair from the test suite (Shot 1)
+                    teed_files = sorted(test_suite_dir.glob("*log_ball_final_found_ball_img_Shot_1_*"))
+                    strobed_files = sorted(test_suite_dir.glob("*log_cam2_last_strobed_img_Shot_1_*"))
+                    if teed_files and strobed_files:
+                        config_json["gs_config"]["testing"]["kBaseTestImageDir"] = str(test_suite_dir) + "/"
+                        config_json["gs_config"]["testing"]["kTwoImageTestTeedBallImage"] = teed_files[0].name
+                        config_json["gs_config"]["testing"]["kTwoImageTestStrobedBallImage"] = strobed_files[0].name
 
-                    with open(config_path, "w") as f:
-                        json.dump(config_json, f, indent=2)
+                if tool_id == "automated_testing":
+                    config_json["gs_config"]["testing"]["kAutomatedTestSuiteDirectory"] = str(test_suite_dir) + "/"
+                    config_json["gs_config"]["testing"]["kAutomatedTestExpectedResultsCSV"] = "Uneekor Comparison 2025-02-07_Small_Test.csv"
+
+                with open(config_path, "w") as f:
+                    json.dump(config_json, f, indent=2)
 
             cmd = [self.pitrac_binary]
 
