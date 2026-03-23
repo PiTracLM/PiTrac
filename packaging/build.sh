@@ -280,7 +280,7 @@ build_dev() {
 
     # Core libraries (libcamera-dev pulls in correct runtime version)
     for pkg in libcamera-dev libcamera-tools libfmt-dev libssl-dev \
-               libmsgpack-cxx-dev \
+               libmsgpack-cxx-dev liblgpio-dev \
                libapr1 libaprutil1 libapr1-dev libaprutil1-dev; do
         if ! dpkg -l | grep -q "^ii  $pkg"; then
             missing_deps+=("$pkg")

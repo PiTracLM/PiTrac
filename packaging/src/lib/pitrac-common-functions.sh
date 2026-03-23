@@ -864,27 +864,22 @@ configure_pitrac_apt_repo() {
 install_dependencies_from_apt() {
     log_info "Installing PiTrac dependencies from APT repository..."
 
+    # ========================================================================
+    # PiTrac custom dependency packages (from pitraclm.github.io/packages)
+    # ========================================================================
+    # lgpio is NOT here — system liblgpio1 is used instead.
+    # python3-lgpio/python3-rpi-lgpio depend on the RPi Foundation version
+    # and break if a custom build with a different version string is installed.
+    # liblgpio-dev is in the system deps block in build.sh.
+    # ========================================================================
     local packages=(
-        "liblgpio1"
-        "liblgpio-dev"
-        "libmsgpack-cxx-dev"
-        "libactivemq-cpp"
-        "libactivemq-cpp-dev"
-        "libopencv4.11"
-        "libopencv-dev"
+        "libmsgpack-cxx-dev"      # MessagePack C++ (header-only)
+        "libactivemq-cpp"         # ActiveMQ C++ client runtime
+        "libactivemq-cpp-dev"     # ActiveMQ C++ client headers
+        "libopencv4.11"           # OpenCV runtime (Pi5-optimized build)
+        "libopencv-dev"           # OpenCV development headers
+        "libonnxruntime1.17.3"    # ONNX Runtime with XNNPACK (1.22.x has Pi5 issues)
     )
-
-    # Add ONNX Runtime - using 1.17.3 for both distros (1.22.x has Pi5 issues)
-    local codename=$(detect_debian_codename)
-    case "$codename" in
-        bookworm|trixie)
-            packages+=("libonnxruntime1.17.3")
-            ;;
-        *)
-            log_warn "Unknown distribution, will attempt generic ONNX install"
-            packages+=("libonnxruntime1.17.3")
-            ;;
-    esac
 
     # Check which packages are available
     log_info "Verifying package availability..."
