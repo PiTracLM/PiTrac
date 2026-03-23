@@ -1692,8 +1692,8 @@ namespace golf_sim {
                     
                     // For ONNX balls, use position-based quality instead of HoughCircles quality ranking
                     int quality_difference;
-                    if (b.ball_color_ == GolfBall::BallColor::kONNXDetected && 
-                        current_ball.ball_color_ == GolfBall::BallColor::kONNXDetected) {
+                    if (b.ball_color_ == GolfBall::BallColor::kModelDetected && 
+                        current_ball.ball_color_ == GolfBall::BallColor::kModelDetected) {
                         // For ONNX balls, all have high confidence - use position difference as quality proxy
                         quality_difference = std::abs(i - (int)outer_index); // Position difference in sorted list
                     } else {
@@ -2057,7 +2057,7 @@ namespace golf_sim {
                 GolfBall& b = initial_balls[i];
 
                 // Skip color analysis for ONNX-detected balls
-                if (b.ball_color_ == GolfBall::BallColor::kONNXDetected) {
+                if (b.ball_color_ == GolfBall::BallColor::kModelDetected) {
                     GS_LOG_TRACE_MSG(trace, "Skipping color analysis for ONNX-detected ball " + std::to_string(i));
                     continue;
                 }
@@ -2297,7 +2297,7 @@ namespace golf_sim {
             
             // *** ONNX PHYSICS CALCULATION - Essential distance/angle calculations for ONNX balls ***
             for (auto& ball : initial_balls) {
-                if (ball.ball_color_ == GolfBall::BallColor::kONNXDetected) {
+                if (ball.ball_color_ == GolfBall::BallColor::kModelDetected) {
                     GS_LOG_TRACE_MSG(trace, "Adding physics calculations for ONNX ball at (" + 
                                    std::to_string(ball.x()) + "," + std::to_string(ball.y()) + ")");
                     
