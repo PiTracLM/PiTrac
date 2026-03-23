@@ -20,17 +20,22 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/dnn.hpp>
 
+#ifdef HAS_ONNXRUNTIME
 #ifdef __unix__
 #include <onnxruntime/core/session/onnxruntime_cxx_api.h>
 #else
 #include <onnxruntime_cxx_api.h>
+#endif
 #endif
 
 #include "logging_tools.h"
 #include "gs_camera.h"
 #include "colorsys.h"
 #include "golf_ball.h"
+#include "ncnn_detector.hpp"
+#ifdef HAS_ONNXRUNTIME
 #include "onnx_runtime_detector.hpp"
+#endif
 
 
 namespace golf_sim {
@@ -195,21 +200,18 @@ public:
     static int kGaborMaxWhitePercent;
     static int kGaborMinWhitePercent;
 
-    // ONNX Detection Configuration
+    // Model Detection Configuration
     static std::string kStrobedBallDetectionMethod;
     static std::string kBallPlacementDetectionMethod;
-    static std::string kONNXModelPath;
-    static float kONNXConfidenceThreshold;
-    static float kONNXNMSThreshold;
-    static int kONNXInputSize;
-    static int kSAHISliceHeight;
-    static int kSAHISliceWidth;
-    static float kSAHIOverlapRatio;
-    static std::string kONNXDeviceType;
+    static std::string kModelPath;          // Model directory — backend appends file names
+    static float kModelConfidenceThreshold;
+    static float kModelNMSThreshold;
+    static int kModelInputSize;
+    static std::string kModelDeviceType;
 
-    static std::string kONNXBackend;  // "onnxruntime" (primary) or "opencv_dnn" (fallback)
-    static bool kONNXRuntimeAutoFallback;  // Enable automatic fallback to OpenCV DNN
-    static int kONNXRuntimeThreads;  // Number of threads for ONNX Runtime (ARM optimization)
+    static std::string kInferenceBackend;   // "ncnn" (primary) or "opencv_dnn" (fallback)
+    static bool kAutoFallback;
+    static int kInferenceThreads;
 
     // This determines which potential 3D angles will be searched for spin processing
     struct RotationSearchSpace {
@@ -342,23 +344,31 @@ public:
 
     bool PreProcessStrobedImage(cv::Mat& search_image, BallSearchMode search_mode);
 
-    // ONNX Detection Methods
-    static bool DetectBalls(const cv::Mat& preprocessed_img, 
-                            BallSearchMode search_mode, 
-                            std::vector<GsCircle>& detected_circles, 
+    // Detection Methods
+    static bool DetectBalls(const cv::Mat& preprocessed_img,
+                            BallSearchMode search_mode,
+                            std::vector<GsCircle>& detected_circles,
                             bool report_find_failures);
     static bool DetectBallsHoughCircles(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
-    static bool DetectBallsONNX(const cv::Mat& preprocessed_img, 
-                                BallSearchMode search_mode, 
+    static bool DetectBallsNCNN(const cv::Mat& preprocessed_img,
+                                BallSearchMode search_mode,
                                 std::vector<GsCircle>& detected_circles,
                                 bool report_find_failures);
-
-    static bool DetectBallsONNXRuntime(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
     static bool DetectBallsOpenCVDNN(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
 
-    static bool PreloadYOLOModel();
+#ifdef HAS_ONNXRUNTIME
+    static bool DetectBallsONNX(const cv::Mat& preprocessed_img,
+                                BallSearchMode search_mode,
+                                std::vector<GsCircle>& detected_circles,
+                                bool report_find_failures);
+    static bool DetectBallsONNXRuntime(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
     static bool PreloadONNXRuntimeModel();
     static void CleanupONNXRuntime();
+#endif
+
+    static bool PreloadYOLOModel();
+    static bool PreloadNCNNModel();
+    static void CleanupNCNN();
 
     // Load configuration values from JSON after config is initialized
     static void LoadConfigurationValues();
@@ -370,11 +380,19 @@ public:
                                           float nms_threshold);
 
 private:
-    // ONNX Runtime detector instance - replaces all static ONNX members
+    // NCNN detector (primary backend)
+    static std::unique_ptr<NCNNDetector> ncnn_detector_;
+    static std::atomic<bool> ncnn_detector_initialized_;
+    static std::mutex ncnn_detector_mutex_;
+
+#ifdef HAS_ONNXRUNTIME
+    // ONNX Runtime detector (legacy backend)
     static std::unique_ptr<ONNXRuntimeDetector> onnx_detector_;
     static std::atomic<bool> onnx_detector_initialized_;
     static std::mutex onnx_detector_mutex_;
+#endif
 
+    // OpenCV DNN fallback
     static cv::dnn::Net yolo_model_;
     static bool yolo_model_loaded_;
     static std::mutex yolo_model_mutex_;  // Thread safety for model loading
