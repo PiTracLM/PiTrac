@@ -23,8 +23,8 @@ add_global_arguments('-D_FILE_OFFSET_BITS=64', language : 'cpp')
 add_global_arguments('-DLIBCXX_ENABLE_INCOMPLETE_FEATURES=ON', language : 'cpp')
 add_global_arguments('-DBOOST_LOG_DYN_LINK', language : 'cpp')
 add_global_arguments('-DBOOST_BIND_GLOBAL_PLACEHOLDERS', language : 'cpp')
-# Enable XNNPACK execution provider for ONNX Runtime
-add_global_arguments('-DUSE_XNNPACK', language : 'cpp')
+# NCNN is the primary inference backend
+add_global_arguments('-DHAS_NCNN', language : 'cpp')
 
 
 fs = import('fs')
@@ -77,7 +77,11 @@ boost_dep = dependency('boost', method: 'pkg-config', version : '>=1.74.0', modu
 
 msgpack_dep = dependency('msgpack-cxx', required : true)
 yamlcpp_dep = dependency('yaml-cpp', required : true)
-onnxruntime_dep = dependency('onnxruntime', required : true)
+ncnn_dep = dependency('ncnn', required : true)
+onnxruntime_dep = dependency('onnxruntime', required : false)
+if onnxruntime_dep.found()
+    add_global_arguments('-DHAS_ONNXRUNTIME', '-DUSE_XNNPACK', language : 'cpp')
+endif
 
 
 summary({
@@ -93,7 +97,10 @@ conf_data = configuration_data()
 
 pitrac_lm_module_deps = [
 	libcamera_dep, thread_dep, opencv_dep, lgpio_dep, rpicam_app_dep,
-	fmt_dep, boost_dep, activemq_dep, ssl_dep, apr_dep, msgpack_dep, yamlcpp_dep, onnxruntime_dep,]
+	fmt_dep, boost_dep, activemq_dep, ssl_dep, apr_dep, msgpack_dep, yamlcpp_dep, ncnn_dep,]
+if onnxruntime_dep.found()
+    pitrac_lm_module_deps += onnxruntime_dep
+endif
 
 
 subdir('core')
@@ -186,6 +193,7 @@ pitrac_lm_sources += ([
 			'ball_watcher_image_buffer.cpp',
 			'libcamera_jpeg.cpp',
 			'ball_image_proc.cpp',
+			'ncnn_detector.cpp',
 			'onnx_runtime_detector.cpp',
 			'pulse_strobe.cpp',
 			'colorsys.cpp',
