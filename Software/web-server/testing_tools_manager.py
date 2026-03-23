@@ -444,6 +444,9 @@ class TestingToolsManager:
             "onnx_preload": None,
             "onnx_warmup": None,
             "onnx_detection": [],
+            "ncnn_preload": None,
+            "ncnn_warmup": None,
+            "ncnn_detection": [],
             "opencv_fallback": [],
             "getball": [],
             "spin_detection": [],
@@ -474,6 +477,24 @@ class TestingToolsManager:
                 if match:
                     timing_data["onnx_detection"].append(int(match.group(1)))
 
+            # NCNN preload
+            elif "NCNN model preloaded in" in line:
+                match = re.search(r"in (\d+)ms", line)
+                if match:
+                    timing_data["ncnn_preload"] = int(match.group(1))
+
+            # NCNN warmup
+            elif "NCNN warmup complete" in line:
+                match = re.search(r"\((\d+) iterations\)", line)
+                if match:
+                    timing_data["ncnn_warmup"] = int(match.group(1))
+
+            # NCNN detection
+            elif "NCNN detected" in line and "balls in" in line:
+                match = re.search(r"in (\d+)ms", line)
+                if match:
+                    timing_data["ncnn_detection"].append(int(match.group(1)))
+
             # OpenCV DNN fallback
             elif "OpenCV DNN completed processing in" in line:
                 match = re.search(r"in (\d+) ms", line)
@@ -497,6 +518,8 @@ class TestingToolsManager:
             timing_data["onnx_preload"]
             or timing_data["onnx_warmup"]
             or timing_data["onnx_detection"]
+            or timing_data["ncnn_preload"]
+            or timing_data["ncnn_detection"]
             or timing_data["opencv_fallback"]
             or timing_data["getball"]
             or timing_data["spin_detection"]
@@ -511,16 +534,31 @@ class TestingToolsManager:
         summary.append("PERFORMANCE TIMING SUMMARY")
         summary.append("=" * 80)
 
-        if timing_data["onnx_preload"]:
+        if timing_data["ncnn_preload"] or timing_data["onnx_preload"]:
             summary.append(f"\n Initialization:")
-            summary.append(f"  ONNX Runtime Preload: {timing_data['onnx_preload']}ms")
-            if timing_data["onnx_warmup"]:
-                summary.append(f"  Final Warmup Inference: {timing_data['onnx_warmup']:.2f}ms")
+            if timing_data["ncnn_preload"]:
+                summary.append(f"  NCNN Model Preload: {timing_data['ncnn_preload']}ms")
+                if timing_data["ncnn_warmup"]:
+                    summary.append(f"  NCNN Warmup: {timing_data['ncnn_warmup']} iterations")
+            if timing_data["onnx_preload"]:
+                summary.append(f"  ONNX Runtime Preload: {timing_data['onnx_preload']}ms")
+                if timing_data["onnx_warmup"]:
+                    summary.append(f"  Final Warmup Inference: {timing_data['onnx_warmup']:.2f}ms")
 
         if timing_data["grayscale"]:
             avg_gray = sum(timing_data["grayscale"]) / len(timing_data["grayscale"])
             summary.append(f"\n Image Preprocessing:")
             summary.append(f"  Grayscale Conversion: {avg_gray:.0f}μs (avg of {len(timing_data['grayscale'])} ops)")
+
+        if timing_data["ncnn_detection"]:
+            avg_ncnn = sum(timing_data["ncnn_detection"]) / len(timing_data["ncnn_detection"])
+            summary.append(f"\n Ball Detection (NCNN):")
+            summary.append(f"  Average: {avg_ncnn:.0f}ms")
+            summary.append(f"  Count: {len(timing_data['ncnn_detection'])} detections")
+            if len(timing_data["ncnn_detection"]) > 1:
+                summary.append(
+                    f"  Range: {min(timing_data['ncnn_detection'])}ms - {max(timing_data['ncnn_detection'])}ms"
+                )
 
         if timing_data["onnx_detection"]:
             avg_onnx = sum(timing_data["onnx_detection"]) / len(timing_data["onnx_detection"])
