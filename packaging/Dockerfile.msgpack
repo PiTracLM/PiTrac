@@ -1,0 +1,53 @@
+# MessagePack C++ Builder for ARM64
+# Produces: msgpack-cxx-6.1.1-arm64.tar.gz artifact
+FROM --platform=linux/arm64 debian:bookworm-slim
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    wget \
+    unzip \
+    libboost-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /build
+
+# Download and build msgpack-c++ (header-only library)
+RUN wget -q https://github.com/msgpack/msgpack-c/archive/refs/heads/cpp_master.zip && \
+    unzip -q cpp_master.zip && \
+    cd msgpack-c-cpp_master && \
+    cmake -S . -B build \
+        -DMSGPACK_CXX20=ON \
+        -DMSGPACK_BUILD_TESTS=OFF \
+        -DMSGPACK_BUILD_EXAMPLES=OFF \
+        -DCMAKE_INSTALL_PREFIX=/opt/msgpack-cxx && \
+    cmake --build build -j$(nproc) && \
+    cmake --install build && \
+    # Create pkg-config file
+    mkdir -p /opt/msgpack-cxx/lib/pkgconfig && \
+    echo 'prefix=/opt/msgpack-cxx' > /opt/msgpack-cxx/lib/pkgconfig/msgpack-cxx.pc && \
+    echo 'exec_prefix=${prefix}' >> /opt/msgpack-cxx/lib/pkgconfig/msgpack-cxx.pc && \
+    echo 'includedir=${prefix}/include' >> /opt/msgpack-cxx/lib/pkgconfig/msgpack-cxx.pc && \
+    echo '' >> /opt/msgpack-cxx/lib/pkgconfig/msgpack-cxx.pc && \
+    echo 'Name: msgpack-cxx' >> /opt/msgpack-cxx/lib/pkgconfig/msgpack-cxx.pc && \
+    echo 'Description: MessagePack for C++' >> /opt/msgpack-cxx/lib/pkgconfig/msgpack-cxx.pc && \
+    echo 'Version: 6.1.1' >> /opt/msgpack-cxx/lib/pkgconfig/msgpack-cxx.pc && \
+    echo 'Cflags: -I${includedir}' >> /opt/msgpack-cxx/lib/pkgconfig/msgpack-cxx.pc
+
+# Create artifact (header-only, so mainly includes)
+RUN cd /opt && \
+    tar czf /msgpack-cxx-6.1.1-arm64.tar.gz msgpack-cxx/ && \
+    echo "MessagePack artifact created: $(du -h /msgpack-cxx-6.1.1-arm64.tar.gz)"
+
+# Generate metadata
+RUN echo "MessagePack C++ 6.1.1 ARM64 Build" > /msgpack-metadata.txt && \
+    echo "Build Date: $(date)" >> /msgpack-metadata.txt && \
+    echo "Architecture: $(uname -m)" >> /msgpack-metadata.txt && \
+    echo "Debian Version: bookworm" >> /msgpack-metadata.txt && \
+    echo "Type: Header-only library" >> /msgpack-metadata.txt && \
+    md5sum /msgpack-cxx-6.1.1-arm64.tar.gz >> /msgpack-metadata.txt
+
+# Default command outputs the artifact
+CMD ["sh", "-c", "cat /msgpack-cxx-6.1.1-arm64.tar.gz"]

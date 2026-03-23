@@ -1,0 +1,34 @@
+# Vendor STEP File References
+
+The files in this directory are 3D models obtained from manufacturer websites and
+are included only for reference in the assembly.
+
+They are not part of the original project design.
+
+These models:
+
+- are included only to simplify assembly and visualization
+
+- should not be modified in this repository
+
+- may be subject to the respective manufacturer's licensing terms
+
+If a newer version is required, please download it from the original source
+and replace the file rather than editing it.
+
+---
+LRS-75-3D.stp
+Manufacturer: Mean Well
+Part number: LRS-75
+Source: https://www.meanwell.eu/productPdf.aspx?i=403
+---
+IMX296 With CS.stp
+Manufacturer: InnoMaker
+Part number: CAM-IMX296RAW(CAM-IMX296Mono-GS)
+https://www.inno-maker.com/product/cam-mipi296raw-trigger/
+---
+RaspberryPi5.step
+Manufacturer: Raspberry Pi
+Part number: Raspberry Pi 5 Model B
+https://pip.raspberrypi.com/categories/892-raspberry-pi-5
+---

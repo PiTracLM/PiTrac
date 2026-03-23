@@ -1,0 +1,10 @@
+FROM ruby:3.2-slim
+
+# Install bashly
+RUN gem install bashly
+
+# Set working directory
+WORKDIR /app
+
+# Default command
+CMD ["bashly", "generate"]

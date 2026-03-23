@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# PiTrac Build System
-# Usage: sudo ./build.sh dev [force]
+# POC build orchestrator
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ARTIFACT_DIR="$SCRIPT_DIR/deps-artifacts"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -16,32 +16,216 @@ log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 log_success() { echo -e "${GREEN}[✓]${NC} $*"; }
 
-ACTION="${1:-dev}"
+# Setup QEMU for cross-platform builds
+setup_qemu() {
+    if ! docker run --rm --privileged multiarch/qemu-user-static --reset -p yes &>/dev/null; then
+        log_warn "Setting up QEMU for ARM64 emulation..."
+        docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+    fi
+}
+
+ACTION="${1:-build}"
 FORCE_REBUILD="${2:-false}"
 
 show_usage() {
-    echo "Usage: sudo $0 [action] [force]"
+    echo "Usage: $0 [action] [force-rebuild]"
     echo ""
     echo "Actions:"
-    echo "  dev     - Build and install PiTrac on Pi (default)"
-    echo "  clean   - Remove build directory"
-    echo "  help    - Show this message"
+    echo "  deps      - Build dependency artifacts if missing"
+    echo "  build     - Build PiTrac using artifacts (default)"
+    echo "  all       - Build deps then PiTrac"
+    echo "  dev       - Build and install directly on Pi (for development)"
+    echo "  clean     - Remove all artifacts and Docker images"
+    echo "  shell     - Interactive shell with artifacts"
+    echo ""
+    echo "Options:"
+    echo "  force-rebuild - Force rebuild even if artifacts exist"
     echo ""
     echo "Examples:"
-    echo "  sudo $0              # Incremental build and install"
-    echo "  sudo $0 dev force    # Full clean rebuild"
-    echo "  $0 clean             # Remove build artifacts"
+    echo "  $0              # Build PiTrac (deps must exist)"
+    echo "  $0 deps         # Build dependency artifacts"
+    echo "  $0 all          # Build everything from scratch"
+    echo "  $0 dev          # Build and install on Pi (incremental)"
+    echo "  $0 dev force    # Clean build and install on Pi"
+    echo "  $0 all true     # Force rebuild everything"
 }
 
-clean_build() {
-    log_info "Cleaning build artifacts..."
-    local build_dir="$REPO_ROOT/Software/LMSourceCode/ImageProcessing/build"
-    if [[ -d "$build_dir" ]]; then
-        rm -rf "$build_dir"
-        log_success "Removed build directory"
+check_artifacts() {
+    local missing=()
+    local use_debs="${USE_DEB_PACKAGES:-true}"
+
+    log_info "Checking for pre-built artifacts..."
+
+    if [[ "$use_debs" == "true" ]]; then
+        # Check for DEB packages first
+        if [ ! -f "$ARTIFACT_DIR/libopencv4.11_4.11.0-1_arm64.deb" ] && [ ! -f "$ARTIFACT_DIR/libopencv-dev_4.11.0-1_arm64.deb" ]; then
+            if [ ! -f "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" ]; then
+                missing+=("opencv")
+            fi
+        fi
+        if [ ! -f "$ARTIFACT_DIR/libactivemq-cpp_3.9.5-1_arm64.deb" ] && [ ! -f "$ARTIFACT_DIR/libactivemq-cpp-dev_3.9.5-1_arm64.deb" ]; then
+            if [ ! -f "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" ]; then
+                missing+=("activemq")
+            fi
+        fi
+        if [ ! -f "$ARTIFACT_DIR/liblgpio1_0.2.2-1_arm64.deb" ]; then
+            if [ ! -f "$ARTIFACT_DIR/lgpio-0.2.2-arm64.tar.gz" ]; then
+                missing+=("lgpio")
+            fi
+        fi
+        if [ ! -f "$ARTIFACT_DIR/libmsgpack-cxx-dev_1:7.0.0-2_all.deb" ]; then
+            if [ ! -f "$ARTIFACT_DIR/msgpack-cxx-7.0.0-arm64.tar.gz" ]; then
+                missing+=("msgpack")
+            fi
+        fi
+        if [ ! -f "$ARTIFACT_DIR/libonnxruntime1.17.3_1.17.3-xnnpack3_arm64.deb" ]; then
+            missing+=("onnxruntime")
+        fi
     else
-        log_info "Build directory already clean"
+        # Check for tar.gz packages
+        if [ ! -f "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" ]; then
+            missing+=("opencv")
+        fi
+        if [ ! -f "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" ]; then
+            missing+=("activemq")
+        fi
+        if [ ! -f "$ARTIFACT_DIR/lgpio-0.2.2-arm64.tar.gz" ]; then
+            missing+=("lgpio")
+        fi
+        if [ ! -f "$ARTIFACT_DIR/msgpack-cxx-7.0.0-arm64.tar.gz" ]; then
+            missing+=("msgpack")
+        fi
     fi
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        log_warn "Missing artifacts: ${missing[*]}"
+        return 1
+    else
+        if [[ "$use_debs" == "true" ]] && [ -f "$ARTIFACT_DIR/libopencv4.11_4.11.0-1_arm64.deb" ]; then
+            log_success "All DEB packages present"
+        else
+            log_success "All artifacts present"
+        fi
+        return 0
+    fi
+}
+
+build_deps() {
+    log_info "Building dependency artifacts..."
+
+    if [ "$FORCE_REBUILD" = "true" ] || [ "$FORCE_REBUILD" = "force" ]; then
+        log_warn "Force rebuild enabled - removing existing artifacts"
+        rm -f "$ARTIFACT_DIR"/*.tar.gz
+    fi
+
+    # Build all dependencies
+    "$SCRIPT_DIR/scripts/build-all-deps.sh"
+}
+
+build_pitrac() {
+    log_info "Building PiTrac with pre-built artifacts..."
+
+    # Check artifacts exist
+    if ! check_artifacts; then
+        log_error "Missing dependency artifacts. Run: $0 deps"
+        exit 1
+    fi
+
+    # Generate Bashly CLI if needed
+    if [[ ! -f "$SCRIPT_DIR/pitrac" ]]; then
+        log_warn "Bashly CLI not found, generating it now..."
+        if [[ -f "$SCRIPT_DIR/generate.sh" ]]; then
+            cd "$SCRIPT_DIR"
+            ./generate.sh
+            cd - > /dev/null
+            log_success "Generated pitrac CLI tool"
+        else
+            log_error "generate.sh not found!"
+            exit 1
+        fi
+    fi
+
+    # Setup QEMU for ARM64 emulation on x86_64
+    setup_qemu
+
+    # Build Docker image
+    log_info "Building PiTrac Docker image..."
+    docker build \
+        --platform=linux/arm64 \
+        -f "$SCRIPT_DIR/Dockerfile.pitrac" \
+        -t pitrac-poc:arm64 \
+        "$SCRIPT_DIR"
+
+    # Run build
+    log_info "Running PiTrac build..."
+    docker run \
+        --rm \
+        --platform=linux/arm64 \
+        -v "$REPO_ROOT:/build:rw" \
+        -u "$(id -u):$(id -g)" \
+        # --memory=16g \
+        # --memory-swap=24g \
+        # --cpus="8" \
+        pitrac-poc:arm64
+
+    # Check result
+    BINARY="$REPO_ROOT/Software/LMSourceCode/ImageProcessing/build/pitrac_lm"
+    if [ -f "$BINARY" ]; then
+        log_success "Build successful!"
+        log_info "Binary: $BINARY"
+        log_info "Size: $(du -h "$BINARY" | cut -f1)"
+        file "$BINARY"
+    else
+        log_error "Build failed - binary not found"
+        exit 1
+    fi
+}
+
+run_shell() {
+    log_info "Starting interactive shell with pre-built artifacts..."
+
+    # Check artifacts exist
+    if ! check_artifacts; then
+        log_error "Missing dependency artifacts. Run: $0 deps"
+        exit 1
+    fi
+
+    # Setup QEMU for ARM64 emulation on x86_64
+    setup_qemu
+
+    # Ensure image exists
+    if ! docker image inspect pitrac-poc:arm64 &>/dev/null; then
+        log_info "Building Docker image first..."
+        docker build \
+            --platform=linux/arm64 \
+            -f "$SCRIPT_DIR/Dockerfile.pitrac" \
+            -t pitrac-poc:arm64 \
+            "$SCRIPT_DIR"
+    fi
+
+    docker run \
+        --rm -it \
+        --platform=linux/arm64 \
+        -v "$REPO_ROOT:/build:rw" \
+        -u "$(id -u):$(id -g)" \
+        pitrac-poc:arm64 \
+        /bin/bash
+}
+
+clean_all() {
+    log_warn "Cleaning all POC artifacts and images..."
+
+    # Remove artifacts
+    rm -rf "$ARTIFACT_DIR"/*.tar.gz
+    rm -rf "$ARTIFACT_DIR"/*.metadata
+
+    # Remove Docker images
+    docker rmi opencv-builder:arm64 2>/dev/null || true
+    docker rmi activemq-builder:arm64 2>/dev/null || true
+    docker rmi lgpio-builder:arm64 2>/dev/null || true
+    docker rmi pitrac-poc:arm64 2>/dev/null || true
+
+    log_success "Cleaned all POC resources"
 }
 
 build_dev() {
@@ -50,9 +234,6 @@ build_dev() {
     # Source common functions
     if [[ -f "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh" ]]; then
         source "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh"
-    else
-        log_error "pitrac-common-functions.sh not found at $SCRIPT_DIR/src/lib/"
-        exit 1
     fi
 
     # Check if running on Raspberry Pi
@@ -79,7 +260,7 @@ build_dev() {
         exit 1
     fi
 
-    # Check build dependencies
+    # Check build dependencies (matching Dockerfile.pitrac)
     log_info "Checking build dependencies..."
     local missing_deps=()
 
@@ -106,13 +287,35 @@ build_dev() {
         fi
     done
 
+    # ========================================================================
+    # lgpio Library Strategy
+    # ========================================================================
+    # lgpio is available in both custom debs (deps-artifacts/) and system repos
+    #
+    # Problem: Version mismatch causes conflicts:
+    #   - Custom: liblgpio1 (0.2.2-1)
+    #   - System: liblgpio1 (0.2.2-1~rpt1) + liblgpio-dev (0.2.2-1~rpt1)
+    #   - Custom package declares "Conflicts: liblgpio-dev"
+    #   - System packages like libcamera-dev depend on liblgpio-dev
+    #
+    # Solution: Prefer system packages when available
+    #   1. Remove custom lgpio before apt-get install (line ~426)
+    #   2. Let apt install system lgpio packages
+    #   3. extract_all_dependencies() will skip custom lgpio if system exists
+    # ========================================================================
+    if ! dpkg -l | grep -qE "^ii\s+(liblgpio1|liblgpio-dev)"; then
+        log_info "lgpio not installed - will use custom package from deps-artifacts"
+    else
+        log_info "System lgpio packages detected - will use those instead of custom"
+    fi
+    
     if ! command -v rpicam-hello &> /dev/null && ! command -v libcamera-hello &> /dev/null; then
         if apt-cache show rpicam-apps &> /dev/null; then
             missing_deps+=("rpicam-apps")
         elif apt-cache show libcamera-apps &> /dev/null; then
             missing_deps+=("libcamera-apps")
         else
-            log_warn "Neither rpicam-apps nor libcamera-apps available in repositories"
+            log_warning "Neither rpicam-apps nor libcamera-apps available in repositories"
         fi
     fi
 
@@ -219,25 +422,48 @@ build_dev() {
         log_warn "Missing build dependencies: ${missing_deps[*]}"
         log_info "Installing missing dependencies..."
 
+        # Remove custom lgpio package if it exists to avoid conflicts with system packages
+        # System packages (libcamera-dev, etc.) may pull in liblgpio-dev from repos
+        # Our custom package has version 0.2.2-1 but system has 0.2.2-1~rpt1
+        if dpkg -l | grep -qE "^ii\s+liblgpio1\s+0\.2\.2-1\s"; then
+            log_warn "Removing custom liblgpio1 package to avoid apt conflicts..."
+            log_info "System lgpio packages will be used instead (from repos)"
+            dpkg --remove --force-depends liblgpio1 2>/dev/null || true
+        fi
+
         apt-get update
         # Use INITRD=No as safety measure - these are just libraries, not kernel modules
         INITRD=No apt-get install -y "${missing_deps[@]}"
     fi
 
-    # Install PiTrac dependencies from APT repository
-    log_info "Installing pre-built dependencies from APT repository..."
+    log_info "Installing pre-built dependencies..."
     mkdir -p /usr/lib/pitrac
 
-    if ! configure_pitrac_apt_repo; then
-        log_error "Failed to configure PiTrac APT repository"
-        log_info "Repository: https://pitraclm.github.io/packages"
-        exit 1
+    # Try APT repository first, fall back to local packages
+    local use_apt=false
+    if configure_pitrac_apt_repo; then
+        if install_dependencies_from_apt; then
+            use_apt=true
+            log_success "Dependencies installed from APT repository"
+        else
+            log_warn "APT installation failed, falling back to local packages"
+        fi
+    else
+        log_info "APT repository not available, using local packages"
     fi
 
-    if ! install_dependencies_from_apt; then
-        log_error "Failed to install dependencies from APT repository"
-        exit 1
+    # Fall back to local packages if APT didn't work
+    if [[ "$use_apt" == "false" ]]; then
+        if ! check_artifacts; then
+            log_error "Neither APT repository nor local packages available"
+            log_info "Local packages should be in: $ARTIFACT_DIR"
+            exit 1
+        fi
+        extract_all_dependencies "$ARTIFACT_DIR" "/usr/lib/pitrac"
     fi
+
+    # Update library cache
+    ldconfig
 
     # Build PiTrac
     log_info "Building PiTrac..."
@@ -247,7 +473,7 @@ build_dev() {
     apply_boost_cxx20_fix
 
     # Set build environment
-    # DEB packages install to standard Debian locations
+    # DEB packages now install to standard Debian locations
     export PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
     export LD_LIBRARY_PATH="/usr/lib/aarch64-linux-gnu:/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
     export CMAKE_PREFIX_PATH="/usr"
@@ -260,19 +486,33 @@ build_dev() {
     touch ClosedSourceObjectFiles/gs_e6_response.cpp.o
 
     # ========================================================================
-    # Detect stale build directory from old tarball installation
+    # Detect stale build directory from tarball/Docker installation
     # ========================================================================
-    # If build directory was created when using tarball extraction to /opt/,
-    # Meson caches those paths. DEB packages install to /usr/, so the cached
-    # paths cause linker failures. Detect and clean up automatically.
+    # Issue: If build directory was created when using tarball extraction to /opt/,
+    # Meson caches those paths. When switching to DEB packages (which install to
+    # /usr/lib/aarch64-linux-gnu/), the cached paths cause linker failures.
+    #
+    # Solution: Detect /opt/ paths in build.ninja and force rebuild if DEB packages
+    # are installed (which use /usr/ paths instead).
     # ========================================================================
     if [[ -f "build/build.ninja" ]]; then
         if grep -q "/opt/opencv\|/opt/activemq" build/build.ninja 2>/dev/null; then
+            # Check if DEB packages are installed (they use /usr/, not /opt/)
             if dpkg -l 2>/dev/null | grep -qE "^ii\s+(libopencv4\.11|libactivemq-cpp)\s"; then
-                log_warn "Detected build directory with stale /opt/ paths"
-                log_info "Automatically cleaning build directory for DEB package compatibility..."
+                log_warn "Detected build directory with /opt/ paths but DEB packages use /usr/"
+                log_warn "This causes linker failures - cached paths are stale"
+                log_info "Automatically cleaning build directory for compatibility..."
                 rm -rf build
                 FORCE_REBUILD="true"
+
+                # Warn if old /opt/ installations still exist alongside DEB packages
+                if [[ -d "/opt/opencv" ]] || [[ -d "/opt/activemq-cpp" ]]; then
+                    echo
+                    log_warn "Old tarball installations detected in /opt/ alongside DEB packages"
+                    log_warn "This may cause runtime library conflicts"
+                    log_info "Recommended: Run 'sudo ./uninstall-tar-deps.sh' to remove old installations"
+                    echo
+                fi
             elif [[ ! -d "/opt/opencv" ]] && [[ ! -d "/opt/activemq-cpp" ]]; then
                 log_warn "Detected build directory expects /opt/ libraries but they don't exist"
                 log_info "Cleaning build directory - will reconfigure for system paths..."
@@ -356,37 +596,37 @@ EOF
     # Configure ActiveMQ
     if command -v activemq &>/dev/null || [[ -f /usr/share/activemq/bin/activemq ]]; then
         log_info "Configuring ActiveMQ using template system..."
-
+        
         mkdir -p /usr/share/pitrac/templates
         cp "$SCRIPT_DIR/templates/activemq.xml.template" /usr/share/pitrac/templates/
         cp "$SCRIPT_DIR/templates/log4j2.properties.template" /usr/share/pitrac/templates/
         cp "$SCRIPT_DIR/templates/activemq-options.template" /usr/share/pitrac/templates/
-
+        
         mkdir -p /usr/lib/pitrac
         cp "$SCRIPT_DIR/src/lib/activemq-service-install.sh" /usr/lib/pitrac/
         chmod 755 /usr/lib/pitrac/activemq-service-install.sh
-
+        
         log_info "Installing ActiveMQ configuration..."
         if /usr/lib/pitrac/activemq-service-install.sh install activemq; then
             log_success "ActiveMQ configuration installed successfully"
-
+            
             log_info "Restarting ActiveMQ service..."
             # First enable the service (for boot)
             systemctl enable activemq 2>/dev/null || true
-
+            
 
             manage_service_restart "activemq"
-
+            
             if systemctl is-active --quiet activemq; then
-
+                
                 # Verify it's actually listening
-                if ss -tln 2>/dev/null | grep -q ":61616 "; then
+                if netstat -tln 2>/dev/null | grep -q ":61616 "; then
                     log_success "ActiveMQ broker listening on port 61616"
                 else
                     log_warn "ActiveMQ started but not listening on port 61616 yet"
                     log_info "It may take a few seconds to fully initialize"
                 fi
-
+                
                 /usr/lib/pitrac/activemq-service-install.sh verify || true
             else
                 log_warn "ActiveMQ configured but may need manual restart"
@@ -404,52 +644,52 @@ EOF
 
     # Clean up old PiTrac systemd service and processes if they exist
     log_info "Checking for existing PiTrac systemd service and processes..."
-
+    
     # Check if old service exists and is running
     if systemctl list-unit-files | grep -q "pitrac.service"; then
         log_warn "Found existing pitrac.service - will clean it up as PiTrac is now managed via web interface"
-
+        
         # Stop the service if it's running
         if systemctl is-active --quiet pitrac.service; then
             log_info "Stopping pitrac.service..."
             systemctl stop pitrac.service || true
             sleep 2
         fi
-
+        
         # Disable the service
         log_info "Disabling pitrac.service..."
         systemctl disable pitrac.service 2>/dev/null || true
-
+        
         # Remove the service files from all possible locations
         log_info "Removing service files..."
         rm -f /etc/systemd/system/pitrac.service
         rm -f /lib/systemd/system/pitrac.service
         rm -f /usr/lib/systemd/system/pitrac.service
-
+        
         # Reload systemd
         systemctl daemon-reload
-
+        
         log_success "Old pitrac.service removed successfully"
     fi
-
+    
     # Kill any lingering pitrac_lm processes (these might be holding GPIO/SPI resources)
     if pgrep -x "pitrac_lm" > /dev/null; then
         log_warn "Found running pitrac_lm processes - cleaning them up..."
-
+        
         # First try graceful termination
         pkill -TERM pitrac_lm 2>/dev/null || true
         sleep 2
-
+        
         # If still running, force kill
         if pgrep -x "pitrac_lm" > /dev/null; then
             log_info "Force killing remaining pitrac_lm processes..."
             pkill -9 pitrac_lm 2>/dev/null || true
             sleep 1
         fi
-
+        
         log_success "Cleaned up old pitrac_lm processes"
     fi
-
+    
     # Clean up PID and lock files
     log_info "Cleaning up PID/lock files..."
     rm -f /var/run/pitrac/*.pid 2>/dev/null || true
@@ -460,31 +700,40 @@ EOF
         rm -f "/home/${SUDO_USER}/.pitrac/run"/*.pid 2>/dev/null || true
         rm -f "/home/${SUDO_USER}/.pitrac/run"/*.lock 2>/dev/null || true
     fi
-
+    
     # Reset GPIO if possible (GPIO 25 is used by PiTrac for pulse strobe)
     log_info "Attempting to reset GPIO resources..."
     if [ -d "/sys/class/gpio/gpio25" ]; then
         echo "25" | tee /sys/class/gpio/unexport > /dev/null 2>&1 || true
     fi
-
+    
     # Give the system a moment to release resources
     sleep 1
-
-    log_info "Installing web server and service files..."
-
+    
+    log_info "Installing web server and ActiveMQ services..."
+    
     mkdir -p /usr/share/pitrac/templates
     cp "$SCRIPT_DIR/templates/pitrac-web.service.template" /usr/share/pitrac/templates/
-
+    cp "$SCRIPT_DIR/templates/activemq.xml.template" /usr/share/pitrac/templates/ 2>/dev/null || true
+    cp "$SCRIPT_DIR/templates/log4j2.properties.template" /usr/share/pitrac/templates/ 2>/dev/null || true
+    cp "$SCRIPT_DIR/templates/activemq-options.template" /usr/share/pitrac/templates/ 2>/dev/null || true
+    
+    
+    if [[ -f "$SCRIPT_DIR/src/lib/activemq-service-install.sh" ]]; then
+        cp "$SCRIPT_DIR/src/lib/activemq-service-install.sh" /usr/lib/pitrac/
+        chmod 755 /usr/lib/pitrac/activemq-service-install.sh
+    fi
+    
     if [[ -f "$SCRIPT_DIR/src/lib/web-service-install.sh" ]]; then
         cp "$SCRIPT_DIR/src/lib/web-service-install.sh" /usr/lib/pitrac/
         chmod 755 /usr/lib/pitrac/web-service-install.sh
     fi
-
+    
     if [[ -f "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh" ]]; then
         cp "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh" /usr/lib/pitrac/
         chmod 644 /usr/lib/pitrac/pitrac-common-functions.sh
     fi
-
+    
     INSTALL_USER="${SUDO_USER:-$(whoami)}"
 
     # Install Python web server (always update)
@@ -547,10 +796,17 @@ EOF
     echo "  Configs: /etc/pitrac/"
     echo "  Web Server: /usr/lib/pitrac/web-server (updated)"
     echo ""
-    echo "Dependencies: PiTrac APT Repository"
-    echo "  Repository: https://pitraclm.github.io/packages"
-    echo "  Distribution: $(detect_debian_codename)"
+
+    # Show dependency source
+    if [[ -f /etc/apt/sources.list.d/pitrac.list ]]; then
+        echo "Dependencies: PiTrac APT Repository"
+        echo "  Repository: https://github.com/PiTracLM/packages"
+        echo "  Distribution: $(detect_debian_codename)"
+    else
+        echo "Dependencies: Local packages (deps-artifacts)"
+    fi
     echo ""
+
     echo "Web server status:"
     if systemctl is-active --quiet pitrac-web.service; then
         echo "  Web service is running"
@@ -581,15 +837,28 @@ EOF
 
 # Main execution
 main() {
-    log_info "PiTrac Build System"
+    log_info "PiTrac POC Build System"
     log_info "Action: $ACTION"
 
     case "$ACTION" in
+        deps)
+            build_deps
+            ;;
+        build)
+            build_pitrac
+            ;;
+        all)
+            build_deps
+            build_pitrac
+            ;;
         dev)
             build_dev
             ;;
+        shell)
+            run_shell
+            ;;
         clean)
-            clean_build
+            clean_all
             ;;
         help|--help|-h)
             show_usage
@@ -605,4 +874,16 @@ main() {
     log_success "Done!"
 }
 
+# Check Docker (not needed for dev mode)
+if [[ "$ACTION" != "dev" ]]; then
+    if ! command -v docker &>/dev/null; then
+        log_error "Docker is required but not installed"
+        exit 1
+    fi
+fi
+
+# Ensure artifact directory exists
+mkdir -p "$ARTIFACT_DIR"
+
+# Run main
 main

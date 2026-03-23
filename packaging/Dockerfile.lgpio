@@ -1,0 +1,47 @@
+# lgpio Builder for ARM64
+# Produces: lgpio-0.2.2-arm64.tar.gz artifact
+FROM --platform=linux/arm64 debian:bookworm-slim
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    wget \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /build
+
+# Download and build lgpio from official source
+RUN wget -q http://abyz.me.uk/lg/lg.zip && \
+    unzip -q lg.zip && \
+    cd lg && \
+    make -j$(nproc) && \
+    make prefix=/opt/lgpio install && \
+    # Create pkg-config file
+    mkdir -p /opt/lgpio/lib/pkgconfig && \
+    echo 'prefix=/opt/lgpio' > /opt/lgpio/lib/pkgconfig/lgpio.pc && \
+    echo 'exec_prefix=${prefix}' >> /opt/lgpio/lib/pkgconfig/lgpio.pc && \
+    echo 'libdir=${exec_prefix}/lib' >> /opt/lgpio/lib/pkgconfig/lgpio.pc && \
+    echo 'includedir=${prefix}/include' >> /opt/lgpio/lib/pkgconfig/lgpio.pc && \
+    echo '' >> /opt/lgpio/lib/pkgconfig/lgpio.pc && \
+    echo 'Name: lgpio' >> /opt/lgpio/lib/pkgconfig/lgpio.pc && \
+    echo 'Description: lg archive GPIO library' >> /opt/lgpio/lib/pkgconfig/lgpio.pc && \
+    echo 'Version: 0.2' >> /opt/lgpio/lib/pkgconfig/lgpio.pc && \
+    echo 'Libs: -L${libdir} -llgpio' >> /opt/lgpio/lib/pkgconfig/lgpio.pc && \
+    echo 'Cflags: -I${includedir}' >> /opt/lgpio/lib/pkgconfig/lgpio.pc
+
+# Create artifact with libraries and headers
+RUN cd /opt && \
+    tar czf /lgpio-0.2.2-arm64.tar.gz lgpio/ && \
+    echo "lgpio artifact created: $(du -h /lgpio-0.2.2-arm64.tar.gz)"
+
+# Generate metadata
+RUN echo "lgpio 0.2.2 ARM64 Build" > /lgpio-metadata.txt && \
+    echo "Build Date: $(date)" >> /lgpio-metadata.txt && \
+    echo "Architecture: $(uname -m)" >> /lgpio-metadata.txt && \
+    echo "Debian Version: bookworm" >> /lgpio-metadata.txt && \
+    md5sum /lgpio-0.2.2-arm64.tar.gz >> /lgpio-metadata.txt
+
+# Default command outputs the artifact
+CMD ["sh", "-c", "cat /lgpio-0.2.2-arm64.tar.gz"]

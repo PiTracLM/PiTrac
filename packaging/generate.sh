@@ -38,6 +38,25 @@ install_bashly_locally() {
     echo "✓ Bashly is ready"
 }
 
+generate_with_docker() {
+    echo "Using Docker to generate Bashly script..."
+    
+    docker build -f Dockerfile.bashly -t bashly-generator .
+    
+    if [[ -f "settings.yml" ]]; then
+        docker run --rm \
+            -v "$PWD:/app" \
+            -v "$PWD/bashly.yml:/app/src/bashly.yml" \
+            -v "$PWD/settings.yml:/app/settings.yml" \
+            bashly-generator bashly generate
+    else
+        docker run --rm \
+            -v "$PWD:/app" \
+            -v "$PWD/bashly.yml:/app/src/bashly.yml" \
+            bashly-generator bashly generate
+    fi
+}
+
 generate_locally() {
     echo "Using local Bashly to generate script..."
     
@@ -54,7 +73,9 @@ generate_locally() {
     rmdir src 2>/dev/null || true
 }
 
-if command_exists bashly; then
+if command_exists docker && docker info >/dev/null 2>&1; then
+    generate_with_docker
+elif command_exists bashly; then
     generate_locally
 else
     install_bashly_locally

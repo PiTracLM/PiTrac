@@ -1,0 +1,140 @@
+# PiTrac Builder
+FROM --platform=linux/arm64 debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y ca-certificates wget gnupg && \
+    wget -qO - http://archive.raspberrypi.org/debian/raspberrypi.gpg.key | gpg --dearmor > /usr/share/keyrings/raspberrypi-archive-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/raspberrypi-archive-keyring.gpg] http://archive.raspberrypi.org/debian/ bookworm main" > /etc/apt/sources.list.d/raspi.list && \
+    apt-get update
+
+RUN apt-get install -y \
+    build-essential \
+    meson \
+    ninja-build \
+    pkg-config \
+    git \
+    libboost-system1.74.0 \
+    libboost-thread1.74.0 \
+    libboost-filesystem1.74.0 \
+    libboost-program-options1.74.0 \
+    libboost-timer1.74.0 \
+    libboost-log1.74.0 \
+    libboost-regex1.74.0 \
+    libboost-dev \
+    libcamera0.0.3 \
+    libcamera-dev \
+    libfmt-dev \
+    libssl-dev \
+    liblgpio-dev \
+    liblgpio1 \
+    libmsgpack-cxx-dev \
+    libapr1 \
+    libaprutil1 \
+    libapr1-dev \
+    libaprutil1-dev \
+    libyaml-cpp-dev \
+    libssl3 \
+    # OpenCV runtime deps
+    libgtk-3-0 \
+    libavcodec59 \
+    libavformat59 \
+    libswscale6 \
+    libtbb12 \
+    libgstreamer1.0-0 \
+    libgstreamer-plugins-base1.0-0 \
+    libopenexr-3-1-30 \
+    # FFmpeg development libraries for encoder
+    libavcodec-dev \
+    libavformat-dev \
+    libavutil-dev \
+    libswscale-dev \
+    libavdevice-dev \
+    # Image metadata library
+    libexif-dev \
+    libjpeg-dev \
+    libtiff-dev \
+    libpng-dev \
+    # Display/DRM library for preview
+    libdrm-dev \
+    libx11-dev \
+    libxext-dev \
+    libepoxy-dev \
+    # Qt5 for GUI preview
+    qtbase5-dev \
+    qt5-qmake \
+    && rm -rf /var/lib/apt/lists/*
+
+# Fix Boost 1.74 C++20 compatibility issue as documented in pi-setup.md
+# This is a known issue when compiling Boost under C++20
+RUN sed -i '/namespace boost {/i #include <utility>' /usr/include/boost/asio/awaitable.hpp
+
+# Copy pre-built artifacts (only for packages not in repos)
+COPY deps-artifacts/opencv-4.11.0-arm64.tar.gz /tmp/
+COPY deps-artifacts/activemq-cpp-3.9.5-arm64.tar.gz /tmp/
+
+# Extract pre-built dependencies
+RUN echo "Extracting pre-built dependencies..." && \
+    tar xzf /tmp/opencv-4.11.0-arm64.tar.gz -C /opt/ && \
+    tar xzf /tmp/activemq-cpp-3.9.5-arm64.tar.gz -C /opt/ && \
+    rm /tmp/*.tar.gz
+
+# Setup library paths
+RUN echo "/opt/opencv/lib" > /etc/ld.so.conf.d/opencv.conf && \
+    echo "/opt/activemq-cpp/lib" > /etc/ld.so.conf.d/activemq.conf && \
+    ldconfig
+
+# Create pkg-config files for libraries that don't include them
+RUN mkdir -p /usr/lib/pkgconfig && \
+    # lgpio (Pi repo package doesn't include pkg-config)
+    echo 'prefix=/usr' > /usr/lib/pkgconfig/lgpio.pc && \
+    echo 'exec_prefix=${prefix}' >> /usr/lib/pkgconfig/lgpio.pc && \
+    echo 'libdir=${exec_prefix}/lib/aarch64-linux-gnu' >> /usr/lib/pkgconfig/lgpio.pc && \
+    echo 'includedir=${prefix}/include' >> /usr/lib/pkgconfig/lgpio.pc && \
+    echo '' >> /usr/lib/pkgconfig/lgpio.pc && \
+    echo 'Name: lgpio' >> /usr/lib/pkgconfig/lgpio.pc && \
+    echo 'Description: GPIO library for Linux' >> /usr/lib/pkgconfig/lgpio.pc && \
+    echo 'Version: 0.2.2' >> /usr/lib/pkgconfig/lgpio.pc && \
+    echo 'Libs: -L${libdir} -llgpio' >> /usr/lib/pkgconfig/lgpio.pc && \
+    echo 'Cflags: -I${includedir}' >> /usr/lib/pkgconfig/lgpio.pc && \
+    # msgpack-cxx (header-only library, needs pkg-config for meson)
+    echo 'prefix=/usr' > /usr/lib/pkgconfig/msgpack-cxx.pc && \
+    echo 'exec_prefix=${prefix}' >> /usr/lib/pkgconfig/msgpack-cxx.pc && \
+    echo 'includedir=${prefix}/include' >> /usr/lib/pkgconfig/msgpack-cxx.pc && \
+    echo '' >> /usr/lib/pkgconfig/msgpack-cxx.pc && \
+    echo 'Name: msgpack-cxx' >> /usr/lib/pkgconfig/msgpack-cxx.pc && \
+    echo 'Description: MessagePack implementation for C++' >> /usr/lib/pkgconfig/msgpack-cxx.pc && \
+    echo 'Version: 4.1.3' >> /usr/lib/pkgconfig/msgpack-cxx.pc && \
+    echo 'Cflags: -I${includedir}' >> /usr/lib/pkgconfig/msgpack-cxx.pc
+
+# Set build environment
+ENV PKG_CONFIG_PATH="/opt/opencv/lib/pkgconfig:/opt/activemq-cpp/lib/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig"
+ENV LD_LIBRARY_PATH="/opt/opencv/lib:/opt/activemq-cpp/lib"
+ENV CMAKE_PREFIX_PATH="/opt/opencv:/opt/activemq-cpp"
+ENV CPLUS_INCLUDE_PATH="/opt/opencv/include/opencv4:/opt/activemq-cpp/include/activemq-cpp-3.9.5"
+
+# Create build user matching host
+ARG UID=1000
+ARG GID=1000
+RUN groupadd -g ${GID} builder && \
+    useradd -m -u ${UID} -g ${GID} -s /bin/bash builder
+
+USER builder
+WORKDIR /build
+
+# Default build command - Release mode with parallel compilation
+CMD ["bash", "-c", "cd /build/Software/LMSourceCode/ImageProcessing && \
+    export PITRAC_ROOT=/build/Software/LMSourceCode && \
+    export CXXFLAGS='-I/opt/opencv/include/opencv4' && \
+    mkdir -p ClosedSourceObjectFiles && \
+    touch ClosedSourceObjectFiles/gs_e6_response.cpp.o && \
+    if [ ! -d build ]; then \
+        echo 'Setting up new build directory (release mode with full optimization)...' && \
+        meson setup build --buildtype=release -Denable_recompile_closed_source=false -Db_lto=false; \
+    else \
+        echo 'Using existing build directory for incremental build...' && \
+        echo -n 'Object files found: ' && \
+        ls -1 build/pitrac_lm.p/*.o 2>/dev/null | wc -l || echo '0' && \
+        echo 'Configuring for release build...' && \
+        meson configure build --buildtype=release -Db_lto=false; \
+    fi && \
+    echo 'Building with parallel compilation for speed...' && \
+    ninja -C build -j 8 pitrac_lm"]

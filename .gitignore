@@ -98,3 +98,6 @@ Software/GroundTruthAnnotator/yolo/labels/*.cache
 # Dev scripts cache
 Dev/scripts/__pycache__
 packaging/pitrac
+
+# FreeCAD backup files
+*.FCBak 
