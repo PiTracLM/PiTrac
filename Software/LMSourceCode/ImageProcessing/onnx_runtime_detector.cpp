@@ -3,6 +3,8 @@
  * Copyright (C) 2022-2025, Verdant Consultants, LLC.
  */
 
+#ifdef HAS_ONNXRUNTIME
+
 #include "onnx_runtime_detector.hpp"
 #include "logging_tools.h"
 #include <algorithm>
@@ -876,3 +878,5 @@ void PooledAllocator::Reset() {
 }
 
 }
+
+#endif // HAS_ONNXRUNTIME

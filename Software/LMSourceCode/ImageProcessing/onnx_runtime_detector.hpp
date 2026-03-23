@@ -5,6 +5,8 @@
 
 #pragma once
 
+#ifdef HAS_ONNXRUNTIME
+
 #ifdef __unix__
 #include <onnxruntime/core/session/onnxruntime_cxx_api.h>
 #else
@@ -273,3 +275,5 @@ private:
 };
 
 } // namespace golf_sim
+
+#endif // HAS_ONNXRUNTIME
