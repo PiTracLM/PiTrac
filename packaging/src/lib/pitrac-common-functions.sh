@@ -309,14 +309,26 @@ install_onnx_models() {
             fi
         done
 
+        # Also install ncnn models (param + bin files directly in model dirs)
+        for param_file in "$models_dir"/*/best.ncnn.param; do
+            if [[ -f "$param_file" ]]; then
+                local model_name=$(basename "$(dirname "$param_file")")
+                local bin_file="$(dirname "$param_file")/best.ncnn.bin"
+                mkdir -p "$system_models_dir/$model_name"
+                cp "$param_file" "$system_models_dir/$model_name/"
+                [[ -f "$bin_file" ]] && cp "$bin_file" "$system_models_dir/$model_name/"
+                log_info "  Installed model: $model_name/best.ncnn.{param,bin}"
+                models_found=$((models_found + 1))
+            fi
+        done
+
         if [[ $models_found -gt 0 ]]; then
             # Set proper permissions - models should be readable by all users
-            chmod -R 644 "$system_models_dir"/*/*.onnx 2>/dev/null || true
-            chmod -R 755 "$system_models_dir"/* 2>/dev/null || true
-            chmod 755 "$system_models_dir"
-            log_success "Installed $models_found ONNX model(s) to $system_models_dir"
+            chmod -R a+r "$system_models_dir" 2>/dev/null || true
+            find "$system_models_dir" -type d -exec chmod 755 {} \; 2>/dev/null || true
+            log_success "Installed $models_found model(s) to $system_models_dir"
         else
-            log_warn "No ONNX models found in $models_dir"
+            log_warn "No models found in $models_dir"
         fi
     else
         log_warn "ONNX models directory not found: $models_dir"
