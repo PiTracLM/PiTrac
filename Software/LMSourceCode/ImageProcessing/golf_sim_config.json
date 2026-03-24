@@ -47,7 +47,7 @@
       "kStrobedBallDetectionMethod": "experimental",
       "kInferenceBackend": "ncnn",
       "kNumberRadiiToAverageForDynamicAdjustment": "2",
-      "kModelConfidenceThreshold": "0.65",
+      "kModelConfidenceThreshold": "0.5",
       "kModelDeviceType": "CPU",
       "kModelInputSize": "640",
       "kModelPath": "../ml_models/yolo26-ball-detector",

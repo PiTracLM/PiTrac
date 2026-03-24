@@ -209,7 +209,7 @@ namespace golf_sim {
     #else
     std::string BallImageProc::kModelPath = "../ml_models/yolo26-ball-detector";
     #endif
-    float BallImageProc::kModelConfidenceThreshold = 0.65f;
+    float BallImageProc::kModelConfidenceThreshold = 0.5f;
     float BallImageProc::kModelNMSThreshold = 0.4f;
     int BallImageProc::kModelInputSize = 640;
     std::string BallImageProc::kModelDeviceType = "CPU";
