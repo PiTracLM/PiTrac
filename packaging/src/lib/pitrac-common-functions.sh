@@ -197,35 +197,6 @@ EOF
         fi
         log_success "Created lgpio.pc"
     fi
-    
-    # Create msgpack-cxx.pc if it doesn't exist
-    if [[ ! -f /usr/lib/pkgconfig/msgpack-cxx.pc ]]; then
-        log_info "Creating msgpack-cxx.pc pkg-config file..."
-        if [[ -n "$need_sudo" ]]; then
-            sudo tee /usr/lib/pkgconfig/msgpack-cxx.pc > /dev/null << 'EOF'
-prefix=/usr
-exec_prefix=${prefix}
-includedir=${prefix}/include
-
-Name: msgpack-cxx
-Description: MessagePack implementation for C++
-Version: 4.1.3
-Cflags: -I${includedir}
-EOF
-        else
-            cat > /usr/lib/pkgconfig/msgpack-cxx.pc << 'EOF'
-prefix=/usr
-exec_prefix=${prefix}
-includedir=${prefix}/include
-
-Name: msgpack-cxx
-Description: MessagePack implementation for C++
-Version: 4.1.3
-Cflags: -I${includedir}
-EOF
-        fi
-        log_success "Created msgpack-cxx.pc"
-    fi
 }
 
 # Get the actual user (not root) who is installing
