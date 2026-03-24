@@ -46,50 +46,52 @@ This document provides a comprehensive list of all components needed to build a 
 
 **TP2 is optional**
 
-| Quantity | Reference Designators | Manufacturer | Manufacturer Part Number | Link |
-|----------|-----------------------|--------------|--------------------------|------|
-| 1 | C1 | KEMET | A750BK107M1AAAE024 | https://www.digikey.com/en/products/detail/kemet/A750BK107M1AAAE024/13420054
-| 2 | C2,C11 | Vishay Beyschlag/Draloric/BC Components | K105K20X7RF5TH5 | https://www.digikey.com/en/products/detail/vishay-beyschlag-draloric-bc-components/K105K20X7RF5TH5/2820552
-| 6 | C3,C8,C10,C12,C14,C15 | Vishay Beyschlag/Draloric/BC Components | K104K10X7RF5UH5 | https://www.digikey.com/en/products/detail/vishay-beyschlag-draloric-bc-components/K104K10X7RF5UH5/2356754
-| 1 | C4 | Vishay Beyschlag/Draloric/BC Components | K471J15C0GF5UH5 | https://www.digikey.com/en/products/detail/vishay-beyschlag-draloric-bc-components/K471J15C0GF5UH5/2823074
-| 1 | C5 | Murata | RDER72A105K2M1H03A | https://www.digikey.com/en/products/detail/murata-electronics/RDER72A105K2M1H03A/4771353
-| 1 | C6 | KEMET | A750MW337M1HAAE020 | https://www.digikey.com/en/products/detail/kemet/A750MW337M1HAAE020/13420041
-| 1 | C7 | Vishay Beyschlag/Draloric/BC Components | K104K20X7RH5UH5 | https://www.digikey.com/en/products/detail/vishay-beyschlag-draloric-bc-components/K104K20X7RH5UH5/2356756
-| 1 | C9 | Murata | RCER71H475K3K1H03B | https://www.digikey.com/en/products/detail/murata-electronics/RCER71H475K3K1H03B/4277828
-| 3 | D1 | Vishay General Semiconductor - Diodes Division | SB150-E3/73 | https://www.digikey.com/en/products/detail/vishay-general-semiconductor-diodes-division/SB150-E3-73/2142188
-| 1 | D2 | Lite-On Inc. | LTL-307G | https://www.digikey.com/en/products/detail/liteon/LTL-307G/669998
-| 1 | D4 | Vishay General Semiconductor - Diodes Division | SD103A-TR | https://www.digikey.com/en/products/detail/vishay-general-semiconductor-diodes-division/SD103A-TR/3104157
-| 1 | D5 | Lite-On Inc. | LTL-307E | https://www.digikey.com/en/products/detail/liteon/LTL-307E/669997
-| 2 | J1,J4 | Amphenol Anytek | YK3210203000G | https://www.digikey.com/en/products/detail/amphenol-anytek/YK3210203000G/4961227
-| 2 | J2,J5 | GCT | USB4085-GF-A | https://www.digikey.com/en/products/detail/gct/USB4085-GF-A/9859662
-| 1 | J3 | Adam Tech | PH1-08-UA | https://www.digikey.com/en/products/detail/adam-tech/PH1-08-UA/9830442
-| 1 | J6 |  GCT | USB1125-GF-B | https://www.digikey.com/en/products/detail/gct/USB1125-GF-B/12819955
-| 1 | L1 | Bourns Inc. | RLB0914-330KL | https://www.digikey.com/en/products/detail/bourns-inc/RLB0914-330KL/2561360
-| 2 | Q1,Q2 | Infineon Technologies | IRLU024NPBF | https://www.digikey.com/en/products/detail/infineon-technologies/IRLU024NPBF/812400
-| 1 | Q3 | Microchip Technology | TN2106N3-G | https://www.digikey.com/en/products/detail/microchip-technology/TN2106N3-G/4902377
-| 1 | Q4 | onsemi | 2N3904TFR | https://www.digikey.com/en/products/detail/onsemi/2N3904TFR/458818
-| 1 | R1 | Yageo | PNP300JR-73-0R15 | https://www.digikey.com/en/products/detail/yageo/PNP300JR-73-0R15/2058854
-| 1 | R2 | Yageo | KNP1WSJT-52-180R | https://www.digikey.com/en/products/detail/yageo/KNP1WSJT-52-180R/9119594
-| 1 | R3 | Yageo | MFR-25FRF52-60K4 | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-60K4/15056
-| 1 | R4 | Yageo | MFR-25FRF52-2K2 | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-2K2/9138953
-| 1 | R5 | Yageo | MFR-25FTE52-2K49 | https://www.digikey.com/en/products/detail/yageo/MFR-25FTE52-2K49/9140029
-| 4 | R6,R8,R17,R22 | Yageo | MFR-25FRF52-1K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-1K/14891
-| 1 | R7 | Yageo | MFR-25FRF52-75K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-75K/15065
-| 1 | R9 | Yageo | MFR-25FTE52-120R | https://www.digikey.com/en/products/detail/yageo/MFR-25FTE52-120R/9139747
-| 1 | R10 | Yageo | KNP100JR-73-0R1 | https://www.digikey.com/en/products/detail/yageo/KNP100JR-73-0R1/9119173
-| 1 | R11 | Yageo | MFR-25FRF52-604R | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-604R/14870
-| 1 | R12 | Yageo | MFR-25FBF52-6K04 | https://www.digikey.com/en/products/detail/yageo/MFR-25FBF52-6K04/13177
-| 2 | R13,R21 | Yageo | MFR-25FRF52-2K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-2K/14920
-| 1 | R14 | Yageo | MFR-25FRF52-3K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-3K/9139012
-| 1 | R15 | Yageo | MFR-25FRF52-10K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-10K/14626
-| 3 | R16,R19,R23 | Yageo | ZOR-25-R-52-0R | https://www.digikey.com/en/products/detail/yageo/ZOR-25-R-52-0R/18795
-| 1 | R18 | Yageo | MFR-25FRF52-10K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-10K/14626
-| 1 | TP2 | Keystone Electronics | 5011 | https://www.digikey.com/en/products/detail/keystone-electronics/5011/255333
-| 1 | U1 | Texas Instruments | MC33063AP | https://www.digikey.com/en/products/detail/texas-instruments/MC33063AP/717430
-| 1 | U2 | onsemi | LM317LBZRAG | https://www.digikey.com/en/products/detail/onsemi/LM317LBZRAG/1476805
-| 1 | U3 | Microchip Technology | MCP1407-E/P | https://www.digikey.com/en/products/detail/microchip-technology/MCP1407-E-P/1228640
-| 1 | U5 | Microchip Technology | MCP4801-E/P | https://www.digikey.com/en/products/detail/microchip-technology/MCP4801-E-P/2332804
-| 1 | U6 | Microchip Technology | MCP3202-CI/P | https://www.digikey.com/en/products/detail/microchip-technology/MCP3202-CI-P/305924
+**If you are searching for alternates, ensure you also filter for "In Stock", "RoHS Compliant" and "Exclude Marketplace Products".**
+
+| Quantity | Reference Designators | Manufacturer | Manufacturer Part Number | Link | Digikey Filters|
+|----------|-----------------------|--------------|--------------------------|------|---------------|
+| 1 | C1 | KEMET | A750BK107M1AAAE024 | https://www.digikey.com/en/products/detail/kemet/A750BK107M1AAAE024/13420054 | Lead Spacing = 2.00mm, Voltage - Rated >= 10V, Ripple Current @ High Frequency >= 1A, Mounting Type = Through Hole |
+| 2 | C2,C11 | Vishay Beyschlag/Draloric/BC Components | K105K20X7RF5TH5 | https://www.digikey.com/en/products/detail/vishay-beyschlag-draloric-bc-components/K105K20X7RF5TH5/2820552 | Temperature Coefficient = X7R, Voltage - Rated >= 35V, Lead Spacing = 5.00mm, Capacitance = 1uF, Size / Dimension <= 5.50mm x 4.00mm, Mounting Type = Through Hole |
+| 6 | C3,C8,C10,C12,C14,C15 | Vishay Beyschlag/Draloric/BC Components | K104K10X7RF5UH5 | https://www.digikey.com/en/products/detail/vishay-beyschlag-draloric-bc-components/K104K10X7RF5UH5/2356754 | Temperature Coefficient = X7R, Voltage - Rated >= 35V, Lead Spacing = 5.00mm, Capacitance = 0.1uF, Size / Dimension <= 5.00mm x 2.60mm, Mounting Type = Through Hole |
+| 1 | C4 | Vishay Beyschlag/Draloric/BC Components | K471J15C0GF5UH5 | https://www.digikey.com/en/products/detail/vishay-beyschlag-draloric-bc-components/K471J15C0GF5UH5/2823074 | Temperature Coefficient = C0G(NP0), Lead Spacing = 5.00mm, Capacitance = 470pF, Mounting Type = Through Hole |
+| 1 | C5 | Murata | RDER72A105K2M1H03A | https://www.digikey.com/en/products/detail/murata-electronics/RDER72A105K2M1H03A/4771353 | Voltage - Rated >= 100V, Temperature Coefficient = X7R, Capacitance = 1uF, Lead Spacing = 5.00mm, Size / Dimension <= 5.50mm x 3.50mm, Mounting Type = Through Hole |
+| 1 | C6 | KEMET | A750MW337M1HAAE020 | https://www.digikey.com/en/products/detail/kemet/A750MW337M1HAAE020/13420041 | Lead Spacing = 5.00mm, Voltage - Rated >= 50V, Capacitance >= 200uF, Ripple Current @ High Frequency >= 4A, Size / Dimension = 10.00mm, Mounting Type = Through Hole |
+| 1 | C7 | Vishay Beyschlag/Draloric/BC Components | K104K20X7RH5UH5 | https://www.digikey.com/en/products/detail/vishay-beyschlag-draloric-bc-components/K104K20X7RH5UH5/2356756 | Voltage - Rated >= 100V, Temperature Coefficient = X7R, Capactiance = 0.1uF, Lead Spacing = 5.00mm, Size / Dimension <= 5.50mm x 3.50mm, Mounting Type = Through Hole |
+| 1 | C9 | Murata | RCER71H475K3K1H03B | https://www.digikey.com/en/products/detail/murata-electronics/RCER71H475K3K1H03B/4277828 | Temperature Coefficient = X7R, Voltage - Rated >= 35V, Lead Spacing = 5.00mm, Capacitance = 4.7uF, Size / Dimension <= 6.50mm x 4.00mm, Mounting Type = Through Hole |
+| 3 | D1 | Vishay General Semiconductor - Diodes Division | SB150-E3/73 | https://www.digikey.com/en/products/detail/vishay-general-semiconductor-diodes-division/SB150-E3-73/2142188 | Technology = Schottky, Current - Average Rectified (Io) >= 1A, Voltage - DC Reverse (Vr) (Max) >= 40V, Package / Case = [(DO-204AC,DO-41,Axial), (DO-204AL,DO-41,Axial)] |
+| 1 | D2 | Lite-On Inc. | LTL-307G | https://www.digikey.com/en/products/detail/liteon/LTL-307G/669998 | Color = Green, Lens Transparency = Diffused, Lens Size = 5.00mm Dia |
+| 1 | D4 | Vishay General Semiconductor - Diodes Division | SD103A-TR | https://www.digikey.com/en/products/detail/vishay-general-semiconductor-diodes-division/SD103A-TR/3104157 |  Technology = Schottky, Voltage - Forward (Vf) (Max) @ If <= 650mV @ 50mA, Package / Case = (DO-204AH,DO-35,Axial) |   
+| 1 | D5 | Lite-On Inc. | LTL-307E | https://www.digikey.com/en/products/detail/liteon/LTL-307E/669997 | Color = Red, Lens Transparency = Diffused, Lens Size = 5.00mm Dia |
+| 2 | J1,J4 | Amphenol Anytek | YK3210203000G | https://www.digikey.com/en/products/detail/amphenol-anytek/YK3210203000G/4961227 | TBD |
+| 2 | J2,J5 | GCT | USB4085-GF-A | https://www.digikey.com/en/products/detail/gct/USB4085-GF-A/9859662 | Unfilterable. Manually search, there will be alternates that can fit. |
+| 1 | J3 | Adam Tech | PH1-08-UA | https://www.digikey.com/en/products/detail/adam-tech/PH1-08-UA/9830442 | Number of Positions = 8, Number of Rows = 1, Pitch - Mating = 2.54mm, Shrouding = Unshrouded, Mounting Type = Through Hole |
+| 1 | J6 |  GCT | USB1125-GF-B | https://www.digikey.com/en/products/detail/gct/USB1125-GF-B/12819955 | Unfilterable. Manually search, there will be alternates that can fit. |
+| 1 | L1 | Bourns Inc. | RLB0914-330KL | https://www.digikey.com/en/products/detail/bourns-inc/RLB0914-330KL/2561360 | 8.50mm <= Size / Dimension <= 9.00mm, 27uH <= Inductance <= 39uH |
+| 2 | Q1,Q2 | Infineon Technologies | IRLU024NPBF | https://www.digikey.com/en/products/detail/infineon-technologies/IRLU024NPBF/812400 | Technology = MOSFET, FET Type = N-Channel, Current - Continuous Drain (Id) @ 25C >= 10A, Vgs(th) (Max) @ Id <= 4.6V @ 250uA, Drain to Source Voltage (Vdss) >= 38V, Mounting Type = Through Hole, Package / Case = [(TO-251-3 Short Leads,IPAK,TO-251AA), (TO251-3 Stub Leads,IPAK)] |
+| 1 | Q3 | Microchip Technology | TN2106N3-G | https://www.digikey.com/en/products/detail/microchip-technology/TN2106N3-G/4902377 | Technology = MOSFET, FET Type = N-Channel, Vgs(th) (Max) @ Id <= 2V @ 500uA Mounting Type = Through Hole, Package / Case = (TO-226-3,TO-92-3(TO-226AA)) |
+| 1 | Q4 | onsemi | 2N3904TFR | https://www.digikey.com/en/products/detail/onsemi/2N3904TFR/458818 | Search = "2N3904", Transistor Type = NPN, Mounting Type = Through Hole, Package / Case = [(TO-226-3,TO-93-3(TO-226AA)), (TO-226-3,TO-92-3(TO-226AA) Formed Leads), (TO-226-3,TO-92-3 Long Body, Formed Leads)] |
+| 1 | R1 | Yageo | PNP300JR-73-0R15 | https://www.digikey.com/en/products/detail/yageo/PNP300JR-73-0R15/2058854 | Power (Watts) >= 3W, Tolerance >= 1%, Resistance = 150mohm, Size /Dimension <= 6.00mm x 16.00mm |
+| 1 | R2 | Yageo | KNP1WSJT-52-180R | https://www.digikey.com/en/products/detail/yageo/KNP1WSJT-52-180R/9119594 | Power (Watts) >= 1/2W, Tolerance >= 1%, Resistance = 180ohm, Size / Dimension <= 3.50mm x 9.00mm |
+| 1 | R3 | Yageo | MFR-25FRF52-60K4 | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-60K4/15056 | Power (Watts) = 1/4W, Tolerance = 1%, Resistance = 60.4kohm |
+| 1 | R4 | Yageo | MFR-25FRF52-2K2 | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-2K2/9138953 | Power (Watts) = 1/4W, Tolerance = 1%, Resistance = 2.2kohm |
+| 1 | R5 | Yageo | MFR-25FTE52-2K49 | https://www.digikey.com/en/products/detail/yageo/MFR-25FTE52-2K49/9140029 | Power (Watts) = 1/4W, Tolerance = 1%, Resistance = 2.49kohm |
+| 4 | R6,R8,R17,R22 | Yageo | MFR-25FRF52-1K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-1K/14891 | Power (Watts) = 1/4W, Tolerance = 1%, Resistance = 1kohm |
+| 1 | R7 | Yageo | MFR-25FRF52-75K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-75K/15065 | Power (Watts) = 1/4W, Tolerance = 1%, Resistance = 75kohm |
+| 1 | R9 | Yageo | MFR-25FTE52-120R | https://www.digikey.com/en/products/detail/yageo/MFR-25FTE52-120R/9139747 | Power (Watts) = 1/4W, Tolerance = 1%, Resistance = 120ohm |
+| 1 | R10 | Yageo | KNP100JR-73-0R1 | https://www.digikey.com/en/products/detail/yageo/KNP100JR-73-0R1/9119173 | Power (Watts) >= 1W, Tolerance >= 1%, Resistance = 100mohm, Size / Dimension <= 4.60mm x 12.00mm |
+| 1 | R11 | Yageo | MFR-25FRF52-604R | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-604R/14870 | Power (Watts) = 1/4W, Tolerance = 1%, Resistance = 604ohm |
+| 1 | R12 | Yageo | MFR-25FBF52-6K04 | https://www.digikey.com/en/products/detail/yageo/MFR-25FBF52-6K04/13177 | Power (Watts) = 1/4W, Tolerance = 1%, Resistance = 6.04kohm |
+| 2 | R13,R21 | Yageo | MFR-25FRF52-2K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-2K/14920 | Power (Watts) = 1/4W, Tolerance = 1%, Resistance = 2kohm |
+| 1 | R14 | Yageo | MFR-25FRF52-3K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-3K/9139012 | Power (Watts) = 1/4W, Tolerance = 1%, Resistance = 3kohm |
+| 1 | R15 | Yageo | MFR-25FRF52-10K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-10K/14626 | Power (Watts) = 1/4W, Tolerance = 1%, Resistance = 10kohm |
+| 3 | R16,R19,R23 | Yageo | ZOR-25-R-52-0R | https://www.digikey.com/en/products/detail/yageo/ZOR-25-R-52-0R/18795 | Power (Watts) = 1/4W, Resistance = 0ohm |
+| 1 | R18 | Yageo | MFR-25FRF52-10K | https://www.digikey.com/en/products/detail/yageo/MFR-25FRF52-10K/14626 | Power (Watts) = 1/4W, Tolerance = 1%, Resistance = 10kohm |
+| 1 | TP2 | Keystone Electronics | 5011 | https://www.digikey.com/en/products/detail/keystone-electronics/5011/255333 | Color = Black, Mounting Type = Through Hole, Hole Diameter = 1.60mm |
+| 1 | U1 | Texas Instruments | MC33063AP | https://www.digikey.com/en/products/detail/texas-instruments/MC33063AP/717430 | Search = "MC34063" or "MC33063", Voltage - Output (Max) = 40V (Switch), Package / Case = 8-DIP (0.300", 7.62mm) |
+| 1 | U2 | onsemi | LM317LBZRAG | https://www.digikey.com/en/products/detail/onsemi/LM317LBZRAG/1476805 | Search = "LM317", Package / Case = [(TO-226-3, TO-92-3 (TO-226AA)), (TO-226-3, TO-92-3 Long Body), (TO-226-3, TO-92-3 (TO-226AA) Formed Leads), (TO-226-3, TO-92-3 Long Body, Formed Leads)] |
+| 1 | U3 | Microchip Technology | MCP1407-E/P | https://www.digikey.com/en/products/detail/microchip-technology/MCP1407-E-P/1228640 | Some alternates exist but difficult to filter. Microchip Technology TC4420xxx is another widely available part that should be drop in. Input Type = Non-Inverting |
+| 1 | U5 | Microchip Technology | MCP4801-E/P | https://www.digikey.com/en/products/detail/microchip-technology/MCP4801-E-P/2332804 | MCP4901-E/P is a valid alternate with caveats. !Requires populating C13 and U4! |
+| 1 | U6 | Microchip Technology | MCP3202-CI/P | https://www.digikey.com/en/products/detail/microchip-technology/MCP3202-CI-P/305924 | MCP3202-BI/P is a valid alternate. All other alternates require software changes. |
 
 ## IRLED BOM
 
