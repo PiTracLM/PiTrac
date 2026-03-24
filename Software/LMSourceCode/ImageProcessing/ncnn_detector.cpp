@@ -32,7 +32,7 @@ bool NCNNDetector::Initialize() {
     net_.opt.num_threads = config_.num_threads;
     net_.opt.use_fp16_packed = config_.use_fp16_packing;
     net_.opt.use_fp16_storage = config_.use_fp16_packing;
-    net_.opt.use_fp16_arithmetic = false; // keep FP32 for accuracy
+    net_.opt.use_fp16_arithmetic = true;  // Pi 5 Cortex-A76 has native FEAT_FP16
     net_.opt.use_packing_layout = true;
 
     if (net_.load_param(config_.param_path.c_str()) != 0) {

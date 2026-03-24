@@ -1090,17 +1090,31 @@
       "passedVia": "json",
       "passedTo": "both"
     },
-    "gs_config.ball_identification.kModelInputSize": {
+    "gs_config.ball_identification.kModelInputWidth": {
       "category": "AI Detection",
       "subcategory": "advanced",
-      "displayName": "Model Input Size",
-      "description": "Neural network input image size (must match exported model)",
+      "displayName": "Model Input Width",
+      "description": "Neural network input width in pixels (must match exported model, multiple of 32)",
       "type": "number",
       "min": 320,
       "max": 2048,
       "step": 32,
-      "default": 640,
-      "requiresRestart": false,
+      "default": 736,
+      "requiresRestart": true,
+      "passedVia": "json",
+      "passedTo": "both"
+    },
+    "gs_config.ball_identification.kModelInputHeight": {
+      "category": "AI Detection",
+      "subcategory": "advanced",
+      "displayName": "Model Input Height",
+      "description": "Neural network input height in pixels (must match exported model, multiple of 32)",
+      "type": "number",
+      "min": 320,
+      "max": 2048,
+      "step": 32,
+      "default": 544,
+      "requiresRestart": true,
       "passedVia": "json",
       "passedTo": "both"
     },

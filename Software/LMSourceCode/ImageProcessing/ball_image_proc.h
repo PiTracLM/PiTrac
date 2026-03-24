@@ -206,7 +206,8 @@ public:
     static std::string kModelPath;          // Model directory — backend appends file names
     static float kModelConfidenceThreshold;
     static float kModelNMSThreshold;
-    static int kModelInputSize;
+    static int kModelInputWidth;
+    static int kModelInputHeight;
     static std::string kModelDeviceType;
 
     static std::string kInferenceBackend;   // "ncnn" (primary) or "opencv_dnn" (fallback)

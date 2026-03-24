@@ -211,7 +211,8 @@ namespace golf_sim {
     #endif
     float BallImageProc::kModelConfidenceThreshold = 0.5f;
     float BallImageProc::kModelNMSThreshold = 0.4f;
-    int BallImageProc::kModelInputSize = 640;
+    int BallImageProc::kModelInputWidth = 736;
+    int BallImageProc::kModelInputHeight = 544;
     std::string BallImageProc::kModelDeviceType = "CPU";
 
     std::string BallImageProc::kInferenceBackend = "ncnn";
@@ -4301,7 +4302,7 @@ namespace golf_sim {
                 yolo_model_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
             }
             
-            yolo_letterbox_buffer_ = cv::Mat(kModelInputSize, kModelInputSize, CV_8UC3);
+            yolo_letterbox_buffer_ = cv::Mat(kModelInputHeight, kModelInputWidth, CV_8UC3);
             yolo_detection_boxes_.reserve(10);  // Max 10 golf balls
             yolo_detection_confidences_.reserve(10);
             yolo_outputs_.reserve(3);  // Network typically has 1-3 output layers
@@ -4342,8 +4343,8 @@ namespace golf_sim {
                     config.bin_path = kModelPath + "/best.ncnn.bin";
                     config.confidence_threshold = kModelConfidenceThreshold;
                     config.nms_threshold = kModelNMSThreshold;
-                    config.input_width = kModelInputSize;
-                    config.input_height = kModelInputSize;
+                    config.input_width = kModelInputWidth;
+                    config.input_height = kModelInputHeight;
                     config.num_threads = kInferenceThreads;
                     config.is_single_class_model = true;
                     config.num_classes = 1;
@@ -4405,8 +4406,8 @@ namespace golf_sim {
             config.bin_path = kModelPath + "/best.ncnn.bin";
             config.confidence_threshold = kModelConfidenceThreshold;
             config.nms_threshold = kModelNMSThreshold;
-            config.input_width = kModelInputSize;
-            config.input_height = kModelInputSize;
+            config.input_width = kModelInputWidth;
+            config.input_height = kModelInputHeight;
             config.num_threads = kInferenceThreads;
 
             ncnn_detector_ = std::make_unique<NCNNDetector>(config);
@@ -4467,8 +4468,8 @@ namespace golf_sim {
                     config.model_path = (kModelPath + "/best.onnx");
                     config.confidence_threshold = kModelConfidenceThreshold;
                     config.nms_threshold = kModelNMSThreshold;
-                    config.input_width = kModelInputSize;
-                    config.input_height = kModelInputSize;
+                    config.input_width = kModelInputWidth;
+                    config.input_height = kModelInputHeight;
                     config.num_threads = kInferenceThreads;
 
                     // Pi-optimized settings
@@ -4576,7 +4577,7 @@ namespace golf_sim {
                         yolo_model_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
                     }
 
-                    yolo_letterbox_buffer_ = cv::Mat(kModelInputSize, kModelInputSize, CV_8UC3);
+                    yolo_letterbox_buffer_ = cv::Mat(kModelInputHeight, kModelInputWidth, CV_8UC3);
                     yolo_detection_boxes_.reserve(50);
                     yolo_detection_confidences_.reserve(50);
                     yolo_outputs_.reserve(3);
@@ -4607,8 +4608,8 @@ namespace golf_sim {
             yolo_detection_confidences_.clear();
 
             {
-                float scale = std::min(float(kModelInputSize) / input_image.cols,
-                                     float(kModelInputSize) / input_image.rows);
+                float scale = std::min(float(kModelInputWidth) / input_image.cols,
+                                     float(kModelInputHeight) / input_image.rows);
                 int new_width = int(input_image.cols * scale);
                 int new_height = int(input_image.rows * scale);
 
@@ -4619,13 +4620,13 @@ namespace golf_sim {
 
                 // Create letterbox with gray padding
                 yolo_letterbox_buffer_.setTo(cv::Scalar(114, 114, 114));
-                int x_offset = (kModelInputSize - new_width) / 2;
-                int y_offset = (kModelInputSize - new_height) / 2;
+                int x_offset = (kModelInputWidth - new_width) / 2;
+                int y_offset = (kModelInputHeight - new_height) / 2;
                 yolo_resized_buffer_.copyTo(yolo_letterbox_buffer_(cv::Rect(x_offset, y_offset, new_width, new_height)));
 
                 // Create blob
                 cv::dnn::blobFromImage(yolo_letterbox_buffer_, yolo_blob_buffer_, 1.0/255.0,
-                                      cv::Size(kModelInputSize, kModelInputSize),
+                                      cv::Size(kModelInputWidth, kModelInputHeight),
                                       cv::Scalar(), false, false);  // swapRB=false for YOLOv8 BGR input
 
                 // Run inference
@@ -4730,8 +4731,8 @@ namespace golf_sim {
             config.model_path = (kModelPath + "/best.onnx");
             config.confidence_threshold = kModelConfidenceThreshold;
             config.nms_threshold = kModelNMSThreshold;
-            config.input_width = kModelInputSize;
-            config.input_height = kModelInputSize;
+            config.input_width = kModelInputWidth;
+            config.input_height = kModelInputHeight;
             config.num_threads = kInferenceThreads;
 
             // Pi-optimized settings
@@ -4784,7 +4785,8 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBallPlacementDetectionMethod", kBallPlacementDetectionMethod);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelConfidenceThreshold", kModelConfidenceThreshold);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelNMSThreshold", kModelNMSThreshold);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelInputSize", kModelInputSize);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelInputWidth", kModelInputWidth);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelInputHeight", kModelInputHeight);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kInferenceBackend", kInferenceBackend);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kAutoFallback", kAutoFallback);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kInferenceThreads", kInferenceThreads);
