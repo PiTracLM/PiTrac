@@ -520,7 +520,7 @@ bool testAnalyzeStrobedBalls() {
     }
 
 #ifdef __unix__  // Ignore in Windows environment
-    GsUISystem::SaveWebserverImage("kCameraXBallLocation_", ball1ImgColor, exposure_balls);
+    GsUISystem::SaveWebserverImage("kCameraXBallLocation_", exposures_image, exposure_balls);
 #endif
     GsGSProResults results(result_ball);
     GS_LOG_TRACE_MSG(trace, "Results are: " + results.Format());
