@@ -39,8 +39,8 @@ public:
         std::string bin_path;
         float confidence_threshold = 0.5f;
         float nms_threshold = 0.4f;
-        int input_width = 1472;
-        int input_height = 1472;
+        int input_width = 640;
+        int input_height = 640;
         int num_threads = 3;
         bool use_fp16_packing = true;
         bool is_single_class_model = true;
