@@ -3044,6 +3044,25 @@ namespace golf_sim {
 
 
 
+        // Downsample dimple edge images for coarse search — 90x90 is enough
+        // to identify the correct 6-degree bin. Fine search uses full resolution.
+        cv::Mat coarse_dimple1, coarse_dimple2;
+        cv::Size coarseSize(90, 90);
+        cv::resize(ball_image1DimpleEdges, coarse_dimple1, coarseSize, 0, 0, cv::INTER_NEAREST);
+        cv::resize(ball_image2DimpleEdges, coarse_dimple2, coarseSize, 0, 0, cv::INTER_NEAREST);
+
+        // Scale ball parameters for the downsampled images
+        GolfBall coarse_ball1 = local_ball1;
+        GolfBall coarse_ball2 = local_ball2;
+        float scale = 90.0f / (float)ball_image1DimpleEdges.cols;
+        // Update ball center and radius for the coarse images
+        coarse_ball1.set_x((float)(local_ball1.x() * scale));
+        coarse_ball1.set_y((float)(local_ball1.y() * scale));
+        coarse_ball1.measured_radius_pixels_ = local_ball1.measured_radius_pixels_ * scale;
+        coarse_ball2.set_x((float)(local_ball2.x() * scale));
+        coarse_ball2.set_y((float)(local_ball2.y() * scale));
+        coarse_ball2.measured_radius_pixels_ = local_ball2.measured_radius_pixels_ * scale;
+
         // Now compute all the possible rotations of the first image so we can figure out which angles make it look like the second ball image
         RotationSearchSpace initialSearchSpace;
 
@@ -3062,11 +3081,11 @@ namespace golf_sim {
         std::vector< RotationCandidate> candidates;
         cv::Vec3i output_candidate_elements_mat_size;
 
-        ComputeCandidateAngleImages(ball_image1DimpleEdges, initialSearchSpace, outputCandidateElementsMat, output_candidate_elements_mat_size, candidates, local_ball1);
+        ComputeCandidateAngleImages(coarse_dimple1, initialSearchSpace, outputCandidateElementsMat, output_candidate_elements_mat_size, candidates, coarse_ball1);
 
         // Compare the second (presumably rotated) ball image to different candidate rotations of the first ball image to determine the angular change
         std::vector<std::string> comparison_csv_data;
-        int best_candidate_index = CompareCandidateAngleImages(&ball_image2DimpleEdges, &outputCandidateElementsMat, &output_candidate_elements_mat_size, &candidates, comparison_csv_data);
+        int best_candidate_index = CompareCandidateAngleImages(&coarse_dimple2, &outputCandidateElementsMat, &output_candidate_elements_mat_size, &candidates, comparison_csv_data);
         
         cv::Vec3f rotationResult;
 
@@ -3769,17 +3788,17 @@ namespace golf_sim {
 
         projectionOp(const GolfBall *currentBall,
                      cv::Mat& projectedImg,
-                     double x_rad, double y_rad, double z_rad)
+                     float x_rad, float y_rad, float z_rad)
             : currentBall_(currentBall), projectedImg_(projectedImg),
               x_rotation_degreesAngleRad_(x_rad),
               y_rotation_degreesAngleRad_(y_rad),
               z_rotation_degreesAngleRad_(z_rad),
-              sinX_(sin(x_rad)), cosX_(cos(x_rad)),
-              sinY_(sin(y_rad)), cosY_(cos(y_rad)),
-              sinZ_(sin(z_rad)), cosZ_(cos(z_rad)),
-              rotatingOnX_(std::abs(x_rad) > 0.001),
-              rotatingOnY_(std::abs(y_rad) > 0.001),
-              rotatingOnZ_(std::abs(z_rad) > 0.001)
+              sinX_(sinf(x_rad)), cosX_(cosf(x_rad)),
+              sinY_(sinf(y_rad)), cosY_(cosf(y_rad)),
+              sinZ_(sinf(z_rad)), cosZ_(cosf(z_rad)),
+              rotatingOnX_(std::abs(x_rad) > 0.001f),
+              rotatingOnY_(std::abs(y_rad) > 0.001f),
+              rotatingOnZ_(std::abs(z_rad) > 0.001f)
         {
             projectedImg_.rows = projectedImg.rows;
             projectedImg_.cols = projectedImg.cols;
@@ -3788,9 +3807,9 @@ namespace golf_sim {
         // Legacy static setup — kept for backward compat with non-OMP code paths
         static void setup(const GolfBall *currentBall,
                           cv::Mat& projectedImg,
-                          const double& x_rotation_degreesAngleRad,
-                          const double& y_rotation_degreesAngleRad,
-                          const double& z_rotation_degreesAngleRad ) {
+                          float x_rotation_degreesAngleRad,
+                          float y_rotation_degreesAngleRad,
+                          float z_rotation_degreesAngleRad ) {
             s_currentBall_ = currentBall;
             s_projectedImg_ = projectedImg;
             s_projectedImg_.rows = projectedImg.rows;
@@ -3798,24 +3817,24 @@ namespace golf_sim {
             s_x_rad_ = x_rotation_degreesAngleRad;
             s_y_rad_ = y_rotation_degreesAngleRad;
             s_z_rad_ = z_rotation_degreesAngleRad;
-            s_sinX_ = sin(x_rotation_degreesAngleRad);
-            s_cosX_ = cos(x_rotation_degreesAngleRad);
-            s_sinY_ = sin(y_rotation_degreesAngleRad);
-            s_cosY_ = cos(y_rotation_degreesAngleRad);
-            s_sinZ_ = sin(z_rotation_degreesAngleRad);
-            s_cosZ_ = cos(z_rotation_degreesAngleRad);
-            s_rotatingOnX_ = (std::abs(x_rotation_degreesAngleRad) > 0.001);
-            s_rotatingOnY_ = (std::abs(y_rotation_degreesAngleRad) > 0.001);
-            s_rotatingOnZ_ = (std::abs(z_rotation_degreesAngleRad) > 0.001);
+            s_sinX_ = sinf(x_rotation_degreesAngleRad);
+            s_cosX_ = cosf(x_rotation_degreesAngleRad);
+            s_sinY_ = sinf(y_rotation_degreesAngleRad);
+            s_cosY_ = cosf(y_rotation_degreesAngleRad);
+            s_sinZ_ = sinf(z_rotation_degreesAngleRad);
+            s_cosZ_ = cosf(z_rotation_degreesAngleRad);
+            s_rotatingOnX_ = (std::abs(x_rotation_degreesAngleRad) > 0.001f);
+            s_rotatingOnY_ = (std::abs(y_rotation_degreesAngleRad) > 0.001f);
+            s_rotatingOnZ_ = (std::abs(z_rotation_degreesAngleRad) > 0.001f);
         }
 
         // The returned imageXFromCenter and imageYFromCenter are the original imageX & Y in a new coordinate system with the center of the ball at (0,0)
-        void getBallZ(const double imageX, const double imageY, double& imageXFromCenter, double& imageYFromCenter, double& ball3dZ) const {
+        void getBallZ(const float imageX, const float imageY, float& imageXFromCenter, float& imageYFromCenter, float& ball3dZ) const {
             // Basic idea:  x2 + y2 + z2 = r2  (2's are squared).  Just solve for z where we can
 
-            double r = currentBall_->measured_radius_pixels_;
-            double ballCenterX = currentBall_->x();
-            double ballCenterY = currentBall_->y();
+            float r = (float)currentBall_->measured_radius_pixels_;
+            float ballCenterX = (float)currentBall_->x();
+            float ballCenterY = (float)currentBall_->y();
 
             // Translate x and y into a new coordinate system that has the origin
             // at the center of the ball.
@@ -3829,33 +3848,33 @@ namespace golf_sim {
             }
             // Project the x,y coordinate onto the hemisphere to get the Z-axis position
             // Note that some of the image may be outside the sphere.  Ignore those
-            double rSquared = r * r;
-            double xSquarePlusYSquare = imageXFromCenter * imageXFromCenter + imageYFromCenter * imageYFromCenter;
-            double diff = rSquared - xSquarePlusYSquare;
-            if (diff < 0.0) {
+            float rSquared = r * r;
+            float xSquarePlusYSquare = imageXFromCenter * imageXFromCenter + imageYFromCenter * imageYFromCenter;
+            float diff = rSquared - xSquarePlusYSquare;
+            if (diff < 0.0f) {
                 ball3dZ = 0;  // Point is off the hemisphere/circle
             }
             else
             {
                 // We seem to be spending a lot of time in round() - TBD
-                ball3dZ = sqrt(diff);  // (int)std::round(sqrt(diff));
+                ball3dZ = sqrtf(diff);  // (int)std::round(sqrtf(diff));
             }
         }
 
         // The sparse Z values associated with the X,Y pairs of the 3D images will be >= 0, because
         // the X,Y rays from the 2D image will be projected only on the closest hemisphere
         void operator ()(uchar& pixelValue, const int* position) const {
-            double imageX = position[0];
-            double imageY = position[1];
+            float imageX = (float)position[0];
+            float imageY = (float)position[1];
 
 
             // Figure out where the pre-rotated point is
-            double imageXFromCenter;
-            double imageYFromCenter;
-            double ball3dZOfUnrotatedPoint = 0.0;
+            float imageXFromCenter;
+            float imageYFromCenter;
+            float ball3dZOfUnrotatedPoint = 0.0f;
             getBallZ(imageX, imageY, imageXFromCenter, imageYFromCenter, ball3dZOfUnrotatedPoint);
 
-            bool prerotatedPointNotValid = (ball3dZOfUnrotatedPoint <= 0.0001);  // A 0 value from getBallZ means that the point was outside the ROI
+            bool prerotatedPointNotValid = (ball3dZOfUnrotatedPoint <= 0.0001f);  // A 0 value from getBallZ means that the point was outside the ROI
 
             // The following is a sort of safety feature - TBD - do we need this?
             // If the point we are rotating FROM is not on the visible hemisphere, set its pixel value to Ignore it.
@@ -3866,7 +3885,7 @@ namespace golf_sim {
                 // std::cout << "CV_ELEM_SIZE1(traits::Depth<_Tp>::value): " << CV_ELEM_SIZE1(projectedImg_.traits::Depth<_Tp>::value) << "elemSize1()" << projectedImg_.elemSize1() << std::endl;
                 // TBD - Not sure we even need to bother with this?
 
-                projectedImg_.at<cv::Vec2i>((int)imageX, (int)imageY)[0] = (int)ball3dZOfUnrotatedPoint;    // TBD - Wait, is this right?  Why change the Z??
+                // Channel [0] Z is dead data — only write channel [1]
                 projectedImg_.at<cv::Vec2i>((int)imageX, (int)imageY)[1] = kPixelIgnoreValue;
             }
 
@@ -3874,77 +3893,51 @@ namespace golf_sim {
             // Note - this method is likely to leave a lot of gaps in the unprojected image.  Consider interpolation?
             // GS_LOG_TRACE_MSG(trace, "projectionOp Result:  [" + std::to_string(imageX) + ", " + std::to_string(imageX) + ", " + std::to_string(ball3dZ) + "]=" + std::to_string(pixelValue));
 
-            double imageZ = ball3dZOfUnrotatedPoint; // Note - the z axis is already situated with the origin in the center
+            float imageZ = ball3dZOfUnrotatedPoint; // Note - the z axis is already situated with the origin in the center
 
             // X-axis rotation
             if (rotatingOnX_) {
-                double tmpImageYFromCenter = imageYFromCenter;  // Want to change both Y and Z at the same time
+                float tmpImageYFromCenter = imageYFromCenter;  // Want to change both Y and Z at the same time
                 imageYFromCenter = (imageYFromCenter * cosX_) - (imageZ * sinX_);
                 imageZ = (int)((tmpImageYFromCenter * sinX_) + (imageZ * cosX_));
             }
-    
+
             // Y-axis rotation
             if (rotatingOnY_) {
-                double tmpImageXFromCenter = imageXFromCenter;
+                float tmpImageXFromCenter = imageXFromCenter;
                 imageXFromCenter = (imageXFromCenter * cosY_) + (imageZ * sinY_);
                 imageZ = (int)((imageZ * cosY_) - (tmpImageXFromCenter * sinY_));
             }
 
             // Z-axis rotation
             if (rotatingOnZ_) {
-                double tmpImageXFromCenter = imageXFromCenter;
+                float tmpImageXFromCenter = imageXFromCenter;
                 imageXFromCenter = (imageXFromCenter * cosZ_) - (imageYFromCenter * sinZ_);
                 imageYFromCenter = (tmpImageXFromCenter * sinZ_) + (imageYFromCenter * cosZ_);
             }
 
             // Shift back to coordinates with the origin in the top-left
-            imageX = imageXFromCenter + currentBall_->x();
-            imageY = imageYFromCenter + currentBall_->y();
+            imageX = imageXFromCenter + (float)currentBall_->x();
+            imageY = imageYFromCenter + (float)currentBall_->y();
 
-            // Get the Z value of the destination, rotated-to point.
-            double ball3dZOfRotatedPoint = 0;
-            double dummy_rotatedImageXFromCenter;  // Just used as a dummy variable to get the new Z
-            double dummy_rotatedImageYFromCenter;  // Just used as a dummy variable to get the new Z
+            // Check if the rotated destination point is on the visible hemisphere.
+            // We only need to know if r² >= x² + y² (no sqrt needed — channel [0] Z value is dead data).
+            float destXFromCenter = imageX - (float)currentBall_->x();
+            float destYFromCenter = imageY - (float)currentBall_->y();
+            float r = (float)currentBall_->measured_radius_pixels_;
+            bool rotatedPointVisible = (destXFromCenter * destXFromCenter + destYFromCenter * destYFromCenter) < (r * r);
 
-            getBallZ(imageX, imageY, dummy_rotatedImageXFromCenter, dummy_rotatedImageYFromCenter, ball3dZOfRotatedPoint);
-
-            if (currentBall_->PointIsInsideBall(imageX, imageY) && ball3dZOfRotatedPoint < 0.001) {
-                GS_LOG_TRACE_MSG(trace, "Project2dImageTo3dBall Z-value pixel within ball at (" + std::to_string(imageX) +
-                    ", " + std::to_string(imageY) + ").");
-            }
-
-            // Some of the points (like the corners) may rotate out to a place that is outside of the image Mat
-            // If so, just ignore that point
-            // Also, if the Z point that we've rotated the current pixel to is now *behind* the ball surface that the camera sees, then just ignore it
-            // and do absolutely nothing
+            // Bounds check + hemisphere visibility
             if (imageX >= 0 &&
                 imageY >= 0 &&
                 imageX < projectedImg_.cols &&
                 imageY < projectedImg_.rows &&
-                ball3dZOfRotatedPoint > 0.0) {
-                    // The rotated-to point is on the visible surface of the hemisphere
+                rotatedPointVisible) {
 
-                    // Instead of performing a zillion round operations, we'll just effectively floor (truncate)
-                    // each x and y value.  We'll lose some accuracy, but if everything is floored, it should at least
-                    // still be consistent.
-                    // projectedImg_.at<cv::Vec2i>((int)imageX, (int)imageY)[0] = (int)std::round(ball3dZOfRotatedPoint);
+                    int roundedImageX = (int)(imageX + 0.5f);
+                    int roundedImageY = (int)(imageY + 0.5f);
 
-                    int roundedImageX = (int)(imageX + 0.5);
-                    int roundedImageY = (int)(imageY + 0.5);
-
-                    // GS_LOG_TRACE_MSG(trace, "RoundedImage X&Y were: (" + std::to_string(roundedImageX) + ", " + std::to_string(roundedImageY) + ").");
-
-
-                    // If the final, new pixel came from an invalid place, don't allow it to pollute the rotated image
-                    // Not rounding here helped increase performance
-                    projectedImg_.at<cv::Vec2i>(roundedImageX, roundedImageY)[0] = (int)(ball3dZOfRotatedPoint);
-
-                    /** TBD - DEBUG ONLY 
-                    if (currentBall_->PointIsInsideBall(roundedImageX, roundedImageY) && pixelValue == kPixelIgnoreValue) {
-                        GS_LOG_TRACE_MSG(trace, "Project2dImageTo3dBall found ignore pixel within ball at (" + std::to_string(roundedImageX) +
-                                    ", " + std::to_string(roundedImageY) + ").");
-                    }
-                    */
+                    // Channel [0] (Z depth) is never read downstream — skip the write
                     projectedImg_.at<cv::Vec2i>(roundedImageX, roundedImageY)[1] = (prerotatedPointNotValid ? kPixelIgnoreValue : pixelValue);
             }
             else {
@@ -3960,12 +3953,12 @@ namespace golf_sim {
         // Instance members — each copy of the functor has its own state (thread-safe)
         const GolfBall* currentBall_ = nullptr;
         mutable cv::Mat projectedImg_;
-        double x_rotation_degreesAngleRad_ = 0;
-        double y_rotation_degreesAngleRad_ = 0;
-        double z_rotation_degreesAngleRad_ = 0;
-        double sinX_ = 0, cosX_ = 0;
-        double sinY_ = 0, cosY_ = 0;
-        double sinZ_ = 0, cosZ_ = 0;
+        float x_rotation_degreesAngleRad_ = 0;
+        float y_rotation_degreesAngleRad_ = 0;
+        float z_rotation_degreesAngleRad_ = 0;
+        float sinX_ = 0, cosX_ = 0;
+        float sinY_ = 0, cosY_ = 0;
+        float sinZ_ = 0, cosZ_ = 0;
         bool rotatingOnX_ = true;
         bool rotatingOnY_ = true;
         bool rotatingOnZ_ = true;
@@ -3973,23 +3966,23 @@ namespace golf_sim {
         // Static members — used only by legacy setup() path (non-OMP forEach)
         static const GolfBall* s_currentBall_;
         static cv::Mat s_projectedImg_;
-        static double s_x_rad_, s_y_rad_, s_z_rad_;
-        static double s_sinX_, s_cosX_, s_sinY_, s_cosY_, s_sinZ_, s_cosZ_;
+        static float s_x_rad_, s_y_rad_, s_z_rad_;
+        static float s_sinX_, s_cosX_, s_sinY_, s_cosY_, s_sinZ_, s_cosZ_;
         static bool s_rotatingOnX_, s_rotatingOnY_, s_rotatingOnZ_;
     };
 
     // Static storage for legacy setup() path
     const GolfBall* projectionOp::s_currentBall_ = nullptr;
     cv::Mat projectionOp::s_projectedImg_;
-    double projectionOp::s_x_rad_ = 0;
-    double projectionOp::s_y_rad_ = 0;
-    double projectionOp::s_z_rad_ = 0;
-    double projectionOp::s_sinX_ = 0;
-    double projectionOp::s_cosX_ = 0;
-    double projectionOp::s_sinY_ = 0;
-    double projectionOp::s_cosY_ = 0;
-    double projectionOp::s_sinZ_ = 0;
-    double projectionOp::s_cosZ_ = 0;
+    float projectionOp::s_x_rad_ = 0;
+    float projectionOp::s_y_rad_ = 0;
+    float projectionOp::s_z_rad_ = 0;
+    float projectionOp::s_sinX_ = 0;
+    float projectionOp::s_cosX_ = 0;
+    float projectionOp::s_sinY_ = 0;
+    float projectionOp::s_cosY_ = 0;
+    float projectionOp::s_sinZ_ = 0;
+    float projectionOp::s_cosZ_ = 0;
     bool projectionOp::s_rotatingOnX_ = true;
     bool projectionOp::s_rotatingOnY_ = true;
     bool projectionOp::s_rotatingOnZ_ = true;
@@ -4011,9 +4004,9 @@ namespace golf_sim {
         projectedImg.rows = image_gray.rows;
         projectedImg.cols = image_gray.cols;
 
-        double x_rad = -(float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[0]);
-        double y_rad = (float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[1]);
-        double z_rad = (float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[2]);
+        float x_rad = -(float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[0]);
+        float y_rad = (float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[1]);
+        float z_rad = (float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[2]);
 
         // Create a thread-safe functor with all state in instance members
         projectionOp op(&ball, projectedImg, x_rad, y_rad, z_rad);

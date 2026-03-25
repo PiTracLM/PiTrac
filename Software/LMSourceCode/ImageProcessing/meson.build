@@ -10,6 +10,7 @@ project('pitrac_lm', 'c', 'cpp',
     default_options : [
         'werror=true',
         'warning_level=2',
+        'b_lto=true',
         'cpp_std=c++20',
     ],
     license : 'LGPL 2.1+')
