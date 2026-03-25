@@ -255,12 +255,13 @@ pitrac_lm_module_deps += ([
 			rpicam_app_dep,
 ])
 
-exec = executable('pitrac_lm', 
+exec = executable('pitrac_lm',
 	pitrac_lm_sources,
 	include_directories : pitrac_lm_include_dirs,
 	install : true,
         objects : closed_source_object_files,
-	dependencies : pitrac_lm_module_deps
+	dependencies : pitrac_lm_module_deps,
+	cpp_args : cpp_arguments
 	)
 
 # Hacky two targets, because can't figure out how to execute more than one command
