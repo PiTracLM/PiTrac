@@ -455,7 +455,14 @@ private:
     // in the calibrated_binary_threshold variable.
     static cv::Mat ApplyGaborFilterToBall(const cv::Mat& img, const GolfBall& ball, float& calibrated_binary_threshold, float prior_binary_threshold = -1);
 
-    // Applies the gabor filter with the specified parameters and returns the final image and white percentage
+    // Compute max Gabor response across all orientations — expensive, run once per ball
+    static cv::Mat ComputeGaborAccumulation(const cv::Mat& img_f32,
+        const int kernel_size, double sig, double lm, double th, double ps, double gm);
+
+    // Apply binary threshold to pre-computed accumulation — cheap, used in calibration loop
+    static cv::Mat ThresholdGaborAccumulation(const cv::Mat& accumGray, float binary_threshold, int& white_percent);
+
+    // Legacy: runs both stages (backward compat for any external callers)
     static cv::Mat ApplyTestGaborFilter(const cv::Mat& img_f32,
         const int kernel_size, double sig, double lm, double th, double ps, double gm, float binary_threshold,
         int& white_percent);

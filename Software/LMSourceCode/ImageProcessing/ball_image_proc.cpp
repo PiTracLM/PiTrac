@@ -3540,21 +3540,21 @@ namespace golf_sim {
 
         int white_percent = 0;
 
-        cv::Mat dimpleImg = ApplyTestGaborFilter(img_f32, kernel_size, sig, lm, th, ps, gm, binary_threshold,
-            white_percent);
+        // Compute the 32 Gabor convolutions ONCE — this is the expensive part (~80ms)
+        cv::Mat accumGray = ComputeGaborAccumulation(img_f32, kernel_size, sig, lm, th, ps, gm);
+
+        // Apply initial threshold — this is cheap (~0.01ms)
+        cv::Mat dimpleImg = ThresholdGaborAccumulation(accumGray, binary_threshold, white_percent);
 
         GS_LOG_TRACE_MSG(trace, "Initial Gabor filter white percent = " + std::to_string(white_percent));
 
         bool ratheting_threshold_down = (white_percent < kGaborMinWhitePercent);
 
-        // Give it a second go if we're too white or too black and haven't already overridden the binary threshold
-        if (prior_binary_threshold < 0 && 
+        // Calibration loop: only re-thresholds the pre-computed accumulation (no convolutions)
+        if (prior_binary_threshold < 0 &&
             (white_percent < kGaborMinWhitePercent || white_percent >= kGaborMaxWhitePercent)) {
 
-            // Keep going down or up (depending on the ractchet direction) until we get within a reasonable
-            // white-ness range
             while (white_percent < kGaborMinWhitePercent || white_percent >= kGaborMaxWhitePercent) {
-                // Try another gabor setting for less/more white
 
                 if (ratheting_threshold_down)
                 {
@@ -3576,19 +3576,17 @@ namespace golf_sim {
                     GS_LOG_TRACE_MSG(trace, "Trying higher gabor binary_threshold setting of " + std::to_string(binary_threshold) + " for better balance.");
                 }
 
-                dimpleImg = ApplyTestGaborFilter(img_f32, kernel_size, sig, lm, th, ps, gm, binary_threshold,
-                    white_percent);
+                // Re-threshold the SAME accumulation — no re-running 32 convolutions
+                dimpleImg = ThresholdGaborAccumulation(accumGray, binary_threshold, white_percent);
                 GS_LOG_TRACE_MSG(trace, "Next, refined, Gabor white percent = " + std::to_string(white_percent));
 
-                // If we've gone as far as we can, just return
                 if (binary_threshold > 30 || binary_threshold < 2) {
-                    GS_LOG_MSG(warning, "Binaary threshold for Gabor filter reached limit of " + std::to_string(binary_threshold));
+                    GS_LOG_MSG(warning, "Binary threshold for Gabor filter reached limit of " + std::to_string(binary_threshold));
                     break;
                 }
 
             }
 
-            // Return the final threshold so that the caller can use for subsequent calls
             calibrated_binary_threshold = binary_threshold;
 
             GS_LOG_TRACE_MSG(trace, "Final Gabor white percent = " + std::to_string(white_percent));
@@ -3597,40 +3595,43 @@ namespace golf_sim {
         return dimpleImg;
     }
 
-    cv::Mat BallImageProc::ApplyTestGaborFilter(const cv::Mat& img_f32,
-        const int kernel_size, double sig, double lm, double th, double ps, double gm, float binary_threshold,
-        int &white_percent  ) {
+    // Compute the max Gabor response across all orientations — the expensive part (32 convolutions).
+    // This result is reusable: only needs to be computed once per ball image.
+    cv::Mat BallImageProc::ComputeGaborAccumulation(const cv::Mat& img_f32,
+        const int kernel_size, double sig, double lm, double th, double ps, double gm) {
 
         cv::Mat dest = cv::Mat::zeros(img_f32.rows, img_f32.cols, img_f32.type());
         cv::Mat accum = cv::Mat::zeros(img_f32.rows, img_f32.cols, img_f32.type());
         cv::Mat kernel;
 
-
-        // Sweep through a bunch of different angles for the filter in order to pick up features
-        // in all directions
-        const double thetaIncrement = 11.25; //  5.625; // CURRENT 11.25;  // degrees.  Nominal: 11.25 also works 
+        const double thetaIncrement = 11.25;
         for (double theta = 0; theta <= 360.0; theta += thetaIncrement) {
             kernel = CreateGaborKernel(kernel_size, sig, theta, lm, gm, ps);
             cv::filter2D(img_f32, dest, CV_32F, kernel);
-
             cv::max(accum, dest, accum);
         }
 
+        // Convert to uint8 once — this is what gets re-thresholded during calibration
         cv::Mat accumGray;
-
-        // Convert from the 0.0 to 1.0 range into 0-255
         accum.convertTo(accumGray, CV_8U, 255, 0);
+        return accumGray;
+    }
 
-        cv::Mat dimpleEdges = cv::Mat::zeros(accum.rows, accum.cols, accum.type());
-
-        // Threshold the image to either 0 or 255
+    // Apply binary threshold to a pre-computed Gabor accumulation — the cheap part (~0.01ms).
+    cv::Mat BallImageProc::ThresholdGaborAccumulation(const cv::Mat& accumGray, float binary_threshold, int& white_percent) {
+        cv::Mat dimpleEdges;
         const int edgeThresholdLow = (int)std::round(binary_threshold * 10.);
-        const int edgeThresholdHigh = 255;
-        cv::threshold(accumGray, dimpleEdges, edgeThresholdLow, edgeThresholdHigh, cv::THRESH_BINARY);
-
+        cv::threshold(accumGray, dimpleEdges, edgeThresholdLow, 255, cv::THRESH_BINARY);
         white_percent = (int)std::round(((double)cv::countNonZero(dimpleEdges) * 100.) / ((double)dimpleEdges.rows * dimpleEdges.cols));
-
         return dimpleEdges;
+    }
+
+    // Legacy wrapper — calls both stages for backward compatibility
+    cv::Mat BallImageProc::ApplyTestGaborFilter(const cv::Mat& img_f32,
+        const int kernel_size, double sig, double lm, double th, double ps, double gm, float binary_threshold,
+        int &white_percent  ) {
+        cv::Mat accumGray = ComputeGaborAccumulation(img_f32, kernel_size, sig, lm, th, ps, gm);
+        return ThresholdGaborAccumulation(accumGray, binary_threshold, white_percent);
     }
  
    bool BallImageProc::ComputeCandidateAngleImages(const cv::Mat& base_dimple_image, 
