@@ -16,6 +16,7 @@
 #include <vector>
 #include <chrono>
 #include <fstream>
+#include <omp.h>
 #include "gs_format_lib.h"
 
 #include <boost/timer/timer.hpp>
@@ -2005,8 +2006,8 @@ namespace golf_sim {
             // TBD - Need to retest everything with the new aspect ratio restriction
             if ((std::abs(xc - circleX) > (ballRadius / 1.5)) ||
                 (std::abs(yc - circleY) > (ballRadius / 1.5)) ||
-                area < pow(ballRadius, 2.0) ||
-                area > 6 * pow(ballRadius, 2.0) ||
+                area < (ballRadius * ballRadius) ||
+                area > 6 * (ballRadius * ballRadius) ||
                 (!CvUtils::IsUprightRect(theta) && false) ||
                 aspectRatio > 1.15) {
                 GS_LOG_TRACE_MSG(trace, "Found and REJECTED ellipse, x,y = " + std::to_string(xc) + "," + std::to_string(yc) + " rw,rh = " + std::to_string(a) + "," + std::to_string(b) + " rectArea = " + std::to_string(a * b) + " theta = " + std::to_string(theta) + " aspectRatio = " + std::to_string(aspectRatio) + "(REJECTED)");
@@ -2191,8 +2192,8 @@ namespace golf_sim {
                 // NOTE - there were too many non-upright ellipses
                 if ((std::abs(xc - circleX) > (ballRadius / 1.5)) ||
                         (std::abs(yc - circleY) > (ballRadius / 1.5)) ||
-                        area < pow(ballRadius, 2.0) ||
-                        area > 5 * pow(ballRadius, 2.0) ||
+                        area < (ballRadius * ballRadius) ||
+                        area > 5 * (ballRadius * ballRadius) ||
                         (!CvUtils::IsUprightRect(theta) && false) )  {
                     GS_LOG_TRACE_MSG(trace, "Found and REJECTED ellipse, x,y = " + std::to_string(xc) + "," + std::to_string(yc) + " rw,rh = " + std::to_string(a) + "," + std::to_string(b) + " rectArea = " + std::to_string(a * b) + " theta = " + std::to_string(theta) + "(REJECTED)");
 
@@ -2417,7 +2418,7 @@ namespace golf_sim {
         GS_LOG_TRACE_MSG(trace, "wait_for_movement called with ball = " + ball.Format());
 
         //min area of motion detectable - based on ball radius, should be at least as large as a third of a ball
-        int min_area = (int)pow(ball.ball_circle_[2],2.0);  // Rougly a third of the ball size
+        int min_area = (int)(ball.ball_circle_[2] * ball.ball_circle_[2]);  // Rougly a third of the ball size
 
         boost::timer::cpu_timer timer1;
 
@@ -3702,62 +3703,45 @@ namespace golf_sim {
 
         output_candidate_elements_mat_size = cv::Vec3i(xSize, ySize, zSize);
 
-        GS_LOG_TRACE_MSG(trace, "ComputeCandidateAngleImages will compute " + std::to_string(xSize * ySize * zSize) + " images.");
+        int totalCandidates = xSize * ySize * zSize;
+        GS_LOG_TRACE_MSG(trace, "ComputeCandidateAngleImages will compute " + std::to_string(totalCandidates) + " images.");
 
-        // Create a new 3D Mat to hold indexes to the results in the vector.  Use a Mat in order to exploit the forEach() function
+        // Create a new 3D Mat to hold indexes to the results in the vector
         int sizes[3] = { xSize, ySize, zSize };
         outputCandidateElementsMat = cv::Mat(3, sizes, CV_16U, cv::Scalar(0));
 
-        short vectorIndex = 0;
+        // Pre-allocate the candidate vector so threads can write by index without locking
+        output_candidates.resize(totalCandidates);
 
-        int xIndex = 0;
-        int yIndex = 0;
-        int zIndex = 0;
+        // Flatten the 3-level nested loop into a single parallel loop.
+        // Each iteration is independent — the 3D projection only reads from base_dimple_image
+        // and writes to its own candidate slot.
+        #pragma omp parallel for schedule(static)
+        for (int flatIdx = 0; flatIdx < totalCandidates; flatIdx++) {
+            // Decompose flat index back to (xIndex, yIndex, zIndex)
+            int xIndex = flatIdx / (ySize * zSize);
+            int rem = flatIdx % (ySize * zSize);
+            int yIndex = rem / zSize;
+            int zIndex = rem % zSize;
 
-        for (int x_rotation_degrees = anglex_rotation_degrees_start, xIndex = 0; x_rotation_degrees <= anglex_rotation_degrees_end; x_rotation_degrees += anglex_rotation_degrees_increment, xIndex++) {
-            for (int y_rotation_degrees = angley_rotation_degrees_start, yIndex = 0; y_rotation_degrees <= angley_rotation_degrees_end; y_rotation_degrees += angley_rotation_degrees_increment, yIndex++) {
-                for (int z_rotation_degrees = anglez_rotation_degrees_start, zIndex = 0; z_rotation_degrees <= anglez_rotation_degrees_end; z_rotation_degrees += anglez_rotation_degrees_increment, zIndex++) {
+            int x_rotation_degrees = anglex_rotation_degrees_start + xIndex * anglex_rotation_degrees_increment;
+            int y_rotation_degrees = angley_rotation_degrees_start + yIndex * angley_rotation_degrees_increment;
+            int z_rotation_degrees = anglez_rotation_degrees_start + zIndex * anglez_rotation_degrees_increment;
 
-                    cv::Mat ball2DImage;
-                    // TBD - Instead of this, call the projectTo3D function and then use the resulting
-                    // matrix directly in the comparison
-                    // GetRotatedImage(base_dimple_image, ball, cv::Vec3i(x_rotation_degrees, y_rotation_degrees, z_rotation_degrees), ball2DImage);
+            // Project the ball onto a 3D hemisphere at the current rotation
+            cv::Mat ball13DImage = Project2dImageTo3dBall(base_dimple_image, ball,
+                cv::Vec3i(x_rotation_degrees, y_rotation_degrees, z_rotation_degrees));
 
-                    // Project the ball out onto a 3D hemisphere at the current x, y, and z-axis rotation
-                    cv::Mat ball13DImage = Project2dImageTo3dBall(base_dimple_image, ball, cv::Vec3i(x_rotation_degrees, y_rotation_degrees, z_rotation_degrees));
+            // Store candidate at its pre-determined index (no locking needed)
+            RotationCandidate& c = output_candidates[flatIdx];
+            c.index = static_cast<short>(flatIdx);
+            c.img = ball13DImage;
+            c.x_rotation_degrees = x_rotation_degrees - xAngleOffset;
+            c.y_rotation_degrees = y_rotation_degrees - yAngleOffset;
+            c.z_rotation_degrees = z_rotation_degrees;
+            c.score = 0.0;
 
-                    // Save the current image as a possible candidate to compare to later
-                    RotationCandidate c;
-
-                    // The angles in the set of images we are building are angles calculated as if the ball was
-                    // centered in the camera's image
-                    c.index = vectorIndex;
-                    c.img = ball13DImage;
-                    c.x_rotation_degrees = x_rotation_degrees - xAngleOffset;
-                    c.y_rotation_degrees = y_rotation_degrees - yAngleOffset;
-                    c.z_rotation_degrees = z_rotation_degrees;
-                    c.score = 0.0;
-
-                    // For now, just throw all of the candidates into a big vector indexed by the entries in the matrix
-                    output_candidates.push_back(c);
-                    outputCandidateElementsMat.at<ushort>(xIndex, yIndex, zIndex) = vectorIndex;
-
-                    vectorIndex++;
-                    
-                    // Just for debug for small runs - probably too much information
-                    /* std::string s = "ComputeCandidateAngleImages - Rotation Candidate: Idx: " + std::to_string(c.index) +
-                        " Rot: (" + std::to_string(c.x_rotation_degrees) + ", " + std::to_string(c.y_rotation_degrees) + ", " + std::to_string(c.z_rotation_degrees) + ") ";
-                    GS_LOG_MSG(debug, s);
-                    */
-
-                    // FOR DEBUG
-                    /*
-                    cv::Mat outputGrayImg = cv::Mat::zeros(base_dimple_image.rows, base_dimple_image.cols, base_dimple_image.type());
-                    Unproject3dBallTo2dImage(ball13DImage, outputGrayImg, ball);
-                    LoggingTools::DebugShowImage("Candidate Image at Rot: (" + std::to_string(c.x_rotation_degrees) + ", " + std::to_string(c.y_rotation_degrees) + ", " + std::to_string(c.z_rotation_degrees) + "): ", outputGrayImg);
-                    */
-                }
-            }
+            outputCandidateElementsMat.at<ushort>(xIndex, yIndex, zIndex) = static_cast<ushort>(flatIdx);
         }
 
         timer1.stop();
@@ -3844,8 +3828,8 @@ namespace golf_sim {
             }
             // Project the x,y coordinate onto the hemisphere to get the Z-axis position
             // Note that some of the image may be outside the sphere.  Ignore those
-            double rSquared = pow(r, 2);
-            double xSquarePlusYSquare = pow(imageXFromCenter, 2) + pow(imageYFromCenter, 2);
+            double rSquared = r * r;
+            double xSquarePlusYSquare = imageXFromCenter * imageXFromCenter + imageYFromCenter * imageYFromCenter;
             double diff = rSquared - xSquarePlusYSquare;
             if (diff < 0.0) {
                 ball3dZ = 0;  // Point is off the hemisphere/circle
