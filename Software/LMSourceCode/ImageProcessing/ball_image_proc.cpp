@@ -3454,41 +3454,27 @@ namespace golf_sim {
 
         CV_Assert((img1.rows == img2.rows && img1.rows == img2.cols));
 
-        // DEBUG - create a binary image showing what pixels are the same between them
-        cv::Mat testCorrespondenceImg = cv::Mat::zeros(img1.rows, img1.cols, img1.type());
-
-        // This comparison is currently done serially, but we should be processing
-        // multiple such image comparisons in parallel
         long score = 0;
         long totalPixelsExamined = 0;
-        for (int x = 0; x < img1.cols; x++) {
-            for (int y = 0; y < img1.rows; y++) {
-                uchar p1 = img1.at<uchar>(x, y);
-                uchar p2 = img2.at<cv::Vec2i>(x, y)[1];
+
+        // Optimized: row-major traversal with pointer access, no debug Mat allocation
+        for (int y = 0; y < img1.rows; y++) {
+            const uchar* row1 = img1.ptr<uchar>(y);
+            const cv::Vec2i* row2 = img2.ptr<cv::Vec2i>(y);
+            for (int x = 0; x < img1.cols; x++) {
+                uchar p1 = row1[x];
+                uchar p2 = static_cast<uchar>(row2[x][1]);
 
                 if (p1 != kPixelIgnoreValue && p2 != kPixelIgnoreValue) {
-                    // Both points have values, so we can validly compare them
                     totalPixelsExamined++;
-
                     if (p1 == p2) {
                         score++;
-                        // The test image is already zero'd out, so only set the
-                        // pixel to 1 if there is a match
-                        testCorrespondenceImg.at<uchar>(x, y) = 255;
                     }
-                }
-                else
-                {
-                    testCorrespondenceImg.at<uchar>(x, y) = kPixelIgnoreValue;
                 }
             }
         }
 
-        // LoggingTools::DebugShowImage("testCorrespondenceImg #" + std::to_string(index), testCorrespondenceImg);
-        // WON'T WORK BECAUSE IMG2 is 3D LoggingTools::DebugShowImage("testCandidateImg #" + std::to_string(index), img2);
-
-        cv::Vec2i result(score, totalPixelsExamined);
-        return result;
+        return cv::Vec2i(score, totalPixelsExamined);
     }
 
 
@@ -3739,7 +3725,7 @@ namespace golf_sim {
             // Store candidate at its pre-determined index (no locking needed)
             RotationCandidate& c = output_candidates[flatIdx];
             c.index = static_cast<short>(flatIdx);
-            c.img = ball13DImage;
+            c.img = std::move(ball13DImage);
             c.x_rotation_degrees = x_rotation_degrees - xAngleOffset;
             c.y_rotation_degrees = y_rotation_degrees - yAngleOffset;
             c.z_rotation_degrees = z_rotation_degrees;
@@ -4033,6 +4019,8 @@ namespace golf_sim {
 
         if (kSerializeOpsForDebug || force_serial) {
             // Serial path — used inside OMP parallel regions to avoid thread contention
+            // Keep original x-outer/y-inner order to match projectionOp's coordinate semantics
+            // (position[0]=x is treated as the first Mat index in at<>() calls)
             for (int x = 0; x < image_gray.cols; x++) {
                 for (int y = 0; y < image_gray.rows; y++) {
                     int position[]{ x, y };
