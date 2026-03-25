@@ -3975,7 +3975,7 @@ namespace golf_sim {
 
         // Instance members — each copy of the functor has its own state (thread-safe)
         const GolfBall* currentBall_ = nullptr;
-        cv::Mat projectedImg_;
+        mutable cv::Mat projectedImg_;
         double x_rotation_degreesAngleRad_ = 0;
         double y_rotation_degreesAngleRad_ = 0;
         double z_rotation_degreesAngleRad_ = 0;
