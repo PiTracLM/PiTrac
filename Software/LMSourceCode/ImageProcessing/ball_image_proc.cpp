@@ -3720,7 +3720,10 @@ namespace golf_sim {
         int prev_cv_threads = cv::getNumThreads();
         cv::setNumThreads(1);
 
-        #pragma omp parallel for schedule(static)
+        int omp_threads = omp_get_max_threads();
+        std::cout << "OMP: max_threads=" << omp_threads << ", candidates=" << totalCandidates << std::endl;
+
+        #pragma omp parallel for schedule(static) num_threads(4)
         for (int flatIdx = 0; flatIdx < totalCandidates; flatIdx++) {
             // Decompose flat index back to (xIndex, yIndex, zIndex)
             int xIndex = flatIdx / (ySize * zSize);
