@@ -462,7 +462,7 @@ private:
 
     static cv::Mat CreateGaborKernel(int ks, double sig, double th, double lm, double gm, double ps);
 
-    static cv::Mat Project2dImageTo3dBall(const cv::Mat& image_gray, const GolfBall& ball, const cv::Vec3i& rotation_angles_degrees);
+    static cv::Mat Project2dImageTo3dBall(const cv::Mat& image_gray, const GolfBall& ball, const cv::Vec3i& rotation_angles_degrees, bool force_serial = false);
 
     static void Unproject3dBallTo2dImage(const cv::Mat& src3D, cv::Mat& destination_image_gray, const GolfBall& ball);
 

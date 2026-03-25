@@ -3716,12 +3716,7 @@ namespace golf_sim {
         // Flatten the 3-level nested loop into a single parallel loop.
         // Each iteration is independent — the 3D projection only reads from base_dimple_image
         // and writes to its own candidate slot.
-        // Disable OpenCV's internal threading to avoid nesting OMP + OpenCV thread pools.
-        int prev_cv_threads = cv::getNumThreads();
-        cv::setNumThreads(1);
-
-        int omp_threads = omp_get_max_threads();
-        GS_LOG_MSG(info, "OMP: max_threads=" + std::to_string(omp_threads) + ", candidates=" + std::to_string(totalCandidates));
+        GS_LOG_MSG(info, "OMP: parallelizing " + std::to_string(totalCandidates) + " candidates across " + std::to_string(omp_get_max_threads()) + " threads (serial pixel loops)");
 
         #pragma omp parallel for schedule(static) num_threads(4)
         for (int flatIdx = 0; flatIdx < totalCandidates; flatIdx++) {
@@ -3736,8 +3731,10 @@ namespace golf_sim {
             int z_rotation_degrees = anglez_rotation_degrees_start + zIndex * anglez_rotation_degrees_increment;
 
             // Project the ball onto a 3D hemisphere at the current rotation
+            // force_serial=true because we're inside an OMP parallel region — each thread
+            // runs its own serial pixel loop instead of fighting over OpenCV's thread pool
             cv::Mat ball13DImage = Project2dImageTo3dBall(base_dimple_image, ball,
-                cv::Vec3i(x_rotation_degrees, y_rotation_degrees, z_rotation_degrees));
+                cv::Vec3i(x_rotation_degrees, y_rotation_degrees, z_rotation_degrees), true);
 
             // Store candidate at its pre-determined index (no locking needed)
             RotationCandidate& c = output_candidates[flatIdx];
@@ -3750,9 +3747,6 @@ namespace golf_sim {
 
             outputCandidateElementsMat.at<ushort>(xIndex, yIndex, zIndex) = static_cast<ushort>(flatIdx);
         }
-
-        // Restore OpenCV threading
-        cv::setNumThreads(prev_cv_threads);
 
         timer1.stop();
         boost::timer::cpu_times times = timer1.elapsed();
@@ -4018,10 +4012,10 @@ namespace golf_sim {
     // positive Y-axis angles move the ball from the top to the bottom
     // positive Z-Axis angles are counter-clockwise looking down the positive z-axis
     // The image_gray input Mat is expected to have pixels with only 0, 255, or kPixelIgnoreValue
-    cv::Mat BallImageProc::Project2dImageTo3dBall(const cv::Mat& image_gray, const GolfBall& ball, const cv::Vec3i& rotation_angles_degrees) {
+    cv::Mat BallImageProc::Project2dImageTo3dBall(const cv::Mat& image_gray, const GolfBall& ball, const cv::Vec3i& rotation_angles_degrees, bool force_serial) {
 
         // Create a new 3D Mat to hold the results
-        int sizes[2] = { image_gray.rows, image_gray.cols };  // , image_gray.rows };
+        int sizes[2] = { image_gray.rows, image_gray.cols };
         // It's possible that due to rotations, some of the 3D image might have "holes" where
         // the pixel was not set to a value.  Make sure anything we don't set is ignored.
         cv::Mat projectedImg = cv::Mat(2, sizes, CV_32SC2, cv::Scalar(0, kPixelIgnoreValue));
@@ -4037,7 +4031,8 @@ namespace golf_sim {
         // Create a thread-safe functor with all state in instance members
         projectionOp op(&ball, projectedImg, x_rad, y_rad, z_rad);
 
-        if (kSerializeOpsForDebug) {
+        if (kSerializeOpsForDebug || force_serial) {
+            // Serial path — used inside OMP parallel regions to avoid thread contention
             for (int x = 0; x < image_gray.cols; x++) {
                 for (int y = 0; y < image_gray.rows; y++) {
                     int position[]{ x, y };
@@ -4047,7 +4042,7 @@ namespace golf_sim {
             }
         }
         else {
-            // forEach copies the functor per thread — safe because all state is in instance members
+            // forEach uses OpenCV's internal thread pool — only use outside OMP regions
             image_gray.forEach<uchar>(op);
         }
 
