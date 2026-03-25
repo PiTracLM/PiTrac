@@ -3721,7 +3721,7 @@ namespace golf_sim {
         cv::setNumThreads(1);
 
         int omp_threads = omp_get_max_threads();
-        std::cout << "OMP: max_threads=" << omp_threads << ", candidates=" << totalCandidates << std::endl;
+        GS_LOG_MSG(info, "OMP: max_threads=" + std::to_string(omp_threads) + ", candidates=" + std::to_string(totalCandidates));
 
         #pragma omp parallel for schedule(static) num_threads(4)
         for (int flatIdx = 0; flatIdx < totalCandidates; flatIdx++) {
