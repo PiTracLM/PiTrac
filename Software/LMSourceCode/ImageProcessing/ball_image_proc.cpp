@@ -3716,6 +3716,10 @@ namespace golf_sim {
         // Flatten the 3-level nested loop into a single parallel loop.
         // Each iteration is independent — the 3D projection only reads from base_dimple_image
         // and writes to its own candidate slot.
+        // Disable OpenCV's internal threading to avoid nesting OMP + OpenCV thread pools.
+        int prev_cv_threads = cv::getNumThreads();
+        cv::setNumThreads(1);
+
         #pragma omp parallel for schedule(static)
         for (int flatIdx = 0; flatIdx < totalCandidates; flatIdx++) {
             // Decompose flat index back to (xIndex, yIndex, zIndex)
@@ -3743,6 +3747,9 @@ namespace golf_sim {
 
             outputCandidateElementsMat.at<ushort>(xIndex, yIndex, zIndex) = static_cast<ushort>(flatIdx);
         }
+
+        // Restore OpenCV threading
+        cv::setNumThreads(prev_cv_threads);
 
         timer1.stop();
         boost::timer::cpu_times times = timer1.elapsed();
