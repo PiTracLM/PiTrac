@@ -3780,43 +3780,53 @@ namespace golf_sim {
    // After first being setup, the operator() will be called in parallel across
    // different processing cores.
     struct projectionOp {
-        // Must be called prior to using the iteration() operator
+        // Constructor initializes all state — no static members, thread-safe for OpenMP
+        projectionOp() = default;
+
+        projectionOp(const GolfBall *currentBall,
+                     cv::Mat& projectedImg,
+                     double x_rad, double y_rad, double z_rad)
+            : currentBall_(currentBall), projectedImg_(projectedImg),
+              x_rotation_degreesAngleRad_(x_rad),
+              y_rotation_degreesAngleRad_(y_rad),
+              z_rotation_degreesAngleRad_(z_rad),
+              sinX_(sin(x_rad)), cosX_(cos(x_rad)),
+              sinY_(sin(y_rad)), cosY_(cos(y_rad)),
+              sinZ_(sin(z_rad)), cosZ_(cos(z_rad)),
+              rotatingOnX_(std::abs(x_rad) > 0.001),
+              rotatingOnY_(std::abs(y_rad) > 0.001),
+              rotatingOnZ_(std::abs(z_rad) > 0.001)
+        {
+            projectedImg_.rows = projectedImg.rows;
+            projectedImg_.cols = projectedImg.cols;
+        }
+
+        // Legacy static setup — kept for backward compat with non-OMP code paths
         static void setup(const GolfBall *currentBall,
                           cv::Mat& projectedImg,
                           const double& x_rotation_degreesAngleRad,
                           const double& y_rotation_degreesAngleRad,
                           const double& z_rotation_degreesAngleRad ) {
-            currentBall_ = currentBall;
-            projectedImg_ = projectedImg;
-            // Copy the rows/cols from the image because openCV will not do so otherwise
-            // TBD - Kind of a hack
-            projectedImg_.rows = projectedImg.rows;
-            projectedImg_.cols = projectedImg.cols;
-            x_rotation_degreesAngleRad_ = x_rotation_degreesAngleRad;
-            y_rotation_degreesAngleRad_ = y_rotation_degreesAngleRad;
-            z_rotation_degreesAngleRad_ = z_rotation_degreesAngleRad;
-
-            // Pre-compute the trig functions for speed.  They will be the same for all pixels in the image
-            sinX_ = sin(x_rotation_degreesAngleRad_);
-            cosX_ = cos(x_rotation_degreesAngleRad_);
-            sinY_ = sin(y_rotation_degreesAngleRad_);
-            cosY_ = cos(y_rotation_degreesAngleRad_);
-            sinZ_ = sin(z_rotation_degreesAngleRad_);
-            cosZ_ = cos(z_rotation_degreesAngleRad_);
-
-            // If some of the angles are 0, then we don't need to do any math at all for that axis or axes
-            /* DELETE OLD
-            rotatingOnX_ = ((int)std::round(1000 * x_rotation_degreesAngleRad_) != 0) ? true : false;
-            rotatingOnY_ = ((int)std::round(1000 * y_rotation_degreesAngleRad_) != 0) ? true : false;
-            rotatingOnZ_ = ((int)std::round(1000 * z_rotation_degreesAngleRad_) != 0) ? true : false;
-            */
-            rotatingOnX_ = (std::abs(x_rotation_degreesAngleRad_) > 0.001) ? true : false;
-            rotatingOnY_ = (std::abs(y_rotation_degreesAngleRad_) > 0.001) ? true : false;
-            rotatingOnZ_ = (std::abs(z_rotation_degreesAngleRad_) > 0.001) ? true : false;
+            s_currentBall_ = currentBall;
+            s_projectedImg_ = projectedImg;
+            s_projectedImg_.rows = projectedImg.rows;
+            s_projectedImg_.cols = projectedImg.cols;
+            s_x_rad_ = x_rotation_degreesAngleRad;
+            s_y_rad_ = y_rotation_degreesAngleRad;
+            s_z_rad_ = z_rotation_degreesAngleRad;
+            s_sinX_ = sin(x_rotation_degreesAngleRad);
+            s_cosX_ = cos(x_rotation_degreesAngleRad);
+            s_sinY_ = sin(y_rotation_degreesAngleRad);
+            s_cosY_ = cos(y_rotation_degreesAngleRad);
+            s_sinZ_ = sin(z_rotation_degreesAngleRad);
+            s_cosZ_ = cos(z_rotation_degreesAngleRad);
+            s_rotatingOnX_ = (std::abs(x_rotation_degreesAngleRad) > 0.001);
+            s_rotatingOnY_ = (std::abs(y_rotation_degreesAngleRad) > 0.001);
+            s_rotatingOnZ_ = (std::abs(z_rotation_degreesAngleRad) > 0.001);
         }
 
         // The returned imageXFromCenter and imageYFromCenter are the original imageX & Y in a new coordinate system with the center of the ball at (0,0)
-        static void getBallZ(const double imageX, const double imageY, double& imageXFromCenter, double& imageYFromCenter, double& ball3dZ) {
+        void getBallZ(const double imageX, const double imageY, double& imageXFromCenter, double& imageYFromCenter, double& ball3dZ) const {
             // Basic idea:  x2 + y2 + z2 = r2  (2's are squared).  Just solve for z where we can
 
             double r = currentBall_->measured_radius_pixels_;
@@ -3904,8 +3914,8 @@ namespace golf_sim {
             }
 
             // Shift back to coordinates with the origin in the top-left
-            imageX = imageXFromCenter + projectionOp::currentBall_->x();
-            imageY = imageYFromCenter + projectionOp::currentBall_->y();
+            imageX = imageXFromCenter + currentBall_->x();
+            imageY = imageYFromCenter + currentBall_->y();
 
             // Get the Z value of the destination, rotated-to point.
             double ball3dZOfRotatedPoint = 0;
@@ -3963,46 +3973,42 @@ namespace golf_sim {
             }
         }
 
-        // The ball information that we are currently operating with
-        // Null if not yet set
-        static const GolfBall* currentBall_;
+        // Instance members — each copy of the functor has its own state (thread-safe)
+        const GolfBall* currentBall_ = nullptr;
+        cv::Mat projectedImg_;
+        double x_rotation_degreesAngleRad_ = 0;
+        double y_rotation_degreesAngleRad_ = 0;
+        double z_rotation_degreesAngleRad_ = 0;
+        double sinX_ = 0, cosX_ = 0;
+        double sinY_ = 0, cosY_ = 0;
+        double sinZ_ = 0, cosZ_ = 0;
+        bool rotatingOnX_ = true;
+        bool rotatingOnY_ = true;
+        bool rotatingOnZ_ = true;
 
-        // The 3D grayscale image we are working on
-        static cv::Mat projectedImg_;
-
-        // The angles to rotate the Mat when we project it to 3D
-        static double x_rotation_degreesAngleRad_;
-        static double y_rotation_degreesAngleRad_;
-        static double z_rotation_degreesAngleRad_;
-
-        // Precomputed trig results for rotation
-        static double sinX_;
-        static double cosX_;
-        static double sinY_;
-        static double cosY_;
-        static double sinZ_;
-        static double cosZ_;
-
-        static bool rotatingOnX_;
-        static bool rotatingOnY_;
-        static bool rotatingOnZ_;
+        // Static members — used only by legacy setup() path (non-OMP forEach)
+        static const GolfBall* s_currentBall_;
+        static cv::Mat s_projectedImg_;
+        static double s_x_rad_, s_y_rad_, s_z_rad_;
+        static double s_sinX_, s_cosX_, s_sinY_, s_cosY_, s_sinZ_, s_cosZ_;
+        static bool s_rotatingOnX_, s_rotatingOnY_, s_rotatingOnZ_;
     };
 
-    // Complete storage for projectionOp struct
-    const GolfBall* projectionOp::currentBall_ = NULL;
-    cv::Mat projectionOp::projectedImg_;
-    double projectionOp::x_rotation_degreesAngleRad_ = 0;
-    double projectionOp::y_rotation_degreesAngleRad_ = 0;
-    double projectionOp::z_rotation_degreesAngleRad_ = 0;
-    double projectionOp::sinX_ = 0;
-    double projectionOp::cosX_ = 0;
-    double projectionOp::sinY_ = 0;
-    double projectionOp::cosY_ = 0;
-    double projectionOp::sinZ_ = 0;
-    double projectionOp::cosZ_ = 0;
-    bool projectionOp::rotatingOnX_ = true;
-    bool projectionOp::rotatingOnY_ = true;
-    bool projectionOp::rotatingOnZ_ = true;
+    // Static storage for legacy setup() path
+    const GolfBall* projectionOp::s_currentBall_ = nullptr;
+    cv::Mat projectionOp::s_projectedImg_;
+    double projectionOp::s_x_rad_ = 0;
+    double projectionOp::s_y_rad_ = 0;
+    double projectionOp::s_z_rad_ = 0;
+    double projectionOp::s_sinX_ = 0;
+    double projectionOp::s_cosX_ = 0;
+    double projectionOp::s_sinY_ = 0;
+    double projectionOp::s_cosY_ = 0;
+    double projectionOp::s_sinZ_ = 0;
+    double projectionOp::s_cosZ_ = 0;
+    bool projectionOp::s_rotatingOnX_ = true;
+    bool projectionOp::s_rotatingOnY_ = true;
+    bool projectionOp::s_rotatingOnZ_ = true;
 
 
     // Positive X-axis angles rotate so that the ball appears to go from left to right
@@ -4021,37 +4027,25 @@ namespace golf_sim {
         projectedImg.rows = image_gray.rows;
         projectedImg.cols = image_gray.cols;
 
-        // Setup the global structures we need before we do the parallelized callback to process
-        // the 2D image
-        projectionOp::setup(&ball, 
-                            projectedImg, 
-                            -(float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[0]),  /* Negative due to rotation in X axis being backward */
-                            (float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[1]),
-                            (float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[2])  );
+        double x_rad = -(float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[0]);
+        double y_rad = (float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[1]);
+        double z_rad = (float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[2]);
+
+        // Create a thread-safe functor with all state in instance members
+        projectionOp op(&ball, projectedImg, x_rad, y_rad, z_rad);
 
         if (kSerializeOpsForDebug) {
-            /*  Serialized version for debugging - use the parallel stuff below for release */
             for (int x = 0; x < image_gray.cols; x++) {
                 for (int y = 0; y < image_gray.rows; y++) {
                     int position[]{ x, y };
                     uchar pixel = image_gray.at<uchar>(x, y);
-
-                    // FOR DEBUG ONLY
-
-                    // TBD - Translate x and y into a new coordinate system that has the origin
-                    // at the center of the ball.
-                    if (ball.PointIsInsideBall(x, y) && pixel == kPixelIgnoreValue) {
-                        GS_LOG_TRACE_MSG(trace, "Project2dImageTo3dBall found ignore pixel within ball at (" + std::to_string(x) + ", " + std::to_string(y) + ").");
-                    }
-
-
-                    projectionOp()(pixel, position);
+                    op(pixel, position);
                 }
             }
         }
         else {
-            // Parallel execution with function object.
-            image_gray.forEach<uchar>(projectionOp());
+            // forEach copies the functor per thread — safe because all state is in instance members
+            image_gray.forEach<uchar>(op);
         }
 
         return projectedImg;
