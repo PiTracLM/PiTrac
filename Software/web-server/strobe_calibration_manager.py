@@ -5,10 +5,12 @@ LED current on the V3 Connector Board.
 """
 
 import asyncio
+import ctypes
 import gc
 import logging
 import os
 import time
+from ctypes.util import find_library
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -17,11 +19,6 @@ try:
     import spidev
 except ImportError:
     spidev = None
-
-try:
-    from gpiozero import DigitalOutputDevice
-except ImportError:
-    DigitalOutputDevice = None
 
 
 class StrobeCalibrationManager:
@@ -32,6 +29,9 @@ class StrobeCalibrationManager:
     SPI_DAC_DEVICE = 0
     SPI_ADC_DEVICE = 1
     SPI_MAX_SPEED_HZ = 1_000_000
+
+    # Pi 5 uses gpiochip4; keep gpiochip0 as a fallback for older boards/installations
+    GPIO_CHIP_CANDIDATES = (4, 0)
 
     # DIAG pin gates the strobe LED (BCM numbering)
     DIAG_GPIO_PIN = 10
@@ -70,7 +70,8 @@ class StrobeCalibrationManager:
 
         self._spi_dac = None
         self._spi_adc = None
-        self._diag_pin = None
+        self._lgpio = None
+        self._gpiochip = None
 
         self._cancel_requested = False
 
@@ -84,11 +85,73 @@ class StrobeCalibrationManager:
     # Hardware lifecycle
     # ------------------------------------------------------------------
 
+    def _load_lgpio(self):
+        """Load liblgpio and declare the C function signatures we use."""
+        if self._lgpio is not None:
+            return self._lgpio
+
+        # Use the C library directly so we can match the C++ strobe path
+        library_name = find_library("lgpio") or "liblgpio.so.1"
+        try:
+            lgpio = ctypes.CDLL(library_name)
+        except OSError as exc:
+            raise RuntimeError("liblgpio not available -- not running on a Raspberry Pi?") from exc
+
+        # Declare the liblgpio call signatures we use
+        lgpio.lgGpiochipOpen.argtypes = [ctypes.c_int]
+        lgpio.lgGpiochipOpen.restype = ctypes.c_int
+        lgpio.lgGpiochipClose.argtypes = [ctypes.c_int]
+        lgpio.lgGpiochipClose.restype = ctypes.c_int
+        lgpio.lgGpioClaimOutput.argtypes = [
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+        ]
+        lgpio.lgGpioClaimOutput.restype = ctypes.c_int
+        lgpio.lgGpioWrite.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
+        lgpio.lgGpioWrite.restype = ctypes.c_int
+
+        self._lgpio = lgpio
+        return lgpio
+
+    def _open_diag_gpio(self):
+        """Open and claim the DIAG GPIO line via liblgpio."""
+        lgpio = self._load_lgpio()
+        self._lgpio = lgpio
+
+        errors = []
+        # Try the Pi 5 gpiochip first, then fall back to the legacy numbering
+        for chip in self.GPIO_CHIP_CANDIDATES:
+            handle = lgpio.lgGpiochipOpen(chip)
+            if handle < 0:
+                errors.append(f"gpiochip{chip} open failed ({handle})")
+                continue
+
+            result = lgpio.lgGpioClaimOutput(handle, 0, self.DIAG_GPIO_PIN, 0)
+            if result == 0:
+                self._gpiochip = handle
+                return
+
+            errors.append(f"gpiochip{chip} claim failed ({result})")
+            close_result = lgpio.lgGpiochipClose(handle)
+            if close_result < 0:
+                logger.debug("Error closing gpiochip%s after claim failure (%s)", chip, close_result)
+
+        raise RuntimeError(f"Failed to open DIAG GPIO via lgpio: {'; '.join(errors)}")
+
+    def _set_diag(self, output: bool):
+        """Drive the DIAG GPIO line high or low."""
+        if self._lgpio is None or self._gpiochip is None:
+            raise RuntimeError("DIAG GPIO not open")
+
+        result = self._lgpio.lgGpioWrite(self._gpiochip, self.DIAG_GPIO_PIN, output)
+        if result < 0:
+            raise RuntimeError(f"lgGpioWrite failed ({result})")
+
     def _open_hardware(self):
         if spidev is None:
             raise RuntimeError("spidev library not available -- not running on a Raspberry Pi?")
-        if DigitalOutputDevice is None:
-            raise RuntimeError("gpiozero library not available -- not running on a Raspberry Pi?")
 
         self._spi_dac = spidev.SpiDev()
         self._spi_dac.open(self.SPI_BUS, self.SPI_DAC_DEVICE)
@@ -100,23 +163,33 @@ class StrobeCalibrationManager:
         self._spi_adc.max_speed_hz = self.SPI_MAX_SPEED_HZ
         self._spi_adc.mode = 0
 
-        self._diag_pin = DigitalOutputDevice(self.DIAG_GPIO_PIN)
+        self._open_diag_gpio()
 
     def _close_hardware(self):
-        for name, resource in [("diag", self._diag_pin),
-                               ("dac", self._spi_dac),
-                               ("adc", self._spi_adc)]:
+        if self._gpiochip is not None and self._lgpio is not None:
+            try:
+                self._set_diag(False)
+                time.sleep(0.1)
+            except Exception:
+                logger.debug("Error turning off diag", exc_info=True)
+
+            try:
+                result = self._lgpio.lgGpiochipClose(self._gpiochip)
+                if result < 0:
+                    logger.debug("Error closing diag gpiochip handle (%s)", result)
+            except Exception:
+                logger.debug("Error closing diag", exc_info=True)
+
+        for name, resource in [("dac", self._spi_dac), ("adc", self._spi_adc)]:
             if resource is None:
                 continue
             try:
-                if name == "diag":
-                    resource.off()
-                    time.sleep(0.1)
                 resource.close()
             except Exception:
                 logger.debug(f"Error closing {name}", exc_info=True)
 
-        self._diag_pin = None
+        self._gpiochip = None
+        self._lgpio = None
         self._spi_dac = None
         self._spi_adc = None
 
@@ -148,7 +221,6 @@ class StrobeCalibrationManager:
         """
         msg = [0x01, self.ADC_CH0_CMD, 0x00]
         spi = self._spi_adc
-        diag = self._diag_pin
 
         gc.disable()
         try:
@@ -161,10 +233,10 @@ class StrobeCalibrationManager:
             time.sleep(0)
 
             try:
-                diag.on()
+                self._set_diag(True)
                 response = spi.xfer2(msg)
             finally:
-                diag.off()
+                self._set_diag(False)
                 try:
                     os.sched_setscheduler(0, os.SCHED_OTHER, os.sched_param(0))
                 except (PermissionError, AttributeError, OSError):
