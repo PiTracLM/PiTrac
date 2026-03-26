@@ -19,6 +19,7 @@ except ImportError:
     spidev = None
 
 try:
+    os.environ.setdefault('LG_WD', '/tmp')
     from gpiozero import DigitalOutputDevice
 except ImportError:
     DigitalOutputDevice = None
