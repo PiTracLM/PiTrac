@@ -460,7 +460,7 @@ function createConfigItem(key, value, defaultValue, isModified) {
 function createInput(key, value, defaultValue, isUserSet) {
     const metadata = configMetadata[key] || {};
 
-    if (key.includes('ONNXModelPath') || key.includes('onnx_model')) {
+    if (key.includes('ONNXModelPath') || key.includes('onnx_model') || key.includes('kModelPath')) {
         const select = document.createElement('select');
 
         if (metadata.options && Object.keys(metadata.options).length > 0) {
