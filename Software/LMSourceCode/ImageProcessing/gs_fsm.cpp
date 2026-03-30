@@ -18,23 +18,25 @@
 
 #include "logging_tools.h"
 #include "worker_thread.h"
-#include "gs_ipc_message.h"
 #include "gs_options.h"
 #include "golf_ball.h"
 #include "gs_camera.h"
 #include "gs_events.h"
 #include "gs_config.h"
 #include "ball_image_proc.h"
-#include "gs_ipc_system.h"
+#include "gs_http_client.h"
 #include "gs_ui_system.h"
 #include "gs_sim_interface.h"
 #include "pulse_strobe.h"
 #include "libcamera_interface.h"
 
 #include "gs_fsm.h"
+#include "cam2_thread.h"
 
 
 namespace golf_sim {
+
+    static Camera2Thread g_cam2_thread;
 
     static int signal_received;
     static void default_signal_handler(int signal_number)
@@ -45,7 +47,7 @@ namespace golf_sim {
         GolfSimGlobals::golf_sim_running_ = false;
     }
 
-    static long kMaxCam2ImageReceivedTimeMs = 4000;
+    static long kMaxCam2ImageReceivedTimeMs = 2000;
 
     const int kWaitForBallPauseMs = 500;
     const int kEventLoopPauseMs = 5000;
@@ -287,9 +289,8 @@ namespace golf_sim {
         // Whatever happens, this is a new shot with a new shot number
         GsSimInterface::IncrementShotCounter();
 
-        // Let the second camera know to be ready for a ball hit
-        GolfSimIPCMessage ipc_message(GolfSimIPCMessage::IPCMessageType::kRequestForCamera2Image);
-        GolfSimIpcSystem::SendIpcMessage(ipc_message);
+        // Arm Camera2 thread to start waiting for the external trigger
+        g_cam2_thread.arm();
 
         // The sending of the priming pulses will include a trigger to make the camera2
         // take a pre-image.  That will in turn send an event to the camera1 system that 
@@ -405,11 +406,7 @@ namespace golf_sim {
         const GolfSimEvent::BeginWatchingForBallHit& beginWatchingForBallHit) {
         GS_LOG_MSG(debug, "GolfSim state transition: WaitingForBallHit - Received BeginWatchingForBallHit.");
 
-        // TBD - Figure out a better way to time this.  Need to give camera2 a moment to get ready to
-        // receive and process the priming pulses and also probably the ready-to-play message
-        sleep(1);
-
-        cv::Mat image;  // Not sure if actually needed
+        cv::Mat image;
 
         bool ball_hit = false;
 
@@ -548,70 +545,9 @@ namespace golf_sim {
     }
 
 
-    /*********** InitializingCamera2System  ************/
-
-    GolfSimState onEvent(const state::InitializingCamera2System& initializing,
-        const GolfSimEvent::Restart& restart) {
-        GS_LOG_MSG(debug, "GolfSim state transition: InitializingCamera2System - Received Restart - Next state WaitingForCameraArmMessage. ");
-
-        if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1TestStandalone ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2TestStandalone) {
-            // for now, we will just fake the camera2 arm message
-            GolfSimEventElement armCamera2MessageReceived{ new GolfSimEvent::ArmCamera2MessageReceived{ } };
-            GolfSimEventQueue::QueueEvent(armCamera2MessageReceived);
-        }
-
-        return state::WaitingForCameraArmMessage{ };
-    }
-
-
-    GolfSimState onEvent(const state::WaitingForCameraArmMessage& initializing,
-        const GolfSimEvent::ArmCamera2MessageReceived& armCamera2MessageReceived) {
-        GS_LOG_MSG(debug, "GolfSim state transition: WaitingForCameraArmMessage - Received ArmCamera2MessageReceived - WAITING FOR EXTERNAL TRIGGER - Next state InitializingCamera2System. ");
-
-        // Prepare for and start waiting for the camera to receive an external trigger
-        // and take a picture.
-
-        cv::Mat image;  // Not sure if actually needed
-
-        GS_LOG_TRACE_MSG(trace, "\n===========================\nGolfSim:  Cam2 System - Waiting for ball.\n");
-        if (!WaitForCam2Trigger(image)) {
-            GS_LOG_MSG(error, "Failed to WaitForCam2Trigger.");
-        }
-
-        GS_LOG_TRACE_MSG(trace, "WaitForCam2Trigger returned with image. ");
-
-        // Send the image back to the cam1 system
-        GolfSimIPCMessage ipc_message(GolfSimIPCMessage::IPCMessageType::kCamera2Image);
-        ipc_message.SetImageMat(image);
-        GolfSimIpcSystem::SendIpcMessage(ipc_message);
-
-        // Save the image for later analysis
-        if (GolfSimOptions::GetCommandLineOptions().artifact_save_level_ != ArtifactSaveLevel::kNoArtifacts) {
-            if (GolfSimCamera::kLogDiagnosticImagesToUniqueFiles) {
-                // Save a unique version of the webserver image into a directory that will not get
-                // over-written.  A unique timestamp will be added to the file name
-                // The camera2 system isn't sending message to the simulator system, so we need to update 
-                // the shot counter here manually
-                // We want the shot number toward the end so that we can more easily sort by the type of image we are lookingg for 
-                GsSimInterface::IncrementShotCounter();
-                LoggingTools::LogImage(kWebServerCamera2Image + "_", image, std::vector < cv::Point >{}, false, "", "_Shot_" + std::to_string(GsSimInterface::GetShotCounter()));
-            }
-
-            // In any case, also save the image with a non-unique name that will be overwritten on the next show, but that the GUI
-            // will be able to depend on the name of.
-
-            // REMOVE THE TRACE - TBD
-            GS_LOG_TRACE_MSG(trace, "Image saving using GolfSimOptions::GetCommandLineOptions().base_image_logging_dir_ = " + GolfSimOptions::GetCommandLineOptions().base_image_logging_dir_);
-            LoggingTools::LogImage("", image, std::vector < cv::Point >{}, true, kWebServerCamera2Image);
-        }
-
-        // Get a restart queued up to start all over
-        GolfSimEventElement restartEvent{ new GolfSimEvent::Restart{ } };
-        GolfSimEventQueue::QueueEvent(restartEvent);
-
-        return state::InitializingCamera2System{ };
-    }
+    // Camera2 FSM states removed — Camera2 now runs as a thread within this process.
+    // See cam2_thread.h. The thread is armed by the stabilization handler and queues
+    // Camera2ImageReceived events directly into the FSM event queue.
 
 
     /*********** Exit state/event ************/
@@ -692,15 +628,6 @@ namespace golf_sim {
                             },
                             [](const state::WaitingForSimulatorArmed& waitingForSimulatorArmed) {
                             GS_LOG_TRACE_MSG(trace, "WaitingForSimulatorArmed.");
-                            },
-                            [](const state::InitializingCamera2System& initializingCamera1System) {
-                            GS_LOG_TRACE_MSG(trace, "InitializingCamera2System.");
-                            },
-                            [](const state::WaitingForCameraArmMessage& waitingForCameraArmMessage) {
-                            GS_LOG_TRACE_MSG(trace, "WaitingForCameraArmMessage.");
-                            },
-                            [](const state::WaitingForCameraTrigger& waitingForCameraTrigger) {
-                            GS_LOG_TRACE_MSG(trace, "WaitingForCameraTrigger.");
                             }
                 },
                 state_);
@@ -767,14 +694,6 @@ namespace golf_sim {
 
         GolfSimEventElement restartEvent{ new GolfSimEvent::Restart{ } };
         GolfSimEventQueue::QueueEvent(restartEvent);
-
-        // If in immediate still-picture mode, also queue up a simulated
-        // ArmCamera2MessageReceived so that the system immediately starts
-        // waiting for a picture.
-        if (GolfSimOptions::GetCommandLineOptions().camera_still_mode_) {
-            GolfSimEventElement armCamera2MessageReceived{ new GolfSimEvent::ArmCamera2MessageReceived{ } };
-            GolfSimEventQueue::QueueEvent(armCamera2MessageReceived);
-        }
 
         while (GolfSimGlobals::golf_sim_running_) {
 
@@ -900,20 +819,15 @@ namespace golf_sim {
             ReceivedCam2ImageCheckTimerThread = nullptr;
         }
 
+        g_cam2_thread.stop();
+
         std::this_thread::yield();
 
-        // Only the camera1 system deals with the simulator interfaces
-        if (GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera1) {
-            GsSimInterface::DeInitializeSims();
-        }
+        GsSimInterface::DeInitializeSims();
 
-        GS_LOG_TRACE_MSG(trace, "Shutting down IPC System");
-        GolfSimIpcSystem::ShutdownIPCSystem();
+        GS_LOG_TRACE_MSG(trace, "System shutdown complete");
 
-        if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1 ||
-               GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1TestStandalone) {
-            PulseStrobe::DeinitGPIOSystem();
-        }
+        PulseStrobe::DeinitGPIOSystem();
         return true;
     }
 
@@ -941,14 +855,7 @@ namespace golf_sim {
             GS_LOG_MSG(info, "Skipping camera initialization for test mode: " + std::to_string(mode));
         }
 
-        if (!GolfSimIpcSystem::InitializeIPCSystem()) {
-            GS_LOG_MSG(error, "Failed to InitializeIPCSystem.");
-            return false;
-        }
-
-        // Give the IPC system time to set up before trying to send any messages
-        sleep(1);
-        
+        GsHttpClient::Init();
         GsUISystem::SendIPCStatusMessage(GsIPCResultType::kInitializing);
 
         if (!PulseStrobe::InitGPIOSystem(default_signal_handler)) {
@@ -956,15 +863,16 @@ namespace golf_sim {
             return false;
         }
 
-        // Only the camera1 system deals with the simulator interfaces
-        if (GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera1) {
-            if (!GsSimInterface::InitializeSims()) {
-                GS_LOG_MSG(error, "Failed to Initialize the Golf Simulator Interface.");
-                return false;
-            }
+        if (!GsSimInterface::InitializeSims()) {
+            GS_LOG_MSG(error, "Failed to Initialize the Golf Simulator Interface.");
+            return false;
         }
 
-        // Driver is as good a default as any if not other indication  
+        // Start Camera2 capture thread for the main shot-detection modes
+        if (mode == SystemMode::kCamera1 || mode == SystemMode::kCamera1TestStandalone) {
+            g_cam2_thread.start();
+        }
+
         bool kStartInPuttingMode = false;
         GolfSimConfiguration::SetConstant("gs_config.modes.kStartInPuttingMode", kStartInPuttingMode);
         

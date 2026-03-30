@@ -43,7 +43,7 @@
 #include "gs_automated_testing.h"
 
 #include "gs_fsm.h"
-#include "gs_ipc_system.h"
+#include "gs_http_client.h"
 #include "libcamera_interface.h"
 
 
@@ -748,8 +748,8 @@ bool TestExternalSimMessage() {
     }
 
 #ifdef __unix__
-    // Give the system time to connect, exchange any handshaking, etc.
-    sleep(15);
+    // Brief settle time for simulator connections
+    sleep(2);
 #endif
     GolfBall ball;
     ball.velocity_ = 123.6;
@@ -766,12 +766,11 @@ bool TestExternalSimMessage() {
     // sending shot information.  For GSPro, the arming is not important.
 
     if (GsE6Interface::InterfaceIsPresent()) {
-        GS_LOG_TRACE_MSG(trace, "Sleeping for a while in order have user setup E6 simulator to send 'Arm' message.");
-        sleep(15);
+        GS_LOG_TRACE_MSG(trace, "Waiting for E6 simulator arm message.");
+        sleep(2);
     }
     else {
-        // We don't need to wait for an arm in the GSPro system
-        sleep(5);
+        sleep(1);
     }
 #endif
     GsSimInterface::IncrementShotCounter();
@@ -924,17 +923,7 @@ void signal_handler(int sig) {
         GS_LOG_MSG(error, "Unknown error during GPIO cleanup");
     }
     
-    try {
-#ifdef __unix__
-        GS_LOG_MSG(info, "Shutting down IPC system...");
-        GolfSimIpcSystem::ShutdownIPCSystem();
-        GS_LOG_MSG(info, "IPC system shutdown successfully");
-#endif
-    } catch (const std::exception& e) {
-        GS_LOG_MSG(error, "Error during IPC cleanup: " + std::string(e.what()));
-    } catch (...) {
-        GS_LOG_MSG(error, "Unknown error during IPC cleanup");
-    }
+    // IPC system removed — results sent via HTTP POST
     
     GS_LOG_MSG(info, "PiTrac shutdown complete");
     exit(0);
@@ -976,24 +965,8 @@ void run_main(int argc, char* argv[])
 
 
     if (GolfSimOptions::GetCommandLineOptions().shutdown_) {
-
-        GS_LOG_TRACE_MSG(trace, "Running in global shutdown mode.");
-        if (!PerformSystemStartupTasks()) {
-            GS_LOG_MSG(error, "Failed to PerformSystemStartupTasks.");
-            return;
-        }
-
-        // Give the IPC threads time to start
-        sleep(2);
-
-        GolfSimIPCMessage ipc_message(GolfSimIPCMessage::IPCMessageType::kShutdown);
-        GolfSimIpcSystem::SendIpcMessage(ipc_message);
-
-        // Give the IPC thread time to send the message
-        sleep(1);
-
-        PerformSystemShutdownTasks();
-
+        GS_LOG_MSG(info, "Shutdown requested. Exiting.");
+        GolfSimGlobals::golf_sim_running_ = false;
         return;
     }
 
@@ -1007,11 +980,6 @@ void run_main(int argc, char* argv[])
             return;
         }
 
-        // Give the IPC threads time to start
-        sleep(2);
-
-        GolfSimIPCMessage ipc_message(GolfSimIPCMessage::IPCMessageType::kResults);
-
         // Send as many test shots as we have to whatever golf sim we are connected to
         std::vector<GsResults> shots;
 
@@ -1023,8 +991,6 @@ void run_main(int argc, char* argv[])
         else {
             GS_LOG_MSG(info, "About to inject " + std::to_string(shots.size()) + " shots.");
         }
-
-        GsIPCResult& ipc_results = ipc_message.GetResultsForModification();
 
         for (GsResults& result : shots) {
             GS_LOG_MSG(info, "********   READY FOR SHOT NO. " + std::to_string(result.shot_number_) + " ********");
@@ -1061,28 +1027,6 @@ void run_main(int argc, char* argv[])
             GsUISystem::SendIPCHitMessage(test_ball, message);
         }
 
-        /**** DEPRECATED
-        // Also send one IPC result to test the GUI
-        ipc_results.result_type_ = GsIPCResultType::kBallPlacedAndReadyForHit;
-        ipc_results.speed_mpers_ = 50.25 + rand() % 40;
-        ipc_results.carry_meters_ = 100 + rand() % 150;
-        ipc_results.launch_angle_deg_ = 12.34;
-        // Tests edge case where a float can be interpreted by MSGPACK as an integer if there is no fractional part
-        ipc_results.side_angle_deg_ = 3.0;
-        ipc_results.back_spin_rpm_ = 4567;
-        ipc_results.club_type_ = GolfSimClubs::GsClubType::kDriver;
-        ipc_results.side_spin_rpm_ = 89;
-        ipc_results.message_ = "Test message";
-
-        ipc_results.log_messages_.push_back("[2024-01-22 11:19:36.321980] (0x000053c0) [debug] [bool __cdecl golf_sim::GolfSimCamera::GetCalibratedBall(const class cv::Mat &,const class cv::Vec<double,3> &,class golf_sim::GolfBall &,const class cv::Vec<int,2> &)(D:\\GolfSim\\LM\\ImageProcessing\\gs_camera.cpp:118)<-bool __cdecl golf_sim::GolfSimCamera::GetCalibratedBall(const class cv::Mat &,const class cv::Vec<double,3> &,class golf_sim::GolfBall &,const class cv::Vec<int,2> &)(D:\\GolfSim\\LM\\ImageProcessing\\gs_camera.cpp:86)...] Looking for a ball with min/max radius (pixels) of: 56, 85");
-        ipc_results.log_messages_.push_back("[2024 - 01 - 22 11:19 : 36.497181](0x000053c0)[trace][void __cdecl golf_sim::LoggingTools::ShowImage(class std::basic_string<char, struct std::char_traits<char>, class std::allocator<char> >, const class cv::Mat&, const class std::vector<class cv::Point_<int>, class std::allocator<class cv::Point_<int> > > &)(D:\\GolfSim\\LM\\ImageProcessing\\logging_tools.cpp:270) < -bool __cdecl golf_sim::GolfSimCamera::GetCalibratedBall(const class cv::Mat&, const class cv::Vec<double, 3> &, class golf_sim::GolfBall&, const class cv::Vec<int, 2> &)(D:\\GolfSim\\LM\\ImageProcessing\\gs_camera.cpp:118)...] ShowImage(AreaMaskImage Photo, (sizeX, sizeY) = (1456, 1088)");
-
-        GS_LOG_TRACE_MSG(trace, "Sending a test IPC Results Message:\n" + ipc_results.Format());
-        GolfSimIpcSystem::SendIpcMessage(ipc_message);
-
-        // Give the IPC thread time to send the message
-        sleep(1);
-        */
 
         PerformSystemShutdownTasks();
 
@@ -1167,20 +1111,9 @@ void run_main(int argc, char* argv[])
         case SystemMode::kCamera1:
         case SystemMode::kCamera1TestStandalone:
         {
-            GS_LOG_MSG(info, "Running in kCamera1 or kCamera1TestStandalone mode.");
+            GS_LOG_MSG(info, "Running in single-process mode (Camera2 runs as internal thread).");
             state::InitializingCamera1System camera1_state;
             RunGolfSimFsm(camera1_state);
-            break;
-        }
-
-        case SystemMode::kCamera2:
-        case SystemMode::kCamera2TestStandalone:
-        case SystemMode::kRunCam2ProcessForPi1Processing:
-        {
-            GS_LOG_MSG(info, "Running in kCamera2 or kCamera2TestStandalone or kRunCam2ProcessForPi1Processing mode.");
-
-            state::InitializingCamera2System camera2_state;
-            RunGolfSimFsm(camera2_state);
             break;
         }
 
@@ -1240,15 +1173,6 @@ void run_main(int argc, char* argv[])
             }
 
             break;
-
-            // Shutdown the camera2 system (if running) so the user doesn't have to do it
-            GolfSimIPCMessage ipc_message(GolfSimIPCMessage::IPCMessageType::kShutdown);
-            GolfSimIpcSystem::SendIpcMessage(ipc_message);
-
-            // Give the IPC thread time to send the message
-            sleep(2);
-
-            return;
         }
 
         case SystemMode::kCamera1Calibrate:
@@ -1257,10 +1181,7 @@ void run_main(int argc, char* argv[])
             GS_LOG_MSG(info, "Running in kCamera1Calibrate or kCamera2Calibrate mode.");
 
             // We will want to send a calibration message to any monitor UIs
-            if (!GolfSimIpcSystem::InitializeIPCSystem()) {
-                GS_LOG_MSG(info, "Failed to InitializeIPCSystem.");
-                return;
-            }
+            GsHttpClient::Init();
 
             GolfBall ball;
             cv::Mat img;
@@ -1292,7 +1213,7 @@ void run_main(int argc, char* argv[])
             average_focal_length /= number_samples;
             GS_LOG_MSG(info, "====>  Average Focal Length = " + std::to_string(average_focal_length) + ".Set this value into the gs_config.json file.");
 
-            GolfSimIpcSystem::ShutdownIPCSystem();
+            /* IPC removed */;
         }
         break;
 
@@ -1651,7 +1572,7 @@ int main(int argc, char *argv[])
         
         try {
 #ifdef __unix__
-            golf_sim::GolfSimIpcSystem::ShutdownIPCSystem();
+            golf_sim::/* IPC removed */;
             GS_LOG_MSG(info, "IPC system cleaned up successfully");
 #endif
         } catch (const std::exception& e) {
@@ -1670,7 +1591,7 @@ int main(int argc, char *argv[])
         
         try {
 #ifdef __unix__
-            golf_sim::GolfSimIpcSystem::ShutdownIPCSystem();
+            golf_sim::/* IPC removed */;
 #endif
         } catch (...) {
             GS_LOG_MSG(error, "Failed to cleanup IPC on exception");

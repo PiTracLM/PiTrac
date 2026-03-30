@@ -16,11 +16,9 @@
 namespace golf_sim {
 
 	enum SystemMode {
-		kTest = 0,			// Just run unit tests.  Generally used when compiled in Windows
-		kCamera1 = 1,		// The mode when PiTrac is running normally and processing hits.  This mode is only used by the Pi 1/Camera 1 half of the system.
-		kCamera2 = 2,		// The mode when PiTrac is running normally and processing hits.  This mode is only used by the Pi 2/Camera 2 half of the system.
+		kTest = 0,
+		kCamera1 = 1,		// Normal shot-detection mode. Camera2 runs as internal thread.
 		kCamera1TestStandalone = 3,
-		kCamera2TestStandalone = 4,
 		kCamera1Calibrate = 5,
 		kCamera2Calibrate = 6,
 		kTestSpin = 7,
@@ -31,8 +29,6 @@ namespace golf_sim {
 		kAutomatedTesting = 12,
 		kCamera1AutoCalibrate = 13,
 		kCamera2AutoCalibrate = 14,
-		kRunCam2ProcessForPi1Processing = 15,  // This is for when a process is running on camera 2 for the purpose of auto-calibration or taking pictures for ball location
-		kCamera2OnePulseOnly = 16,
 	};
 
 	enum LoggingLevel {
@@ -170,7 +166,7 @@ namespace golf_sim {
 		ArtifactSaveLevel artifact_save_level_ = kNoArtifacts;
 		GolferOrientation golfer_orientation_ = kRightHanded;
 		bool wait_for_key_on_images_;
-		bool run_single_pi_;
+		bool run_single_pi_ = true;  // Always true — dual-Pi support removed
 		bool show_images_;
 		unsigned int search_center_x_ = 0;
 		unsigned int search_center_y_ = 0;
