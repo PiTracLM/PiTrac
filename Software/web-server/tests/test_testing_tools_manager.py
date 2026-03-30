@@ -12,7 +12,6 @@ def mock_config_manager():
     """Create a mock config manager"""
     manager = MagicMock()
     manager.get_config.return_value = {
-        "system": {"mode": "single"},
         "gs_config": {
             "ipc_interface": {"kWebServerShareDirectory": "~/LM_Shares/Images/"}
         },

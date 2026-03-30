@@ -17,7 +17,6 @@ class MockConfigManagerFactory:
         manager = Mock()
 
         manager.get_config.return_value = {
-            "system": {"mode": "single", "camera_role": "camera1"},
             "cameras": {"camera1_gain": 2.0, "camera2_gain": 4.0},
             "simulators": {"gspro_host": "192.168.1.100", "gspro_port": 921},
             "logging": {"level": "info"},
@@ -26,7 +25,7 @@ class MockConfigManagerFactory:
         manager.get_default.return_value = 1.0
         manager.get_user_settings.return_value = {"cameras": {"camera1_gain": 2.0}}
         manager.get_categories.return_value = {
-            "Basic": {"basic": ["system.mode"], "advanced": []},
+            "Basic": {"basic": [], "advanced": []},
             "Cameras": {"basic": ["cameras.camera1_gain"], "advanced": ["cameras.camera2_gain"]},
             "Simulators": {"basic": ["simulators.gspro_host"], "advanced": ["simulators.gspro_port"]},
         }
@@ -44,10 +43,7 @@ class MockConfigManagerFactory:
         manager = Mock()
 
         manager.get_config.return_value = {
-            "system.mode": "single",
-            "system.camera_role": "camera1",
             "logging.level": "info",
-            "gs_config.ipc_interface.kWebActiveMQHostAddress": "tcp://localhost:61616",
             "storage.image_dir": "/var/pitrac/images",
             "storage.web_share_dir": "/var/pitrac/web",
             "gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress": "192.168.1.100",

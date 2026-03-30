@@ -18,8 +18,6 @@ class TestPiTracProcessManager:
         """Create a mock configuration manager"""
         config_manager = Mock()
         config_manager.get_config.return_value = {
-            "system.mode": "single",
-            "system.camera_role": "camera1",
             "logging.level": "info",
             "gs_config.ipc_interface.kWebActiveMQHostAddress": "tcp://localhost:61616",
             "storage.image_dir": "/var/pitrac/images",
@@ -360,7 +358,6 @@ class TestPiTracProcessManagerIntegration:
         """Create a PiTracProcessManager instance for integration testing"""
         config_manager = Mock()
         config_manager.get_config.return_value = {
-            "system": {"mode": "single", "camera_role": "camera1"},
             "logging": {"level": "debug"},
             "gs_config": {
                 "ipc_interface": {"kWebActiveMQHostAddress": "tcp://localhost:61616"},
