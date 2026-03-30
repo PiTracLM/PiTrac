@@ -156,16 +156,11 @@ class ProcessTestHelper:
 
     @staticmethod
     def create_mock_process_status(
-        camera1_running: bool = False,
-        camera2_running: bool = False,
-        camera1_pid: Optional[int] = None,
-        camera2_pid: Optional[int] = None,
+        running: bool = False,
+        pid: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Create mock process status data."""
-        return {
-            "camera1": {"running": camera1_running, "pid": camera1_pid},
-            "camera2": {"running": camera2_running, "pid": camera2_pid},
-        }
+        return {"is_running": running, "pid": pid}
 
     @staticmethod
     def create_mock_log_data(

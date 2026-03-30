@@ -73,19 +73,19 @@ namespace golf_sim {
 				("golfer_orientation", value<std::string>(&golfer_orientation_string_)->default_value("right_handed"),
 					"Set the golfer's handed-ness (right_handed, left_handed)")
 				("system_mode", value<std::string>(&system_mode_string_)->default_value("test"),
-					"Set the system's operating mode (test, camera1, camera2, camera1Calibrate, camera2Calibrate, camera1_test_standalone, camera2_test_standalone, test_spin, camera1_ball_location, camera2_ball_location, test_gspro_message, test_gspro_server, automated_testing, camera1AutoCalibrate, camera2AutoCalibrate, runCam2ProcessForPi1Processing, camera2_one_pulse_only)")
+					"Set the system's operating mode (camera1, camera1_test_standalone, camera1Calibrate, camera2Calibrate, test_spin, camera1_ball_location, camera2_ball_location, test_gspro_server, automated_testing, camera1AutoCalibrate, camera2AutoCalibrate, test)")
 				("logging_level", value<std::string>(&logging_level_string_)->default_value("warn"),
 					"Set the system's logging level (trace, debug, info, warn, error, none)")
 				("artifact_save_level", value<std::string>(&artifact_save_level_string_)->default_value("final_results_only"),
 					"Set the system's level of saving artifact images to files (none, final_results_only, all)")
 				("shutdown", value<bool>(&shutdown_)->default_value(false)->implicit_value(true),
-					"Instructs any GolfSim instance connected to the ActiveMQ broker to shutdown")
+					"Request clean shutdown")
 				("cam_still_mode", value<bool>(&camera_still_mode_)->default_value(false)->implicit_value(true),
 					"Take a single camera2 still picture (using one strobe flash) and exit")
 				("lm_comparison_mode", value<bool>(&lm_comparison_mode_)->default_value(false)->implicit_value(true),
 					"Configure for operating in another infrared-based LM environment")
 				("send_test_results", value<bool>(&send_test_results_)->default_value(false)->implicit_value(true),
-					"Send a single IPC results message (e.g., for testing) and exit")
+					"Send test shot results to the web server and exit")
 				("skip_wait_armed", value<bool>(&skip_wait_armed_)->default_value(false)->implicit_value(true),
 					"Skip waiting for simulator armed state (for hardware-less testing)")
 				("output_filename", value<std::string>(&output_filename_)->default_value("out.png"),
@@ -111,7 +111,7 @@ namespace golf_sim {
 				("camera_gain", value<double>(&camera_gain_)->default_value(0.0),
 					"Amount of gain for taking pictures")
 				("msg_broker_address", value<std::string>(&msg_broker_address_)->default_value(""),
-					"Specify the full hostname or ip address and port of the host of the Active MQ broker. For example: tcp://10.0.0.41:61616 . Default is: <empty string>")
+					"Deprecated — no longer used")
 				("base_image_logging_dir", value<std::string>(&base_image_logging_dir_)->default_value(""),
 					"Specify the full path (with an ending '/') where diagnostic images are to be written. Default is: <empty>")
 				("web_server_share_dir", value<std::string>(&web_server_share_dir_)->default_value(""),

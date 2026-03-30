@@ -263,7 +263,7 @@ class TestLogsAPI:
         mock_stream_systemd.side_effect = mock_stream
         mock_stream_file.side_effect = mock_stream
 
-        services = ["pitrac", "activemq", "pitrac-web"]
+        services = ["pitrac", "pitrac-web"]
 
         for service_name in services:
             with TestClient(app) as client:
