@@ -83,35 +83,13 @@ void SetExternalTrigger(bool& flag) {
 	}
 }
 
-// The main event loop for the the externally-triggered camera.
-
-bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
+// Run the triggered capture event loop on an already-opened camera.
+// The camera must have been opened and configured before calling this.
+// Calls StartCamera at entry and StopCamera when the final image arrives.
+bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 {
-	GS_LOG_TRACE_MSG(trace, "ball_flight_camera_event_loop started.  Waiting for external trigger....");
-
-	// MJLMODs BELOW
-
-	StillOptions const * options = app.GetOptions();
-
-	if (options == nullptr) {
-		GS_LOG_TRACE_MSG(trace, "ball_flight_camera_event_loop could not get app.GetOptions()");
-		return false;
-	}
-
-	GS_LOG_TRACE_MSG(trace, "ball_flight_camera_event_loop started.  Opening Camera at slot: " + std::to_string(options->Set().camera));
-
-
-	app.OpenCamera();
-
-	GS_LOG_TRACE_MSG(trace, "ball_flight_camera_event_loop started.  Opened Camera....");
-
-	// The RGB flag still works for grayscale mono images
-	uint flags = RPiCamApp::FLAG_STILL_RGB;
-	app.ConfigureViewfinder(flags);
-
 	app.StartCamera();
-
-	GS_LOG_TRACE_MSG(trace, "ball_flight_camera_event_loop started.  Started Camera....");
+	GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop: camera started, waiting for triggers");
 
 
 	auto start_time = std::chrono::high_resolution_clock::now();
@@ -400,9 +378,19 @@ bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 		} // switching on state
 	} // for loop
 
-	GS_LOG_TRACE_MSG(trace, "ball_flight_camera_event_loop ended.  Return final image.");
+	GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop ended.");
 
 	return return_status;
+}
+
+// Full pipeline open + capture + close. Used by WaitForCam2Trigger in still-picture mode.
+bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
+{
+	app.OpenCamera();
+	uint flags = RPiCamApp::FLAG_STILL_RGB;
+	app.ConfigureViewfinder(flags);
+	bool result = cam2_run_event_loop(app, returnImg);
+	return result;
 }
 
 	// The main event loop for the camera 1 system.

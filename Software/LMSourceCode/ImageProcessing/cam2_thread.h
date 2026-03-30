@@ -11,18 +11,19 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <memory>
 #include <opencv2/core.hpp>
+
+// Forward declarations — avoid pulling libcamera headers into every TU
+class LibcameraJpegApp;
 
 namespace golf_sim {
 
-// Runs Camera2 capture in a background thread within the single pitrac_lm process.
-// Replaces the old separate Camera2 process + ActiveMQ image exchange.
-//
-// Lifecycle: start() → [arm() → captures → queues event] loop → stop()
-//
-// The thread blocks in WaitForCam2Trigger() waiting for the external hardware
-// trigger. When triggered, it queues a Camera2ImageReceived event directly
-// into the FSM event queue — same event type the old IPC dispatch used.
+class GolfSimCamera;
+
+// Runs Camera2 capture in a background thread. The libcamera pipeline
+// (OpenCamera + ConfigureViewfinder) is initialized once at start() and
+// reused across shots. Only StartCamera/StopCamera cycle per capture.
 class Camera2Thread {
 public:
     Camera2Thread() = default;
@@ -33,19 +34,23 @@ public:
 
     void start();
     void stop();
-
-    // Signal Camera2 to begin waiting for the external trigger.
-    // Called by Camera1 FSM when the ball has stabilized.
     void arm();
 
 private:
     void run();
+    bool init_pipeline();
+    void teardown_pipeline();
 
     std::thread thread_;
     std::mutex mutex_;
     std::condition_variable cv_;
     bool armed_ = false;
     std::atomic<bool> running_{false};
+
+    // Persistent camera pipeline — created once, reused per shot
+    std::unique_ptr<LibcameraJpegApp> app_;
+    std::unique_ptr<GolfSimCamera> camera_;
+    bool pipeline_ready_ = false;
 };
 
 } // namespace golf_sim

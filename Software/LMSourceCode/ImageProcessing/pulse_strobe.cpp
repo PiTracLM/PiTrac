@@ -619,7 +619,7 @@ namespace golf_sim {
 
 		// Camera2 thread is already armed and waiting for trigger — minimal settle time
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kCam2SetupPeriodMilliseconds", kCam2SetupPeriodMilliseconds);
-		usleep(100 * 1000);  // 100ms hardware settle
+		usleep(200 * 1000);  // 200ms — pipeline pre-opened, just StartCamera + settle
 		GS_LOG_TRACE_MSG(trace, "Sending PRIMING pulses...");
 
 		// Generate a short low pulse (aka shutter speed) at a
