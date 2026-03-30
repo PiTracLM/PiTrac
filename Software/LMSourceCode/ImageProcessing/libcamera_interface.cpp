@@ -1317,38 +1317,34 @@ bool CheckForBallEnhanced(GolfBall& ball, cv::Mat& img) {
     cv::Vec2i search_center = camera.GetExpectedBallCenter();
     
     if (use_yolo) {
-        if (!golf_sim::BallImageProc::PreloadYOLOModel()) {
-            GS_LOG_MSG(warning, "YOLO model not available, using legacy detection");
-        } else {
-            std::vector<GsCircle> detected_circles;
-            // Don't worry if there is no ball.  We're not certain there would be.
-            bool detected = golf_sim::BallImageProc::DetectBallsONNX(img, 
-                                                          golf_sim::BallImageProc::BallSearchMode::kFindPlacedBall,
-                                                          detected_circles, false);
-            
-            if (detected && !detected_circles.empty()) {
-                GsCircle best_circle;
-                float best_distance = FLT_MAX;
-                
-                for (const auto& circle : detected_circles) {
-                    float dx = circle[0] - search_center[0];
-                    float dy = circle[1] - search_center[1];
-                    float distance = sqrt(dx*dx + dy*dy);
-                    
-                    if (distance < best_distance) {
-                        best_distance = distance;
-                        best_circle = circle;
-                    }
-                }
-                
-                if (best_distance < 200) {
-                    ball.ball_circle_ = best_circle;
-                    ball.measured_radius_pixels_ = best_circle[2];
-                    ball.search_area_center_ = search_center;
-                    ball.search_area_radius_ = 200;
+        std::vector<GsCircle> detected_circles;
+        // Use the backend-aware dispatcher (routes to NCNN, ONNX Runtime, or OpenCV DNN)
+        bool detected = golf_sim::BallImageProc::DetectBalls(img,
+                                                      golf_sim::BallImageProc::BallSearchMode::kFindPlacedBall,
+                                                      detected_circles, false);
 
-                    return true;
+        if (detected && !detected_circles.empty()) {
+            GsCircle best_circle;
+            float best_distance = FLT_MAX;
+
+            for (const auto& circle : detected_circles) {
+                float dx = circle[0] - search_center[0];
+                float dy = circle[1] - search_center[1];
+                float distance = sqrt(dx*dx + dy*dy);
+
+                if (distance < best_distance) {
+                    best_distance = distance;
+                    best_circle = circle;
                 }
+            }
+
+            if (best_distance < 200) {
+                ball.ball_circle_ = best_circle;
+                ball.measured_radius_pixels_ = best_circle[2];
+                ball.search_area_center_ = search_center;
+                ball.search_area_radius_ = 200;
+
+                return true;
             }
         }
     }
