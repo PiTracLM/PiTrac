@@ -609,7 +609,7 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
         // Both cameras must be connected to this Pi.
         int new_line_position = line.find('\n');
 
-        if (new_line_position == (int)string::npos) {
+        if (new_line_position == (int)std::string::npos) {
             GS_LOG_TRACE_MSG(error, "Only one camera detected. Both cameras must be connected.");
             return false;
         }
@@ -636,7 +636,7 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
 
         std::string device_number_str;
 
-        if (last_space_position != (int)string::npos) {
+        if (last_space_position != (int)std::string::npos) {
             device_number_str = line.substr(last_space_position + 1);
         }
         else {
@@ -648,7 +648,7 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
 
         std::string media_number_str;
 
-        if (first_space_position != (int)string::npos) {
+        if (first_space_position != (int)std::string::npos) {
             media_number_str = line.substr(0, first_space_position);
         }
         else {
