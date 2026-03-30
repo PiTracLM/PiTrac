@@ -25,7 +25,6 @@ def main():
     for key, value in settings.items():
         if "passedVia" not in value:
             value["passedVia"] = "json"
-            value["passedTo"] = "both"  # JSON settings go to both cameras
             count_without_passed_via += 1
         else:
             count_with_passed_via += 1
@@ -40,7 +39,7 @@ def main():
             "default": False,
             "requiresRestart": True,
             "passedVia": "cli",
-            "passedTo": "both",
+
             "cliArgument": "--cam_still_mode",
             "internal": True,
         },
@@ -52,7 +51,7 @@ def main():
             "default": False,
             "requiresRestart": True,
             "passedVia": "cli",
-            "passedTo": "both",
+
             "cliArgument": "--pulse_test",
             "internal": True,
         },
@@ -64,7 +63,7 @@ def main():
             "default": False,
             "requiresRestart": True,
             "passedVia": "cli",
-            "passedTo": "both",
+
             "cliArgument": "--send_test_results",
             "internal": True,
         },
@@ -76,7 +75,7 @@ def main():
             "default": False,
             "requiresRestart": True,
             "passedVia": "cli",
-            "passedTo": "both",
+
             "cliArgument": "--lm_comparison_mode",
             "internal": True,
         },
@@ -88,7 +87,7 @@ def main():
             "default": False,
             "requiresRestart": True,
             "passedVia": "cli",
-            "passedTo": "both",
+
             "cliArgument": "--skip_wait_armed",
             "internal": True,
         },

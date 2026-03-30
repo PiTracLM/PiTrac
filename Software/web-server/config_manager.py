@@ -684,60 +684,36 @@ class ConfigurationManager:
             print(f"Error loading configurations.json: {e}")
             return {"settings": {}}
 
-    def get_cli_parameters(self, target: str = "both") -> List[Dict[str, Any]]:
-        """Get all CLI parameters for a specific target (camera1, camera2, both)
-
-        Args:
-            target: Target to filter by ('camera1', 'camera2', or 'both')
-
-        Returns:
-            List of CLI parameter metadata dictionaries
-        """
+    def get_cli_parameters(self) -> List[Dict[str, Any]]:
+        """Get all CLI parameters to pass to the pitrac_lm process."""
         metadata = self.load_configurations_metadata()
         settings = metadata.get("settings", {})
 
         cli_params = []
         for key, info in settings.items():
             if info.get("passedVia") == "cli":
-                passed_to = info.get("passedTo", "both")
-                if passed_to == target or passed_to == "both" or target == "both":
-                    cli_params.append(
-                        {
-                            "key": key,
-                            "cliArgument": info.get("cliArgument"),
-                            "passedTo": passed_to,
-                            "type": info.get("type"),
-                            "default": info.get("default"),
-                        }
-                    )
+                cli_params.append({
+                    "key": key,
+                    "cliArgument": info.get("cliArgument"),
+                    "type": info.get("type"),
+                    "default": info.get("default"),
+                })
         return cli_params
 
-    def get_environment_parameters(self, target: str = "both") -> List[Dict[str, Any]]:
-        """Get all environment parameters for a specific target
-
-        Args:
-            target: Target to filter by ('camera1', 'camera2', or 'both')
-
-        Returns:
-            List of environment parameter metadata dictionaries
-        """
+    def get_environment_parameters(self) -> List[Dict[str, Any]]:
+        """Get all environment parameters to set for the pitrac_lm process."""
         metadata = self.load_configurations_metadata()
         settings = metadata.get("settings", {})
 
         env_params = []
         for key, info in settings.items():
             if info.get("passedVia") == "environment":
-                passed_to = info.get("passedTo", "both")
-                if passed_to == target or passed_to == "both" or target == "both":
-                    env_params.append(
-                        {
-                            "key": key,
-                            "envVariable": info.get("envVariable"),
-                            "passedTo": passed_to,
-                            "type": info.get("type"),
-                            "default": info.get("default"),
-                        }
-                    )
+                env_params.append({
+                    "key": key,
+                    "envVariable": info.get("envVariable"),
+                    "type": info.get("type"),
+                    "default": info.get("default"),
+                })
         return env_params
 
     def flatten_config(self, config: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
