@@ -50,7 +50,7 @@ bool Camera2Thread::init_pipeline() {
         return false;
     }
 
-    SetLibCameraLoggingOff();
+    LibCameraInterface::SetLibCameraLoggingOff();
 
     options->Set().camera = 1;
     options->Set().gain = LibCameraInterface::kCamera2Gain;
