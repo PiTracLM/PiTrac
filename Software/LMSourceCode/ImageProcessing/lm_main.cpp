@@ -1212,8 +1212,6 @@ void run_main(int argc, char* argv[])
 
             average_focal_length /= number_samples;
             GS_LOG_MSG(info, "====>  Average Focal Length = " + std::to_string(average_focal_length) + ".Set this value into the gs_config.json file.");
-
-            /* IPC removed */;
         }
         break;
 
@@ -1570,33 +1568,17 @@ int main(int argc, char *argv[])
             GS_LOG_MSG(error, "Error during GPIO cleanup: " + std::string(e.what()));
         }
         
-        try {
-#ifdef __unix__
-            golf_sim::/* IPC removed */;
-            GS_LOG_MSG(info, "IPC system cleaned up successfully");
-#endif
-        } catch (const std::exception& e) {
-            GS_LOG_MSG(error, "Error during IPC cleanup: " + std::string(e.what()));
-        }
     }
     catch (std::exception const& e)
     {
         GS_LOG_MSG(error, "Exception occurred. ERROR: *** " + std::string(e.what()) + " ***");
-        
+
         try {
             golf_sim::PulseStrobe::DeinitGPIOSystem();
         } catch (...) {
             GS_LOG_MSG(error, "Failed to cleanup GPIO on exception");
         }
-        
-        try {
-#ifdef __unix__
-            golf_sim::/* IPC removed */;
-#endif
-        } catch (...) {
-            GS_LOG_MSG(error, "Failed to cleanup IPC on exception");
-        }
-        
+
         return -1;
     }
 
