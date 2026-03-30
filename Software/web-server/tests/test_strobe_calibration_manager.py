@@ -639,6 +639,7 @@ class TestStartCalibration:
         mgr._open_hardware = Mock()
         mgr._close_hardware = Mock()
         mgr._calibrate = Mock(return_value=(True, 0x80, 9.5))
+        mgr.get_ldo_voltage = Mock(return_value=5.0)
 
         result = await mgr.start_calibration(led_type="v3", overwrite=True)
         assert result["state"] == "complete"
@@ -734,6 +735,7 @@ class TestStartCalibration:
         mgr._open_hardware = Mock()
         mgr._close_hardware = Mock()
         mgr._calibrate = Mock(return_value=(True, 0x80, 9.5))
+        mgr.get_ldo_voltage = Mock(return_value=5.0)
 
         await mgr.start_calibration(led_type="v3")
         cm.set_config.assert_called_once_with("gs_config.strobing.kDAC_setting", 0x80)
@@ -796,6 +798,7 @@ class TestStartCalibration:
         mgr._open_hardware = Mock()
         mgr._close_hardware = Mock()
         mgr._calibrate = Mock(return_value=(True, 0x80, 9.5))
+        mgr.get_ldo_voltage = Mock(return_value=5.0)
 
         assert mgr.status["state"] == "idle"
         await mgr.start_calibration(led_type="v3")
