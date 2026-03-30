@@ -22,6 +22,7 @@ from constants import (
     MPS_TO_MPH,
 )
 from managers import ConnectionManager, ShotDataStore
+from models import ShotData
 from parsers import ShotDataParser
 from pitrac_manager import PiTracProcessManager
 from strobe_calibration_manager import StrobeCalibrationManager
@@ -120,12 +121,21 @@ class PiTracServer:
             ]
 
             if is_status or is_fake_hit:
-                shot_data = self.shot_store.update(
+                current = self.shot_store.get()
+                shot_data = ShotData(
+                    speed=current.speed,
+                    carry=current.carry,
+                    launch_angle=current.launch_angle,
+                    side_angle=current.side_angle,
+                    back_spin=current.back_spin,
+                    side_spin=current.side_spin,
                     result_type=result_type_str,
                     message=message,
+                    timestamp=datetime.now().isoformat(),
+                    images=current.images,
                 )
             else:
-                shot_data = self.shot_store.update(
+                shot_data = ShotData(
                     speed=round(speed_mps * MPS_TO_MPH, 1),
                     carry=float(body.get("carry", 0)),
                     launch_angle=round(float(body.get("launch_angle", 0)), 1),
@@ -134,9 +144,11 @@ class PiTracServer:
                     side_spin=int(body.get("side_spin", 0)),
                     result_type=result_type_str,
                     message=message,
+                    timestamp=datetime.now().isoformat(),
                     images=images,
                 )
 
+            self.shot_store.update(shot_data)
             await self.connection_manager.broadcast(shot_data.to_dict())
             return {"status": "ok"}
 
