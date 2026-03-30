@@ -542,6 +542,10 @@ build_dev() {
     log_info "Installing PiTrac binary..."
     install -m 755 build/pitrac_lm /usr/lib/pitrac/pitrac_lm
 
+    # Grant real-time scheduling capability for low-latency trigger path
+    setcap cap_sys_nice=eip /usr/lib/pitrac/pitrac_lm 2>/dev/null || \
+        log_warn "Could not set CAP_SYS_NICE — SCHED_FIFO will not be available"
+
     log_info "Installing CLI tool..."
     install -m 755 "$SCRIPT_DIR/pitrac" /usr/bin/pitrac
 
