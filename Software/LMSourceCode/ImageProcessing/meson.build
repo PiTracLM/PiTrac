@@ -64,8 +64,6 @@ elif neon == 'armv8-neon'
 endif
 
 ssl_dep = dependency('openssl', required : true)
-activemq_dep = dependency('activemq-cpp', required : true)
-apr_dep = cxx.find_library('apr-1', required : true)
 
 libcamera_dep = dependency('libcamera', required : true)
 thread_dep = dependency('threads', required : true)
@@ -102,7 +100,7 @@ conf_data = configuration_data()
 
 pitrac_lm_module_deps = [
 	libcamera_dep, thread_dep, opencv_dep, lgpio_dep, rpicam_app_dep,
-	fmt_dep, boost_dep, activemq_dep, ssl_dep, apr_dep, msgpack_dep, yamlcpp_dep, ncnn_dep, omp_dep,]
+	fmt_dep, boost_dep, ssl_dep, msgpack_dep, yamlcpp_dep, ncnn_dep, omp_dep,]
 if onnxruntime_dep.found()
     pitrac_lm_module_deps += onnxruntime_dep
 endif
@@ -192,6 +190,7 @@ pitrac_lm_sources += ([
 			'lm_main.cpp',
 			'gs_globals.cpp',
 			'gs_fsm.cpp',
+			'cam2_thread.cpp',
 			'libcamera_interface.cpp',
 			'libcamera_jpeg.cpp',
 			'ball_watcher.cpp',
@@ -227,17 +226,12 @@ pitrac_lm_sources += ([
 			'gs_events.cpp',
 			'worker_thread.cpp',
 			'camera_hardware.cpp',
-                        'gs_ipc_message.cpp',
                         'gs_ipc_control_msg.cpp',
                         'gs_results.cpp',
                         'gs_gspro_results.cpp',
                         'gs_ui_system.cpp',
-                        'gs_ipc_mat.cpp',
                         'gs_ipc_result.cpp',
-                        'gs_ipc_test.cpp',
-                        'gs_ipc_system.cpp',
-                        'gs_message_consumer.cpp',
-                        'gs_message_producer.cpp',
+                        'gs_http_client.cpp',
 ])
 
 pitrac_lm_sources += ([
