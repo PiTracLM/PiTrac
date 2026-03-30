@@ -5,10 +5,6 @@ from pathlib import Path
 MPS_TO_MPH = 2.237
 EXPECTED_DATA_LENGTH = 12
 
-DEFAULT_BROKER = "tcp://localhost:61616"
-STOMP_PORT = 61613
-DEFAULT_USERNAME = "admin"
-DEFAULT_PASSWORD = "admin"
 
 HOME_DIR = Path.home()
 PITRAC_DIR = HOME_DIR / ".pitrac"

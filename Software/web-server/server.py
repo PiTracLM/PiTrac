@@ -7,7 +7,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-import stomp
 import yaml
 from fastapi import FastAPI, File, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, Response
@@ -19,13 +18,9 @@ from camera_detector import CameraDetector
 from config_manager import ConfigurationManager
 from constants import (
     CONFIG_FILE,
-    DEFAULT_BROKER,
-    DEFAULT_PASSWORD,
-    DEFAULT_USERNAME,
     IMAGES_DIR,
-    STOMP_PORT,
+    MPS_TO_MPH,
 )
-from listeners import ActiveMQListener
 from managers import ConnectionManager, ShotDataStore
 from parsers import ShotDataParser
 from pitrac_manager import PiTracProcessManager
@@ -48,8 +43,6 @@ class PiTracServer:
         self.calibration_manager = CalibrationManager(self.config_manager)
         self.testing_manager = TestingToolsManager(self.config_manager)
         self.strobe_calibration_manager = StrobeCalibrationManager(self.config_manager)
-        self.mq_conn: Optional[stomp.Connection] = None
-        self.listener: Optional[ActiveMQListener] = None
         self.reconnect_task: Optional[asyncio.Task] = None
         self.shutdown_flag = False
         self.background_tasks: set[asyncio.Task] = set()
@@ -110,14 +103,49 @@ class PiTracServer:
             logger.info("Shot data reset via API")
             return {"status": "reset", "timestamp": shot_data.timestamp}
 
-        @self.app.get("/health")
-        async def health_check() -> Dict[str, Union[str, bool, int, Dict]]:
-            mq_connected = self.mq_conn.is_connected() if self.mq_conn else False
+        @self.app.post("/api/internal/shot-result")
+        async def receive_shot_result(request: Request) -> Dict[str, str]:
+            """Receives shot results from the C++ pitrac_lm process via HTTP POST."""
+            body = await request.json()
 
+            result_type_int = int(body.get("result_type", 0))
+            result_type_str = self.parser._get_result_type_string(result_type_int)
+            speed_mps = float(body.get("speed_mps", 0))
+            message = str(body.get("message", ""))
+            images = body.get("images", [])
+
+            is_status = result_type_str in self.parser._get_status_message_strings()
+            is_fake_hit = result_type_int == 7 and message in [
+                "Club type was set", "Test message", "Configuration update",
+            ]
+
+            if is_status or is_fake_hit:
+                shot_data = self.shot_store.update(
+                    result_type=result_type_str,
+                    message=message,
+                )
+            else:
+                shot_data = self.shot_store.update(
+                    speed=round(speed_mps * MPS_TO_MPH, 1),
+                    carry=float(body.get("carry", 0)),
+                    launch_angle=round(float(body.get("launch_angle", 0)), 1),
+                    side_angle=round(float(body.get("side_angle", 0)), 1),
+                    back_spin=int(body.get("back_spin", 0)),
+                    side_spin=int(body.get("side_spin", 0)),
+                    result_type=result_type_str,
+                    message=message,
+                    images=images,
+                )
+
+            await self.connection_manager.broadcast(shot_data.to_dict())
+            return {"status": "ok"}
+
+        @self.app.get("/health")
+        async def health_check() -> Dict[str, Union[str, bool, int]]:
             pitrac_running = False
             try:
                 result = subprocess.run(
-                    ["pgrep", "-f", "golf_sim"],
+                    ["pgrep", "-f", "pitrac_lm"],
                     capture_output=True,
                     text=True,
                     timeout=1,
@@ -126,29 +154,17 @@ class PiTracServer:
             except Exception:
                 pass
 
-            activemq_running = False
-            try:
-                result = subprocess.run(["ss", "-tln"], capture_output=True, text=True, timeout=1)
-                activemq_running = ":61616" in result.stdout or ":61613" in result.stdout
-            except Exception:
-                pass
-
-            listener_stats = self.listener.get_stats() if self.listener else {}
-
             return {
-                "status": "healthy" if mq_connected else "degraded",
-                "activemq_connected": mq_connected,
-                "activemq_running": activemq_running,
+                "status": "healthy",
                 "pitrac_running": pitrac_running,
                 "websocket_clients": self.connection_manager.connection_count,
-                "listener_stats": listener_stats,
             }
 
         @self.app.get("/api/stats")
         async def get_stats() -> Dict[str, Any]:
             return {
                 "websocket_connections": self.connection_manager.connection_count,
-                "listener": self.listener.get_stats() if self.listener else None,
+                "transport": "http",
                 "shot_history_count": len(self.shot_store.get_history(100)),
             }
 
@@ -612,37 +628,6 @@ class PiTracServer:
                 }
             )
 
-            if pitrac_status.get("is_dual_camera"):
-                services.append(
-                    {
-                        "id": "pitrac_camera2",
-                        "name": "PiTrac Camera 2",
-                        "status": ("running" if pitrac_status.get("camera2_running") else "stopped"),
-                        "pid": pitrac_status.get("camera2_pid"),
-                    }
-                )
-
-            activemq_running = False
-            try:
-                result = subprocess.run(
-                    ["systemctl", "is-active", "activemq"],
-                    capture_output=True,
-                    text=True,
-                    timeout=1,
-                )
-                activemq_running = result.stdout.strip() == "active"
-            except Exception:
-                pass
-
-            services.append(
-                {
-                    "id": "activemq",
-                    "name": "ActiveMQ Broker",
-                    "status": "running" if activemq_running else "stopped",
-                    "pid": None,
-                }
-            )
-
             services.append(
                 {
                     "id": "pitrac-web",
@@ -660,11 +645,6 @@ class PiTracServer:
             if service == "pitrac":
                 log_file = self.pitrac_manager.log_file
                 await self._stream_file_logs(websocket, log_file)
-            elif service == "pitrac_camera2":
-                log_file = self.pitrac_manager.camera2_log_file
-                await self._stream_file_logs(websocket, log_file)
-            elif service == "activemq":
-                await self._stream_systemd_logs(websocket, "activemq")
             elif service == "pitrac-web":
                 await self._stream_systemd_logs(websocket, "pitrac-web")
             else:
@@ -795,81 +775,10 @@ class PiTracServer:
             logger.error(f"Error loading config: {e}")
             return {}
 
-    def setup_activemq(self, loop: Optional[asyncio.AbstractEventLoop] = None) -> Optional[stomp.Connection]:
-        try:
-            config = self._load_config()
-
-            network_config = config.get("network", {})
-            broker_address = network_config.get("broker_address", DEFAULT_BROKER)
-            username = network_config.get("username", DEFAULT_USERNAME)
-            password = network_config.get("password", DEFAULT_PASSWORD)
-
-            if broker_address.startswith("tcp://"):
-                broker_address = broker_address[6:]
-
-            broker_host = broker_address.split(":")[0] if ":" in broker_address else broker_address
-
-            conn = stomp.Connection([(broker_host, STOMP_PORT)])
-
-            self.listener = ActiveMQListener(self.shot_store, self.connection_manager, self.parser, loop)
-            conn.set_listener("", self.listener)
-
-            conn.connect(username, password, wait=True)
-            conn.subscribe(destination="/topic/Golf.Sim", id=1, ack="auto")
-
-            logger.info(f"Connected to ActiveMQ at {broker_host}:{STOMP_PORT}")
-            return conn
-
-        except stomp.exception.ConnectFailedException as e:
-            logger.error(f"Failed to connect to ActiveMQ broker: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Unexpected error connecting to ActiveMQ: {e}", exc_info=True)
-            return None
-
-    async def reconnect_activemq_loop(self) -> None:
-        """Background task to maintain ActiveMQ connection"""
-        loop = asyncio.get_event_loop()
-        retry_delay = 5
-        max_retry_delay = 60
-
-        while not self.shutdown_flag:
-            try:
-                if self.mq_conn and self.mq_conn.is_connected():
-                    retry_delay = 5
-                    await asyncio.sleep(10)
-                    continue
-
-                logger.info("ActiveMQ connection lost, attempting to reconnect...")
-
-                if self.mq_conn:
-                    try:
-                        self.mq_conn.disconnect()
-                    except Exception:
-                        pass
-                    self.mq_conn = None
-
-                self.mq_conn = self.setup_activemq(loop)
-
-                if self.mq_conn:
-                    logger.info("Successfully reconnected to ActiveMQ")
-                    retry_delay = 5
-                else:
-                    logger.warning(f"Failed to reconnect to ActiveMQ, retrying in {retry_delay} seconds")
-                    await asyncio.sleep(retry_delay)
-                    retry_delay = min(retry_delay * 2, max_retry_delay)
-
-            except Exception as e:
-                logger.error(f"Error in reconnection loop: {e}", exc_info=True)
-                await asyncio.sleep(retry_delay)
-                retry_delay = min(retry_delay * 2, max_retry_delay)
-
     async def startup_event(self) -> None:
         logger.info("Starting PiTrac Web Server...")
         loop = asyncio.get_event_loop()
-
         self.calibration_manager.loop = loop
-
         await self.calibration_manager._replay_pending_updates()
 
         # V3 boards: write calibrated DAC value to hardware before any strobe fires.
@@ -879,13 +788,7 @@ class PiTracServer:
                 "V3 DAC not initialized — strobe calibration required before PiTrac can run"
             )
 
-        self.mq_conn = self.setup_activemq(loop)
-
-        if not self.mq_conn:
-            logger.warning("Could not connect to ActiveMQ at startup - will retry in background")
-
-        self.reconnect_task = asyncio.create_task(self.reconnect_activemq_loop())
-        logger.info("Started ActiveMQ reconnection monitor")
+        logger.info("PiTrac Web Server ready — receiving results via HTTP POST")
 
     async def _run_tool_async(self, tool_id: str) -> None:
         """Helper method to run a testing tool asynchronously"""
@@ -914,20 +817,6 @@ class PiTracServer:
 
         if self.background_tasks:
             await asyncio.gather(*self.background_tasks, return_exceptions=True)
-
-        if self.reconnect_task and not self.reconnect_task.done():
-            self.reconnect_task.cancel()
-            try:
-                await self.reconnect_task
-            except asyncio.CancelledError:
-                pass
-
-        if self.mq_conn:
-            try:
-                self.mq_conn.disconnect()
-                logger.info("Disconnected from ActiveMQ")
-            except Exception as e:
-                logger.error(f"Error disconnecting from ActiveMQ: {e}")
 
         for ws in self.connection_manager.connections:
             try:
