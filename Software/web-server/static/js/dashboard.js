@@ -1,5 +1,6 @@
 // Dashboard-specific functionality (theme and dropdown handled by common.js)
 let ws = null;
+let piTracRunning = false;
 
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -12,7 +13,11 @@ function connectWebSocket() {
 
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        updateDisplay(data);
+        // Only update display from WebSocket if PiTrac is actually running.
+        // Otherwise the default ShotData values ("Waiting for ball...") are misleading.
+        if (piTracRunning) {
+            updateDisplay(data);
+        }
     };
 
     ws.onclose = () => {
@@ -145,11 +150,17 @@ const dashboardCheckPiTracStatus = async function() {
         originalCheckPiTracStatus = window.checkPiTracStatus;
     }
     const isRunning = await originalCheckPiTracStatus();
-    
+    piTracRunning = isRunning;
+
+    const metricsGrid = document.querySelector('.metrics-grid');
+    if (metricsGrid) {
+        metricsGrid.style.opacity = isRunning ? '1' : '0.3';
+    }
+
     if (!isRunning) {
         updateBallStatus(null, null, false);
     }
-    
+
     return isRunning;
 }
 
@@ -170,7 +181,7 @@ function showStatusMessage(message, type = 'info') {
 document.addEventListener('DOMContentLoaded', () => {
     connectWebSocket();
     
-    updateBallStatus('Initializing', 'System starting up...');
+    updateBallStatus(null, null, false);
     
     if (window.checkPiTracStatus) {
         originalCheckPiTracStatus = window.checkPiTracStatus;
