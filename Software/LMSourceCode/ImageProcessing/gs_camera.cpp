@@ -462,8 +462,7 @@ namespace golf_sim {
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2Calibrate ||
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1BallLocation ||
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2BallLocation ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1TestStandalone ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2TestStandalone) {
+            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1TestStandalone) {
 
             if (kCamera1CalibrationDistanceToBall > 0.01) {
                 if (GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera1) {
@@ -4293,40 +4292,16 @@ namespace golf_sim {
                 return true;
             }
 
-            // We are taking a picture with the camera that is (presumably) controlled from
-            // the Pi2/Camera2 executable (at least until we can work with a single Pi))
-
-            // Let the second camera know to be ready for a ball hit
-            GolfSimIPCMessage ipc_message(GolfSimIPCMessage::IPCMessageType::kRequestForCamera2Image);
-            GolfSimIpcSystem::SendIpcMessage(ipc_message);
-
-            // Give the camera2 system a moment to set up
-            sleep(1);
-
+            // Take a still picture with Camera2 directly (single-process mode)
             if (!PulseStrobe::SendCameraPrimingPulses(true)) {
                 GS_LOG_MSG(error, "FAILED to PulseStrobe::SendCameraPrimingPulses");
                 return false;
             }
 
-            // Give the camera2 system another moment
-            sleep(1);
-
             PulseStrobe::SendExternalTrigger();
 
-            // At this point, the camera2 system should take a image and return it via IPC
-            // We will give the IPC system to receive and process this image
-            // TBD - Figure a better way than just waiting for a long time.
-            GS_LOG_TRACE_MSG(trace, "Waiting to receive one strobed picture from camera2 system.");
-            sleep(6);
-
-            // Get the image that the IPC system should have saved
-            {
-                std::lock_guard<std::mutex> lock(GolfSimIpcSystem::last_received_image_mutex_);
-                color_image = GolfSimIpcSystem::last_received_image_.clone();
-            }
-
-            if (color_image.empty()) {
-                GS_LOG_MSG(error, "FAILED to find an image from the IPC system.");
+            if (!WaitForCam2Trigger(color_image)) {
+                GS_LOG_MSG(error, "FAILED to WaitForCam2Trigger for still picture.");
                 return false;
             }
 #else

@@ -687,9 +687,8 @@ bool GolfSimConfiguration::ReadValues() {
 		 // In cases where the Pi 2/ Camera 2 system needs to take a picture, that will happen in a separate
 		 // process that (as far as it knows) will run just like it does when operating in the normal launch
 		 // monitor mode.
-		 if ((GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera1 && 
-					(GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kRunCam2ProcessForPi1Processing)) ||
-			 (GolfSimOptions::GetCommandLineOptions().camera_still_mode_ && 
+		 if (GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera1 ||
+			 (GolfSimOptions::GetCommandLineOptions().camera_still_mode_ &&
 					GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera2) ||
 			 GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1AutoCalibrate ||
 			 GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2AutoCalibrate ||

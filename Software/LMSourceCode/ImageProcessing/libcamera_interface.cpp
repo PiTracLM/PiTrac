@@ -19,8 +19,6 @@
 
 #include <opencv2/calib3d/calib3d.hpp>
 
-// TBD - May need to be before ball_watcher, as there is a mman.h conflict
-#include "gs_ipc_system.h"
 
 
 #include "ball_watcher.h"
@@ -608,21 +606,12 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
     // <media number> <space> <device number>
     try {
 
-        // Using a single pi requires both cameras to be connected to that Pi.
-        // If we are not receiving two sets of camera data, then something is wrong.
+        // Both cameras must be connected to this Pi.
         int new_line_position = line.find('\n');
 
         if (new_line_position == (int)string::npos) {
-
-            // There is only one line of discovered information
-
-            if (GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
-                GS_LOG_TRACE_MSG(error, "No expected new line found in camera location output.  Missing camera when running in single-pi mode.");
-                return false;
-            }
-            else {
-                // We have only a single line of information.  Do not need to do anything else
-            }
+            GS_LOG_TRACE_MSG(error, "Only one camera detected. Both cameras must be connected.");
+            return false;
         }
         else {
             // Assume (TBD - Confirm with Pi people) that the camera on camera unit 0
@@ -897,7 +886,7 @@ bool RetrieveCameraInfo(const GsCameraNumber camera_number, cv::Vec2i& resolutio
                 options->Set().no_raw = true;  // See https://forums.raspberrypi.com/viewtopic.php?t=369927
 
                 // Set the camera number (0 or 1, likely) when we have more than one camera
-                options->Set().camera = (camera_number == GsCameraNumber::kGsCamera1 || !GolfSimOptions::GetCommandLineOptions().run_single_pi_) ? 0 : 1;
+                options->Set().camera = (camera_number == GsCameraNumber::kGsCamera1) ? 0 : 1;
 
                 // Get the camera open for a moment so that we can read its settings
                 app.OpenCamera();
@@ -924,7 +913,7 @@ bool RetrieveCameraInfo(const GsCameraNumber camera_number, cv::Vec2i& resolutio
         return false;
     }
 
-    int camera_slot_number = (camera_number == GsCameraNumber::kGsCamera1 || !GolfSimOptions::GetCommandLineOptions().run_single_pi_) ? 0 : 1;
+    int camera_slot_number = (camera_number == GsCameraNumber::kGsCamera1) ? 0 : 1;
 
     auto const& cam = cameras[camera_slot_number];
 
@@ -1135,7 +1124,6 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
             // TBD - This code seems backward.  But everything is working right now, 
             // so let's not change until we can really test it all.
             if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2Calibrate ||
-                GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2OnePulseOnly ||
                 GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2BallLocation ||
                 GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2AutoCalibrate) {
 
@@ -1149,7 +1137,7 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
 
         // Assume camera 1 will be at slot 0 in all cases.  Camera 2 will be at slot 1
         // only in a single Pi system.
-        options->Set().camera = (camera_number == GsCameraNumber::kGsCamera1 || !GolfSimOptions::GetCommandLineOptions().run_single_pi_) ? 0 : 1;
+        options->Set().camera = (camera_number == GsCameraNumber::kGsCamera1) ? 0 : 1;
 
         // Shouldn't need a special gain to take a "normal" picture.   Default will be 1.0
         // from the command line options.
@@ -1429,15 +1417,7 @@ bool WaitForCam2Trigger(cv::Mat& return_image) {
 
         SetLibCameraLoggingOff();
 
-        // On a two-Pi system, each Pi has just one camera, and that camera will be in slot 0
-        // On a single-pi system the one Pi 5 has both cameras.  And Camera 2 will be in slot 1
-        // because Camera 1 is in slot 0.
-        if (GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
-            options->Set().camera = 1;
-        }
-        else {
-            options->Set().camera = 0;
-        }
+        options->Set().camera = 1;  // Camera2 is always slot 1
 
         if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2Calibrate ||
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2BallLocation ||
@@ -1548,76 +1528,8 @@ bool PerformCameraSystemStartup() {
         case SystemMode::kCamera1:
         case SystemMode::kCamera1TestStandalone:
         case SystemMode::kTestSpin: {
-
-            if (!GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
-                std::string trigger_mode_command = "sudo $PITRAC_ROOT/ImageProcessing/CameraTools/setCameraTriggerInternal.sh";
-
-                int command_result = system(trigger_mode_command.c_str());
-
-                if (command_result != 0) {
-                    GS_LOG_TRACE_MSG(trace, "system(trigger_mode_command) failed.");
-                    return false;
-                }
-            }
-            else {
-                /****
-                const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot1CameraType;
-                if (camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
-                    std::string trigger_mode_command = "$PITRAC_ROOT/ImageProcessing/CameraTools/imx296_trigger 6 0";
-
-                    GS_LOG_TRACE_MSG(trace, "Camera 1 trigger_mode_command = " + trigger_mode_command);
-                    int command_result = system(trigger_mode_command.c_str());
-
-                    if (command_result != 0) {
-                        GS_LOG_TRACE_MSG(trace, "system(trigger_mode_command) failed.");
-                        return false;
-                    }
-                }
-                else {
-                    GS_LOG_TRACE_MSG(trace, "Running in single-pi mode, so not setting camera triggering (internal or external) programmatically.  Instead, please see the following discussion on how to setup the boot/firmware.config.txt dtoverlays for triggering:  https://forums.raspberrypi.com/viewtopic.php?p=2315464#p2315464.");
-                }
-                    ****/
-            }
-        }
-        break;
-
-        case SystemMode::kCamera2:
-        case SystemMode::kRunCam2ProcessForPi1Processing:
-        case SystemMode::kCamera2TestStandalone: {
-
-            if (!GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
-                std::string trigger_mode_command = "sudo $PITRAC_ROOT/ImageProcessing/CameraTools/setCameraTriggerExternal.sh";
-
-                int command_result = system(trigger_mode_command.c_str());
-
-                if (command_result != 0) {
-                    GS_LOG_TRACE_MSG(trace, "system(trigger_mode_command) failed.");
-                    return false;
-                }
-            }
-            else {
-                const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot2CameraType;
-
-                if (camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
-                    std::string trigger_mode_command = "$PITRAC_ROOT/ImageProcessing/CameraTools/imx296_trigger 4 1";
-
-                    int command_result = system(trigger_mode_command.c_str());
-
-                    if (command_result != 0) {
-                        GS_LOG_TRACE_MSG(trace, "system(trigger_mode_command) failed.");
-                        return false;
-                    }
-                }
-            }
-
-            // Create a camera just for purposes of setting the tuning file variable
-            GolfSimCamera camera;
-            camera.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera2, GolfSimCamera::kSystemSlot2CameraType, GolfSimCamera::kSystemSlot2LensType, GolfSimCamera::kSystemSlot1CameraOrientation);
-
-            if (!SetLibcameraTuningFileEnvVariable(camera)) {
-                GS_LOG_TRACE_MSG(error, "failed to SetLibcameraTuningFileEnvVariable");
-                return false;
-            }
+            // Camera triggering is configured via firmware config.txt dtoverlays,
+            // not programmatically. Nothing to do here.
         }
         break;
 
