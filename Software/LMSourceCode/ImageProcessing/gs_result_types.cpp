@@ -8,7 +8,7 @@
 
 #include "logging_tools.h"
 
-#include "gs_ipc_result.h"
+#include "gs_result_types.h"
 #include "cv_utils.h"
 
 namespace golf_sim {

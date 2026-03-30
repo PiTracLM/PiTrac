@@ -12,7 +12,7 @@
 
 #include "logging_tools.h"
 #include "golf_ball.h"
-#include "gs_ipc_result.h"
+#include "gs_result_types.h"
 
 
 // The primary object for communications to the Golf Sim user interface

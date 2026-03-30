@@ -226,11 +226,11 @@ pitrac_lm_sources += ([
 			'gs_events.cpp',
 			'worker_thread.cpp',
 			'camera_hardware.cpp',
-                        'gs_ipc_control_msg.cpp',
+                        'gs_control_msg.cpp',
                         'gs_results.cpp',
                         'gs_gspro_results.cpp',
                         'gs_ui_system.cpp',
-                        'gs_ipc_result.cpp',
+                        'gs_result_types.cpp',
                         'gs_http_client.cpp',
 ])
 

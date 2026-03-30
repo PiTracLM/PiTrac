@@ -96,8 +96,8 @@ namespace golf_sim {
 					"Configure system to expect a lightweight, soft, practice ball")
 				("wait_keys", value<bool>(&wait_for_key_on_images_)->default_value(false)->implicit_value(true),
 					"0 = Don't wait for a key press after showing each debug image, 1 = Do wait")
-				("run_single_pi", value<bool>(&run_single_pi_)->default_value(false)->implicit_value(true),
-					"0 =  System will run on separate Pi's, each with its own camer.  1 = This system will run both cameras on a single Pi.")
+				("run_single_pi", value<bool>(&run_single_pi_)->default_value(true)->implicit_value(true),
+					"Deprecated — always single Pi. Accepted for backward compatibility.")
 				("show_images", value<bool>(&show_images_)->default_value(false)->implicit_value(true),
 					"0 = Don't show any debug/trace images in windows on the screen, 1 = Do")
 				("use_non_IR_camera", value<bool>(&use_non_IR_camera_)->default_value(false)->implicit_value(true),

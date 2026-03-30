@@ -8,7 +8,7 @@
 
 #include "logging_tools.h"
 
-#include "gs_ipc_result.h"
+#include "gs_result_types.h"
 #include "gs_options.h"
 #include "gs_clubs.h"
 #include "gs_ui_system.h"

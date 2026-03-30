@@ -18,7 +18,7 @@
 #include <opencv2/core.hpp>
 
 #include "golf_ball.h"
-#include "gs_ipc_result.h"
+#include "gs_result_types.h"
 #include "gs_events.h"
 
 

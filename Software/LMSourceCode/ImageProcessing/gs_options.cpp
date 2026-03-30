@@ -148,7 +148,6 @@ void GolfSimOptions::Print() const
 	std::cout << "    practice_ball: " << std::to_string(practice_ball_) << std::endl;
 	std::cout << "    wait_keys: " << std::to_string(wait_for_key_on_images_) << std::endl;
 	
-	std::cout << "    run_single_pi: " << std::to_string(run_single_pi_) << std::endl;
 	std::cout << "    show_images: " << std::to_string(show_images_) << std::endl;
 	std::cout << "    use_non_IR_camera: " << std::to_string(use_non_IR_camera_) << std::endl;
 	if (!command_line_file_.empty())

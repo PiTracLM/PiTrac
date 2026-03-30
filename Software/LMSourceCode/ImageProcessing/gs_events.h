@@ -22,7 +22,7 @@
 #include <opencv2/core.hpp>
 
 #include "golf_ball.h"
-#include "gs_ipc_control_msg.h"
+#include "gs_control_msg.h"
 
 namespace golf_sim {
 
