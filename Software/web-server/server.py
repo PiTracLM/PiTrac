@@ -10,12 +10,13 @@ from typing import Any, Dict, List, Optional, Union
 import stomp
 import yaml
 from fastapi import FastAPI, File, Request, UploadFile, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from calibration_manager import CalibrationManager
 from camera_detector import CameraDetector
+from camera_stream_manager import CameraStreamManager
 from config_manager import ConfigurationManager
 from constants import (
     CONFIG_FILE,
@@ -44,7 +45,8 @@ class PiTracServer:
         self.parser = ShotDataParser()
         self.config_manager = ConfigurationManager()
         self.pitrac_manager = PiTracProcessManager(self.config_manager)
-        self.calibration_manager = CalibrationManager(self.config_manager)
+        self.camera_stream_manager = CameraStreamManager(self.config_manager)
+        self.calibration_manager = CalibrationManager(self.config_manager, self.camera_stream_manager)
         self.testing_manager = TestingToolsManager(self.config_manager)
         self.mq_conn: Optional[stomp.Connection] = None
         self.listener: Optional[ActiveMQListener] = None
@@ -359,6 +361,102 @@ class PiTracServer:
         async def stop_calibration() -> Dict[str, Any]:
             """Stop any running calibration process"""
             return await self.calibration_manager.stop_calibration()
+
+        @self.app.post("/api/camera/{camera_id}/stream/start")
+        async def start_camera_stream(camera_id: str) -> Dict[str, Any]:
+            """Start live camera preview for calibration
+
+            Args:
+                camera_id: Camera identifier (camera1 or camera2)
+
+            Returns:
+                Dict with status and camera ID
+            """
+            if camera_id not in ["camera1", "camera2"]:
+                return {"status": "error", "message": "Invalid camera ID"}
+
+            # Stop pitrac_lm if running (can't access cameras while it's running)
+            if self.pitrac_manager.is_running():
+                logger.info(f"Stopping pitrac_lm before starting camera {camera_id} preview")
+                stop_result = await self.pitrac_manager.stop()
+                if stop_result.get("status") == "error":
+                    return {
+                        "status": "error",
+                        "message": f"Failed to stop pitrac_lm: {stop_result.get('message')}",
+                    }
+
+            # Stop any active calibration processes
+            if self.calibration_manager.current_processes:
+                logger.info(f"Stopping calibration processes before starting camera {camera_id} preview")
+                await self.calibration_manager.stop_calibration()
+
+            # Start the camera stream
+            try:
+                result = self.camera_stream_manager.start_stream(camera_id)
+                return result
+            except Exception as e:
+                logger.error(f"Failed to start camera stream: {e}", exc_info=True)
+                return {"status": "error", "message": str(e)}
+
+        @self.app.post("/api/camera/{camera_id}/stream/stop")
+        async def stop_camera_stream(camera_id: str) -> Dict[str, Any]:
+            """Stop live camera preview
+
+            Args:
+                camera_id: Camera identifier (camera1 or camera2)
+
+            Returns:
+                Dict with status
+            """
+            try:
+                result = self.camera_stream_manager.stop_stream()
+                return result
+            except Exception as e:
+                logger.error(f"Failed to stop camera stream: {e}", exc_info=True)
+                return {"status": "error", "message": str(e)}
+
+        @self.app.get("/api/camera/{camera_id}/stream")
+        async def stream_camera_feed(camera_id: str) -> StreamingResponse:
+            """MJPEG stream endpoint for live camera preview
+
+            Args:
+                camera_id: Camera identifier (camera1 or camera2)
+
+            Returns:
+                StreamingResponse with MJPEG video stream
+            """
+            if camera_id not in ["camera1", "camera2"]:
+                return Response(status_code=400, content="Invalid camera ID")
+
+            if not self.camera_stream_manager.is_streaming(camera_id):
+                return Response(status_code=404, content=f"Camera {camera_id} stream not started")
+
+            try:
+                return StreamingResponse(
+                    self.camera_stream_manager.generate_frames(),
+                    media_type="multipart/x-mixed-replace; boundary=FRAME",
+                    headers={
+                        "Cache-Control": "no-cache, private",
+                        "Pragma": "no-cache",
+                        "Age": "0",
+                        "X-Accel-Buffering": "no",  # Disable nginx buffering if behind proxy
+                    },
+                )
+            except Exception as e:
+                logger.error(f"Error streaming camera feed: {e}", exc_info=True)
+                return Response(status_code=500, content=str(e))
+
+        @self.app.get("/api/camera/status")
+        async def get_camera_stream_status() -> Dict[str, Any]:
+            """Get current camera stream status
+
+            Returns:
+                Dict with active camera and streaming status
+            """
+            return {
+                "is_streaming": self.camera_stream_manager.is_streaming(),
+                "active_camera": self.camera_stream_manager.get_active_camera(),
+            }
 
         @self.app.get("/testing", response_class=HTMLResponse)
         async def testing_page(request: Request) -> Response:
@@ -838,6 +936,13 @@ class PiTracServer:
                 logger.info("Disconnected from ActiveMQ")
             except Exception as e:
                 logger.error(f"Error disconnecting from ActiveMQ: {e}")
+
+        # Stop any active camera streams
+        try:
+            self.camera_stream_manager.cleanup()
+            logger.info("Camera stream manager cleaned up")
+        except Exception as e:
+            logger.error(f"Error cleaning up camera stream manager: {e}")
 
         for ws in self.connection_manager.connections:
             try:

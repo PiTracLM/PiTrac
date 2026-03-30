@@ -27,15 +27,17 @@ CAMERA2_BACKGROUND_INIT_WAIT = 4.0  # Time to wait for background process to ini
 class CalibrationManager:
     """Manages calibration processes for PiTrac cameras"""
 
-    def __init__(self, config_manager, pitrac_binary: str = "/usr/lib/pitrac/pitrac_lm"):
+    def __init__(self, config_manager, camera_stream_manager=None, pitrac_binary: str = "/usr/lib/pitrac/pitrac_lm"):
         """
         Initialize calibration manager
 
         Args:
             config_manager: Configuration manager instance
+            camera_stream_manager: Optional camera stream manager to stop streams before calibration
             pitrac_binary: Path to pitrac_lm binary
         """
         self.config_manager = config_manager
+        self.camera_stream_manager = camera_stream_manager
         self.pitrac_binary = pitrac_binary
         self.current_processes: Dict[str, asyncio.subprocess.Process] = {}
         self._process_lock = asyncio.Lock()
@@ -309,8 +311,13 @@ class CalibrationManager:
             camera: Which camera to use ("camera1" or "camera2")
 
         Returns:
-            Dict with status and ball location info
+            Dict with status, ball location info, and image path for display
         """
+        # Stop any active camera stream before running calibration
+        if self.camera_stream_manager and self.camera_stream_manager.is_streaming():
+            logger.info(f"Stopping camera stream before ball location check for {camera}")
+            self.camera_stream_manager.stop_stream()
+
         logger.info(f"Starting ball location check for {camera}")
 
         self.calibration_status[camera] = {
@@ -348,6 +355,13 @@ class CalibrationManager:
         if camera_gain is None:
             camera_gain = 6.0
 
+        # Create output filename for the captured image
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_file = f"ball_location_{camera}_{timestamp}.png"
+        images_dir = Path.home() / "LM_Shares" / "Images"
+        images_dir.mkdir(parents=True, exist_ok=True)
+        output_path = images_dir / output_file
+
         cmd.extend(
             [
                 f"--search_center_x={search_x}",
@@ -355,6 +369,7 @@ class CalibrationManager:
                 f"--logging_level={logging_level}",
                 "--artifact_save_level=all",
                 f"--camera_gain={camera_gain}",
+                f"--output_filename={output_path}",
             ]
         )
         cmd.extend(self._build_cli_args_from_metadata(camera))
@@ -368,10 +383,19 @@ class CalibrationManager:
             self.calibration_status[camera]["message"] = "Ball detected" if ball_info else "Ball not found"
             self.calibration_status[camera]["progress"] = 100
 
+            image_url = None
+            if output_path.exists():
+                image_url = f"/api/images/{output_file}"
+                logger.info(f"Ball location image saved: {output_path}")
+            else:
+                logger.warning(f"Ball location image not found at: {output_path}")
+
             return {
                 "status": "success",
                 "ball_found": bool(ball_info),
                 "ball_info": ball_info,
+                "image_url": image_url,
+                "image_path": str(output_path) if output_path.exists() else None,
                 "output": result.get("output", ""),
             }
 
@@ -392,6 +416,10 @@ class CalibrationManager:
             Dict with calibration results
 
         """
+        # Stop any active camera stream before running calibration
+        if self.camera_stream_manager and self.camera_stream_manager.is_streaming():
+            logger.info(f"Stopping camera stream before auto calibration for {camera}")
+            self.camera_stream_manager.stop_stream()
 
         generated_config_path = self.config_manager.generate_golf_sim_config()
         logger.info(f"Generated config file at: {generated_config_path}")
@@ -864,6 +892,11 @@ class CalibrationManager:
         Returns:
             Dict with calibration results
         """
+        # Stop any active camera stream before running calibration
+        if self.camera_stream_manager and self.camera_stream_manager.is_streaming():
+            logger.info(f"Stopping camera stream before manual calibration for {camera}")
+            self.camera_stream_manager.stop_stream()
+
         logger.info(f"Starting manual calibration for {camera}")
 
         self.calibration_status[camera] = {
