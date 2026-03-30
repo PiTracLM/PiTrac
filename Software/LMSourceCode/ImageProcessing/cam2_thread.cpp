@@ -25,7 +25,6 @@ namespace golf_sim {
 
 // Defined in libcamera_interface.cpp
 bool SetLibcameraTuningFileEnvVariable(const GolfSimCamera& camera);
-void SetLibCameraLoggingOff();
 
 Camera2Thread::~Camera2Thread() {
     stop();
@@ -50,8 +49,6 @@ bool Camera2Thread::init_pipeline() {
         GS_LOG_MSG(error, "Camera2 failed to parse options");
         return false;
     }
-
-    SetLibCameraLoggingOff();
 
     options->Set().camera = 1;
     options->Set().gain = LibCameraInterface::kCamera2Gain;
