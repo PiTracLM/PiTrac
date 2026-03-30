@@ -1,3 +1,15 @@
+---
+title: Enclosure Version 3 Assembly
+layout: default
+nav_order: 2
+parent: V3 Enclosure
+grand_parent: Hardware
+description: Assembly instructions for the V3 Enclosure.
+keywords: DIY golf hardware, launch monitor parts, raspberry pi golf components, 3D print golf enclosure
+og_image: /assets/images/logos/PiTrac_Square.png
+last_modified_date: 2026.03.30
+---
+
 # Enclosure Version 3 / Assembly
 
 ---

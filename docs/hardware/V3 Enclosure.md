@@ -1,18 +1,26 @@
-# Enclosure Version 3 Overview
-![PiTrac_V3-Enclosure](../../assets/images/V3_Enclosure/PiTrac_V3-Enclosure.png)
+---
+title: V3 Enclosure
+layout: default
+nav_order: 5
+has_children: true
+description: V3 Enclosure overview, assembly guide and part printing guide
+keywords: DIY golf hardware, launch monitor parts, raspberry pi golf components, 3D print golf enclosure
+og_image: /assets/images/logos/PiTrac_Square.png
+last_modified_date: 2026-03-30
+---
+
+# V3 Enclosure
+![PiTrac_V3-Enclosure](../assets/images/V3_Enclosure/PiTrac_V3-Enclosure.png)
 
 Folder overview:  
 
 ```
-Enclosure Version 3/
-├─ README.md          # Overview, Safety Disclaimer, Requirements
+PiTrac/3D Printed Parts /Enclosure Version 3/
 ├─ Assembly/          # FreeCAD Assembly files
-│  ├─ README.md       # Assembly instruction
    └─ Assembly4/      # .FCStd and .svg assembly files
 ├─ Assets/            # general supporting material
 │  └─ Part Pictures/  # Images for buildplate-orientation
 └─ Part/
-   ├─ README.md       # Parts overview and printing instruction
    ├─ Misc/           # .FCStd files for  CAD supporting material
    ├─ Calibration Rig/# .stl, .stp and .FCStd files for the calibration rig
    ├─ Purchase/       # .stp and .FCStd files for purchased parts
@@ -59,7 +67,7 @@ Failure to follow these precautions can result in **fire, electric shock, or per
 ---
 
 ## Main Informations
-![Calibration Setup](../../assets/images/V3_Enclosure/Calibration_setup.png)
+![Calibration Setup](../assets/images/V3_Enclosure/Calibration_setup.png)
 Calibration coordinates for the calibration rig:  
 Camera1 (tee - far back / long rig)  
   X: "-0.522" m  
