@@ -6,6 +6,7 @@
 #pragma once
 
 #include <string>
+#include <atomic>
 #include <opencv2/core.hpp>
 
 
@@ -26,7 +27,7 @@ namespace golf_sim {
 		// Can be set false to stop the event loops and other async processes
 		// Certain processes may not check this very frequently, so may take
 		// some time to shutdown even after this is set false.
-		static bool golf_sim_running_;
+		static std::atomic<bool> golf_sim_running_;
 
 	};
 
