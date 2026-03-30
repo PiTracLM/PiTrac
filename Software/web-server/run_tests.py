@@ -70,7 +70,6 @@ def run_module_tests(module_name):
             "tests/test_smoke.py::TestSmoke::test_parser",
             "tests/test_shot_simulation.py::TestShotSimulation::test_parser_validation",
         ],
-        "listeners": ["tests/test_activemq_integration.py"],
         "server": ["tests/test_api_endpoints.py"],
         "websocket": ["tests/test_websocket.py"],
     }

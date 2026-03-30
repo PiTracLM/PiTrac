@@ -185,13 +185,16 @@ class TestRunTool:
         mock_process.returncode = 0
         mock_process.communicate.return_value = (b"Output", b"")
 
-        with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
-            await testing_manager.run_tool("test_images")
+        config_content = '{"gs_config": {}}'
 
-            # Verify sudo was added to command
-            args, kwargs = mock_exec.call_args
-            assert args[0] == "sudo"
-            assert "-E" in args
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+            with patch("builtins.open", mock_open(read_data=config_content)):
+                with patch.object(testing_manager, "_find_and_read_test_log", return_value=None):
+                    await testing_manager.run_tool("test_images")
+
+                    args, kwargs = mock_exec.call_args
+                    assert args[0] == "sudo"
+                    assert "-E" in args
 
     @pytest.mark.asyncio
     async def test_run_tool_exception(self, testing_manager, mock_config_manager):

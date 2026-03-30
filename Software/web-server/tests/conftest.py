@@ -18,26 +18,15 @@ from parsers import ShotDataParser
 from server import PiTracServer
 
 from utils.mock_factories import (
-    MockActiveMQFactory,
     MockWebSocketFactory,
 )
 from utils.test_helpers import ShotDataHelper
 
 
 @pytest.fixture
-def mock_activemq():
-    """Mock ActiveMQ connection using factory"""
-    with patch("server.stomp.Connection") as mock_conn:
-        mock_instance = MockActiveMQFactory.create_connection()
-        mock_conn.return_value = mock_instance
-        yield mock_instance
-
-
-@pytest.fixture
-def server_instance(mock_activemq):
+def server_instance():
     """Create PiTracServer instance with mocked dependencies"""
     server = PiTracServer()
-    server.mq_conn = mock_activemq
     server.shutdown_flag = False
     server.reconnect_task = None
     return server

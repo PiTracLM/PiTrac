@@ -55,7 +55,7 @@ class TestLogsAPI:
 
         with TestClient(app) as client:
             with client.websocket_connect("/ws/logs") as websocket:
-                websocket.send_json({"service": "activemq"})
+                websocket.send_json({"service": "pitrac-web"})
 
                 time.sleep(0.1)
 
@@ -140,7 +140,7 @@ class TestLogsAPI:
 
         with TestClient(app) as client:
             with client.websocket_connect("/ws/logs") as websocket:
-                websocket.send_json({"service": "activemq"})
+                websocket.send_json({"service": "pitrac-web"})
 
                 time.sleep(0.1)
 
@@ -181,7 +181,7 @@ class TestLogsAPI:
         with TestClient(app) as client1, TestClient(app) as client2:
             with client1.websocket_connect("/ws/logs") as ws1, client2.websocket_connect("/ws/logs") as ws2:
                 ws1.send_json({"service": "pitrac"})
-                ws2.send_json({"service": "activemq"})
+                ws2.send_json({"service": "pitrac-web"})
 
                 time.sleep(0.1)
 
@@ -211,7 +211,7 @@ class TestLogsAPI:
 
         with TestClient(app) as client:
             with client.websocket_connect("/ws/logs") as websocket:
-                websocket.send_json({"service": "activemq"})
+                websocket.send_json({"service": "pitrac-web"})
 
                 time.sleep(0.1)
 
