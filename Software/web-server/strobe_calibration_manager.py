@@ -190,10 +190,16 @@ class StrobeCalibrationManager:
         ldo = 0.0
 
         for i in range(self.DAC_MAX + 1):
+            if self._cancel_requested:
+                return -1, 0.0
+
             self._set_dac(i)
             time.sleep(0.1)
             ldo = self.get_ldo_voltage()
             logger.debug(f"DAC={i:#04x}, LDO={ldo:.2f}V")
+
+            self.status["progress"] = int((i / self.DAC_MAX) * 20)
+            self.status["message"] = f"Finding safe start point... DAC {i}/{self.DAC_MAX}"
 
             if ldo < self.LDO_MIN_V:
                 dac_start = i - 1
@@ -362,12 +368,14 @@ class StrobeCalibrationManager:
             success, final_dac, led_current = self._calibrate(target)
 
             if success and final_dac > 0:
+                ldo = self.get_ldo_voltage()
                 self.config_manager.set_config(self.DAC_CONFIG_KEY, final_dac)
                 self.status = {
                     "state": "complete", "progress": 100,
                     "message": f"DAC=0x{final_dac:02X}, current={led_current:.2f}A",
                     "dac_setting": final_dac,
                     "led_current": round(led_current, 2),
+                    "ldo_voltage": round(ldo, 2),
                 }
                 return self.status
             elif self._cancel_requested:
