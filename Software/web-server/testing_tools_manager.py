@@ -206,16 +206,12 @@ class TestingToolsManager:
 
             cmd = [self.pitrac_binary]
 
-            system_mode = self.config_manager.get_config().get("system", {}).get("mode", "single")
-            if system_mode == "single" and tool_id not in ["test_gspro_server", "test_e6_connect"]:
-                cmd.append("--run_single_pi")
+            cmd.append("--run_single_pi")
 
             cmd.extend(tool_info["args"])
             cmd.append(f"--config_file={config_path}")
 
             config = self.config_manager.get_config()
-
-            cmd.append("--msg_broker_address=tcp://localhost:61616")
 
             web_share_dir = (
                 config.get("gs_config", {})
@@ -233,19 +229,14 @@ class TestingToolsManager:
             env = os.environ.copy()
             env["LD_LIBRARY_PATH"] = "/usr/lib/pitrac"
             env["PITRAC_ROOT"] = "/usr/lib/pitrac"
-            env["PITRAC_MSG_BROKER_FULL_ADDRESS"] = "tcp://localhost:61616"
             env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = base_image_dir
             env["PITRAC_WEBSERVER_SHARE_DIR"] = str(Path.home() / "LM_Shares/WebShare")
             env["DISPLAY"] = ":0.0"
 
-            env_params_cam1 = self.config_manager.get_environment_parameters("camera1")
-            env_params_cam2 = self.config_manager.get_environment_parameters("camera2")
             merged_config = self.config_manager.get_config()
-
-            for param in env_params_cam1:
+            for param in self.config_manager.get_environment_parameters():
                 key = param["key"]
                 env_var = param["envVariable"]
-
                 value = merged_config
                 for part in key.split("."):
                     if isinstance(value, dict):
@@ -253,22 +244,6 @@ class TestingToolsManager:
                     else:
                         value = None
                         break
-
-                if value is not None and value != "":
-                    env[env_var] = str(value)
-
-            for param in env_params_cam2:
-                key = param["key"]
-                env_var = param["envVariable"]
-
-                value = merged_config
-                for part in key.split("."):
-                    if isinstance(value, dict):
-                        value = value.get(part)
-                    else:
-                        value = None
-                        break
-
                 if value is not None and value != "":
                     env[env_var] = str(value)
 
