@@ -1677,6 +1677,19 @@
       "passedVia": "json",
       "passedTo": "both"
     },
+    "gs_config.spin_analysis.kCoarseSearchResolution": {
+      "category": "Spin Analysis",
+      "subcategory": "advanced",
+      "displayName": "Coarse Search Resolution",
+      "description": "Resolution (pixels) for downsampled dimple images during coarse spin search. Lower is faster, higher preserves more detail.",
+      "type": "number",
+      "min": 45,
+      "max": 120,
+      "default": 90,
+      "requiresRestart": false,
+      "passedVia": "json",
+      "passedTo": "both"
+    },
     "gs_config.spin_analysis.kGaborMaxWhitePercent": {
       "category": "Spin Analysis",
       "subcategory": "advanced",

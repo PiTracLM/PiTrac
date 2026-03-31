@@ -389,6 +389,7 @@
       "kBallRadiusMeters": "0.021335"
     },
     "spin_analysis": {
+      "kCoarseSearchResolution": "90",
       "kCoarseXRotationDegreesEnd": "36",
       "kCoarseXRotationDegreesIncrement": "4",
       "kCoarseXRotationDegreesStart": "-36",

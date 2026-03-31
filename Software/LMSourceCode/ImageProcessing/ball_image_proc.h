@@ -77,6 +77,7 @@ public:
     static int kCoarseZRotationDegreesIncrement;
     static int kCoarseZRotationDegreesStart;
     static int kCoarseZRotationDegreesEnd;
+    static int kCoarseSearchResolution;
 
     static double kPlacedBallCannyLower;
     static double kPlacedBallCannyUpper;

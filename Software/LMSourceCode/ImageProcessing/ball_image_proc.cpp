@@ -79,6 +79,7 @@ namespace golf_sim {
     int BallImageProc::kCoarseZRotationDegreesIncrement = 6;
     int BallImageProc::kCoarseZRotationDegreesStart = -50;
     int BallImageProc::kCoarseZRotationDegreesEnd = 60;
+    int BallImageProc::kCoarseSearchResolution = 90;
 
     double BallImageProc::kPlacedBallCannyLower;
     double BallImageProc::kPlacedBallCannyUpper;
@@ -271,6 +272,8 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseZRotationDegreesIncrement", kCoarseZRotationDegreesIncrement);
         GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseZRotationDegreesStart", kCoarseZRotationDegreesStart);
         GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseZRotationDegreesEnd", kCoarseZRotationDegreesEnd);
+
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseSearchResolution", kCoarseSearchResolution);
 
         GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kGaborMinWhitePercent", kGaborMinWhitePercent);
         GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kGaborMaxWhitePercent", kGaborMaxWhitePercent);
@@ -3044,17 +3047,18 @@ namespace golf_sim {
 
 
 
-        // Downsample dimple edge images for coarse search — 90x90 is enough
+        // Downsample dimple edge images for coarse search — configurable resolution is enough
         // to identify the correct 6-degree bin. Fine search uses full resolution.
         cv::Mat coarse_dimple1, coarse_dimple2;
-        cv::Size coarseSize(90, 90);
+        int coarseRes = kCoarseSearchResolution;
+        cv::Size coarseSize(coarseRes, coarseRes);
         cv::resize(ball_image1DimpleEdges, coarse_dimple1, coarseSize, 0, 0, cv::INTER_NEAREST);
         cv::resize(ball_image2DimpleEdges, coarse_dimple2, coarseSize, 0, 0, cv::INTER_NEAREST);
 
         // Scale ball parameters for the downsampled images
         GolfBall coarse_ball1 = local_ball1;
         GolfBall coarse_ball2 = local_ball2;
-        float scale = 90.0f / (float)ball_image1DimpleEdges.cols;
+        float scale = (float)coarseRes / (float)ball_image1DimpleEdges.cols;
         // Update ball center and radius for the coarse images
         coarse_ball1.set_x((float)(local_ball1.x() * scale));
         coarse_ball1.set_y((float)(local_ball1.y() * scale));
