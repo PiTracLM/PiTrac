@@ -4121,6 +4121,29 @@ namespace golf_sim {
         // LoggingTools::DebugShowImage("(closed) destination_image_gray", destination_image_gray);
     }
 
+    bool BallImageProc::BboxToCircle(float bbox_x, float bbox_y, float bbox_w, float bbox_h,
+                                     int image_cols, int image_rows,
+                                     const char* backend_name,
+                                     GsCircle& out_circle) {
+        float cx = bbox_x + bbox_w * 0.5f;
+        float cy = bbox_y + bbox_h * 0.5f;
+        float r = std::max(bbox_w, bbox_h) * 0.5f;
+
+        if (cx - r < 0 || cy - r < 0 ||
+            cx + r > image_cols || cy + r > image_rows) {
+            GS_LOG_TRACE_MSG(trace, std::string(backend_name) +
+                           ": rejecting edge-clipped detection at (" +
+                           std::to_string((int)cx) + "," + std::to_string((int)cy) +
+                           ") r=" + std::to_string((int)r));
+            return false;
+        }
+
+        out_circle[0] = cx;
+        out_circle[1] = cy;
+        out_circle[2] = r;
+        return true;
+    }
+
     /**
      * Detection Algorithm Dispatcher
      * Routes detection to HoughCircles or ONNX based on kStrobedBallDetectionMethod configuration
@@ -4343,14 +4366,18 @@ namespace golf_sim {
             detected_circles.reserve(detections.size());
             for (const auto& d : detections) {
                 GsCircle circle;
-                circle[0] = d.bbox.x + d.bbox.width * 0.5f;
-                circle[1] = d.bbox.y + d.bbox.height * 0.5f;
-                circle[2] = std::max(d.bbox.width, d.bbox.height) * 0.5f;
-                detected_circles.push_back(circle);
+                if (BboxToCircle(d.bbox.x, d.bbox.y, d.bbox.width, d.bbox.height,
+                                 input_image.cols, input_image.rows, "NCNN", circle)) {
+                    detected_circles.push_back(circle);
+                }
             }
 
             auto detection_end = std::chrono::high_resolution_clock::now();
             auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(detection_end - detection_start);
+            if (detected_circles.empty() && !detections.empty()) {
+                GS_LOG_MSG(warning, "NCNN: model detected " + std::to_string(detections.size()) +
+                           " ball(s) but all were rejected as edge-clipped");
+            }
             GS_LOG_TRACE_MSG(trace, "NCNN detected " + std::to_string(detected_circles.size()) +
                            " balls in " + std::to_string(ms.count()) + "ms");
             return !detected_circles.empty();
@@ -4500,15 +4527,19 @@ namespace golf_sim {
 
             for (const auto& detection : detections) {
                 GsCircle circle;
-                circle[0] = detection.bbox.x + detection.bbox.width * 0.5f;
-                circle[1] = detection.bbox.y + detection.bbox.height * 0.5f;
-                circle[2] = std::max(detection.bbox.width, detection.bbox.height) * 0.5f;
-                detected_circles.push_back(circle);
+                if (BboxToCircle(detection.bbox.x, detection.bbox.y, detection.bbox.width, detection.bbox.height,
+                                 input_image.cols, input_image.rows, "ONNX", circle)) {
+                    detected_circles.push_back(circle);
+                }
             }
 
             auto detection_end = std::chrono::high_resolution_clock::now();
             auto detection_duration = std::chrono::duration_cast<std::chrono::milliseconds>(detection_end - detection_start);
 
+            if (detected_circles.empty() && !detections.empty()) {
+                GS_LOG_MSG(warning, "ONNX: model detected " + std::to_string(detections.size()) +
+                           " ball(s) but all were rejected as edge-clipped");
+            }
             GS_LOG_TRACE_MSG(trace, "ONNX Runtime detected " + std::to_string(detected_circles.size()) +
                            " balls in " + std::to_string(detection_duration.count()) + "ms");
             return !detected_circles.empty();
@@ -4656,16 +4687,20 @@ namespace golf_sim {
             for (int idx : indices) {
                 const cv::Rect& box = yolo_detection_boxes_[idx];
                 GsCircle circle;
-                circle[0] = (float)(box.x + (int)(std::round(box.width / 2.0)));
-                circle[1] = (float)(box.y + (int)(std::round(box.height / 2.0)));
-                circle[2] = (float)(std::max(box.width, (int)(std::round(box.height) / 2.0)));
-                detected_circles.push_back(circle);
+                if (BboxToCircle((float)box.x, (float)box.y, (float)box.width, (float)box.height,
+                                 input_image.cols, input_image.rows, "DNN", circle)) {
+                    detected_circles.push_back(circle);
+                }
             }
 
             auto processing_end_time = std::chrono::high_resolution_clock::now();
             auto processing_duration = std::chrono::duration_cast<std::chrono::milliseconds>(processing_end_time - processing_start_time);
             GS_LOG_MSG(trace, "OpenCV DNN completed processing in " + std::to_string(processing_duration.count()) + " ms (fallback)");
 
+            if (detected_circles.empty() && !indices.empty()) {
+                GS_LOG_MSG(warning, "DNN: model detected " + std::to_string(indices.size()) +
+                           " ball(s) but all were rejected as edge-clipped");
+            }
             GS_LOG_TRACE_MSG(trace, "OpenCV DNN detected " + std::to_string(detected_circles.size()) + " balls after NMS");
             return !detected_circles.empty();
 

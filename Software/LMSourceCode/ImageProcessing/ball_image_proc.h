@@ -346,6 +346,14 @@ public:
 
     bool PreProcessStrobedImage(cv::Mat& search_image, BallSearchMode search_mode);
 
+    // Converts a bounding box to a GsCircle, rejecting edge-clipped detections
+    // whose inscribed circle extends outside the image bounds.
+    // Returns true if the detection was accepted, false if rejected.
+    static bool BboxToCircle(float bbox_x, float bbox_y, float bbox_w, float bbox_h,
+                             int image_cols, int image_rows,
+                             const char* backend_name,
+                             GsCircle& out_circle);
+
     // Detection Methods
     static bool DetectBalls(const cv::Mat& preprocessed_img,
                             BallSearchMode search_mode,
