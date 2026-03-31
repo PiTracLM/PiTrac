@@ -369,19 +369,26 @@ namespace golf_sim {
             return true;
         }
 
-		// If the camera is flipped, the cropping has to be adjusted accordingly so that the crop offset is flipped vertically
+		// If the camera is flipped (VFlip + HFlip = 180-degree rotation), the cropping
+        // offset must be adjusted for both axes to match the rotated coordinate system.
         GsCameraNumber camera_number = camera.camera_hardware_.camera_number_;
         const CameraHardware::CameraOrientation  camera_orientation = (camera_number == GsCameraNumber::kGsCamera1) ? GolfSimCamera::kSystemSlot1CameraOrientation : GolfSimCamera::kSystemSlot2CameraOrientation;
 
         if (camera_orientation == CameraHardware::CameraOrientation::kUpsideDown) {
-            GS_LOG_TRACE_MSG(trace, "Original watching_crop_offset[1] = " + std:: to_string(watching_crop_offset[1]));
+            GS_LOG_TRACE_MSG(trace, "Original watching_crop_offset = (" + std::to_string(watching_crop_offset[0]) + ", " + std::to_string(watching_crop_offset[1]) + ")");
+
+            float half_screen_width = std::round(camera.camera_hardware_.video_resolution_x_ / 2);
             float half_screen_height = std::round(camera.camera_hardware_.video_resolution_y_ / 2);
+
+            // Reflect both axes around screen center for 180-degree rotation
+            watching_crop_offset[0] = half_screen_width - (watching_crop_offset[0] - half_screen_width);
             watching_crop_offset[1] = half_screen_height - (watching_crop_offset[1] - half_screen_height);
 
-	    // We essentially need to swap the top and bottom of the cropping rectangle 
+            // Swap the origin from bottom-right to top-left of the cropping rectangle
+            watching_crop_offset[0] -= watching_crop_size[0];
             watching_crop_offset[1] -= watching_crop_size[1];
 
-            GS_LOG_TRACE_MSG(trace, "Flipped watching_crop_offset[1] = " + std::to_string(watching_crop_offset[1]));
+            GS_LOG_TRACE_MSG(trace, "Flipped watching_crop_offset = (" + std::to_string(watching_crop_offset[0]) + ", " + std::to_string(watching_crop_offset[1]) + ")");
         }
 
         if (!SendCameraCroppingCommand(camera, watching_crop_size, watching_crop_offset)) {
@@ -806,7 +813,7 @@ bool ConfigureLibCameraOptions(const GolfSimCamera& camera, RPiCamEncoder& app, 
 
     if (camera_orientation == CameraHardware::CameraOrientation::kUpsideDown) {
      // Tell libcamera to flip the image vertically back to where it should be
-        options->Set().transform = libcamera::Transform::VFlip;
+        options->Set().transform = libcamera::Transform::VFlip | libcamera::Transform::HFlip;
         GS_LOG_MSG(trace, "Flipping still picture upside down.");
     }
     else {
@@ -1174,7 +1181,7 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
 
         if (camera_orientation == CameraHardware::CameraOrientation::kUpsideDown) {
     	    // Tell libcamera to flip the image vertically back to where it should be
-            options->Set().transform = libcamera::Transform::VFlip;
+            options->Set().transform = libcamera::Transform::VFlip | libcamera::Transform::HFlip;
             GS_LOG_MSG(trace, "Flipping still picture upside down.");
         }
 	else {
@@ -1480,7 +1487,7 @@ bool WaitForCam2Trigger(cv::Mat& return_image) {
 	// We know we are using camera 2
         if (GolfSimCamera::kSystemSlot2CameraOrientation == CameraHardware::CameraOrientation::kUpsideDown) {
     	    // Tell libcamera to flip the image vertically back to where it should be
-            options->Set().transform = libcamera::Transform::VFlip;
+            options->Set().transform = libcamera::Transform::VFlip | libcamera::Transform::HFlip;
             GS_LOG_MSG(trace, "Flipping still picture upside down.");
         }
 	else {
