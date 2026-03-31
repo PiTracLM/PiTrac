@@ -350,11 +350,11 @@ namespace golf_sim {
         // If we need to correct something, preserve the crop width and correct the offset.
         // NOTE - Camera resolutions are 1 greater than the greatest pixel position
         if ((((camera.camera_hardware_.resolution_x_ - 1) - crop_offset_x) + watching_crop_width) >= camera.camera_hardware_.resolution_x_) {
-            crop_offset_x = (camera.camera_hardware_.video_resolution_x_ - crop_offset_x) - 1;
+            crop_offset_x = (camera.camera_hardware_.resolution_x_ - crop_offset_x) - 1;
         }
 
         if ((((camera.camera_hardware_.resolution_y_ - 1) - crop_offset_y) + watching_crop_height) >= camera.camera_hardware_.resolution_y_) {
-            crop_offset_y = (camera.camera_hardware_.video_resolution_y_ - crop_offset_y) - 1;
+            crop_offset_y = (camera.camera_hardware_.resolution_y_ - crop_offset_y) - 1;
         }
 
         cv::Vec2i watching_crop_size = cv::Vec2i((uint)watching_crop_width, (uint)watching_crop_height);
@@ -377,8 +377,8 @@ namespace golf_sim {
         if (camera_orientation == CameraHardware::CameraOrientation::kUpsideDown) {
             GS_LOG_TRACE_MSG(trace, "Original watching_crop_offset = (" + std::to_string(watching_crop_offset[0]) + ", " + std::to_string(watching_crop_offset[1]) + ")");
 
-            float half_screen_width = std::round(camera.camera_hardware_.video_resolution_x_ / 2);
-            float half_screen_height = std::round(camera.camera_hardware_.video_resolution_y_ / 2);
+            float half_screen_width = std::round(camera.camera_hardware_.resolution_x_ / 2);
+            float half_screen_height = std::round(camera.camera_hardware_.resolution_y_ / 2);
 
             // Reflect both axes around screen center for 180-degree rotation
             watching_crop_offset[0] = half_screen_width - (watching_crop_offset[0] - half_screen_width);
