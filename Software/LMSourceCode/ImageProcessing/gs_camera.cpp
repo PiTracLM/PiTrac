@@ -2315,16 +2315,81 @@ namespace golf_sim {
                 }
             }
             
-            // Check if all detected balls came from the ML model (NCNN/ONNX).
-            // ML-detected balls are high-confidence and don't need the Hough-specific
-            // filtering gauntlet (color, radius, scoring, angle, trajectory).
-            // Only overlap removal is needed for later spin processing.
-            bool all_model_detected = std::all_of(initial_balls.begin(), initial_balls.end(),
-                [](const GolfBall& b) { return b.ball_color_ == GolfBall::BallColor::kModelDetected; });
+            RemoveWrongColorBalls(strobed_balls_color_image, initial_balls, expected_best_ball, max_color_difference);
+            ShowAndLogBalls("AnalyzeStrobedBall_After_RemoveWrongColorBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
+            LoggingTools::Trace("Initial_balls after RemoveWrongColorBalls: ", initial_balls);
 
-            if (all_model_detected) {
-                GS_LOG_MSG(info, "All " + std::to_string(initial_balls.size()) + " balls are ML-detected — skipping legacy Hough filters, keeping only overlap removal.");
+            // Seems like wrong radius balls can be a better and more-ball-removing early filter than UnlikelyAngle balls
+            RemoveWrongRadiusBalls(initial_balls, expected_best_ball);
+            ShowAndLogBalls("AnalyzeStrobedBall_After_RemoveWrongRadiusBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
+
+            RemoveUnlikelyAngleLowerQualityBalls(initial_balls);
+            ShowAndLogBalls("AnalyzeStrobedBall_After_RemoveUnlikelyAngleLowerQualityBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
+
+
+            // TBD - REMOVE - Hack to test the strobe interval function
+            /** 
+            initial_balls.erase(initial_balls.begin() + 2);
+            initial_balls.erase(initial_balls.begin() + 2);
+            ShowAndLogBalls("initial_balls after hack for testing", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
+            ***/
+
+
+            if (initial_balls.size() < 2) {
+                GS_LOG_MSG(warning, "Found less than 2 balls.");
+                return false;
             }
+            // Unlikely that the best balls would have been removed.  However, it is possible.
+            // Reset as necessary
+            best_ball = initial_balls[0];
+            second_best_ball = initial_balls[1];
+            expected_best_ball = best_ball;
+
+            // TBD - Am putting this back in because we're still getting too many balls with the new edge detector
+            RemoveLowScoringBalls(initial_balls, kMaxBallsToRetain);
+            ShowAndLogBalls("AnalyzeStrobedBall_After_RemoveLowScoringBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
+
+            // Must be sorted by quality
+            RemoveUnlikelyAngleLowerQualityBalls(initial_balls);
+            ShowAndLogBalls("AnalyzeStrobedBall_After_RemoveUnlikelyAngleLowerQualityBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
+
+            RemoveWrongRadiusBalls(initial_balls, expected_best_ball);
+            ShowAndLogBalls("AnalyzeStrobedBall_After_RemoveWrongRadiusBalls (Normal Mode)", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
+
+            // Unlikely that the best balls would have been removed.  However, it is possible.
+            // Reset as necessary
+            best_ball = initial_balls[0];
+            second_best_ball = initial_balls[1];
+            expected_best_ball = best_ball;
+
+
+            // Especially if we are using a loose Hough for initial identification, this could get rid of 100 or more ball candidates
+            SortBallsByXPosition(initial_balls);
+            RemoveOffTrajectoryBalls(initial_balls, kMaxDistanceFromTrajectory, best_ball, second_best_ball);
+            ShowAndLogBalls("AnalyzeStrobedBall_After_0thRemoveOffTrajectoryBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
+
+            // A frequent problem because of the very-broad net we cast is that crappy balls end up determined
+            // right next to a good one.  Get rid of 'em
+            if (number_of_initial_balls > 20) {
+                ShowAndLogBalls("AnalyzeStrobedBall Balls before RemoveNearbyPoorQualityBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
+                RemoveNearbyPoorQualityBalls(initial_balls, ip->min_ball_radius_, number_of_initial_balls / 2);
+                ShowAndLogBalls("AnalyzeStrobedBall Balls after RemoveNearbyPoorQualityBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
+            }
+
+            // Allow for a couple of misidentifications, but assume that the best scoring
+            // balls are all at the front of the herd and that we can get rid of the ones
+            // at the back of the pack, quality-wise;
+            RemoveLowScoringBalls(initial_balls, kMaxBallsToRetain);
+
+            ShowAndLogBalls("AnalyzeStrobedBall_after_RemoveLowScoringBalls", strobed_balls_color_image, initial_balls, false);
+
+            if (initial_balls.size() == 1) {
+                GS_LOG_MSG(warning, "GetBall() found only one ball after initial filtering.  Ball velocity may have been too high or very slow.");
+                return false;
+            }
+
+            SortBallsByXPosition(initial_balls);
+            ShowAndLogBalls("AnalyzeStrobedBall_Before_RemoveUnlikelyRadiusChangeBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
 
             double max_intermediate_ball_radius_change_percent = 0.0;
 
@@ -2335,81 +2400,38 @@ namespace golf_sim {
                 max_intermediate_ball_radius_change_percent = kMaxIntermediateBallRadiusChangePercent;
             }
 
-            if (!all_model_detected) {
-                // Legacy Hough filtering — needed to winnow down large candidate sets
-                RemoveWrongColorBalls(strobed_balls_color_image, initial_balls, expected_best_ball, max_color_difference);
-                ShowAndLogBalls("AnalyzeStrobedBall_After_RemoveWrongColorBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
-                LoggingTools::Trace("Initial_balls after RemoveWrongColorBalls: ", initial_balls);
+            RemoveUnlikelyRadiusChangeBalls(initial_balls, max_intermediate_ball_radius_change_percent, kMaxOverlappedBallRadiusChangeRatio);
 
-                RemoveWrongRadiusBalls(initial_balls, expected_best_ball);
-                ShowAndLogBalls("AnalyzeStrobedBall_After_RemoveWrongRadiusBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
+            SortBallsByXPosition(initial_balls);
+            ShowAndLogBalls("AnalyzeStrobedBall_After_1stRemoveUnlikelyRadiusChangeBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
 
-                RemoveUnlikelyAngleLowerQualityBalls(initial_balls);
-                ShowAndLogBalls("AnalyzeStrobedBall_After_RemoveUnlikelyAngleLowerQualityBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
+            RemoveUnlikelyRadiusChangeBalls(initial_balls, max_intermediate_ball_radius_change_percent, kMaxOverlappedBallRadiusChangeRatio);
 
-                if (initial_balls.size() < 2) {
-                    GS_LOG_MSG(warning, "Found less than 2 balls.");
-                    return false;
-                }
-                best_ball = initial_balls[0];
-                second_best_ball = initial_balls[1];
-                expected_best_ball = best_ball;
+            SortBallsByXPosition(initial_balls);
+            ShowAndLogBalls("AnalyzeStrobedBall_After_2ndRemoveUnlikelyRadiusChangeBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
 
-                RemoveLowScoringBalls(initial_balls, kMaxBallsToRetain);
-                ShowAndLogBalls("AnalyzeStrobedBall_After_RemoveLowScoringBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
+            RemoveUnlikelyRadiusChangeBalls(initial_balls, max_intermediate_ball_radius_change_percent, kMaxOverlappedBallRadiusChangeRatio);
 
-                RemoveUnlikelyAngleLowerQualityBalls(initial_balls);
-                ShowAndLogBalls("AnalyzeStrobedBall_After_RemoveUnlikelyAngleLowerQualityBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
+            ShowAndLogBalls("AnalyzeStrobedBall_After_3rdRemoveUnlikelyRadiusChangeBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
 
-                RemoveWrongRadiusBalls(initial_balls, expected_best_ball);
-                ShowAndLogBalls("AnalyzeStrobedBall_After_RemoveWrongRadiusBalls (Normal Mode)", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
+            // Identify any balls that are overlapping with other balls.  Such balls are unlikely to be useful 
+            // for spin calculations.
 
-                best_ball = initial_balls[0];
-                second_best_ball = initial_balls[1];
-                expected_best_ball = best_ball;
+            // After sorting, the first ball will be the one that is furthest away from the tee-off spot
+            // This is necessary for the RemoveOverlappingBalls to work correctly
+            SortBallsByXPosition(initial_balls);
 
-                SortBallsByXPosition(initial_balls);
-                RemoveOffTrajectoryBalls(initial_balls, kMaxDistanceFromTrajectory, best_ball, second_best_ball);
-                ShowAndLogBalls("AnalyzeStrobedBall_After_0thRemoveOffTrajectoryBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
+            LoggingTools::Trace("Initial_balls sorted by ascending (or for left-handed--descending) X value: ", initial_balls);
+            ShowAndLogBalls("AnalyzeStrobedBall_After_1stRemoveOffTrajectoryBalls", strobed_balls_color_image, initial_balls, false);
 
-                if (number_of_initial_balls > 20) {
-                    ShowAndLogBalls("AnalyzeStrobedBall Balls before RemoveNearbyPoorQualityBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
-                    RemoveNearbyPoorQualityBalls(initial_balls, ip->min_ball_radius_, number_of_initial_balls / 2);
-                    ShowAndLogBalls("AnalyzeStrobedBall Balls after RemoveNearbyPoorQualityBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
-                }
 
-                RemoveLowScoringBalls(initial_balls, kMaxBallsToRetain);
-                ShowAndLogBalls("AnalyzeStrobedBall_after_RemoveLowScoringBalls", strobed_balls_color_image, initial_balls, false);
+            // This should be using a tighter trajectory limit, but we're trying to accomodate some slow balls right now 
+            // that end up with curved trajectories.  TBD
+            SortBallsByXPosition(initial_balls);
+            RemoveOffTrajectoryBalls(initial_balls, kMaxDistanceFromTrajectory, best_ball, second_best_ball);
 
-                if (initial_balls.size() == 1) {
-                    GS_LOG_MSG(warning, "GetBall() found only one ball after initial filtering.  Ball velocity may have been too high or very slow.");
-                    return false;
-                }
+            ShowAndLogBalls("AnalyzeStrobedBall_After_1stRemoveOffTrajectoryBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
 
-                SortBallsByXPosition(initial_balls);
-                ShowAndLogBalls("AnalyzeStrobedBall_Before_RemoveUnlikelyRadiusChangeBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
-
-                RemoveUnlikelyRadiusChangeBalls(initial_balls, max_intermediate_ball_radius_change_percent, kMaxOverlappedBallRadiusChangeRatio);
-                SortBallsByXPosition(initial_balls);
-                ShowAndLogBalls("AnalyzeStrobedBall_After_1stRemoveUnlikelyRadiusChangeBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
-
-                RemoveUnlikelyRadiusChangeBalls(initial_balls, max_intermediate_ball_radius_change_percent, kMaxOverlappedBallRadiusChangeRatio);
-                SortBallsByXPosition(initial_balls);
-                ShowAndLogBalls("AnalyzeStrobedBall_After_2ndRemoveUnlikelyRadiusChangeBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
-
-                RemoveUnlikelyRadiusChangeBalls(initial_balls, max_intermediate_ball_radius_change_percent, kMaxOverlappedBallRadiusChangeRatio);
-                ShowAndLogBalls("AnalyzeStrobedBall_After_3rdRemoveUnlikelyRadiusChangeBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
-
-                SortBallsByXPosition(initial_balls);
-                LoggingTools::Trace("Initial_balls sorted by ascending (or for left-handed--descending) X value: ", initial_balls);
-                ShowAndLogBalls("AnalyzeStrobedBall_After_1stRemoveOffTrajectoryBalls", strobed_balls_color_image, initial_balls, false);
-
-                SortBallsByXPosition(initial_balls);
-                RemoveOffTrajectoryBalls(initial_balls, kMaxDistanceFromTrajectory, best_ball, second_best_ball);
-                ShowAndLogBalls("AnalyzeStrobedBall_After_1stRemoveOffTrajectoryBalls", strobed_balls_color_image, initial_balls, kLogIntermediateExposureImagesToFile);
-            }
-
-            // Both ML and legacy paths converge here for overlap removal
             SortBallsByXPosition(initial_balls);
 
 
@@ -2435,14 +2457,13 @@ namespace golf_sim {
 
             ShowAndLogBalls("AnalyzeStrobedBall_After_1stRemoveOverlappingBalls", strobed_balls_color_image, first_pass_balls, kLogIntermediateExposureImagesToFile);
 
-            if (!all_model_detected) {
-                // TBD -Trying these two steps twice to deal with really close balls that remain after the first pass
-                // THIS time, do not preserve high-quality balls that look sketchy
-                RemoveUnlikelyRadiusChangeBalls(first_pass_balls, max_intermediate_ball_radius_change_percent, kMaxOverlappedBallRadiusChangeRatio, false);
-                ShowAndLogBalls("AnalyzeStrobedBall_After_3rdRemoveUnlikelyRadiusChangeBalls", strobed_balls_color_image, first_pass_balls, kLogIntermediateExposureImagesToFile);
-            }
+            // TBD -Trying these two steps twice to deal with really close balls that remain after the first pass
+            // THIS time, do not preserve high-quality balls that look sketchy
+            RemoveUnlikelyRadiusChangeBalls(first_pass_balls, max_intermediate_ball_radius_change_percent, kMaxOverlappedBallRadiusChangeRatio, false);
+            ShowAndLogBalls("AnalyzeStrobedBall_After_3rdRemoveUnlikelyRadiusChangeBalls", strobed_balls_color_image, first_pass_balls, kLogIntermediateExposureImagesToFile);
 
             SortBallsByXPosition(first_pass_balls);
+
 
             std::vector<GolfBall> return_balls;
             number_overlapping_balls_removed += RemoveOverlappingBalls(first_pass_balls, kBallProximityMarginPercentRelaxed, true,
@@ -2575,19 +2596,18 @@ namespace golf_sim {
 
             std::vector<GolfBall> non_overlapping_balls;
 
-            if (!all_model_detected) {
-                // The false is to ensure ALL overlapping balls are removed.  We want to check for overlaps
-                // between as many possible balls as we can, so we perform this identification on the set
-                // of balls before off-color (and possibly overlapping) balls were removed.
-                RemoveUnlikelyRadiusChangeBalls(possibly_overlapping_balls_before_color_filter, max_intermediate_ball_radius_change_percent, kMaxOverlappedBallRadiusChangeRatio, false);
+            // The false is to ensure ALL overlapping balls are removed.  We want to check for overlaps
+            // between as many possible balls as we can, so we perform this identification on the set
+            // of balls before off-color (and possibly overlapping) balls were removed.
+            RemoveUnlikelyRadiusChangeBalls(possibly_overlapping_balls_before_color_filter, max_intermediate_ball_radius_change_percent, kMaxOverlappedBallRadiusChangeRatio, false);
 
-                ShowAndLogBalls("AnalyzeStrobedBall - balls after final RemoveUnlikelyRadiusChangeBalls", strobed_balls_color_image, possibly_overlapping_balls_before_color_filter, false);
+            ShowAndLogBalls("AnalyzeStrobedBall - balls after final RemoveUnlikelyRadiusChangeBalls", strobed_balls_color_image, possibly_overlapping_balls_before_color_filter, false);
 
-                // TBD - For some reason, we end up creating the possibly-overlapping-balls vector at a time before the poor quality balls are necessarily removed.
-                // So, do so here
-                RemoveUnlikelyAngleLowerQualityBalls(possibly_overlapping_balls_before_color_filter);
-                ShowAndLogBalls("AnalyzeStrobedBall_After FINAL RemoveUnlikelyAngleLowerQualityBalls", strobed_balls_color_image, possibly_overlapping_balls_before_color_filter, kLogIntermediateExposureImagesToFile);
-            }
+            // TBD - For some reason, we end up creating the possibly-overlapping-balls vector at a time before the poor quality balls are necessarily removed.
+            // So, do so here
+            RemoveUnlikelyAngleLowerQualityBalls(possibly_overlapping_balls_before_color_filter);
+            ShowAndLogBalls("AnalyzeStrobedBall_After FINAL RemoveUnlikelyAngleLowerQualityBalls", strobed_balls_color_image, possibly_overlapping_balls_before_color_filter, kLogIntermediateExposureImagesToFile);
+
 
             RemoveOverlappingBalls(possibly_overlapping_balls_before_color_filter,
                 kBallProximityMarginPercentStrict,
@@ -2599,9 +2619,9 @@ namespace golf_sim {
 
             ShowAndLogBalls("AnalyzeStrobedBall - balls after strictly-overlapping are removed", strobed_balls_color_image, non_overlapping_balls, kLogIntermediateExposureImagesToFile);
 
-            if (!all_model_detected) {
-                RemoveWrongColorBalls(strobed_balls_color_image, non_overlapping_balls, expected_best_ball, kMaxStrobedBallColorDifferenceStrict);
-            }
+            RemoveWrongColorBalls(strobed_balls_color_image, non_overlapping_balls, expected_best_ball, kMaxStrobedBallColorDifferenceStrict);
+
+
 
             // Create the NON_OVERLAPPING balls_and_timing vector.
             // Will do so by taking the current possibly-overlapping vector and
