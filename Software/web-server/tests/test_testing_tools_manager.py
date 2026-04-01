@@ -175,8 +175,12 @@ class TestRunTool:
         assert "Test log content" in result["output"]
 
     @pytest.mark.asyncio
-    async def test_run_tool_with_sudo(self, testing_manager, mock_config_manager):
+    async def test_run_tool_with_sudo(self, testing_manager, mock_config_manager, tmp_path):
         """Test running a tool that requires sudo"""
+        config_file = tmp_path / "test_config.json"
+        config_file.write_text('{"gs_config": {"testing": {}}}')
+        mock_config_manager.generate_golf_sim_config.return_value = str(config_file)
+
         mock_process = AsyncMock()
         mock_process.returncode = 0
         mock_process.communicate.return_value = (b"Output", b"")
