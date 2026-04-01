@@ -19,7 +19,6 @@ class TestPiTracProcessManager:
         config_manager = Mock()
         config_manager.get_config.return_value = {
             "logging.level": "info",
-            "gs_config.ipc_interface.kWebActiveMQHostAddress": "tcp://localhost:61616",
             "storage.image_dir": "/var/pitrac/images",
             "storage.web_share_dir": "/var/pitrac/web",
             "gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress": "192.168.1.100",
@@ -34,8 +33,6 @@ class TestPiTracProcessManager:
                 "camera2": {"displayName": "Camera 2", "slot": "slot2", "defaultIndex": 1, "envPrefix": "PITRAC_SLOT2"},
             },
             "systemDefaults": {
-                "mode": "single",
-                "cameraRole": "camera1",
                 "configStructure": {"systemKey": "system", "camerasKey": "cameras"},
             },
             "categoryList": [
@@ -60,12 +57,8 @@ class TestPiTracProcessManager:
             },
             "processManagement": {
                 "camera1LogFile": {"default": "pitrac.log"},
-                "camera2LogFile": {"default": "pitrac_camera2.log"},
                 "camera1PidFile": {"default": "pitrac.pid"},
-                "camera2PidFile": {"default": "pitrac_camera2.pid"},
                 "processCheckCommand": {"default": "pitrac_lm"},
-                "startupDelayCamera2": {"default": 2},
-                "startupWaitCamera2Ready": {"default": 1},
                 "startupDelayCamera1": {"default": 3},
                 "shutdownGracePeriod": {"default": 5},
                 "shutdownCheckInterval": {"default": 0.1},
@@ -80,7 +73,6 @@ class TestPiTracProcessManager:
                 "pitracRoot": {"default": "/usr/lib/pitrac"},
                 "baseImageLoggingDir": {"default": "~/LM_Shares/Images/"},
                 "webserverShareDir": {"default": "~/LM_Shares/WebShare/"},
-                "msgBrokerFullAddress": {"default": "tcp://localhost:61616"},
             },
             "settings": {},
         }
@@ -359,9 +351,6 @@ class TestPiTracProcessManagerIntegration:
         config_manager = Mock()
         config_manager.get_config.return_value = {
             "logging": {"level": "debug"},
-            "gs_config": {
-                "ipc_interface": {"kWebActiveMQHostAddress": "tcp://localhost:61616"},
-            },
             "storage": {"image_dir": "/tmp/pitrac/images", "web_share_dir": "/tmp/pitrac/web"},
         }
         config_manager.load_configurations_metadata.return_value = {
@@ -373,9 +362,7 @@ class TestPiTracProcessManagerIntegration:
             },
             "processManagement": {
                 "camera1LogFile": {"default": "pitrac.log"},
-                "camera2LogFile": {"default": "pitrac_camera2.log"},
                 "camera1PidFile": {"default": "pitrac.pid"},
-                "camera2PidFile": {"default": "pitrac_camera2.pid"},
                 "processCheckCommand": {"default": "pitrac_lm"},
                 "shutdownGracePeriod": {"default": 5},
             },
@@ -412,4 +399,3 @@ class TestPiTracProcessManagerIntegration:
             assert "error" in result.get("message", "").lower() or "failed" in result.get("message", "").lower()
 
         manager.process = None
-        manager.camera2_process = None

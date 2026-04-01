@@ -19,7 +19,6 @@ class TestConfigurationAPI:
         manager.load_configurations_metadata.return_value = {
             "settings": {
                 "cameras.camera1_gain": {"type": "number", "default": 1.0},
-                "system.mode": {"type": "select", "options": {"single": "Single"}},
             }
         }
         manager.get_diff.return_value = {"cameras.camera1_gain": {"user": 2.0, "default": 1.0}}

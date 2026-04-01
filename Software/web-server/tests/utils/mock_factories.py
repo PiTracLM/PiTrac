@@ -58,8 +58,6 @@ class MockConfigManagerFactory:
                 "camera2": {"displayName": "Camera 2", "slot": "slot2", "defaultIndex": 1, "envPrefix": "PITRAC_SLOT2"},
             },
             "systemDefaults": {
-                "mode": "single",
-                "cameraRole": "camera1",
                 "configStructure": {"systemKey": "system", "camerasKey": "cameras"},
             },
             "categoryList": [
@@ -84,12 +82,8 @@ class MockConfigManagerFactory:
             },
             "processManagement": {
                 "camera1LogFile": {"default": "pitrac.log"},
-                "camera2LogFile": {"default": "pitrac_camera2.log"},
                 "camera1PidFile": {"default": "pitrac.pid"},
-                "camera2PidFile": {"default": "pitrac_camera2.pid"},
                 "processCheckCommand": {"default": "pitrac_lm"},
-                "startupDelayCamera2": {"default": 2},
-                "startupWaitCamera2Ready": {"default": 1},
                 "startupDelayCamera1": {"default": 3},
                 "shutdownGracePeriod": {"default": 5},
                 "shutdownCheckInterval": {"default": 0.1},
@@ -104,7 +98,6 @@ class MockConfigManagerFactory:
                 "pitracRoot": {"default": "/usr/lib/pitrac"},
                 "baseImageLoggingDir": {"default": "~/LM_Shares/Images/"},
                 "webserverShareDir": {"default": "~/LM_Shares/WebShare/"},
-                "msgBrokerFullAddress": {"default": "tcp://localhost:61616"},
             },
             "settings": {},
         }
@@ -125,12 +118,10 @@ class MockProcessManagerFactory:
 
         manager.is_running.return_value = False
         manager.get_status.return_value = {
-            "camera1": {"running": False, "pid": None},
-            "camera2": {"running": False, "pid": None},
-        }
-        manager.get_logs.return_value = {
-            "camera1": ["Sample log line 1", "Sample log line 2"],
-            "camera2": ["Camera 2 log line 1"],
+            "is_running": False,
+            "pid": None,
+            "log_file": "/tmp/pitrac.log",
+            "binary": "/usr/lib/pitrac/pitrac_lm",
         }
 
         manager.start = AsyncMock(return_value=True)
@@ -138,22 +129,6 @@ class MockProcessManagerFactory:
         manager.restart = AsyncMock(return_value=True)
 
         return manager
-
-
-class MockActiveMQFactory:
-    """Factory for creating ActiveMQ connection mocks."""
-
-    @staticmethod
-    def create_connection() -> Mock:
-        """Create a basic ActiveMQ connection mock."""
-        connection = Mock()
-
-        connection.is_connected.return_value = True
-        connection.connect.return_value = None
-        connection.disconnect.return_value = None
-        connection.send.return_value = None
-
-        return connection
 
 
 class MockWebSocketFactory:

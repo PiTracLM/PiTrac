@@ -89,7 +89,6 @@ def mock_home_dir(tmp_path):
 
     config = {
         "network": {
-            "broker_address": "tcp://localhost:61616",
             "username": "test_user",
             "password": "test_pass",
         }

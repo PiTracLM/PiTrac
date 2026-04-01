@@ -33,7 +33,6 @@ class TestTestingToolsAPI:
             "pulse_test",
             "camera1_still",
             "camera2_still",
-            "dual_camera_test",
             "config_test",
             "image_processing_test",
         ]
