@@ -129,8 +129,6 @@ namespace golf_sim {
 		return pi_trac_root;
 	}
 
-	// TBD - Will need to be improved to adapt to having two cameras on the same
-	// Pi.
 GolfSimConfiguration::PiModel GolfSimConfiguration::GetPiModel() {
      GolfSimConfiguration::PiModel pi_model = kRPi5; // default fallback
 
@@ -652,10 +650,5 @@ bool GolfSimConfiguration::ReadValues() {
 
 		 return true;
 	 }
-
-	 std::string GolfSimConfiguration::GetSystemID() {
-		 return "LM_1";
-	 }
-
 
 } // namespace golf_sim
