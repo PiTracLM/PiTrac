@@ -78,12 +78,7 @@ function initDropdown() {
 
 async function controlPiTrac(action) {
   if ((action === "start" || action === "restart") && !strobeSafe) {
-    if (typeof showStatusMessage === "function") {
-      showStatusMessage(
-        "Cannot start PiTrac: V3 board requires strobe calibration first",
-        "error",
-      );
-    }
+    showStrobeSafetyModal();
     return;
   }
 
@@ -278,39 +273,83 @@ async function checkPiTracStatus() {
 
 // V3 strobe safety — blocks UI actions that would fire strobes without DAC calibration
 let strobeSafe = true;
+let strobeUnsafeReason = "";
 
 async function checkStrobeSafety() {
   try {
     const response = await fetch("/api/strobe-safety");
     const data = await response.json();
     strobeSafe = data.safe;
-
-    const existing = document.getElementById("strobe-safety-banner");
-    if (!data.safe) {
-      if (!existing) {
-        const banner = document.createElement("div");
-        banner.id = "strobe-safety-banner";
-        banner.style.cssText =
-          "background:#d32f2f;color:white;padding:10px 16px;text-align:center;font-weight:500;position:sticky;top:0;z-index:1000;";
-        banner.textContent = data.reason;
-        document.body.prepend(banner);
-      } else {
-        existing.textContent = data.reason;
-        existing.style.display = "";
-      }
-
-      document
-        .querySelectorAll(".control-btn, .tool-run-btn, .calibration-btn")
-        .forEach((btn) => {
-          btn.disabled = true;
-          btn.title = data.reason;
-        });
-    } else {
-      if (existing) existing.style.display = "none";
-    }
+    strobeUnsafeReason = data.reason || "";
   } catch (error) {
     console.error("Failed to check strobe safety:", error);
   }
+}
+
+function showStrobeSafetyModal() {
+  const existing = document.getElementById("strobe-safety-modal");
+  if (existing) {
+    existing.style.display = "flex";
+    return;
+  }
+
+  const overlay = document.createElement("div");
+  overlay.id = "strobe-safety-modal";
+  overlay.style.cssText =
+    "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;justify-content:center;align-items:center;z-index:1000;";
+
+  const card = document.createElement("div");
+  card.style.cssText =
+    "background:var(--bg-card);border-radius:0.75rem;padding:2rem;max-width:420px;width:90%;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.3);border:1px solid var(--border-color);";
+
+  const icon = document.createElement("div");
+  icon.style.cssText = "text-align:center;margin-bottom:1rem;";
+  icon.innerHTML =
+    '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+
+  const title = document.createElement("h3");
+  title.style.cssText =
+    "color:var(--text-primary);margin:0 0 0.75rem;text-align:center;font-size:1.1rem;";
+  title.textContent = "Strobe Calibration Required";
+
+  const msg = document.createElement("p");
+  msg.style.cssText =
+    "color:var(--text-secondary);margin:0 0 1.5rem;text-align:center;font-size:0.9rem;line-height:1.5;";
+  msg.textContent =
+    strobeUnsafeReason ||
+    "V3 board requires strobe calibration before use.";
+
+  const btnRow = document.createElement("div");
+  btnRow.style.cssText =
+    "display:flex;gap:0.75rem;justify-content:center;";
+
+  const calBtn = document.createElement("a");
+  calBtn.href = "/calibration";
+  calBtn.style.cssText =
+    "background:var(--accent-gradient);color:white;border:none;padding:0.6rem 1.25rem;border-radius:0.5rem;font-size:0.9rem;font-weight:500;cursor:pointer;text-decoration:none;display:inline-block;";
+  calBtn.textContent = "Go to Calibration";
+
+  const dismissBtn = document.createElement("button");
+  dismissBtn.style.cssText =
+    "background:transparent;color:var(--text-secondary);border:1px solid var(--border-color);padding:0.6rem 1.25rem;border-radius:0.5rem;font-size:0.9rem;cursor:pointer;";
+  dismissBtn.textContent = "Dismiss";
+  dismissBtn.onclick = () => {
+    overlay.style.display = "none";
+  };
+
+  btnRow.appendChild(calBtn);
+  btnRow.appendChild(dismissBtn);
+  card.appendChild(icon);
+  card.appendChild(title);
+  card.appendChild(msg);
+  card.appendChild(btnRow);
+  overlay.appendChild(card);
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.style.display = "none";
+  });
+
+  document.body.appendChild(overlay);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
