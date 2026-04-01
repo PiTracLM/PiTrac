@@ -16,8 +16,6 @@
     }
   },
   "systemDefaults": {
-    "mode": "single",
-    "cameraRole": "camera1",
     "configStructure": {
       "systemKey": "system",
       "camerasKey": "cameras"
@@ -181,13 +179,6 @@
       "description": "Legacy environment variable for backward compatibility",
       "type": "string",
       "default": "~/LM_Shares/WebShare/",
-      "internal": true
-    },
-    "msgBrokerFullAddress": {
-      "displayName": "Message Broker Address",
-      "description": "Legacy environment variable for backward compatibility",
-      "type": "string",
-      "default": "tcp://localhost:61616",
       "internal": true
     }
   },
@@ -925,18 +916,6 @@
       "requiresRestart": false,
       "passedVia": "json"
     },
-    "gs_config.ipc_interface.kWebActiveMQHostAddress": {
-      "category": "Network",
-      "subcategory": "basic",
-      "basicSubcategory": "Network",
-      "displayName": "ActiveMQ Broker Address",
-      "description": "ActiveMQ message broker address for dual camera mode",
-      "type": "text",
-      "default": "tcp://127.0.0.1:61616",
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "cliArgument": "--msg_broker_address"
-    },
     "gs_config.ipc_interface.kRefreshTimeSeconds": {
       "category": "Network",
       "subcategory": "basic",
@@ -1551,8 +1530,7 @@
       "max": 120,
       "default": 90,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.spin_analysis.kGaborMaxWhitePercent": {
       "category": "Spin Analysis",
