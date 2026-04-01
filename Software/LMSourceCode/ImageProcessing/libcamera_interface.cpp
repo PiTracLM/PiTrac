@@ -141,29 +141,6 @@ namespace golf_sim {
         return true;
     }
 
-    bool LibCameraInterface::SendCamera2PreImage(const cv::Mat& raw_image) {
-
-        // TBD -Not currently implemented
-        return false;
-
-        /*** 
-        // We must undistort here, because we are going to immediately send the pre-image and the receiver
-        // may not know what camera (and what distortion matrix) is in use.
-        CameraHardware::CameraModel  camera_model = CameraHardware::PiGS;
-        cv::Mat return_image = undistort_camera_image(raw_image, GsCameraNumber::kGsCamera2, camera_model);
-
-        // Send the image back to the cam1 system
-        GolfSimIPCMessage ipc_message(GolfSimIPCMessage::IPCMessageType::kCamera2ReturnPreImage);
-        ipc_message.SetImageMat(return_image);
-        GolfSimIpcSystem::SendIpcMessage(ipc_message);
-
-        // Save the image for later analysis
-        LoggingTools::LogImage("", return_image, std::vector < cv::Point >{}, true, "log_cam2_last_pre_image.png");
-        ***/
-        return true;
-    }
-
-
     bool WatchForBallMovement(GolfSimCamera& camera, const GolfBall& ball, bool& motion_detected) {
 
         if (!GolfSimClubData::Configure()) {
