@@ -289,8 +289,7 @@ bool MotionDetectStage::Process(CompletedRequestPtr& completed_request)
 			GS_LOG_MSG(trace, "---> SendExternalTrigger");
 		}
 		else {
-			// simulate the other system sending an image back
-			// TBD gs::GolfSimIpcSystem::SimulateCamera2ImageMessage();
+			// Camera2 image is captured by the in-process Camera2Thread
 		}
 
 		if (config_.verbose)

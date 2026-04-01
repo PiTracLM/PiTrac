@@ -3,8 +3,8 @@
  * Copyright (C) 2022-2025, Verdant Consultants, LLC.
  */
 
-// Base class for incomigin IPC messages, such as those sent between the LM and
-// external systems like the LM Monitor GUI and third-party golf simulators
+// Base class for control messages, such as those sent between the LM and
+// external systems like the web dashboard and third-party golf simulators
 
 #pragma once
 

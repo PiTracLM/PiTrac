@@ -1035,18 +1035,11 @@ void run_main(int argc, char* argv[])
 
 
     // In this mode, we just take a single picture and save it.
-    // Only do so locally if this is the camera1 system, of course
-    // If in cam2_still_mode on the camera2 system, send the shutter
-    // and strobe pulses asap, though the difference in
-    // operation will be the number of strobe pulses is cut to 1
-    // NOTE - when running in still mode for camera2, the Pi2/Camera2 process
-    // must separately be up and running to take the picture and return it
-    // to this process.
     if (GolfSimOptions::GetCommandLineOptions().camera_still_mode_) {
 
         GS_LOG_TRACE_MSG(trace, "Running in camera_still_mode.");
 
-        // We will still need IPC and cameras and such to communicate in and between the systems as usual
+        // Initialize cameras and system components
         if (!PerformSystemStartupTasks()) {
             GS_LOG_MSG(error, "Failed to PerformSystemStartupTasks.");
             return;
@@ -1155,7 +1148,7 @@ void run_main(int argc, char* argv[])
         {
             GS_LOG_MSG(info, "Running in kCamera1AutoCalibrate or kCamera2AutoCalibrate mode.");
 
-            // We will still need IPC and cameras and such to communicate in and between the systems as usual
+            // Initialize cameras and system components
             if (!PerformSystemStartupTasks()) {
                 GS_LOG_MSG(error, "Failed to PerformSystemStartupTasks.");
                 return;
@@ -1185,8 +1178,8 @@ void run_main(int argc, char* argv[])
 
             GolfBall ball;
             cv::Mat img;
-            // In addition to checking for the ball, this method will send an IPC results
-            // message if we are in calibration mode.
+            // In addition to checking for the ball, this method will send results
+            // to the web server if we are in calibration mode.
 
             GS_LOG_MSG(info, "Calibration Results (Distance of kCamera (1 OR 2) CalibrationDistanceToBall):");
             double average_focal_length = 0.0;
@@ -1248,7 +1241,7 @@ void run_main(int argc, char* argv[])
             GS_LOG_MSG(info, "Running in kCamera1BallLocation or kCamera2BallLocation mode.");
 
 
-            // We will still need IPC and cameras and such to communicate in and between the systems as usual
+            // Initialize cameras and system components
             if (!PerformSystemStartupTasks()) {
                 GS_LOG_MSG(error, "Failed to PerformSystemStartupTasks.");
                 return;
@@ -1558,7 +1551,7 @@ int main(int argc, char *argv[])
 
         GS_LOG_MSG(info, "PiTrac Launch Monitor shutting down normally...");
 
-        // Signal all background threads to stop (required for IPC consumer thread to exit)
+        // Signal all background threads to stop
         GolfSimGlobals::golf_sim_running_ = false;
 
         try {
