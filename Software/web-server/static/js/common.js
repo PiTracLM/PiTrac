@@ -77,10 +77,7 @@ function initDropdown() {
 }
 
 async function controlPiTrac(action) {
-  if ((action === "start" || action === "restart") && !strobeSafe) {
-    showStrobeSafetyModal();
-    return;
-  }
+  if ((action === "start" || action === "restart") && !requireStrobeSafe()) return;
 
   const buttonMap = {
     start: ["pitrac-start-btn-desktop", "pitrac-start-btn-mobile"],
@@ -284,6 +281,17 @@ async function checkStrobeSafety() {
   } catch (error) {
     console.error("Failed to check strobe safety:", error);
   }
+}
+
+/**
+ * Check strobe safety before performing an action. Returns true if safe.
+ * If unsafe, shows a modal directing the user to calibration. Use at the
+ * top of any function that could fire the strobe.
+ */
+function requireStrobeSafe() {
+  if (strobeSafe) return true;
+  showStrobeSafetyModal();
+  return false;
 }
 
 function showStrobeSafetyModal() {

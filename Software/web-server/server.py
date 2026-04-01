@@ -365,6 +365,10 @@ class PiTracServer:
             """Capture a still image for camera setup"""
             if camera not in ["camera1", "camera2"]:
                 return {"status": "error", "message": "Invalid camera"}
+            if camera == "camera2":
+                safety = self.strobe_calibration_manager.is_strobe_safe()
+                if not safety["safe"]:
+                    return {"status": "error", "message": safety["reason"]}
             if self.calibration_manager.loop is None:
                 return {"status": "error", "message": "Server still starting up, please retry in a moment"}
             return await self.calibration_manager.capture_still_image(camera)
