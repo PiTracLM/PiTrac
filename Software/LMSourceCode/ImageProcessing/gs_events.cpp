@@ -58,7 +58,6 @@ namespace golf_sim {
         GolfSimEvent::ControlMessage* controlMessage = nullptr;
         GolfSimEvent::FoundMultipleBalls* foundMultipleBalls = nullptr;
         GolfSimEvent::Camera2ImageReceived* cam2ImageReceived = nullptr;
-        GolfSimEvent::Camera2PreImageReceived* cam2PreImageReceived = nullptr;
         GolfSimEvent::Restart* restart = nullptr;
         GolfSimEvent::CheckForBallStable* checkForBallStable = nullptr;
         GolfSimEvent::BeginWatchingForBallHit* beginWatchingForBallHit = nullptr;
@@ -95,9 +94,6 @@ namespace golf_sim {
         }
         else if ((cam2ImageReceived = dynamic_cast<GolfSimEvent::Camera2ImageReceived*>(event))) {
             possible_event = *cam2ImageReceived;
-        }
-        else if ((cam2PreImageReceived = dynamic_cast<GolfSimEvent::Camera2PreImageReceived*>(event))) {
-            possible_event = *cam2PreImageReceived;
         }
         else if ((checkForCam2ImageReceived = dynamic_cast<GolfSimEvent::CheckForCam2ImageReceived*>(event))) {
             possible_event = *checkForCam2ImageReceived;

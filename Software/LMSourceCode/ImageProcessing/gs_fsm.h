@@ -61,13 +61,6 @@ namespace golf_sim {
             cv::Mat camera2_pre_image_;
         };
 
-        struct WaitingForCamera2PreImage {
-            std::chrono::steady_clock::time_point  startTime_;
-            GolfBall cam1_ball_;
-            cv::Mat ball_image_;
-        };
-
-
         struct Exiting {
         };
 
@@ -79,11 +72,10 @@ namespace golf_sim {
                                         state::WaitingForBall,
                                         state::WaitingForBallStabilization,
                                         state::WaitingForBallHit,
-                                        state::WaitingForCamera2PreImage,
                                         state::BallHitNowWaitingForCam2Image
                                     >;
 
-    // Send an Active-MQ message to any listeners, such as the PiTrac GUI
+    // Send a status message to the web server via HTTP POST
     // Such messages can be states like "WaitingForBallStabilization"
     bool SendIPCStatusMessage(GsIPCResultType& message_type);
     void SendIPCErrorStatusMessage(const std::string& error_message);

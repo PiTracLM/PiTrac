@@ -317,42 +317,17 @@ namespace golf_sim {
             LoggingTools::LogImageWithCircles("", img, std::vector < GsCircle >{ball.ball_circle_}, true, kWebServerLastTeedBallImage + ".png");
         }
 
-        // TBD - Not sure this is necessary if the Java servlet is smart enough
-        // to figure out what it needs to display
         GsUISystem::ClearWebserverImages();
 
-        // TBD - Probably remove.  Pre-image subtraction was an idea that never panned out as well as we'd hoped.
-        if (GolfSimCamera::kUsePreImageSubtraction) {
-            return state::WaitingForCamera2PreImage{ std::chrono::steady_clock::now(), ball, img };
-        }
-        else {
-            // This even will cause the waitingForBallHit state to begin watching for the hit
-            GolfSimEventElement beginWatchingForBallHit{ new GolfSimEvent::BeginWatchingForBallHit{ } };
-            GolfSimEventQueue::QueueEvent(beginWatchingForBallHit);
-
-            cv::Mat empty_mat;
-            return state::WaitingForBallHit{ std::chrono::steady_clock::now(),
-                                             waitingForBallStabilization.cam1_ball_,
-                                             waitingForBallStabilization.ball_image_,
-                                             empty_mat };
-
-        }
-    }
-
-
-    /*********** WaitingForCamera2PreImage ************/
-    GolfSimState onEvent(const state::WaitingForCamera2PreImage& waitingForCamera2PreImage,
-        const GolfSimEvent::Camera2PreImageReceived& camera2PreImageReceived) {
-        GS_LOG_MSG(debug, "GolfSim state transition: WaitingForCamera2PreImage - Received Camera2PreImageReceived.");
-
-        // This even will cause the waitingForBallHit state to begin watching for the hit
+        // Queue the event that causes the WaitingForBallHit state to begin watching for the hit
         GolfSimEventElement beginWatchingForBallHit{ new GolfSimEvent::BeginWatchingForBallHit{ } };
         GolfSimEventQueue::QueueEvent(beginWatchingForBallHit);
 
+        cv::Mat empty_mat;
         return state::WaitingForBallHit{ std::chrono::steady_clock::now(),
-                                         waitingForCamera2PreImage.cam1_ball_,
-                                         waitingForCamera2PreImage.ball_image_,
-                                         camera2PreImageReceived.GetBallFlightPreImage() };
+                                         waitingForBallStabilization.cam1_ball_,
+                                         waitingForBallStabilization.ball_image_,
+                                         empty_mat };
     }
 
     
@@ -623,9 +598,6 @@ namespace golf_sim {
                             [](const state::WaitingForBallHit& ballHit) {
                             GS_LOG_TRACE_MSG(trace, "WaitingForBallHit.");
                             },
-                            [](const state::WaitingForCamera2PreImage& waitingForCamera2PreImage) {
-                            GS_LOG_TRACE_MSG(trace, "WaitingForCamera2PreImage.");
-                            },
                             [](const state::WaitingForSimulatorArmed& waitingForSimulatorArmed) {
                             GS_LOG_TRACE_MSG(trace, "WaitingForSimulatorArmed.");
                             }
@@ -673,7 +645,7 @@ namespace golf_sim {
 
         // TBD - Is this the right place to create the IPC stuff
         if ( !PerformSystemStartupTasks() ) {
-            GS_LOG_MSG(error, "Failed to InitializeIPCSystem.");
+            GS_LOG_MSG(error, "Failed to PerformSystemStartupTasks.");
             return false;
         }
 
