@@ -807,11 +807,6 @@ class ConfigurationManager:
 
     # Auto-categorization removed - all items must have explicit categories
 
-    def get_basic_subcategories(self):
-        """DEPRECATED: Use get_categories() instead which now includes subcategories."""
-        # Return empty dict for backward compatibility
-        return {}
-
     def export_config(self) -> Dict[str, Any]:
         """Export current configuration for backup or sharing
 

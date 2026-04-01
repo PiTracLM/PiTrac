@@ -9,7 +9,6 @@ def check_dependencies():
         import pytest  # noqa: F401
         import httpx  # noqa: F401
         import websocket  # noqa: F401
-        import msgpack  # noqa: F401
         import yaml  # noqa: F401
 
         return True

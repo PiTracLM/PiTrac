@@ -7,7 +7,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-import yaml
 from fastapi import FastAPI, File, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -17,7 +16,6 @@ from calibration_manager import CalibrationManager
 from camera_detector import CameraDetector
 from config_manager import ConfigurationManager
 from constants import (
-    CONFIG_FILE,
     IMAGES_DIR,
     MPS_TO_MPH,
 )
@@ -44,7 +42,6 @@ class PiTracServer:
         self.calibration_manager = CalibrationManager(self.config_manager)
         self.testing_manager = TestingToolsManager(self.config_manager)
         self.strobe_calibration_manager = StrobeCalibrationManager(self.config_manager)
-        self.reconnect_task: Optional[asyncio.Task] = None
         self.shutdown_flag = False
         self.background_tasks: set[asyncio.Task] = set()
         IMAGES_DIR.mkdir(parents=True, exist_ok=True)
@@ -772,20 +769,6 @@ class PiTracServer:
 
         except Exception as e:
             logger.error(f"Error streaming file logs: {e}")
-
-    def _load_config(self) -> Dict[str, Any]:
-        if not CONFIG_FILE.exists():
-            logger.warning(f"Config file not found: {CONFIG_FILE}")
-            return {}
-
-        try:
-            with open(CONFIG_FILE, "r") as f:
-                config = yaml.safe_load(f) or {}
-                logger.info(f"Loaded config from {CONFIG_FILE}")
-                return config
-        except Exception as e:
-            logger.error(f"Error loading config: {e}")
-            return {}
 
     async def startup_event(self) -> None:
         logger.info("Starting PiTrac Web Server...")

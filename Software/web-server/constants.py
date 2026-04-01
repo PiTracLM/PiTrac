@@ -3,13 +3,7 @@
 from pathlib import Path
 
 MPS_TO_MPH = 2.237
-EXPECTED_DATA_LENGTH = 12
-
 
 HOME_DIR = Path.home()
 PITRAC_DIR = HOME_DIR / ".pitrac"
 IMAGES_DIR = HOME_DIR / "LM_Shares" / "Images"
-CONFIG_FILE = PITRAC_DIR / "config" / "pitrac.yaml"
-
-HEARTBEAT_INTERVAL = 30  # seconds
-MAX_MESSAGE_SIZE = 1024 * 1024  # 1MB
