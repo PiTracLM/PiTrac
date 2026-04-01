@@ -50,7 +50,7 @@ private:
     // Persistent camera pipeline — created once, reused per shot
     std::unique_ptr<LibcameraJpegApp> app_;
     std::unique_ptr<GolfSimCamera> camera_;
-    bool pipeline_ready_ = false;
+    std::atomic<bool> pipeline_ready_{false};
 };
 
 } // namespace golf_sim

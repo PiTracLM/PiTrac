@@ -64,7 +64,7 @@ bool Camera2Thread::init_pipeline() {
     options->Set().shutter.set("11111us");
     options->Set().info_text = "";
 
-    const CameraHardware::CameraModel camera_model = GolfSimCamera::kSystemSlot1CameraType;
+    const CameraHardware::CameraModel camera_model = GolfSimCamera::kSystemSlot2CameraType;
     if (camera_model != CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
         options->Set().denoise = "cdn_off";
     } else {
