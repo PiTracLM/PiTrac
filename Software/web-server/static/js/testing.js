@@ -1,4 +1,4 @@
-/* globals setTheme, closeModal */
+/* globals setTheme */
 
 let runningTools = new Set();
 let outputBuffer = [];
@@ -248,6 +248,11 @@ function showImageResult(toolId, imageUrl) {
     `;
     
     modal.style.display = 'block';
+}
+
+function closeTestModal() {
+    modal = document.getElementById('testModal');
+    modal.style.display = 'none';
 }
 
 function showError(message) {

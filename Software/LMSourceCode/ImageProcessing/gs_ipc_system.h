@@ -66,6 +66,7 @@ namespace golf_sim {
 	private:
 		static GolfSimMessageConsumer* consumer_;
 		static GolfSimMessageProducer* producer_;
+		static bool active_mqlibrary_initialized_;
 	};
 
 }
