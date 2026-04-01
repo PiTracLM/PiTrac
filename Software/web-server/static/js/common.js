@@ -77,7 +77,11 @@ function initDropdown() {
 }
 
 async function controlPiTrac(action) {
-  if ((action === "start" || action === "restart") && !requireStrobeSafe()) return;
+  if (
+    (action === "start" || action === "restart") &&
+    !(await requireStrobeSafe())
+  )
+    return;
 
   const buttonMap = {
     start: ["pitrac-start-btn-desktop", "pitrac-start-btn-mobile"],
@@ -268,30 +272,22 @@ async function checkPiTracStatus() {
   }
 }
 
-// V3 strobe safety — blocks UI actions that would fire strobes without DAC calibration
-let strobeSafe = true;
 let strobeUnsafeReason = "";
 
-async function checkStrobeSafety() {
+async function requireStrobeSafe() {
   try {
     const response = await fetch("/api/strobe-safety");
     const data = await response.json();
-    strobeSafe = data.safe;
+    if (data.safe) return true;
     strobeUnsafeReason = data.reason || "";
+    showStrobeSafetyModal();
+    return false;
   } catch (error) {
-    console.error("Failed to check strobe safety:", error);
+    strobeUnsafeReason =
+      "Could not verify strobe safety — check server connection.";
+    showStrobeSafetyModal();
+    return false;
   }
-}
-
-/**
- * Check strobe safety before performing an action. Returns true if safe.
- * If unsafe, shows a modal directing the user to calibration. Use at the
- * top of any function that could fire the strobe.
- */
-function requireStrobeSafe() {
-  if (strobeSafe) return true;
-  showStrobeSafetyModal();
-  return false;
 }
 
 function showStrobeSafetyModal() {
@@ -364,7 +360,6 @@ document.addEventListener("DOMContentLoaded", () => {
   initTheme();
   initDropdown();
 
-  checkStrobeSafety();
   checkSystemStatus();
   checkPiTracStatus();
 

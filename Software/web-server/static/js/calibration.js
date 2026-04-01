@@ -217,7 +217,7 @@ class CalibrationManager {
      * @param {Event} event - The click event from the button (optional)
      */
     async runAutoCalibration(camera, event) {
-        if (!requireStrobeSafe()) return;
+        if (!(await requireStrobeSafe())) return;
         if (!this.validateCameraName(camera)) {
             this.showMessage(`Invalid camera name: ${camera}`, 'error');
             return;
@@ -277,7 +277,7 @@ class CalibrationManager {
      * @param {Event} event - The click event from the button (optional)
      */
     async checkBallLocation(camera, event) {
-        if (!requireStrobeSafe()) return;
+        if (!(await requireStrobeSafe())) return;
         if (!this.validateCameraName(camera)) {
             this.showMessage(`Invalid camera name: ${camera}`, 'error');
             return;
@@ -342,7 +342,7 @@ class CalibrationManager {
     }
 
     async startCalibration(method) {
-        if (!requireStrobeSafe()) return;
+        if (!(await requireStrobeSafe())) return;
         this.calibrationInProgress = true;
 
         document.getElementById('calibration-log-content').innerHTML = '';

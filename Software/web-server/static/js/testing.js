@@ -62,7 +62,7 @@ function createToolCard(tool) {
 }
 
 async function runTool(toolId) {
-    if (!requireStrobeSafe()) return;
+    if (!(await requireStrobeSafe())) return;
 
     const card = document.querySelector(`[data-tool-id="${toolId}"]`);
     const runBtn = card.querySelector('.run-btn');
