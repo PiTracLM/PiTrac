@@ -1,7 +1,15 @@
 """Tests for calibration API endpoints"""
 
 import pytest
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock, AsyncMock, MagicMock
+
+
+@pytest.fixture(autouse=True)
+def mock_strobe_safety(server_instance):
+    """Calibration tests assume strobe is safe"""
+    server_instance.strobe_calibration_manager.is_strobe_safe = MagicMock(
+        return_value={"safe": True, "board_version": None}
+    )
 
 
 @pytest.mark.unit

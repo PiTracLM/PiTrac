@@ -4,6 +4,14 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock
 
 
+@pytest.fixture(autouse=True)
+def mock_strobe_safety(server_instance):
+    """All pitrac process tests assume strobe is safe (V1/V2 or calibrated V3)"""
+    server_instance.strobe_calibration_manager.is_strobe_safe = MagicMock(
+        return_value={"safe": True, "board_version": None}
+    )
+
+
 @pytest.mark.unit
 class TestPiTracAPIEndpoints:
     """Test PiTrac process management endpoints"""

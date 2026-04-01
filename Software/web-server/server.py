@@ -283,6 +283,9 @@ class PiTracServer:
         @self.app.post("/api/pitrac/start")
         async def start_pitrac() -> Dict[str, Any]:
             """Start the PiTrac launch monitor process"""
+            safety = self.strobe_calibration_manager.is_strobe_safe()
+            if not safety["safe"]:
+                return {"status": "error", "message": safety["reason"]}
             result = await self.pitrac_manager.start()
             logger.info(f"PiTrac start request: {result}")
             return result
@@ -297,6 +300,9 @@ class PiTracServer:
         @self.app.post("/api/pitrac/restart")
         async def restart_pitrac() -> Dict[str, Any]:
             """Restart the PiTrac launch monitor process"""
+            safety = self.strobe_calibration_manager.is_strobe_safe()
+            if not safety["safe"]:
+                return {"status": "error", "message": safety["reason"]}
             result = await self.pitrac_manager.restart()
             logger.info(f"PiTrac restart request: {result}")
             return result
@@ -335,6 +341,9 @@ class PiTracServer:
             """Run automatic calibration for specified camera"""
             if camera not in ["camera1", "camera2"]:
                 return {"status": "error", "message": "Invalid camera"}
+            safety = self.strobe_calibration_manager.is_strobe_safe()
+            if not safety["safe"]:
+                return {"status": "error", "message": safety["reason"]}
             if self.calibration_manager.loop is None:
                 return {"status": "error", "message": "Server still starting up, please retry in a moment"}
             return await self.calibration_manager.run_auto_calibration(camera)
@@ -344,6 +353,9 @@ class PiTracServer:
             """Run manual calibration for specified camera"""
             if camera not in ["camera1", "camera2"]:
                 return {"status": "error", "message": "Invalid camera"}
+            safety = self.strobe_calibration_manager.is_strobe_safe()
+            if not safety["safe"]:
+                return {"status": "error", "message": safety["reason"]}
             if self.calibration_manager.loop is None:
                 return {"status": "error", "message": "Server still starting up, please retry in a moment"}
             return await self.calibration_manager.run_manual_calibration(camera)
@@ -375,6 +387,9 @@ class PiTracServer:
         @self.app.post("/api/testing/run/{tool_id}")
         async def run_testing_tool(tool_id: str) -> Dict[str, Any]:
             """Run a specific testing tool"""
+            safety = self.strobe_calibration_manager.is_strobe_safe()
+            if not safety["safe"]:
+                return {"status": "error", "message": safety["reason"]}
             if self.pitrac_manager.is_running():
                 return {
                     "status": "error",
@@ -437,6 +452,12 @@ class PiTracServer:
             except Exception as e:
                 logger.error(f"Error uploading test image: {e}")
                 return {"status": "error", "message": str(e)}
+
+        # Strobe safety check — used by frontend to gate strobe-triggering actions
+        @self.app.get("/api/strobe-safety")
+        async def strobe_safety() -> Dict[str, Any]:
+            """Check if strobing is safe (V3 boards need DAC calibration first)"""
+            return self.strobe_calibration_manager.is_strobe_safe()
 
         # Strobe calibration endpoints
         @self.app.get("/api/strobe-calibration/status")
@@ -846,6 +867,13 @@ class PiTracServer:
         self.calibration_manager.loop = loop
 
         await self.calibration_manager._replay_pending_updates()
+
+        # V3 boards: write calibrated DAC value to hardware before any strobe fires.
+        # Without this, the MCP4801 is in shutdown after boot and strobing will blow the MOSFET.
+        if not self.strobe_calibration_manager.apply_dac_setting():
+            logger.warning(
+                "V3 DAC not initialized — strobe calibration required before PiTrac can run"
+            )
 
         self.mq_conn = self.setup_activemq(loop)
 

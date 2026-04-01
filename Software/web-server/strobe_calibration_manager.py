@@ -74,6 +74,7 @@ class StrobeCalibrationManager:
         self._diag_pin = None
 
         self._cancel_requested = False
+        self._dac_applied = False
 
         self.status: Dict[str, Any] = {
             "state": "idle",
@@ -370,6 +371,7 @@ class StrobeCalibrationManager:
             if success and final_dac > 0:
                 ldo = self.get_ldo_voltage()
                 self.config_manager.set_config(self.DAC_CONFIG_KEY, final_dac)
+                self._dac_applied = True
                 self.status = {
                     "state": "complete", "progress": 100,
                     "message": f"DAC=0x{final_dac:02X}, current={led_current:.2f}A",
@@ -414,7 +416,23 @@ class StrobeCalibrationManager:
 
     def _read_diagnostics_sync(self) -> Dict[str, Any]:
         try:
+            # Gate on board version
+            board_version = self.config_manager.get_config(
+                "gs_config.strobing.kConnectionBoardVersion"
+            )
+            if board_version is None or int(board_version) != 3:
+                return {"status": "error", "message": "Diagnostics only available on V3 boards"}
+
             self._open_hardware()
+
+            # Set calibrated DAC value before pulsing DIAG — without this,
+            # the current regulator has no reference and LED current is unregulated
+            dac_value = self.config_manager.get_config(self.DAC_CONFIG_KEY)
+            if dac_value is not None and int(dac_value) > 0:
+                self._set_dac(int(dac_value))
+                time.sleep(0.05)
+            else:
+                logger.warning("No calibrated DAC value — skipping LED current measurement")
 
             ldo = self.get_ldo_voltage()
             adc_ch0 = self._read_adc(self.ADC_CH0_CMD)
@@ -426,7 +444,10 @@ class StrobeCalibrationManager:
                 "adc_ch1_raw": adc_ch1,
             }
 
-            if ldo >= self.LDO_MIN_V:
+            if dac_value is None or int(dac_value) <= 0:
+                result["led_current"] = None
+                result["warning"] = "No DAC calibration — LED current measurement skipped to protect hardware"
+            elif ldo >= self.LDO_MIN_V:
                 led_current = self.get_led_current()
                 result["led_current"] = round(led_current, 2)
             else:
@@ -496,7 +517,89 @@ class StrobeCalibrationManager:
         finally:
             self._close_hardware()
 
+    def is_strobe_safe(self) -> Dict[str, Any]:
+        """Check if the system is safe to fire strobes.
+
+        Returns a dict with 'safe' (bool), 'reason' (str if unsafe),
+        and 'board_version' (int or None).
+        """
+        board_version = self.config_manager.get_config(
+            "gs_config.strobing.kConnectionBoardVersion"
+        )
+
+        # V1/V2 boards use fixed resistors — always safe
+        if board_version is None or int(board_version) != 3:
+            return {"safe": True, "board_version": board_version}
+
+        dac_value = self.config_manager.get_config(self.DAC_CONFIG_KEY)
+        if dac_value is None or int(dac_value) < 0:
+            return {
+                "safe": False,
+                "board_version": 3,
+                "reason": "V3 board requires strobe calibration before use. "
+                          "Run strobe calibration from the Calibration page.",
+            }
+
+        if not self._dac_applied:
+            return {
+                "safe": False,
+                "board_version": 3,
+                "reason": "V3 DAC not yet initialized. Restart the web server.",
+            }
+
+        return {"safe": True, "board_version": 3, "dac_setting": int(dac_value)}
+
     async def get_saved_settings(self) -> Dict[str, Any]:
         """Read the saved kDAC_setting from config."""
         value = self.config_manager.get_config(self.DAC_CONFIG_KEY)
         return {"dac_setting": value}
+
+    def apply_dac_setting(self) -> bool:
+        """Write the saved calibrated DAC value to hardware via SPI1.
+
+        Must be called on boot before any strobe fires. Without this,
+        the MCP4801 powers up in shutdown (high-Z) and the current regulator
+        has no reference — strobing in that state blows the MOSFET.
+
+        Returns True if the DAC was successfully set, False otherwise.
+        """
+        board_version = self.config_manager.get_config(
+            "gs_config.strobing.kConnectionBoardVersion"
+        )
+        if board_version is None or int(board_version) != 3:
+            logger.debug("Not a V3 board, skipping DAC initialization")
+            return True
+
+        dac_value = self.config_manager.get_config(self.DAC_CONFIG_KEY)
+        if dac_value is None or int(dac_value) < 0:
+            logger.warning(
+                "V3 board detected but no DAC calibration found. "
+                "Strobe will be BLOCKED until calibration is run."
+            )
+            return False
+
+        dac_value = int(dac_value)
+
+        if spidev is None:
+            logger.warning("spidev not available, cannot set DAC")
+            return False
+
+        try:
+            spi = spidev.SpiDev()
+            spi.open(self.SPI_BUS, self.SPI_DAC_DEVICE)
+            spi.max_speed_hz = self.SPI_MAX_SPEED_HZ
+            spi.mode = 0
+
+            msb = self.MCP4801_WRITE_CMD | ((dac_value >> 4) & 0x0F)
+            lsb = (dac_value << 4) & 0xF0
+            spi.xfer2([msb, lsb])
+
+            spi.close()
+            self._dac_applied = True
+            logger.info(
+                f"V3 DAC initialized to calibrated value 0x{dac_value:02X}"
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize V3 DAC: {e}")
+            return False

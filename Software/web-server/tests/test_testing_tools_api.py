@@ -2,6 +2,14 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 
+@pytest.fixture(autouse=True)
+def mock_strobe_safety(server_instance):
+    """Testing tool tests assume strobe is safe"""
+    server_instance.strobe_calibration_manager.is_strobe_safe = MagicMock(
+        return_value={"safe": True, "board_version": None}
+    )
+
+
 @pytest.mark.unit
 class TestTestingToolsAPI:
     """Test testing tools REST API endpoints"""
