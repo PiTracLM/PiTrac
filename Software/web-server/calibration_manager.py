@@ -322,7 +322,7 @@ class CalibrationManager:
 
         config = self.config_manager.get_config()
 
-        cmd = [self.pitrac_binary, "--run_single_pi", f"--system_mode={camera}_ball_location"]
+        cmd = [self.pitrac_binary, f"--system_mode={camera}_ball_location"]
 
         if camera == "camera1":
             search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
@@ -398,7 +398,7 @@ class CalibrationManager:
         """
         timeout = CAMERA1_CALIBRATION_TIMEOUT if camera == "camera1" else CAMERA2_CALIBRATION_TIMEOUT
 
-        logger.info(f"Starting camera1 auto calibration with hybrid detection (timeout={timeout}s)")
+        logger.info(f"Starting {camera} auto calibration with hybrid detection (timeout={timeout}s)")
 
         self.calibration_status[camera] = {
             "status": "calibrating",
@@ -413,7 +413,7 @@ class CalibrationManager:
             logger.info(f"Pre-registered calibration session {session_id} for {camera}")
 
         config = self.config_manager.get_config()
-        cmd = [self.pitrac_binary, "--run_single_pi", f"--system_mode={camera}AutoCalibrate"]
+        cmd = [self.pitrac_binary, f"--system_mode={camera}AutoCalibrate"]
 
         search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
         if search_x is None:
@@ -525,7 +525,7 @@ class CalibrationManager:
                 }
 
         except Exception as e:
-            logger.error(f"Camera1 auto calibration failed: {e}", exc_info=True)
+            logger.error(f"{camera} auto calibration failed: {e}", exc_info=True)
             self.calibration_status[camera]["status"] = "error"
             self.calibration_status[camera]["message"] = str(e)
             return {"status": "error", "message": str(e)}
@@ -578,7 +578,7 @@ class CalibrationManager:
         }
 
         config = self.config_manager.get_config()
-        cmd = [self.pitrac_binary, "--run_single_pi", f"--system_mode={camera}Calibrate"]
+        cmd = [self.pitrac_binary, f"--system_mode={camera}Calibrate"]
 
         if camera == "camera1":
             search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
@@ -653,7 +653,7 @@ class CalibrationManager:
         logger.info(f"Capturing still image for {camera}")
 
         config = self.config_manager.get_config()
-        cmd = [self.pitrac_binary, "--run_single_pi", f"--system_mode={camera}", "--cam_still_mode"]
+        cmd = [self.pitrac_binary, f"--system_mode={camera}", "--cam_still_mode"]
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_file = f"calibration_{camera}_{timestamp}.png"
@@ -714,7 +714,6 @@ class CalibrationManager:
         # Skip args that we handle separately or need special handling
         skip_args = {
             "--system_mode",
-            "--run_single_pi",
             "--search_center_x",
             "--search_center_y",
             "--logging_level",

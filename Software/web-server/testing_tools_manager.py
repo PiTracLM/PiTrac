@@ -206,8 +206,6 @@ class TestingToolsManager:
 
             cmd = [self.pitrac_binary]
 
-            cmd.append("--run_single_pi")
-
             cmd.extend(tool_info["args"])
             cmd.append(f"--config_file={config_path}")
 

@@ -52,7 +52,7 @@ class PiTracProcessManager:
     def _build_cli_args_from_metadata(self) -> list:
         args = []
         merged_config = self.config_manager.get_config()
-        skip_args = {"--system_mode", "--run_single_pi", "--web_server_share_dir"}
+        skip_args = {"--system_mode", "--web_server_share_dir"}
 
         for param in self.config_manager.get_cli_parameters():
             cli_arg = param["cliArgument"]
@@ -83,7 +83,6 @@ class PiTracProcessManager:
     def _build_command(self, config_file_path: Optional[Path] = None) -> list:
         cmd = [self.pitrac_binary]
         cmd.append("--system_mode=camera1")
-        cmd.append("--run_single_pi")
 
         if config_file_path and Path(config_file_path).exists():
             cmd.append(f"--config_file={config_file_path}")
