@@ -251,7 +251,12 @@ private:
 	void configureDenoise(const std::string &denoise_mode);
 	Mode selectMode(const Mode &mode) const;
 
-	std::unique_ptr<CameraManager> camera_manager_;
+	// libcamera enforces a single CameraManager per process.  In single-process
+	// mode both camera RPiCamApp instances share one via weak_ptr/shared_ptr;
+	// the last instance to CloseCamera() destroys it.
+	static std::mutex cm_mutex_;
+	static std::weak_ptr<CameraManager> shared_cm_;
+	std::shared_ptr<CameraManager> camera_manager_;
 	std::shared_ptr<Camera> camera_;
 	bool camera_acquired_ = false;
 	std::unique_ptr<CameraConfiguration> configuration_;

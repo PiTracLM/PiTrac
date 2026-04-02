@@ -27,6 +27,8 @@
 #include "logging_tools.h"
 
 unsigned int RPiCamApp::verbosity = 1;
+std::mutex RPiCamApp::cm_mutex_;
+std::weak_ptr<RPiCamApp::CameraManager> RPiCamApp::shared_cm_;
 
 static libcamera::PixelFormat mode_to_pixel_format(Mode const &mode)
 {
@@ -125,11 +127,16 @@ RPiCamApp::~RPiCamApp()
 
 void RPiCamApp::initCameraManager()
 {
-	camera_manager_.reset();
-	camera_manager_ = std::make_unique<CameraManager>();
-	int ret = camera_manager_->start();
-	if (ret)
-		throw std::runtime_error("camera manager failed to start, code " + std::to_string(-ret));
+	std::lock_guard<std::mutex> lock(cm_mutex_);
+	camera_manager_ = shared_cm_.lock();
+	if (!camera_manager_)
+	{
+		camera_manager_ = std::make_shared<CameraManager>();
+		int ret = camera_manager_->start();
+		if (ret)
+			throw std::runtime_error("camera manager failed to start, code " + std::to_string(-ret));
+		shared_cm_ = camera_manager_;
+	}
 }
 
 std::string const &RPiCamApp::CameraId() const
