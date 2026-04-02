@@ -147,6 +147,7 @@ public:
 
 	Msg Wait();
 	void PostMessage(MsgType &t, MsgPayload &p);
+	void PostQuit();
 
 	Stream *GetStream(std::string const &name, StreamInfo *info = nullptr) const;
 	Stream *ViewfinderStream(StreamInfo *info = nullptr) const;
@@ -256,6 +257,10 @@ private:
 	// the last instance to CloseCamera() destroys it.
 	static std::mutex cm_mutex_;
 	static std::weak_ptr<CameraManager> shared_cm_;
+	// libcamera's pipeline handler is not thread-safe for concurrent camera
+	// operations (acquire, configure, start, stop).  This mutex serializes
+	// all pipeline-state-changing calls across every RPiCamApp instance.
+	static std::recursive_mutex pipeline_mutex_;
 	std::shared_ptr<CameraManager> camera_manager_;
 	std::shared_ptr<Camera> camera_;
 	bool camera_acquired_ = false;

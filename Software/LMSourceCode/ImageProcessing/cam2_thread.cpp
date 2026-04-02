@@ -105,6 +105,24 @@ void Camera2Thread::start() {
     thread_ = std::thread(&Camera2Thread::run, this);
 }
 
+bool Camera2Thread::wait_until_ready(int timeout_ms) {
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+    while (!pipeline_ready_.load() && !pipeline_failed_.load()
+           && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    if (pipeline_failed_.load()) {
+        GS_LOG_MSG(error, "Camera2 pipeline initialization failed");
+        return false;
+    }
+    if (!pipeline_ready_.load()) {
+        GS_LOG_MSG(error, "Camera2 pipeline did not become ready within " + std::to_string(timeout_ms) + "ms");
+        return false;
+    }
+    GS_LOG_MSG(info, "Camera2 pipeline ready, proceeding with Camera1 setup");
+    return true;
+}
+
 void Camera2Thread::stop() {
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -112,6 +130,18 @@ void Camera2Thread::stop() {
         armed_ = true;
     }
     cv_.notify_one();
+
+    // Ensure the global flag is false so cam2_run_event_loop's loop exits
+    // after the StopCamera-induced Timeout unblocks Wait().
+    GolfSimGlobals::golf_sim_running_ = false;
+
+    // StopCamera cancels in-flight requests but also clears the message
+    // queue, so any Timeout it produces may be wiped before Wait() sees it.
+    // PostQuit guarantees Wait() unblocks with a Quit message.
+    if (app_) {
+        app_->StopCamera();
+        app_->PostQuit();
+    }
 
     if (thread_.joinable()) {
         thread_.join();
@@ -132,6 +162,7 @@ void Camera2Thread::run() {
 
     if (!init_pipeline()) {
         GS_LOG_MSG(error, "Camera2 pipeline init failed, thread exiting");
+        pipeline_failed_ = true;
         return;
     }
 

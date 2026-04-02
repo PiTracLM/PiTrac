@@ -29,6 +29,7 @@
 unsigned int RPiCamApp::verbosity = 1;
 std::mutex RPiCamApp::cm_mutex_;
 std::weak_ptr<RPiCamApp::CameraManager> RPiCamApp::shared_cm_;
+std::recursive_mutex RPiCamApp::pipeline_mutex_;
 
 static libcamera::PixelFormat mode_to_pixel_format(Mode const &mode)
 {
@@ -128,6 +129,7 @@ RPiCamApp::~RPiCamApp()
 void RPiCamApp::initCameraManager()
 {
 	std::lock_guard<std::mutex> lock(cm_mutex_);
+	camera_manager_.reset();
 	camera_manager_ = shared_cm_.lock();
 	if (!camera_manager_)
 	{
@@ -151,6 +153,8 @@ std::string RPiCamApp::CameraModel() const
 
 void RPiCamApp::OpenCamera()
 {
+	std::lock_guard<std::recursive_mutex> lock(pipeline_mutex_);
+
 	// Make a preview window.
 	preview_ = std::unique_ptr<Preview>(make_preview(RPiCamApp::GetOptions()));
 	preview_->SetDoneCallback(std::bind(&RPiCamApp::previewDoneCallback, this, std::placeholders::_1));
@@ -233,6 +237,8 @@ void RPiCamApp::OpenCamera()
 
 void RPiCamApp::CloseCamera()
 {
+	std::lock_guard<std::recursive_mutex> lock(pipeline_mutex_);
+
 	preview_.reset();
 
 	if (camera_acquired_)
@@ -298,6 +304,7 @@ Mode RPiCamApp::selectMode(const Mode &mode) const
 
 void RPiCamApp::ConfigureViewfinder(unsigned int flags)
 {
+	std::lock_guard<std::recursive_mutex> lock(pipeline_mutex_);
 	LOG(2, "Configuring viewfinder...");
 
 	int lores_stream_num = 0, raw_stream_num = 0;
@@ -404,6 +411,7 @@ void RPiCamApp::ConfigureViewfinder(unsigned int flags)
 
 void RPiCamApp::ConfigureZsl(unsigned int still_flags)
 {
+	std::lock_guard<std::recursive_mutex> lock(pipeline_mutex_);
 	LOG(2, "Configuring ZSL...");
 
 	StreamRoles stream_roles = { StreamRole::StillCapture, StreamRole::Viewfinder };
@@ -499,6 +507,7 @@ void RPiCamApp::ConfigureZsl(unsigned int still_flags)
 
 void RPiCamApp::ConfigureStill(unsigned int flags)
 {
+	std::lock_guard<std::recursive_mutex> lock(pipeline_mutex_);
 	LOG(2, "Configuring still capture...");
 
 	// Always request a raw stream as this forces the full resolution capture mode,
@@ -564,6 +573,7 @@ void RPiCamApp::ConfigureStill(unsigned int flags)
 
 void RPiCamApp::ConfigureVideo(unsigned int flags)
 {
+	std::lock_guard<std::recursive_mutex> lock(pipeline_mutex_);
 	LOG(2, "Configuring video...");
 
 	bool have_lores_stream = options_->Get().lores_width && options_->Get().lores_height;
@@ -640,6 +650,7 @@ void RPiCamApp::ConfigureVideo(unsigned int flags)
 
 void RPiCamApp::Teardown()
 {
+	std::lock_guard<std::recursive_mutex> lock(pipeline_mutex_);
 	stopPreview();
 
 	post_processor_.Teardown();
@@ -665,6 +676,7 @@ void RPiCamApp::Teardown()
 
 void RPiCamApp::StartCamera()
 {
+	std::lock_guard<std::recursive_mutex> lock(pipeline_mutex_);
 	// This makes all the Request objects that we shall need.
 	makeRequests();
 
@@ -849,6 +861,7 @@ void RPiCamApp::StartCamera()
 
 void RPiCamApp::StopCamera()
 {
+	std::lock_guard<std::recursive_mutex> lock(pipeline_mutex_);
 	{
 		// We don't want QueueRequest to run asynchronously while we stop the camera.
 		std::lock_guard<std::mutex> lock(camera_stop_mutex_);
@@ -945,6 +958,11 @@ void RPiCamApp::queueRequest(CompletedRequest *completed_request)
 void RPiCamApp::PostMessage(MsgType &t, MsgPayload &p)
 {
 	msg_queue_.Post(Msg(t, std::move(p)));
+}
+
+void RPiCamApp::PostQuit()
+{
+	msg_queue_.Post(Msg(MsgType::Quit));
 }
 
 libcamera::Stream *RPiCamApp::GetStream(std::string const &name, StreamInfo *info) const

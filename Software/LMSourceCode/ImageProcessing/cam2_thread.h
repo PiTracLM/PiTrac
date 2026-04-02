@@ -35,6 +35,7 @@ public:
     void start();
     void stop();
     void arm();
+    bool wait_until_ready(int timeout_ms = 10000);
 
 private:
     void run();
@@ -51,6 +52,7 @@ private:
     std::unique_ptr<LibcameraJpegApp> app_;
     std::unique_ptr<GolfSimCamera> camera_;
     std::atomic<bool> pipeline_ready_{false};
+    std::atomic<bool> pipeline_failed_{false};
 };
 
 } // namespace golf_sim

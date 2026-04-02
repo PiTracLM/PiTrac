@@ -841,8 +841,14 @@ namespace golf_sim {
         }
 
         // Start Camera2 capture thread for the main shot-detection modes
+        // Wait for Camera2's pipeline to finish before Camera1 opens —
+        // libcamera's pipeline handler is not thread-safe for concurrent setup.
         if (mode == SystemMode::kCamera1 || mode == SystemMode::kCamera1TestStandalone) {
             g_cam2_thread.start();
+            if (!g_cam2_thread.wait_until_ready()) {
+                GS_LOG_MSG(error, "Camera2 pipeline failed to initialize");
+                return false;
+            }
         }
 
         bool kStartInPuttingMode = false;
@@ -856,8 +862,6 @@ namespace golf_sim {
             GolfSimClubs::SetCurrentClubType(GolfSimClubs::GsClubType::kDriver);
         }
 
-        // Give the other threads a chance to get going
-        std::this_thread::yield();
 
         return true;
     }

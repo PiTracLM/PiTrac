@@ -152,7 +152,7 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 
 		if (msg.type == RPiCamApp::MsgType::Quit) {
 			GS_LOG_TRACE_MSG(trace, "Received Quit message.");
-			return true;
+			return false;
 		}
 		else if (msg.type != RPiCamApp::MsgType::RequestComplete)
 			throw std::runtime_error("Unrecognised message!");
@@ -426,7 +426,7 @@ bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 			if (msg.type == RPiCamApp::MsgType::Timeout)
 			{
 				GS_LOG_MSG(error, "ERROR: Device timeout detected, attempting a restart.");
-				GS_LOG_MSG(error, "		Check to make sure the .yaml file in use by libcamera has a long timeout set, for example,  \"camera_timeout_value_ms\": 10000000,  in the appropriate file.");
+				GS_LOG_MSG(error, "		Check to make sure the .yaml file in use by libcamera has a long timeout set, for example,  \"camera_timeout_value_ms\": 86400000,  in the appropriate file.");
 				GS_LOG_MSG(error, "			On a Pi 4, check both /usr/local/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml and /usr/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml");
 				GS_LOG_MSG(error, "			On a Pi 5, check both /usr/local/share/libcamera/pipeline/rpi/pisp/rpi_apps.yaml and /usr/share/libcamera/pipeline/rpi/pisp/rpi_apps.yaml");
 				app.StopCamera();

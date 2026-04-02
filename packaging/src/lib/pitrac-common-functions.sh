@@ -93,21 +93,21 @@ configure_libcamera() {
                 # Check if we need sudo
                 if [[ -w "$config_dir" ]]; then
                     cp "$example_file" "$config_file"
-                    sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
+                    sed -i 's/# *"camera_timeout_value_ms": *[0-9][0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
                 else
                     sudo cp "$example_file" "$config_file"
-                    sudo sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
+                    sudo sed -i 's/# *"camera_timeout_value_ms": *[0-9][0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
                 fi
                 log_success "Created ${config_file} with extended timeout"
             elif [[ -f "$config_file" ]]; then
                 if ! grep -q '"camera_timeout_value_ms": *86400000' "$config_file"; then
                     log_info "Updating ${pipeline} camera timeout to 86400000ms..."
                     if [[ -w "$config_file" ]]; then
-                        sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
-                        sed -i 's/"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
+                        sed -i 's/# *"camera_timeout_value_ms": *[0-9][0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
+                        sed -i 's/"camera_timeout_value_ms": *[0-9][0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
                     else
-                        sudo sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
-                        sudo sed -i 's/"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
+                        sudo sed -i 's/# *"camera_timeout_value_ms": *[0-9][0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
+                        sudo sed -i 's/"camera_timeout_value_ms": *[0-9][0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
                     fi
                     log_success "Updated ${pipeline} camera timeout"
                 else
