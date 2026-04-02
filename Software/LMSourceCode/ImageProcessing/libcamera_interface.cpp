@@ -545,7 +545,7 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
 
     script_command = script_name;
 
-    cmdResult = system(script_command.c_str());
+    int cmdResult = system(script_command.c_str());
 
     if (cmdResult != 0) {
         GS_LOG_TRACE_MSG(error, "system(DiscoverCameraLocation) failed.  Return value was: " + std::to_string(cmdResult));
