@@ -186,7 +186,6 @@ namespace golf_sim {
         try {
             if (cv::imwrite(fname, img)) {
                 GS_LOG_TRACE_MSG(trace, "Logged image to file: " + fname);
-                GsHttpClient::PostImageReady(file_name);
             }
             else {
                 GS_LOG_MSG(warning, "GsUISystem::SaveWebserverImage - could not save to file name: " + fname);

@@ -485,6 +485,7 @@ namespace golf_sim {
             }
             GsUISystem::SaveWebserverImage(GsUISystem::kWebServerResultBallExposureCandidates,
                 exposures_image, exposure_balls);
+            GsHttpClient::PostImageReady(GsUISystem::kWebServerResultBallExposureCandidates + ".png");
 #endif
 
         }
