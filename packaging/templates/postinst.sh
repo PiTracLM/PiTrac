@@ -154,13 +154,13 @@ case "$1" in
                 if [ -f "$EXAMPLE_FILE" ] && [ ! -f "$CAMERA_CONFIG" ]; then
                     echo "Creating ${pipeline} config from example..."
                     cp "$EXAMPLE_FILE" "$CAMERA_CONFIG"
-                    # Uncomment and set the camera timeout to 1 second (1000000 ms)
-                    sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 1000000/' "$CAMERA_CONFIG"
+                    # Uncomment and set the camera timeout to 24 hours (86400000 ms)
+                    sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 86400000/' "$CAMERA_CONFIG"
                 elif [ -f "$CAMERA_CONFIG" ]; then
                     # Config exists, check if timeout needs updating
                     if grep -q '# *"camera_timeout_value_ms"' "$CAMERA_CONFIG"; then
                         echo "Updating ${pipeline} camera timeout..."
-                        sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 1000000/' "$CAMERA_CONFIG"
+                        sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 86400000/' "$CAMERA_CONFIG"
                     fi
                 fi
             fi
