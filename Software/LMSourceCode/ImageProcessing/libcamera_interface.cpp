@@ -522,12 +522,8 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
     const std::string script_name = "/tmp/pi_cam_location.sh";
 
 	// Ensure that we can write to the output file if it was already created
-    std::string script_command = "sudo rm " + script_name;
+    std::string script_command = "sudo rm -f " + script_name;
     system(script_command.c_str());
-
-    int cmdResult = system(script_command.c_str());
-
-	// It's ok if the file wasn't there.  No need to check the return code
     
     // Write the script out to file to run.  
     // Otherwise, system() would try to run the script as a sh script,

@@ -12,7 +12,7 @@
 namespace golf_sim {
 
 std::string GsHttpClient::host_ = "localhost";
-int GsHttpClient::port_ = 8000;
+int GsHttpClient::port_ = 8080;
 
 void GsHttpClient::Init(const std::string& host, int port) {
     host_ = host;

@@ -15,7 +15,7 @@ namespace golf_sim {
 // Fire-and-forget — failures are logged but don't block the shot cycle.
 class GsHttpClient {
 public:
-    static void Init(const std::string& host = "localhost", int port = 8000);
+    static void Init(const std::string& host = "localhost", int port = 8080);
     static void PostResult(const std::string& json_body);
 
 private:
