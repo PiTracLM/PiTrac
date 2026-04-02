@@ -138,8 +138,6 @@ namespace golf_sim {
         int carry = 100 + rand() % 150;
 
         std::vector<std::string> images;
-        images.push_back(kWebServerResultBallExposureCandidates + ".png");
-        images.push_back(kWebServerResultBallRotatedByBestAngles + ".png");
 
         std::string msg = "Ball Hit - Results returned." + secondary_message;
 
@@ -188,6 +186,7 @@ namespace golf_sim {
         try {
             if (cv::imwrite(fname, img)) {
                 GS_LOG_TRACE_MSG(trace, "Logged image to file: " + fname);
+                GsHttpClient::PostImageReady(file_name);
             }
             else {
                 GS_LOG_MSG(warning, "GsUISystem::SaveWebserverImage - could not save to file name: " + fname);

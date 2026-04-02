@@ -56,16 +56,10 @@
     <!-- Right Column: Image Panel -->
     <div class="image-panel">
         <div class="image-panel-inner" id="image-panel-inner">
-            {% if shot.images and shot.images|length > 0 %}
-                {% for image in shot.images %}
-                <img src="/images/{{ image }}?t={{ range(100000, 999999) | random }}" alt="Shot {{ loop.index }}" class="shot-image" loading="lazy" onclick="openImage('{{ image }}')">
-                {% endfor %}
-            {% else %}
             <div class="image-empty-state">
                 <div class="empty-icon"></div>
                 <div class="empty-text">Hit a shot to see the image here</div>
             </div>
-            {% endif %}
         </div>
     </div>
 

@@ -17,6 +17,7 @@ class GsHttpClient {
 public:
     static void Init(const std::string& host = "localhost", int port = 8080);
     static void PostResult(const std::string& json_body);
+    static void PostImageReady(const std::string& filename);
 
 private:
     static std::string host_;

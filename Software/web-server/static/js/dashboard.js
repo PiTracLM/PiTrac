@@ -12,9 +12,14 @@ function connectWebSocket() {
 
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        // Only update display from WebSocket if PiTrac is actually running.
-        // Otherwise the default ShotData values ("Waiting for ball...") are misleading.
-        if (piTracRunning) {
+        if (!piTracRunning) {
+            piTracRunning = true;
+            const metricsPanel = document.getElementById('metrics-panel');
+            if (metricsPanel) metricsPanel.style.opacity = '1';
+        }
+        if (data.type === 'image_ready') {
+            handleImageReady(data.filename);
+        } else {
             updateDisplay(data);
         }
     };
@@ -66,18 +71,9 @@ function updateDisplay(data) {
         document.getElementById('timestamp').textContent = date.toLocaleTimeString();
     }
 
-    // Update images
-    const imageInner = document.getElementById('image-panel-inner');
     const resultType = (data.result_type || '').toLowerCase();
-
-    if (resultType.includes('hit') && data.images && data.images.length > 0) {
-        const ts = Date.now();
-        const multiClass = data.images.length > 1 ? ' multi-image' : '';
-        imageInner.className = 'image-panel-inner' + multiClass;
-        imageInner.innerHTML = data.images.map((img, idx) =>
-            `<img src="/images/${img}?t=${ts}" alt="Shot ${idx + 1}" class="shot-image" loading="lazy" onclick="openImage('${img}')">`
-        ).join('');
-    } else if (resultType.includes('waiting for ball')) {
+    if (resultType.includes('waiting for ball')) {
+        const imageInner = document.getElementById('image-panel-inner');
         imageInner.className = 'image-panel-inner';
         imageInner.innerHTML =
             '<div class="image-empty-state">' +
@@ -85,6 +81,14 @@ function updateDisplay(data) {
                 '<div class="empty-text">Waiting for shot...</div>' +
             '</div>';
     }
+}
+
+function handleImageReady(filename) {
+    const imageInner = document.getElementById('image-panel-inner');
+    const ts = Date.now();
+    imageInner.className = 'image-panel-inner';
+    imageInner.innerHTML =
+        `<img src="/images/${filename}?t=${ts}" alt="Shot image" class="shot-image" onclick="openImage('${filename}')">`;
 }
 
 function updateBallStatus(resultType, message, isPiTracRunning) {

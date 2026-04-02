@@ -110,7 +110,6 @@ class PiTracServer:
             result_type_str = self.parser._get_result_type_string(result_type_int)
             speed_mps = float(body.get("speed_mps", 0))
             message = str(body.get("message", ""))
-            images = body.get("images", [])
 
             is_status = result_type_str in self.parser._get_status_message_strings()
             is_fake_hit = result_type_int == 7 and message in [
@@ -129,7 +128,6 @@ class PiTracServer:
                     result_type=result_type_str,
                     message=message,
                     timestamp=datetime.now().isoformat(),
-                    images=current.images,
                 )
             else:
                 shot_data = ShotData(
@@ -142,11 +140,21 @@ class PiTracServer:
                     result_type=result_type_str,
                     message=message,
                     timestamp=datetime.now().isoformat(),
-                    images=images,
                 )
 
             self.shot_store.update(shot_data)
             await self.connection_manager.broadcast(shot_data.to_dict())
+            return {"status": "ok"}
+
+        @self.app.post("/api/internal/image-ready")
+        async def receive_image_ready(request: Request) -> Dict[str, str]:
+            body = await request.json()
+            filename = body.get("filename", "")
+            if filename:
+                await self.connection_manager.broadcast({
+                    "type": "image_ready",
+                    "filename": filename,
+                })
             return {"status": "ok"}
 
         @self.app.get("/health")

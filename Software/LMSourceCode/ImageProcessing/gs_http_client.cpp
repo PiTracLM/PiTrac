@@ -37,6 +37,23 @@ void GsHttpClient::PostResult(const std::string& json_body) {
     }
 }
 
+void GsHttpClient::PostImageReady(const std::string& filename) {
+    try {
+        httplib::Client cli(host_, port_);
+        cli.set_connection_timeout(1);
+        cli.set_read_timeout(1);
+
+        std::string json = "{\"filename\":\"" + filename + "\"}";
+        auto res = cli.Post("/api/internal/image-ready", json, "application/json");
+
+        if (!res) {
+            GS_LOG_MSG(warning, "HTTP POST image-ready failed (no response)");
+        }
+    } catch (const std::exception& e) {
+        GS_LOG_MSG(warning, "HTTP POST image-ready exception: " + std::string(e.what()));
+    }
+}
+
 } // namespace golf_sim
 
 #endif

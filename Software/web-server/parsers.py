@@ -83,8 +83,6 @@ class ShotDataParser:
 
         if "message" in data:
             updates["message"] = str(data["message"])
-        if "image_paths" in data:
-            updates["images"] = list(data["image_paths"])
 
         updates["timestamp"] = datetime.now().isoformat()
 

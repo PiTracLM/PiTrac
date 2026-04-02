@@ -1,6 +1,6 @@
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 
 class ResultType(Enum):
@@ -27,7 +27,6 @@ class ShotData:
     result_type: str = "Waiting for ball..."
     message: str = ""
     timestamp: Optional[str] = None
-    images: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
