@@ -72,7 +72,7 @@ function updateDisplay(data) {
     }
 
     const resultType = (data.result_type || '').toLowerCase();
-    if (resultType.includes('waiting for ball')) {
+    if (resultType.includes('stabilization') || resultType.includes('pausing')) {
         const imageInner = document.getElementById('image-panel-inner');
         imageInner.className = 'image-panel-inner';
         imageInner.innerHTML =
@@ -159,6 +159,14 @@ async function resetShot() {
     try {
         const response = await fetch('/api/reset', { method: 'POST' });
         if (response.ok) {
+            // Clear the image panel on explicit reset
+            const imageInner = document.getElementById('image-panel-inner');
+            imageInner.className = 'image-panel-inner';
+            imageInner.innerHTML =
+                '<div class="image-empty-state">' +
+                    '<div class="empty-icon"></div>' +
+                    '<div class="empty-text">Waiting for shot...</div>' +
+                '</div>';
         }
     } catch (error) {
         console.error('Error resetting shot:', error);
@@ -203,6 +211,11 @@ document.addEventListener('DOMContentLoaded', () => {
     connectWebSocket();
 
     updateBallStatus(null, null, false);
+
+    // Check if a shot image already exists on disk (e.g. page refresh after a shot)
+    const img = new Image();
+    img.onload = () => handleImageReady('ball_exposure_candidates.png');
+    img.src = '/images/ball_exposure_candidates.png?t=' + Date.now();
 
     if (window.checkPiTracStatus) {
         originalCheckPiTracStatus = window.checkPiTracStatus;
