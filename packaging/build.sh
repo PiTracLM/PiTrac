@@ -58,8 +58,8 @@ check_artifacts() {
 
     if [[ "$use_debs" == "true" ]]; then
         # Check for DEB packages first
-        if [ ! -f "$ARTIFACT_DIR/libopencv4.11_4.11.0-1_arm64.deb" ] && [ ! -f "$ARTIFACT_DIR/libopencv-dev_4.11.0-1_arm64.deb" ]; then
-            if [ ! -f "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" ]; then
+        if [ ! -f "$ARTIFACT_DIR/libopencv4.13_4.13.0-1_arm64.deb" ] && [ ! -f "$ARTIFACT_DIR/libopencv-dev_4.13.0-1_arm64.deb" ]; then
+            if [ ! -f "$ARTIFACT_DIR/opencv-4.13.0-arm64.tar.gz" ]; then
                 missing+=("opencv")
             fi
         fi
@@ -78,7 +78,7 @@ check_artifacts() {
         fi
     else
         # Check for tar.gz packages
-        if [ ! -f "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" ]; then
+        if [ ! -f "$ARTIFACT_DIR/opencv-4.13.0-arm64.tar.gz" ]; then
             missing+=("opencv")
         fi
         if [ ! -f "$ARTIFACT_DIR/lgpio-0.2.2-arm64.tar.gz" ]; then
@@ -93,7 +93,7 @@ check_artifacts() {
         log_warn "Missing artifacts: ${missing[*]}"
         return 1
     else
-        if [[ "$use_debs" == "true" ]] && [ -f "$ARTIFACT_DIR/libopencv4.11_4.11.0-1_arm64.deb" ]; then
+        if [[ "$use_debs" == "true" ]] && [ -f "$ARTIFACT_DIR/libopencv4.13_4.13.0-1_arm64.deb" ]; then
             log_success "All DEB packages present"
         else
             log_success "All artifacts present"
@@ -485,7 +485,7 @@ build_dev() {
     if [[ -f "build/build.ninja" ]]; then
         if grep -q "/opt/opencv" build/build.ninja 2>/dev/null; then
             # Check if DEB packages are installed (they use /usr/, not /opt/)
-            if dpkg -l 2>/dev/null | grep -qE "^ii\s+(libopencv4\.11)\s"; then
+            if dpkg -l 2>/dev/null | grep -qE "^ii\s+(libopencv4\.(11|12|13))\s"; then
                 log_warn "Detected build directory with /opt/ paths but DEB packages use /usr/"
                 log_warn "This causes linker failures - cached paths are stale"
                 log_info "Automatically cleaning build directory for compatibility..."

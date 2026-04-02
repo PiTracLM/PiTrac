@@ -28,7 +28,6 @@ def server_instance():
     """Create PiTracServer instance with mocked dependencies"""
     server = PiTracServer()
     server.shutdown_flag = False
-    server.reconnect_task = None
     return server
 
 

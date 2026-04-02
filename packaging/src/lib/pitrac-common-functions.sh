@@ -719,7 +719,7 @@ install_dependencies_from_apt() {
         "libmsgpack-cxx-dev"      # MessagePack C++ (header-only)
         "libactivemq-cpp"         # ActiveMQ C++ client runtime
         "libactivemq-cpp-dev"     # ActiveMQ C++ client headers
-        "libopencv4.11"           # OpenCV runtime (Pi5-optimized build)
+        "libopencv4.13"           # OpenCV runtime (Pi5-optimized build)
         "libopencv-dev"           # OpenCV development headers
         "libncnn-dev"             # ncnn inference framework (static lib + headers)
         "libonnxruntime1.17.3"    # ONNX Runtime with XNNPACK (1.22.x has Pi5 issues)
