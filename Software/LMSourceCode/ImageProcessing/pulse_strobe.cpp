@@ -652,8 +652,7 @@ namespace golf_sim {
 		GS_LOG_TRACE_MSG(trace, "Sent " + std::to_string(kNumberPrimingPulses) + " initial priming pulses.  About to pause for " + 
 				std::to_string(kPauseBeforeReadyForFinalPrimingPulseMs) + " milliSeconds before sending penultimate priming pulse.");
 
-		// Brief pause before final priming pulse — Camera2 is in-process, no IPC latency
-		usleep(20 * 1000);  // 20ms
+		usleep(kPauseBeforeReadyForFinalPrimingPulseMs * 1000);
 
 		// This next priming pulses gets the camera2 state machine ready to take an actual image
 		SendOnOffPulse(kShutterSpeed - kShutterOffset);
