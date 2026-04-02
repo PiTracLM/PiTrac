@@ -56,7 +56,7 @@ bool ball_watcher_event_loop(RPiCamEncoder &app, bool & motion_detected)
 {
 	// Elevate to real-time priority for the trigger-critical motion detection loop.
 	// Prevents the kernel from preempting us for 1-4ms during normal scheduling.
-	// Requires CAP_SYS_NICE (set via setcap on the binary).
+	// Requires CAP_SYS_NICE (granted via AmbientCapabilities in the systemd service).
 	struct sched_param sp = {};
 	sp.sched_priority = 80;
 	if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp) != 0) {
