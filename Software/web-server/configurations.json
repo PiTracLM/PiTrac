@@ -679,7 +679,7 @@
       "basicSubcategory": "Simulators",
       "displayName": "E6 Connect Address",
       "description": "IP address of E6 Connect simulator",
-      "type": "text",
+      "type": "ip_address",
       "default": "",
       "requiresRestart": false,
       "passedVia": "cli",

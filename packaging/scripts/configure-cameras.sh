@@ -187,9 +187,13 @@ dtparam=spi=on"
         log_info "  dtparam=spi=on already exists, skipping"
     fi
 
-    # NOTE: dtoverlay=spi1-2cs is needed for V3 connector board calibration (SPI1 DAC/ADC)
-    # but conflicts with NVMe drives. Users with V3 boards should add it manually.
-    # See: https://github.com/PiTracLM/PiTrac/issues/XXX
+    # dtoverlay=spi1-2cs is needed for V3 connector board calibration (SPI1 DAC/ADC)
+    if ! grep -q "^dtoverlay=spi1-2cs" "$config_path"; then
+        config_block="$config_block
+dtoverlay=spi1-2cs"
+    else
+        log_info "  dtoverlay=spi1-2cs already exists, skipping"
+    fi
 
     if ! grep -q "^force_turbo=" "$config_path"; then
         config_block="$config_block
