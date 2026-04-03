@@ -75,7 +75,6 @@ def shot_data_instance():
         result_type="Hit",
         message="Great shot!",
         timestamp="2024-01-01T12:00:00",
-        images=["shot_001.jpg", "shot_002.jpg"],
     )
 
 
