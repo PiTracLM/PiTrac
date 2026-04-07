@@ -2296,6 +2296,7 @@ namespace golf_sim {
             // Model-detected balls skip the normal pipeline, so compute spatial data explicitly
             for (auto& ball : initial_balls) {
                 if (ball.ball_color_ == GolfBall::BallColor::kModelDetected) {
+                    GS_LOG_TRACE_MSG(trace, "Computing spatial data for model-detected ball at (" +
                                    std::to_string(ball.x()) + "," + std::to_string(ball.y()) + ")");
 
                     if (!ComputeSingleBallXYZOrthoCamPerspective(*this, ball)) {

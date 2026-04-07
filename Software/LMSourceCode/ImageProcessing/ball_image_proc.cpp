@@ -3567,7 +3567,6 @@ namespace golf_sim {
                 cachedKernels[i] = CreateGaborKernel(kernel_size, sig, theta, lm, gm, ps);
             }
         });
-        }
 
         int nThreads = std::min(omp_get_max_threads(), 4);
         std::vector<cv::Mat> threadAccum(nThreads);
