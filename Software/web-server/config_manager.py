@@ -485,7 +485,7 @@ class ConfigurationManager:
             setting_type = setting_info.get("type", "")
 
             if setting_type == "select" and "options" in setting_info:
-                if key == "gs_config.ball_identification.kModelPath":
+                if key in ("gs_config.ball_identification.kModelPath", "gs_config.spin_analysis.kSpinModelPath"):
                     available_models = self.get_available_models()
                     if available_models:
                         valid_options = list(available_models.values())
@@ -675,9 +675,9 @@ class ConfigurationManager:
 
             model_options = self.get_available_models()
             if model_options and "settings" in metadata:
-                model_key = "gs_config.ball_identification.kModelPath"
-                if model_key in metadata["settings"]:
-                    metadata["settings"][model_key]["options"] = model_options
+                for model_key in ("gs_config.ball_identification.kModelPath", "gs_config.spin_analysis.kSpinModelPath"):
+                    if model_key in metadata["settings"]:
+                        metadata["settings"][model_key]["options"] = model_options
 
             return metadata
         except Exception as e:

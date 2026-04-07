@@ -460,7 +460,7 @@ function createConfigItem(key, value, defaultValue, isModified) {
 function createInput(key, value, defaultValue, isUserSet) {
     const metadata = configMetadata[key] || {};
 
-    if (key === 'gs_config.ball_identification.kModelPath') {
+    if (key.includes('kModelPath')) {
         const select = document.createElement('select');
 
         if (metadata.options && Object.keys(metadata.options).length > 0) {

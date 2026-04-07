@@ -1628,7 +1628,8 @@
       "subcategory": "advanced",
       "displayName": "Spin Prediction Model",
       "description": "Path to the NCNN spin prediction model directory",
-      "type": "string",
+      "type": "select",
+      "options": {},
       "default": "/etc/pitrac/models/spin-predictor",
       "requiresRestart": true,
       "passedVia": "json"
