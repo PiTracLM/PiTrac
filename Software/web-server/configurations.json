@@ -1479,6 +1479,21 @@
       "requiresRestart": true,
       "passedVia": "json"
     },
+    "gs_config.spin_analysis.kSpinDetectionMethod": {
+      "category": "Spin Analysis",
+      "subcategory": "basic",
+      "basicSubcategory": "Detection Methods",
+      "displayName": "Spin Detection Method",
+      "description": "Algorithm for calculating ball spin",
+      "type": "select",
+      "options": {
+        "ml": "ML Prediction (NCNN)",
+        "legacy": "Rotation Search (Legacy)"
+      },
+      "default": "ml",
+      "requiresRestart": true,
+      "passedVia": "json"
+    },
     "gs_config.spin_analysis.kCoarseSearchResolution": {
       "category": "Spin Analysis",
       "subcategory": "advanced",

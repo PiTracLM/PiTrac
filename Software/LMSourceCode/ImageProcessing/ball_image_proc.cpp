@@ -203,6 +203,7 @@ namespace golf_sim {
 
     int BallImageProc::kGaborMaxWhitePercent = 44; // Nominal 46;
     int BallImageProc::kGaborMinWhitePercent = 38; // Nominal 40;
+    std::string BallImageProc::kSpinDetectionMethod = "ml";
 
     // Model Detection Configuration
     std::string BallImageProc::kStrobedBallDetectionMethod = "experimental";
@@ -395,7 +396,13 @@ namespace golf_sim {
             }
         }
 
-        PreloadSpinModel();
+        if (kSpinDetectionMethod == "ml") {
+            if (PreloadSpinModel()) {
+                GS_LOG_MSG(info, "ML spin model preloaded - spin detection will use ML path");
+            } else {
+                GS_LOG_MSG(warning, "Failed to preload ML spin model - will fall back to rotation search");
+            }
+        }
     }
 
     BallImageProc::~BallImageProc() {
@@ -3007,7 +3014,14 @@ namespace golf_sim {
         int best_rot_y = 0;
         int best_rot_z = 0;
 
-        if (spin_predictor_initialized_.load(std::memory_order_acquire)) {
+        bool use_ml = (kSpinDetectionMethod == "ml") &&
+                      spin_predictor_initialized_.load(std::memory_order_acquire);
+
+        if (kSpinDetectionMethod == "ml" && !use_ml) {
+            GS_LOG_MSG(warning, "Spin method is 'ml' but model not initialized - using rotation search");
+        }
+
+        if (use_ml) {
             auto ml_result = spin_predictor_->Predict(ball_image1DimpleEdges, ball_image2DimpleEdges);
 
             best_rot_x = (int)std::round(ml_result.x_deg);
@@ -4375,9 +4389,15 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelInputWidth", kModelInputWidth);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelInputHeight", kModelInputHeight);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kInferenceThreads", kInferenceThreads);
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kSpinDetectionMethod", kSpinDetectionMethod);
+        if (kSpinDetectionMethod != "ml" && kSpinDetectionMethod != "legacy") {
+            GS_LOG_MSG(error, "Unrecognized kSpinDetectionMethod: '" + kSpinDetectionMethod + "' - defaulting to 'ml'");
+            kSpinDetectionMethod = "ml";
+        }
 
         GS_LOG_MSG(info, "Model directory: " + kModelPath);
         GS_LOG_MSG(info, "Detection method: " + kStrobedBallDetectionMethod);
+        GS_LOG_MSG(info, "Spin detection: " + kSpinDetectionMethod);
         GS_LOG_MSG(info, "Backend: ncnn");
 
         std::string param = kModelPath + "/best.ncnn.param";

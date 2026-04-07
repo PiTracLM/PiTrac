@@ -189,6 +189,7 @@ public:
 
     static int kGaborMaxWhitePercent;
     static int kGaborMinWhitePercent;
+    static std::string kSpinDetectionMethod;
 
     // Model Detection Configuration
     static std::string kStrobedBallDetectionMethod;

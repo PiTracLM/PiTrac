@@ -398,6 +398,7 @@
       "kCoarseZRotationDegreesStart": "-10",
       "kGaborMaxWhitePercent": "45",
       "kGaborMinWhitePercent": "39",
+      "kSpinDetectionMethod": "ml",
       "kSpinModelPath": "/etc/pitrac/models/spin-predictor",
       "kSpinMLZFallbackThreshold": "60.0"
     },
