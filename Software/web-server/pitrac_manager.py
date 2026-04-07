@@ -124,6 +124,7 @@ class PiTracProcessManager:
             home_dir = str(Path.home())
             env["LD_LIBRARY_PATH"] = "/usr/lib/pitrac"
             env["PITRAC_ROOT"] = "/usr/lib/pitrac"
+            env["OMP_WAIT_POLICY"] = "PASSIVE"
             env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = "~/LM_Shares/Images/".replace("~", home_dir)
             env["PITRAC_WEBSERVER_SHARE_DIR"] = "~/LM_Shares/WebShare/".replace("~", home_dir)
 

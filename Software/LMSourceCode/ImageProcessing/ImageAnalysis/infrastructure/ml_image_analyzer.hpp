@@ -45,7 +45,7 @@ namespace golf_sim::image_analysis::infrastructure::ml {
         YOLO_V8,        ///< YOLOv8 object detection model  
         TENSORFLOW_LITE,///< TensorFlow Lite mobile model
         PYTORCH_MOBILE, ///< PyTorch Mobile optimized model
-        ONNX_RUNTIME    ///< ONNX Runtime cross-platform model
+        NCNN            ///< NCNN optimized inference model
     };
 
     /**

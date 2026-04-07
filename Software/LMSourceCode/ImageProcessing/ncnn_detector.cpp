@@ -128,7 +128,6 @@ std::vector<NCNNDetector::Detection> NCNNDetector::PostprocessYOLO(
 
     // NCNN exports YOLO26 in traditional format: [data_width, num_predictions]
     // where data_width = 4 + num_classes, transposed (channel-first).
-    // Same layout as YOLOv8 ONNX: all cx, then all cy, then w, h, then scores.
 
     const int num_preds = PredictionCount(config_.input_width, config_.input_height);
     const int data_w = 4 + config_.num_classes;

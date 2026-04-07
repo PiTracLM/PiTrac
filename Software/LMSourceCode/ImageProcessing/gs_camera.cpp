@@ -1689,11 +1689,11 @@ namespace golf_sim {
 
                     double ball_distance = current_ball.PixelDistanceFromBall(b);
                     
-                    // For ONNX balls, use position-based quality instead of HoughCircles quality ranking
+                    // NCNN detections lack HoughCircles quality scores, so use spatial ordering as a proxy
                     int quality_difference;
-                    if (b.ball_color_ == GolfBall::BallColor::kModelDetected && 
+                    if (b.ball_color_ == GolfBall::BallColor::kModelDetected &&
                         current_ball.ball_color_ == GolfBall::BallColor::kModelDetected) {
-                        // For ONNX balls, all have high confidence - use position difference as quality proxy
+
                         quality_difference = std::abs(i - (int)outer_index); // Position difference in sorted list
                     } else {
                         // Legacy HoughCircles quality ranking
@@ -2055,9 +2055,8 @@ namespace golf_sim {
             for (int i = (int)initial_balls.size() - 1; i >= 0; i--) {
                 GolfBall& b = initial_balls[i];
 
-                // Skip color analysis for ONNX-detected balls
                 if (b.ball_color_ == GolfBall::BallColor::kModelDetected) {
-                    GS_LOG_TRACE_MSG(trace, "Skipping color analysis for ONNX-detected ball " + std::to_string(i));
+                    GS_LOG_TRACE_MSG(trace, "Skipping color analysis for model-detected ball " + std::to_string(i));
                     continue;
                 }
 
@@ -2294,22 +2293,19 @@ namespace golf_sim {
 
             double max_color_difference = (GolfSimClubs::GetCurrentClubType() == GolfSimClubs::kPutter) ? kMaxPuttingBallColorDifferenceRelaxed : kMaxStrobedBallColorDifferenceRelaxed;
             
-            // *** ONNX PHYSICS CALCULATION - Essential distance/angle calculations for ONNX balls ***
+            // Model-detected balls skip the normal pipeline, so compute spatial data explicitly
             for (auto& ball : initial_balls) {
                 if (ball.ball_color_ == GolfBall::BallColor::kModelDetected) {
-                    GS_LOG_TRACE_MSG(trace, "Adding physics calculations for ONNX ball at (" + 
                                    std::to_string(ball.x()) + "," + std::to_string(ball.y()) + ")");
-                    
-                    // 1. Compute essential distance/angle/calibration data
+
                     if (!ComputeSingleBallXYZOrthoCamPerspective(*this, ball)) {
-                        GS_LOG_MSG(warning, "Failed to compute spatial physics for ONNX ball - continuing anyway");
+                        GS_LOG_MSG(warning, "Failed to compute spatial physics for model-detected ball - continuing anyway");
                     }
-                    
-                    // 2. Get color information for display/logging (avgC, stdC fields)
+
                     GetBallColorInformation(strobed_balls_color_image, ball);
-                    
-                    GS_LOG_TRACE_MSG(trace, "ONNX ball physics complete: DistFromLens=" + 
-                                   std::to_string(ball.distance_to_z_plane_from_lens_) + "m, CalFocLen=" + 
+
+                    GS_LOG_TRACE_MSG(trace, "Model-detected ball physics complete: DistFromLens=" +
+                                   std::to_string(ball.distance_to_z_plane_from_lens_) + "m, CalFocLen=" +
                                    std::to_string(ball.calibrated_focal_length_));
                 }
             }

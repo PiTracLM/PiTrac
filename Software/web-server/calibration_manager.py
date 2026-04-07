@@ -776,6 +776,7 @@ class CalibrationManager:
         # Set PITRAC_ROOT if not already set (required by camera discovery)
         if "PITRAC_ROOT" not in env:
             env["PITRAC_ROOT"] = "/usr/lib/pitrac"
+        env["OMP_WAIT_POLICY"] = "PASSIVE"
 
         # Camera types come from cameras.slot1.type and cameras.slot2.type (default 5 = InnoMaker IMX296)
         slot1_type = config.get("cameras", {}).get("slot1", {}).get("type", 5)
@@ -924,7 +925,7 @@ class CalibrationManager:
         """
         failure_indicators = [
             "Failed to AutoCalibrateCamera",
-            "ONNX detection failed - no balls found",
+            "Model detection failed to find any balls",
             "GetBall() failed to get a ball",
             "Could not DetermineFocalLengthForAutoCalibration",
         ]

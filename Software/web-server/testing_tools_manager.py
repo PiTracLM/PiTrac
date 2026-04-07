@@ -230,6 +230,7 @@ class TestingToolsManager:
             env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = base_image_dir
             env["PITRAC_WEBSERVER_SHARE_DIR"] = str(Path.home() / "LM_Shares/WebShare")
             env["DISPLAY"] = ":0.0"
+            env["OMP_WAIT_POLICY"] = "PASSIVE"
 
             merged_config = self.config_manager.get_config()
             for param in self.config_manager.get_environment_parameters():
@@ -414,9 +415,6 @@ class TestingToolsManager:
 
         timing_data = {
             "grayscale": [],
-            "onnx_preload": None,
-            "onnx_warmup": None,
-            "onnx_detection": [],
             "ncnn_preload": None,
             "ncnn_warmup": None,
             "ncnn_detection": [],
@@ -431,24 +429,6 @@ class TestingToolsManager:
                 match = re.search(r"(\d+)us", line)
                 if match:
                     timing_data["grayscale"].append(int(match.group(1)))
-
-            # ONNX Runtime preload
-            elif "ONNX Runtime detector preloaded successfully" in line:
-                match = re.search(r"in (\d+)ms", line)
-                if match:
-                    timing_data["onnx_preload"] = int(match.group(1))
-
-            # ONNX Runtime warmup
-            elif "Warmup complete. Final inference time" in line:
-                match = re.search(r"time: ([\d.]+) ms", line)
-                if match:
-                    timing_data["onnx_warmup"] = float(match.group(1))
-
-            # ONNX Runtime detection
-            elif "ONNX Runtime detected" in line and "balls in" in line:
-                match = re.search(r"in (\d+)ms", line)
-                if match:
-                    timing_data["onnx_detection"].append(int(match.group(1)))
 
             # NCNN preload
             elif "NCNN model preloaded in" in line:
@@ -488,10 +468,7 @@ class TestingToolsManager:
 
         # Check if we have any timing data
         has_data = (
-            timing_data["onnx_preload"]
-            or timing_data["onnx_warmup"]
-            or timing_data["onnx_detection"]
-            or timing_data["ncnn_preload"]
+            timing_data["ncnn_preload"]
             or timing_data["ncnn_detection"]
             or timing_data["opencv_fallback"]
             or timing_data["getball"]
@@ -507,16 +484,11 @@ class TestingToolsManager:
         summary.append("PERFORMANCE TIMING SUMMARY")
         summary.append("=" * 80)
 
-        if timing_data["ncnn_preload"] or timing_data["onnx_preload"]:
+        if timing_data["ncnn_preload"]:
             summary.append(f"\n Initialization:")
-            if timing_data["ncnn_preload"]:
-                summary.append(f"  NCNN Model Preload: {timing_data['ncnn_preload']}ms")
-                if timing_data["ncnn_warmup"]:
-                    summary.append(f"  NCNN Warmup: {timing_data['ncnn_warmup']} iterations")
-            if timing_data["onnx_preload"]:
-                summary.append(f"  ONNX Runtime Preload: {timing_data['onnx_preload']}ms")
-                if timing_data["onnx_warmup"]:
-                    summary.append(f"  Final Warmup Inference: {timing_data['onnx_warmup']:.2f}ms")
+            summary.append(f"  NCNN Model Preload: {timing_data['ncnn_preload']}ms")
+            if timing_data["ncnn_warmup"]:
+                summary.append(f"  NCNN Warmup: {timing_data['ncnn_warmup']} iterations")
 
         if timing_data["grayscale"]:
             avg_gray = sum(timing_data["grayscale"]) / len(timing_data["grayscale"])
@@ -531,16 +503,6 @@ class TestingToolsManager:
             if len(timing_data["ncnn_detection"]) > 1:
                 summary.append(
                     f"  Range: {min(timing_data['ncnn_detection'])}ms - {max(timing_data['ncnn_detection'])}ms"
-                )
-
-        if timing_data["onnx_detection"]:
-            avg_onnx = sum(timing_data["onnx_detection"]) / len(timing_data["onnx_detection"])
-            summary.append(f"\n Ball Detection (ONNX Runtime):")
-            summary.append(f"  Average: {avg_onnx:.0f}ms")
-            summary.append(f"  Count: {len(timing_data['onnx_detection'])} detections")
-            if len(timing_data["onnx_detection"]) > 1:
-                summary.append(
-                    f"  Range: {min(timing_data['onnx_detection'])}ms - {max(timing_data['onnx_detection'])}ms"
                 )
 
         if timing_data["opencv_fallback"]:
@@ -562,8 +524,8 @@ class TestingToolsManager:
             summary.append(f"  Count: {len(timing_data['spin_detection'])}")
 
         # Calculate total per-shot time if we have detection + spin
-        if timing_data["onnx_detection"] and timing_data["spin_detection"]:
-            avg_detection = sum(timing_data["onnx_detection"]) / len(timing_data["onnx_detection"])
+        if timing_data["ncnn_detection"] and timing_data["spin_detection"]:
+            avg_detection = sum(timing_data["ncnn_detection"]) / len(timing_data["ncnn_detection"])
             avg_spin = sum(timing_data["spin_detection"]) / len(timing_data["spin_detection"])
             total_per_shot = avg_detection + avg_spin
             summary.append(f"\n  Total Per-Shot Time:")

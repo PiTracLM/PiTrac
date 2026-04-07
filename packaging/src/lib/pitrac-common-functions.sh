@@ -279,11 +279,11 @@ install_test_suites() {
     fi
 }
 
-install_onnx_models() {
+install_models() {
     local repo_root="${1:-${REPO_ROOT:-/opt/PiTrac}}"
     local install_user="${2:-${SUDO_USER:-$(whoami)}}"
 
-    log_info "Installing ONNX models for AI detection..."
+    log_info "Installing models for AI detection..."
 
     local models_dir="$repo_root/Software/LMSourceCode/ml_models"
     if [[ -d "$models_dir" ]]; then
@@ -299,20 +299,8 @@ install_onnx_models() {
         mkdir -p "$system_models_dir"
 
         local models_found=0
-        for model_path in "$models_dir"/*/weights/best.onnx; do
-            if [[ -f "$model_path" ]]; then
-                # Extract model name from path (e.g., pitrac-ball-detection-09-23-25)
-                local model_name=$(basename "$(dirname "$(dirname "$model_path")")")
 
-                # Create folder and copy model
-                mkdir -p "$system_models_dir/$model_name"
-                cp "$model_path" "$system_models_dir/$model_name/best.onnx"
-                log_info "  Installed model: $model_name/best.onnx"
-                models_found=$((models_found + 1))
-            fi
-        done
-
-        # Also install ncnn models (param + bin files directly in model dirs)
+        # Install ncnn models (param + bin files directly in model dirs)
         for param_file in "$models_dir"/*/best.ncnn.param; do
             if [[ -f "$param_file" ]]; then
                 local model_name=$(basename "$(dirname "$param_file")")
@@ -334,7 +322,7 @@ install_onnx_models() {
             log_warn "No models found in $models_dir"
         fi
     else
-        log_warn "ONNX models directory not found: $models_dir"
+        log_warn "Models directory not found: $models_dir"
     fi
 }
 
@@ -725,7 +713,6 @@ install_dependencies_from_apt() {
         "libopencv4.13"           # OpenCV runtime (Pi5-optimized build)
         "libopencv-dev"           # OpenCV development headers
         "libncnn-dev"             # ncnn inference framework (static lib + headers)
-        "libonnxruntime1.17.3"    # ONNX Runtime with XNNPACK (1.22.x has Pi5 issues)
     )
 
     # Check which packages are available

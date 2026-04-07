@@ -635,7 +635,7 @@ class ConfigurationManager:
         """
         Discover available YOLO models from the models directory.
         Returns a dict of {display_name: model_dir_path} for dropdown options.
-        The C++ backend appends the correct file extension based on kInferenceBackend.
+        The C++ backend loads NCNN model files from the selected directory.
         """
         models = {}
         metadata = self._raw_metadata if hasattr(self, "_raw_metadata") else self._load_raw_metadata()

@@ -425,37 +425,6 @@ class TestExtractTimingSummary:
         assert "Grayscale Conversion" in result
         assert "150" in result
 
-    def test_extract_timing_onnx_preload(self, testing_manager):
-        """Test extracting ONNX preload timing"""
-        log_lines = ["ONNX Runtime detector preloaded successfully in 450ms"]
-        result = testing_manager._extract_timing_summary(log_lines)
-        assert result is not None
-        assert "ONNX Runtime Preload" in result
-        assert "450ms" in result
-
-    def test_extract_timing_onnx_warmup(self, testing_manager):
-        """Test extracting ONNX warmup timing"""
-        # Need preload timing as well for output to be generated
-        log_lines = [
-            "ONNX Runtime detector preloaded successfully in 450ms",
-            "Warmup complete. Final inference time: 23.5 ms",
-        ]
-        result = testing_manager._extract_timing_summary(log_lines)
-        assert result is not None
-        assert "Warmup Inference" in result or "Final Warmup Inference" in result
-        assert "23.5" in result or "23.50" in result
-
-    def test_extract_timing_onnx_detection(self, testing_manager):
-        """Test extracting ONNX detection timing"""
-        log_lines = [
-            "ONNX Runtime detected 1 balls in 25ms",
-            "ONNX Runtime detected 2 balls in 30ms",
-        ]
-        result = testing_manager._extract_timing_summary(log_lines)
-        assert result is not None
-        assert "Ball Detection (ONNX Runtime)" in result
-        assert "Average" in result
-
     def test_extract_timing_opencv_fallback(self, testing_manager):
         """Test extracting OpenCV fallback timing"""
         log_lines = ["OpenCV DNN completed processing in 45 ms"]
@@ -483,11 +452,10 @@ class TestExtractTimingSummary:
     def test_extract_timing_complete_pipeline(self, testing_manager):
         """Test extracting complete pipeline timing"""
         log_lines = [
-            "ONNX Runtime detector preloaded successfully in 450ms",
-            "Warmup complete. Final inference time: 23.5 ms",
+            "NCNN model preloaded in 250ms",
             "Grayscale conversion completed in 150us",
-            "ONNX Runtime detected 1 balls in 25ms",
-            "ONNX Runtime detected 2 balls in 30ms",
+            "NCNN detected 1 balls in 25ms",
+            "NCNN detected 2 balls in 30ms",
             "Spin detection completed in 35ms",
             "Spin detection completed in 40ms",
         ]
@@ -495,16 +463,16 @@ class TestExtractTimingSummary:
         assert result is not None
         assert "Initialization" in result
         assert "Image Preprocessing" in result
-        assert "Ball Detection (ONNX Runtime)" in result
+        assert "Ball Detection (NCNN)" in result
         assert "Spin Analysis" in result
         assert "Total Per-Shot Time" in result
 
     def test_extract_timing_multiple_detections_range(self, testing_manager):
         """Test that range is shown for multiple detections"""
         log_lines = [
-            "ONNX Runtime detected 1 balls in 20ms",
-            "ONNX Runtime detected 1 balls in 25ms",
-            "ONNX Runtime detected 1 balls in 30ms",
+            "NCNN detected 1 balls in 20ms",
+            "NCNN detected 1 balls in 25ms",
+            "NCNN detected 1 balls in 30ms",
         ]
         result = testing_manager._extract_timing_summary(log_lines)
         assert result is not None

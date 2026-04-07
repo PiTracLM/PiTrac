@@ -73,9 +73,6 @@ check_artifacts() {
                 missing+=("msgpack")
             fi
         fi
-        if [ ! -f "$ARTIFACT_DIR/libonnxruntime1.17.3_1.17.3-xnnpack3_arm64.deb" ]; then
-            missing+=("onnxruntime")
-        fi
     else
         # Check for tar.gz packages
         if [ ! -f "$ARTIFACT_DIR/opencv-4.13.0-arm64.tar.gz" ]; then
@@ -562,7 +559,7 @@ build_dev() {
 
     install_test_suites "/usr/share/pitrac/test-suites" "$REPO_ROOT"
 
-    install_onnx_models "$REPO_ROOT" "${SUDO_USER:-$(whoami)}"
+    install_models "$REPO_ROOT" "${SUDO_USER:-$(whoami)}"
 
     # Install calibration tools
     log_info "Installing calibration tools..."

@@ -18,24 +18,13 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
-#include <opencv2/dnn.hpp>
-
-#ifdef HAS_ONNXRUNTIME
-#ifdef __unix__
-#include <onnxruntime/core/session/onnxruntime_cxx_api.h>
-#else
-#include <onnxruntime_cxx_api.h>
-#endif
-#endif
 
 #include "logging_tools.h"
 #include "gs_camera.h"
 #include "colorsys.h"
 #include "golf_ball.h"
 #include "ncnn_detector.hpp"
-#ifdef HAS_ONNXRUNTIME
-#include "onnx_runtime_detector.hpp"
-#endif
+#include "spin_predictor.hpp"
 
 
 namespace golf_sim {
@@ -204,15 +193,11 @@ public:
     // Model Detection Configuration
     static std::string kStrobedBallDetectionMethod;
     static std::string kBallPlacementDetectionMethod;
-    static std::string kModelPath;          // Model directory — backend appends file names
+    static std::string kModelPath;
     static float kModelConfidenceThreshold;
     static float kModelNMSThreshold;
     static int kModelInputWidth;
     static int kModelInputHeight;
-    static std::string kModelDeviceType;
-
-    static std::string kInferenceBackend;   // "ncnn" (primary) or "opencv_dnn" (fallback)
-    static bool kAutoFallback;
     static int kInferenceThreads;
 
     // This determines which potential 3D angles will be searched for spin processing
@@ -364,20 +349,9 @@ public:
                                 BallSearchMode search_mode,
                                 std::vector<GsCircle>& detected_circles,
                                 bool report_find_failures);
-    static bool DetectBallsOpenCVDNN(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
 
-#ifdef HAS_ONNXRUNTIME
-    static bool DetectBallsONNX(const cv::Mat& preprocessed_img,
-                                BallSearchMode search_mode,
-                                std::vector<GsCircle>& detected_circles,
-                                bool report_find_failures);
-    static bool DetectBallsONNXRuntime(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
-    static bool PreloadONNXRuntimeModel();
-    static void CleanupONNXRuntime();
-#endif
-
-    static bool PreloadYOLOModel();
     static bool PreloadNCNNModel();
+    static bool PreloadSpinModel();
     static void CleanupNCNN();
 
     // Load configuration values from JSON after config is initialized
@@ -390,30 +364,14 @@ public:
                                           float nms_threshold);
 
 private:
-    // NCNN detector (primary backend)
+    // NCNN detector
     static std::unique_ptr<NCNNDetector> ncnn_detector_;
     static std::atomic<bool> ncnn_detector_initialized_;
     static std::mutex ncnn_detector_mutex_;
 
-#ifdef HAS_ONNXRUNTIME
-    // ONNX Runtime detector (legacy backend)
-    static std::unique_ptr<ONNXRuntimeDetector> onnx_detector_;
-    static std::atomic<bool> onnx_detector_initialized_;
-    static std::mutex onnx_detector_mutex_;
-#endif
-
-    // OpenCV DNN fallback
-    static cv::dnn::Net yolo_model_;
-    static bool yolo_model_loaded_;
-    static std::mutex yolo_model_mutex_;  // Thread safety for model loading
-    // Prevents allocating ~1.2MB per frame (640x640x3 multiple times)
-    static cv::Mat yolo_input_buffer_;        // Reusable input conversion buffer
-    static cv::Mat yolo_letterbox_buffer_;    // 640x640x3 letterboxed image
-    static cv::Mat yolo_resized_buffer_;      // Resized image before letterboxing
-    static cv::Mat yolo_blob_buffer_;         // Blob for network input
-    static std::vector<cv::Rect> yolo_detection_boxes_;     // Detection results
-    static std::vector<float> yolo_detection_confidences_;  // Detection confidences
-    static std::vector<cv::Mat> yolo_outputs_;              // Network outputs
+    static std::unique_ptr<SpinPredictor> spin_predictor_;
+    static std::atomic<bool> spin_predictor_initialized_;
+    static std::mutex spin_predictor_mutex_;
 
     // Experimental flag to have YOLO process either monochrome or color images
     static YOLOImageTypeToUse kImageTypeToProcessWithYOLO;

@@ -45,16 +45,13 @@
       "kCLAHEClipLimit": "8",
       "kCLAHETilesGridSize": "6",
       "kStrobedBallDetectionMethod": "experimental",
-      "kInferenceBackend": "ncnn",
       "kNumberRadiiToAverageForDynamicAdjustment": "2",
       "kModelConfidenceThreshold": "0.5",
-      "kModelDeviceType": "CPU",
       "kModelInputWidth": "736",
       "kModelInputHeight": "544",
       "kModelPath": "../ml_models/yolo26-ball-detector",
       "kModelNMSThreshold": "0.4",
-      "kAutoFallback": "1",
-      "kInferenceThreads": "3",
+      "kInferenceThreads": "4",
       "kPlacedBallCannyLower": "35",
       "kPlacedBallCannyUpper": "80",
       "kPlacedBallCurrentParam1": "130",
@@ -400,7 +397,9 @@
       "kCoarseZRotationDegreesIncrement": "4",
       "kCoarseZRotationDegreesStart": "-10",
       "kGaborMaxWhitePercent": "45",
-      "kGaborMinWhitePercent": "39"
+      "kGaborMinWhitePercent": "39",
+      "kSpinModelPath": "/etc/pitrac/models/spin-predictor",
+      "kSpinMLZFallbackThreshold": "60.0"
     },
     "strobing": {
       "kBaudRateForFastPulses": "115200",

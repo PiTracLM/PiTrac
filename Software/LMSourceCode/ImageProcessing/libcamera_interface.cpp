@@ -1286,7 +1286,6 @@ bool CheckForBallEnhanced(GolfBall& ball, cv::Mat& img) {
     
     if (use_yolo) {
         std::vector<GsCircle> detected_circles;
-        // Use the backend-aware dispatcher (routes to NCNN, ONNX Runtime, or OpenCV DNN)
         bool detected = golf_sim::BallImageProc::DetectBalls(img,
                                                       golf_sim::BallImageProc::BallSearchMode::kFindPlacedBall,
                                                       detected_circles, false);

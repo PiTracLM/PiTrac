@@ -81,10 +81,6 @@ omp_dep = dependency('openmp', language : 'cpp', required : false)
 if not omp_dep.found()
     omp_dep = declare_dependency(link_args : '-lgomp')
 endif
-onnxruntime_dep = dependency('onnxruntime', required : false)
-if onnxruntime_dep.found()
-    add_global_arguments('-DHAS_ONNXRUNTIME', '-DUSE_XNNPACK', language : 'cpp')
-endif
 
 
 summary({
@@ -101,9 +97,6 @@ conf_data = configuration_data()
 pitrac_lm_module_deps = [
 	libcamera_dep, thread_dep, opencv_dep, lgpio_dep, rpicam_app_dep,
 	fmt_dep, boost_dep, ssl_dep, msgpack_dep, yamlcpp_dep, ncnn_dep, omp_dep,]
-if onnxruntime_dep.found()
-    pitrac_lm_module_deps += onnxruntime_dep
-endif
 
 
 subdir('core')
@@ -198,7 +191,7 @@ pitrac_lm_sources += ([
 			'libcamera_jpeg.cpp',
 			'ball_image_proc.cpp',
 			'ncnn_detector.cpp',
-			'onnx_runtime_detector.cpp',
+			'spin_predictor.cpp',
 			'pulse_strobe.cpp',
 			'colorsys.cpp',
 			'cv_utils.cpp',

@@ -36,10 +36,9 @@ case "$1" in
                     mkdir -p "$SYSTEM_MODELS_DIR"
                     cp -r /usr/share/pitrac/models/* "$SYSTEM_MODELS_DIR/" 2>/dev/null || true
                     # Set proper permissions - models should be readable by all users
-                    chmod -R 644 "$SYSTEM_MODELS_DIR"/*/*.onnx 2>/dev/null || true
                     chmod -R 755 "$SYSTEM_MODELS_DIR"/* 2>/dev/null || true
                     chmod 755 "$SYSTEM_MODELS_DIR"
-                    echo "Installed ONNX models to $SYSTEM_MODELS_DIR"
+                    echo "Installed models to $SYSTEM_MODELS_DIR"
                 fi
             fi
 

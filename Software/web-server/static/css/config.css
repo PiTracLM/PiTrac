@@ -1018,7 +1018,7 @@ textarea.config-input {
     font-size: 0.875rem;
 }
 
-/* ONNX Model Selector */
+/* Model Selector */
 select option[value="__browse__"] {
     font-style: italic;
     color: var(--accent-primary);

@@ -73,9 +73,7 @@
       "type": "array",
       "default": [
         "best.ncnn.param",
-        "best.onnx",
-        "weights/best.ncnn.param",
-        "weights/best.onnx"
+        "weights/best.ncnn.param"
       ],
       "internal": true
     }
@@ -536,7 +534,7 @@
       "subcategory": "basic",
       "basicSubcategory": "Detection Methods",
       "displayName": "AI Model",
-      "description": "Model directory \u2014 backend loads the right format (NCNN/ONNX) automatically",
+      "description": "Model directory \u2014 NCNN model files are loaded from this path",
       "type": "select",
       "options": {},
       "default": "/etc/pitrac/models/yolo26-ball-detector",
@@ -1003,31 +1001,6 @@
       "requiresRestart": true,
       "passedVia": "json"
     },
-    "gs_config.ball_identification.kInferenceBackend": {
-      "category": "AI Detection",
-      "subcategory": "advanced",
-      "displayName": "Inference Backend",
-      "description": "Neural network inference backend",
-      "type": "select",
-      "options": {
-        "ncnn": "NCNN (Fastest on Pi 5)",
-        "onnxruntime": "ONNX Runtime (Legacy)",
-        "opencv_dnn": "OpenCV DNN (Fallback)"
-      },
-      "default": "ncnn",
-      "requiresRestart": true,
-      "passedVia": "json"
-    },
-    "gs_config.ball_identification.kAutoFallback": {
-      "category": "AI Detection",
-      "subcategory": "advanced",
-      "displayName": "Auto Fallback to OpenCV",
-      "description": "Automatically fallback to OpenCV DNN if primary backend fails",
-      "type": "boolean",
-      "default": true,
-      "requiresRestart": false,
-      "passedVia": "json"
-    },
     "gs_config.ball_identification.kInferenceThreads": {
       "category": "AI Detection",
       "subcategory": "advanced",
@@ -1037,21 +1010,7 @@
       "min": 0,
       "max": 8,
       "step": 1,
-      "default": 3,
-      "requiresRestart": true,
-      "passedVia": "json"
-    },
-    "gs_config.ball_identification.kModelDeviceType": {
-      "category": "AI Detection",
-      "subcategory": "advanced",
-      "displayName": "ONNX Device Type",
-      "description": "Device type for ONNX inference (CPU/GPU)",
-      "type": "select",
-      "options": {
-        "CPU": "CPU",
-        "GPU": "GPU (if available)"
-      },
-      "default": "CPU",
+      "default": 4,
       "requiresRestart": true,
       "passedVia": "json"
     },
@@ -1661,6 +1620,28 @@
       "min": 0,
       "max": 180,
       "default": 110,
+      "requiresRestart": false,
+      "passedVia": "json"
+    },
+    "gs_config.spin_analysis.kSpinModelPath": {
+      "category": "Spin Analysis",
+      "subcategory": "advanced",
+      "displayName": "Spin Prediction Model",
+      "description": "Path to the NCNN spin prediction model directory",
+      "type": "string",
+      "default": "/etc/pitrac/models/spin-predictor",
+      "requiresRestart": true,
+      "passedVia": "json"
+    },
+    "gs_config.spin_analysis.kSpinMLZFallbackThreshold": {
+      "category": "Spin Analysis",
+      "subcategory": "advanced",
+      "displayName": "ML Spin Z Fallback Threshold",
+      "description": "Z rotation threshold (degrees) that triggers traditional search fallback",
+      "type": "number",
+      "min": 10,
+      "max": 180,
+      "default": 60,
       "requiresRestart": false,
       "passedVia": "json"
     },

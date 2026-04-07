@@ -112,7 +112,7 @@ public:
         kYellow = 3,
         kOpticGreen = 4,
         kUnknown = 5,
-        kModelDetected = 6    // Ball detected using YOLO model (NCNN/ONNX)
+        kModelDetected = 6    // Ball detected via ML model
     };
 
     // If the ball's hsv range is known (at it really better be!), ball_color_ should be set to kCalibrated
