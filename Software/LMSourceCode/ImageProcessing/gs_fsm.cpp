@@ -428,6 +428,11 @@ namespace golf_sim {
 
         const cv::Mat& cam2_mat = cam2ImageReceived.GetBallFlightImage();
 
+#ifdef __unix__
+        // Save the raw strobed image before processing (was lost in single-process migration)
+        GsUISystem::SaveWebserverImage(kWebServerCamera2Image, cam2_mat);
+#endif
+
         GolfBall result_ball;
         cv::Vec3d rotation_results;
         cv::Mat exposures_image;
