@@ -29,6 +29,11 @@ from update_manager import UpdateManager
 
 logger = logging.getLogger(__name__)
 
+CHARUCO_SQUARES_X = 7
+CHARUCO_SQUARES_Y = 10
+CHARUCO_SQUARE_LENGTH = 0.025
+CHARUCO_MARKER_LENGTH = 0.020
+
 
 class PiTracServer:
 
@@ -437,6 +442,276 @@ class PiTracServer:
             if self.calibration_manager.loop is None:
                 return {"status": "error", "message": "Server still starting up, please retry in a moment"}
             return await self.calibration_manager.capture_still_image(camera)
+
+        @self.app.get("/api/calibration/charuco-board")
+        async def generate_charuco_board() -> Response:
+            try:
+                import cv2
+                import numpy as np
+            except ImportError as e:
+                return Response(
+                    content=json.dumps({"status": "error", "message": str(e)}),
+                    media_type="application/json",
+                    status_code=500,
+                )
+
+            # Match the board used by run_distortion_calibration
+            aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+            board = cv2.aruco.CharucoBoard(
+                (CHARUCO_SQUARES_X, CHARUCO_SQUARES_Y),
+                CHARUCO_SQUARE_LENGTH, CHARUCO_MARKER_LENGTH, aruco_dict,
+            )
+
+            # A4 at 300 DPI = 2480x3508; leave margins for printer
+            margin = 100  # px
+            board_img = board.generateImage((2480 - 2 * margin, 3508 - 2 * margin))
+            page = np.full((3508, 2480), 255, dtype=np.uint8)
+            page[margin:margin + board_img.shape[0], margin:margin + board_img.shape[1]] = board_img
+
+            success, png_bytes = cv2.imencode(".png", page)
+            if not success:
+                return Response(
+                    content=json.dumps({"status": "error", "message": "Failed to encode image"}),
+                    media_type="application/json",
+                    status_code=500,
+                )
+
+            return Response(
+                content=png_bytes.tobytes(),
+                media_type="image/png",
+                headers={"Content-Disposition": "inline; filename=charuco_board_7x10.png"},
+            )
+
+        @self.app.websocket("/ws/distortion-feed")
+        async def distortion_camera_feed(websocket: WebSocket) -> None:
+            await websocket.accept()
+            try:
+                import cv2
+                import numpy as np
+                from charuco_detector import CompatibleCharucoDetector
+
+                data = await websocket.receive_json()
+                camera = data.get("camera", "camera1")
+                camera_index = 0 if camera == "camera1" else 1
+
+                detector = CompatibleCharucoDetector(
+                    squares_x=CHARUCO_SQUARES_X, squares_y=CHARUCO_SQUARES_Y,
+                    square_length=CHARUCO_SQUARE_LENGTH, marker_length=CHARUCO_MARKER_LENGTH,
+                )
+
+                cap = cv2.VideoCapture(camera_index)
+                if not cap.isOpened():
+                    await websocket.send_json({"error": f"Cannot open camera {camera_index}"})
+                    await websocket.close()
+                    return
+
+                # Capture at max resolution for calibration accuracy
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 3840)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160)
+                # Read actual resolution the camera settled on
+                actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                logger.info(f"Distortion feed camera resolution: {actual_w}x{actual_h}")
+
+                STREAM_WIDTH = 960  # downscale for streaming display
+
+                try:
+                    while True:
+                        ret, frame = cap.read()
+                        if not ret:
+                            await asyncio.sleep(0.1)
+                            continue
+
+                        # Publish full-res RAW frame for calibration
+                        self.calibration_manager.set_shared_frame(camera_index, frame.copy())
+
+                        # Downscale for display and detection overlay
+                        scale = STREAM_WIDTH / frame.shape[1]
+                        display = cv2.resize(frame, (STREAM_WIDTH, int(frame.shape[0] * scale)))
+
+                        gray = cv2.cvtColor(display, cv2.COLOR_BGR2GRAY)
+                        corners, ids, marker_corners, marker_ids = detector.detect_charuco_corners(gray)
+
+                        if marker_corners and len(marker_corners) > 0:
+                            cv2.aruco.drawDetectedMarkers(display, marker_corners, marker_ids)
+                        if corners is not None and len(corners) > 0:
+                            cv2.aruco.drawDetectedCornersCharuco(display, corners, ids)
+                            quality = detector.assess_image_quality(gray, corners)
+                            label = f"Corners: {quality['num_corners']}  Blur: {quality['blur_score']:.0f}"
+                            color = (0, 255, 0) if quality["is_good"] else (0, 128, 255)
+                            cv2.putText(display, label, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                        else:
+                            cv2.putText(display, "No board detected", (10, 25),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+
+                        # Draw coverage grid overlay (single blend pass)
+                        status = self.calibration_manager.calibration_status.get(camera, {})
+                        cov = status.get("coverage")
+                        if cov and cov.get("grid"):
+                            dh, dw = display.shape[:2]
+                            grid = cov["grid"]
+                            rows, cols = len(grid), len(grid[0])
+                            if any(grid[r][c] > 0 for r in range(rows) for c in range(cols)):
+                                overlay = display.copy()
+                                for r in range(rows):
+                                    for c in range(cols):
+                                        if grid[r][c] > 0:
+                                            x1 = int(c * dw / cols)
+                                            y1 = int(r * dh / rows)
+                                            x2 = int((c + 1) * dw / cols)
+                                            y2 = int((r + 1) * dh / rows)
+                                            cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 180, 0), -1)
+                                cv2.addWeighted(overlay, 0.15, display, 0.85, 0, display)
+
+                        _, jpg = cv2.imencode(".jpg", display, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                        await websocket.send_bytes(jpg.tobytes())
+                        await asyncio.sleep(0.066)  # ~15 fps
+                finally:
+                    cap.release()
+                    self.calibration_manager.clear_shared_frame(camera_index)
+
+            except WebSocketDisconnect:
+                logger.debug("Distortion feed WebSocket disconnected")
+            except Exception as e:
+                logger.error(f"Distortion feed error: {e}")
+                try:
+                    await websocket.close()
+                except Exception:
+                    pass
+
+        @self.app.websocket("/ws/undistort-preview")
+        async def undistort_preview_feed(websocket: WebSocket) -> None:
+            await websocket.accept()
+            try:
+                import cv2
+                import numpy as np
+
+                data = await websocket.receive_json()
+                camera = data.get("camera", "camera1")
+                camera_index = 0 if camera == "camera1" else 1
+
+                # Load calibration data
+                camera_num = "1" if camera == "camera1" else "2"
+                matrix_key = f"gs_config.cameras.kCamera{camera_num}CalibrationMatrix"
+                dist_key = f"gs_config.cameras.kCamera{camera_num}DistortionVector"
+                matrix_data = self.config_manager.get_config(matrix_key)
+                dist_data = self.config_manager.get_config(dist_key)
+
+                if matrix_data is None or dist_data is None:
+                    await websocket.send_json({"error": "No calibration data found for this camera"})
+                    await websocket.close()
+                    return
+
+                camera_matrix = np.array(matrix_data, dtype=np.float64)
+                dist_coeffs = np.array(dist_data, dtype=np.float64)
+
+                cap = cv2.VideoCapture(camera_index)
+                if not cap.isOpened():
+                    await websocket.send_json({"error": f"Cannot open camera {camera_index}"})
+                    await websocket.close()
+                    return
+
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+                # Read actual resolution and precompute undistort maps
+                ret, first_frame = cap.read()
+                if not ret:
+                    await websocket.send_json({"error": "Could not read from camera"})
+                    await websocket.close()
+                    return
+                h, w = first_frame.shape[:2]
+                new_matrix, roi = cv2.getOptimalNewCameraMatrix(
+                    camera_matrix, dist_coeffs, (w, h), 1, (w, h)
+                )
+                map1, map2 = cv2.initUndistortRectifyMap(
+                    camera_matrix, dist_coeffs, None, new_matrix, (w, h), cv2.CV_16SC2
+                )
+
+                mode = "side_by_side"  # or "raw" or "undistorted"
+
+                # Listen for mode toggles in a background task
+                mode_holder = {"mode": mode}
+
+                async def listen_for_mode():
+                    try:
+                        while True:
+                            msg = await websocket.receive_json()
+                            mode_holder["mode"] = msg.get("mode", mode_holder["mode"])
+                    except (WebSocketDisconnect, asyncio.CancelledError):
+                        pass
+                    except Exception as e:
+                        logger.debug(f"Mode listener error: {e}")
+
+                listener = asyncio.create_task(listen_for_mode())
+
+                try:
+                    while True:
+                        ret, frame = cap.read()
+                        if not ret:
+                            await asyncio.sleep(0.1)
+                            continue
+
+                        mode = mode_holder["mode"]
+
+                        if mode == "raw":
+                            cv2.putText(frame, "RAW", (10, 30),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                            output = frame
+                        elif mode == "undistorted":
+                            output = cv2.remap(frame, map1, map2, cv2.INTER_LINEAR)
+                            cv2.putText(output, "UNDISTORTED", (10, 30),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                        else:
+                            undistorted = cv2.remap(frame, map1, map2, cv2.INTER_LINEAR)
+                            # Scale both to half width for side-by-side
+                            half_w = w // 2
+                            left = cv2.resize(frame, (half_w, h))
+                            right = cv2.resize(undistorted, (half_w, h))
+                            cv2.putText(left, "RAW", (10, 30),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                            cv2.putText(right, "UNDISTORTED", (10, 30),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                            output = np.hstack([left, right])
+
+                        _, jpg = cv2.imencode(".jpg", output, [cv2.IMWRITE_JPEG_QUALITY, 75])
+                        await websocket.send_bytes(jpg.tobytes())
+                        await asyncio.sleep(0.066)  # ~15 fps
+                finally:
+                    listener.cancel()
+                    cap.release()
+
+            except WebSocketDisconnect:
+                logger.debug("Undistort preview WebSocket disconnected")
+            except Exception as e:
+                logger.error(f"Undistort preview error: {e}")
+                try:
+                    await websocket.close()
+                except Exception:
+                    pass
+
+        @self.app.post("/api/calibration/distortion/{camera}")
+        async def run_distortion_calibration(camera: str, request: Request) -> Dict[str, Any]:
+            """Start automated lens distortion calibration using ChArUco board"""
+            if camera not in ["camera1", "camera2"]:
+                return {"status": "error", "message": "Invalid camera"}
+            if self.calibration_manager.loop is None:
+                return {"status": "error", "message": "Server still starting up, please retry in a moment"}
+
+            target_images = 20
+            try:
+                body = await request.json()
+                target_images = body.get("target_images", 20)
+            except Exception:
+                pass  # No body or invalid JSON is fine, use default
+
+            task = asyncio.create_task(
+                self.calibration_manager.run_distortion_calibration(camera, target_images)
+            )
+            self.background_tasks.add(task)
+            task.add_done_callback(self.background_tasks.discard)
+
+            return {"status": "started", "message": f"Distortion calibration started for {camera}"}
 
         @self.app.post("/api/calibration/stop")
         async def stop_calibration() -> Dict[str, Any]:
