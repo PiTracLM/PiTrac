@@ -83,8 +83,8 @@ The folling assembly instruction might be a hard read, so feel free to watch the
 ---
 
 ##  Camera Assembly
-![Camera Assembly](../../assets/technicaldrawings/Assy_Camera_Eyeball-3D.svg)
-[Camera Assembly Drawing](../../assets/technicaldrawings/Assy_Camera_Eyeball.svg)
+![Camera Assembly](../assets/technicaldrawings/Assy_Camera_Eyeball-3D.svg)
+[Camera Assembly Drawing](../assets/technicaldrawings/Assy_Camera_Eyeball.svg)
 
 Tools:
 - Cross-head screwdriver  
@@ -110,8 +110,8 @@ Note: Choose the apropirate eyeball for your camera and lens.
 ---
 
 ##  LED Assembly (5x2 IR LED board)
-![LED Assembly](../../assets/technicaldrawings/Assy_PiTracIRLED-3D.svg)
-[LED Assembly Drawing](../../assets/technicaldrawings/Assy_PiTracIRLED.svg)
+![LED Assembly](../assets/technicaldrawings/Assy_PiTracIRLED-3D.svg)
+[LED Assembly Drawing](../assets/technicaldrawings/Assy_PiTracIRLED.svg)
 
 Tools:
 - Cross-head screwdriver  
@@ -152,10 +152,10 @@ Tools:
 ---
 
 ##  Eyeball Assembly
-![Tee-Cam Screen Assembly](../../assets/technicaldrawings/Assy_Tee_Cam-3D.svg)
-![LED Screen Assembly](../../assets/technicaldrawings/Assy_Screen_PiTracIRLED-3D.svg)
-![Flight-Cam Screen Assembly](../../assets/technicaldrawings/Assy_Flight_Cam-3D.svg)
-[Flight-Cam Screen Assembly Drawing](../../assets/technicaldrawings/Assy_Flight_Cam.svg)
+![Tee-Cam Screen Assembly](../assets/technicaldrawings/Assy_Tee_Cam-3D.svg)
+![LED Screen Assembly](../assets/technicaldrawings/Assy_Screen_PiTracIRLED-3D.svg)
+![Flight-Cam Screen Assembly](../assets/technicaldrawings/Assy_Flight_Cam-3D.svg)
+[Flight-Cam Screen Assembly Drawing](../assets/technicaldrawings/Assy_Flight_Cam.svg)
 
 Tools:
 - 3 mm Allen key for ISO 7380-2 or 4 mm for ISO 4762
@@ -182,8 +182,8 @@ Note: ISO 7380-2 button-head screws look nicer and provide more surface contact;
 ---
 
 ##  PSU Stack Module Assembly
-![PSU Stack Module Assembly](../../assets/technicaldrawings/Assy_Stack_Module_PSU-3D.svg)
-[PSU Stack Module Assembly Drawing](../../assets/technicaldrawings/Assy_Stack_Module_PSU.svg)
+![PSU Stack Module Assembly](../assets/technicaldrawings/Assy_Stack_Module_PSU-3D.svg)
+[PSU Stack Module Assembly Drawing](../assets/technicaldrawings/Assy_Stack_Module_PSU.svg)
 Tools:
 - Cross-head screwdriver 
 - 3 mm Allen key for ISO 7380-2 or 4 mm for ISO 4762
@@ -224,9 +224,9 @@ Note: Four ISO 4762 M5x35 mm screws can be used in the Stack_Module_PSU if you d
 ---
 
 ##  Camera Stack Module Assembly
-![Tee Camera Stack Module Assembly](../../assets/technicaldrawings/Assy_Stack_Module_Tee_Cam-3D.svg)
-![Flight Camera Stack Module Assembly](../../assets/technicaldrawings/Assy_Stack_Module_Flight_Cam-3D.svg)
-[Flight Camera Stack Module Assembly Drawing](../../assets/technicaldrawings/Assy_Stack_Module_Flight_Cam.svg)
+![Tee Camera Stack Module Assembly](../assets/technicaldrawings/Assy_Stack_Module_Tee_Cam-3D.svg)
+![Flight Camera Stack Module Assembly](../assets/technicaldrawings/Assy_Stack_Module_Flight_Cam-3D.svg)
+[Flight Camera Stack Module Assembly Drawing](../assets/technicaldrawings/Assy_Stack_Module_Flight_Cam.svg)
 
 Tools:
 - 3 mm Allen key for ISO 7380-2 or 4 mm for ISO 4762
@@ -249,7 +249,7 @@ Tools:
 ---
 
 ##  LED Stack Module Assembly
-![LED Stack Module Assembly](../../assets/technicaldrawings/Assy_Stack_Module_LED-3D.svg)
+![LED Stack Module Assembly](../assets/technicaldrawings/Assy_Stack_Module_LED-3D.svg)
 Tools:
 - 3 mm Allen key for ISO 7380-2 or 4 mm for ISO 4762
 
@@ -269,11 +269,11 @@ Tools:
 ---
 
 ##  Electronics
-![Pi5 Assembly](../../assets/technicaldrawings/Assy_RaspberryPi5_carrier-3D.svg)
-![V3Connector Board Assembly](../../assets/technicaldrawings/Assy_V3Connector_Board-3D.svg)
-[Pi5 Assembly Drawing](../../assets/technicaldrawings/Assy_RaspberryPi5_carrier.svg)
+![Pi5 Assembly](../assets/technicaldrawings/Assy_RaspberryPi5_carrier-3D.svg)
+![V3Connector Board Assembly](../assets/technicaldrawings/Assy_V3Connector_Board-3D.svg)
+[Pi5 Assembly Drawing](../assets/technicaldrawings/Assy_RaspberryPi5_carrier.svg)
 
-[V3Connector Board Assembly Drawing](../../assets/technicaldrawings/Assy_V3Connector_Board.svg)
+[V3Connector Board Assembly Drawing](../assets/technicaldrawings/Assy_V3Connector_Board.svg)
 
 Tools:
 - Cross-head screwdriver 
@@ -299,8 +299,8 @@ Note: this assembly state is a good point to fire up the PiTrac for the first ti
 ---
 
 ##  Cover assembly
-![Cover Assembly](../../assets/technicaldrawings/Assy_Stack_Module_Cover_forInserts-3D.svg)
-[Cover Assembly Drawing](../../assets/technicaldrawings/Assy_Stack_Module_Cover_forInserts.svg)
+![Cover Assembly](../assets/technicaldrawings/Assy_Stack_Module_Cover_forInserts-3D.svg)
+[Cover Assembly Drawing](../assets/technicaldrawings/Assy_Stack_Module_Cover_forInserts.svg)
 
 Tools:
 - Cross-head screwdriver 
@@ -324,8 +324,8 @@ Note: There are alternative **Stack_Module_Cover** available, providing a less c
 ---
 
 ##  Stack Module to Stack Module Assembly
-![PiTrac Assembly](../../assets/technicaldrawings/Assy_PiTrac-3D.svg)
-[PiTrac Assembly Drawing](../../assets/technicaldrawings/Assy_PiTrac.svg) 
+![PiTrac Assembly](../assets/technicaldrawings/Assy_PiTrac-3D.svg)
+[PiTrac Assembly Drawing](../assets/technicaldrawings/Assy_PiTrac.svg) 
 
 Tools:
 - 3 mm or 4 mm Allen key (ball-end preferred)
