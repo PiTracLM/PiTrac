@@ -169,24 +169,47 @@ class TestingToolsManager:
                 # Set the base directory to where our test images are
                 config_json["gs_config"]["testing"]["kBaseTestImageDir"] = str(self.test_images_dir) + "/"
                 config_json["gs_config"]["testing"]["kTwoImageTestTeedBallImage"] = image_filename
-                config_json["gs_config"]["testing"]["kTwoImageTestStrobedImage"] = image_filename
+                config_json["gs_config"]["testing"]["kTwoImageTestStrobedBallImage"] = image_filename
                 config_json["gs_config"]["testing"]["kTwoImageTestPreImage"] = ""  # Optional
+
+                with open(config_path, "w") as f:
+                    json.dump(config_json, f, indent=2)
+
+            # For sample image test or automated testing, set up test suite paths
+            if tool_id in ("test_images", "automated_testing"):
+                import json
+
+                test_suite_dir = Path("/usr/share/pitrac/test-suites/TestSuite_2025_02_07")
+                with open(config_path, "r") as f:
+                    config_json = json.load(f)
+
+                if "gs_config" not in config_json:
+                    config_json["gs_config"] = {}
+                if "testing" not in config_json["gs_config"]:
+                    config_json["gs_config"]["testing"] = {}
+
+                if tool_id == "test_images" and test_suite_dir.exists():
+                    # Use a matched pair from the test suite (Shot 1)
+                    teed_files = sorted(test_suite_dir.glob("*log_ball_final_found_ball_img_Shot_1_*"))
+                    strobed_files = sorted(test_suite_dir.glob("*log_cam2_last_strobed_img_Shot_1_*"))
+                    if teed_files and strobed_files:
+                        config_json["gs_config"]["testing"]["kBaseTestImageDir"] = str(test_suite_dir) + "/"
+                        config_json["gs_config"]["testing"]["kTwoImageTestTeedBallImage"] = teed_files[0].name
+                        config_json["gs_config"]["testing"]["kTwoImageTestStrobedBallImage"] = strobed_files[0].name
+
+                if tool_id == "automated_testing":
+                    config_json["gs_config"]["testing"]["kAutomatedTestSuiteDirectory"] = str(test_suite_dir) + "/"
+                    config_json["gs_config"]["testing"]["kAutomatedTestExpectedResultsCSV"] = "Uneekor Comparison 2025-02-07_Small_Test.csv"
 
                 with open(config_path, "w") as f:
                     json.dump(config_json, f, indent=2)
 
             cmd = [self.pitrac_binary]
 
-            system_mode = self.config_manager.get_config().get("system", {}).get("mode", "single")
-            if system_mode == "single" and tool_id not in ["test_gspro_server", "test_e6_connect"]:
-                cmd.append("--run_single_pi")
-
             cmd.extend(tool_info["args"])
             cmd.append(f"--config_file={config_path}")
 
             config = self.config_manager.get_config()
-
-            cmd.append("--msg_broker_address=tcp://localhost:61616")
 
             web_share_dir = (
                 config.get("gs_config", {})
@@ -204,19 +227,15 @@ class TestingToolsManager:
             env = os.environ.copy()
             env["LD_LIBRARY_PATH"] = "/usr/lib/pitrac"
             env["PITRAC_ROOT"] = "/usr/lib/pitrac"
-            env["PITRAC_MSG_BROKER_FULL_ADDRESS"] = "tcp://localhost:61616"
             env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = base_image_dir
             env["PITRAC_WEBSERVER_SHARE_DIR"] = str(Path.home() / "LM_Shares/WebShare")
             env["DISPLAY"] = ":0.0"
+            env["OMP_WAIT_POLICY"] = "PASSIVE"
 
-            env_params_cam1 = self.config_manager.get_environment_parameters("camera1")
-            env_params_cam2 = self.config_manager.get_environment_parameters("camera2")
             merged_config = self.config_manager.get_config()
-
-            for param in env_params_cam1:
+            for param in self.config_manager.get_environment_parameters():
                 key = param["key"]
                 env_var = param["envVariable"]
-
                 value = merged_config
                 for part in key.split("."):
                     if isinstance(value, dict):
@@ -224,22 +243,6 @@ class TestingToolsManager:
                     else:
                         value = None
                         break
-
-                if value is not None and value != "":
-                    env[env_var] = str(value)
-
-            for param in env_params_cam2:
-                key = param["key"]
-                env_var = param["envVariable"]
-
-                value = merged_config
-                for part in key.split("."):
-                    if isinstance(value, dict):
-                        value = value.get(part)
-                    else:
-                        value = None
-                        break
-
                 if value is not None and value != "":
                     env[env_var] = str(value)
 
@@ -412,9 +415,9 @@ class TestingToolsManager:
 
         timing_data = {
             "grayscale": [],
-            "onnx_preload": None,
-            "onnx_warmup": None,
-            "onnx_detection": [],
+            "ncnn_preload": None,
+            "ncnn_warmup": None,
+            "ncnn_detection": [],
             "opencv_fallback": [],
             "getball": [],
             "spin_detection": [],
@@ -427,23 +430,23 @@ class TestingToolsManager:
                 if match:
                     timing_data["grayscale"].append(int(match.group(1)))
 
-            # ONNX Runtime preload
-            elif "ONNX Runtime detector preloaded successfully" in line:
+            # NCNN preload
+            elif "NCNN model preloaded in" in line:
                 match = re.search(r"in (\d+)ms", line)
                 if match:
-                    timing_data["onnx_preload"] = int(match.group(1))
+                    timing_data["ncnn_preload"] = int(match.group(1))
 
-            # ONNX Runtime warmup
-            elif "Warmup complete. Final inference time" in line:
-                match = re.search(r"time: ([\d.]+) ms", line)
+            # NCNN warmup
+            elif "NCNN warmup complete" in line:
+                match = re.search(r"\((\d+) iterations\)", line)
                 if match:
-                    timing_data["onnx_warmup"] = float(match.group(1))
+                    timing_data["ncnn_warmup"] = int(match.group(1))
 
-            # ONNX Runtime detection
-            elif "ONNX Runtime detected" in line and "balls in" in line:
+            # NCNN detection
+            elif "NCNN detected" in line and "balls in" in line:
                 match = re.search(r"in (\d+)ms", line)
                 if match:
-                    timing_data["onnx_detection"].append(int(match.group(1)))
+                    timing_data["ncnn_detection"].append(int(match.group(1)))
 
             # OpenCV DNN fallback
             elif "OpenCV DNN completed processing in" in line:
@@ -465,9 +468,8 @@ class TestingToolsManager:
 
         # Check if we have any timing data
         has_data = (
-            timing_data["onnx_preload"]
-            or timing_data["onnx_warmup"]
-            or timing_data["onnx_detection"]
+            timing_data["ncnn_preload"]
+            or timing_data["ncnn_detection"]
             or timing_data["opencv_fallback"]
             or timing_data["getball"]
             or timing_data["spin_detection"]
@@ -482,25 +484,25 @@ class TestingToolsManager:
         summary.append("PERFORMANCE TIMING SUMMARY")
         summary.append("=" * 80)
 
-        if timing_data["onnx_preload"]:
+        if timing_data["ncnn_preload"]:
             summary.append(f"\n Initialization:")
-            summary.append(f"  ONNX Runtime Preload: {timing_data['onnx_preload']}ms")
-            if timing_data["onnx_warmup"]:
-                summary.append(f"  Final Warmup Inference: {timing_data['onnx_warmup']:.2f}ms")
+            summary.append(f"  NCNN Model Preload: {timing_data['ncnn_preload']}ms")
+            if timing_data["ncnn_warmup"]:
+                summary.append(f"  NCNN Warmup: {timing_data['ncnn_warmup']} iterations")
 
         if timing_data["grayscale"]:
             avg_gray = sum(timing_data["grayscale"]) / len(timing_data["grayscale"])
             summary.append(f"\n Image Preprocessing:")
             summary.append(f"  Grayscale Conversion: {avg_gray:.0f}μs (avg of {len(timing_data['grayscale'])} ops)")
 
-        if timing_data["onnx_detection"]:
-            avg_onnx = sum(timing_data["onnx_detection"]) / len(timing_data["onnx_detection"])
-            summary.append(f"\n Ball Detection (ONNX Runtime):")
-            summary.append(f"  Average: {avg_onnx:.0f}ms")
-            summary.append(f"  Count: {len(timing_data['onnx_detection'])} detections")
-            if len(timing_data["onnx_detection"]) > 1:
+        if timing_data["ncnn_detection"]:
+            avg_ncnn = sum(timing_data["ncnn_detection"]) / len(timing_data["ncnn_detection"])
+            summary.append(f"\n Ball Detection (NCNN):")
+            summary.append(f"  Average: {avg_ncnn:.0f}ms")
+            summary.append(f"  Count: {len(timing_data['ncnn_detection'])} detections")
+            if len(timing_data["ncnn_detection"]) > 1:
                 summary.append(
-                    f"  Range: {min(timing_data['onnx_detection'])}ms - {max(timing_data['onnx_detection'])}ms"
+                    f"  Range: {min(timing_data['ncnn_detection'])}ms - {max(timing_data['ncnn_detection'])}ms"
                 )
 
         if timing_data["opencv_fallback"]:
@@ -522,8 +524,8 @@ class TestingToolsManager:
             summary.append(f"  Count: {len(timing_data['spin_detection'])}")
 
         # Calculate total per-shot time if we have detection + spin
-        if timing_data["onnx_detection"] and timing_data["spin_detection"]:
-            avg_detection = sum(timing_data["onnx_detection"]) / len(timing_data["onnx_detection"])
+        if timing_data["ncnn_detection"] and timing_data["spin_detection"]:
+            avg_detection = sum(timing_data["ncnn_detection"]) / len(timing_data["ncnn_detection"])
             avg_spin = sum(timing_data["spin_detection"]) / len(timing_data["spin_detection"])
             total_per_shot = avg_detection + avg_spin
             summary.append(f"\n  Total Per-Shot Time:")

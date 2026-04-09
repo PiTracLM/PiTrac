@@ -51,36 +51,6 @@ class TestShotSimulation:
         assert 1500 <= shot["back_spin"] <= 4000
         assert -1000 <= shot["side_spin"] <= 1000
 
-    @pytest.mark.asyncio
-    async def test_shot_with_images(self, server_instance, parser, tmp_path):
-        """Test shot processing with image handling"""
-        image_files = []
-        for i in range(3):
-            img_path = tmp_path / f"shot_{i}.jpg"
-            img_path.write_bytes(b"fake image data")
-            image_files.append(f"shot_{i}.jpg")
-
-        shot_data = {
-            "speed": 155.0,
-            "carry": 280.0,
-            "launch_angle": 14.0,
-            "side_angle": 0.0,
-            "back_spin": 2800,
-            "side_spin": 0,
-            "result_type": 7,
-            "message": "Perfect shot",
-            "image_paths": image_files,
-        }
-
-        with patch("constants.IMAGES_DIR", tmp_path):
-            current = server_instance.shot_store.get()
-            parsed_shot = parser.parse_dict_format(shot_data, current)
-            server_instance.shot_store.update(parsed_shot)
-
-            stored_shot = server_instance.shot_store.get()
-            assert stored_shot.images == image_files
-            assert len(stored_shot.images) == 3
-
     @pytest.mark.slow
     @pytest.mark.asyncio
     async def test_sustained_shot_stream(self, server_instance, parser, shot_simulator):

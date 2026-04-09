@@ -129,8 +129,6 @@ namespace golf_sim {
 		return pi_trac_root;
 	}
 
-	// TBD - Will need to be improved to adapt to having two cameras on the same
-	// Pi.
 GolfSimConfiguration::PiModel GolfSimConfiguration::GetPiModel() {
      GolfSimConfiguration::PiModel pi_model = kRPi5; // default fallback
 
@@ -241,13 +239,8 @@ bool GolfSimConfiguration::ReadValues() {
     std::string slot2_env = safe_getenv("PITRAC_SLOT2_CAMERA_TYPE");
     GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT2_CAMERA_TYPE environment variable was: " + slot2_env );
     if (slot2_env.empty()) {
-        if (GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
-            // We somewhat arbitrarily require the slot2 camera type to be set if we're running in single-pi mode.
-            GS_LOG_TRACE_MSG(error, "GolfSimConfiguration - PITRAC_SLOT2_CAMERA_TYPE environment variable must be set when running in single-pi mode, but was not.  Exiting.");
-            return false;
-        } else {
-            GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT2_CAMERA_TYPE environment variable was not set.  Assuming default of: " + std::to_string(GolfSimCamera::kSystemSlot2CameraType));
-        }
+        GS_LOG_TRACE_MSG(error, "PITRAC_SLOT2_CAMERA_TYPE must be set. Exiting.");
+        return false;
     } else {
 #ifndef __unix__  // Ignore in Windows environment
         // Ensure we don't have any trailing spaces.  Visual Studio seems to add them?
@@ -272,14 +265,8 @@ bool GolfSimConfiguration::ReadValues() {
 	std::string slot2_lens_env = safe_getenv("PITRAC_SLOT2_LENS_TYPE");
 	GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT2_LENS_TYPE environment variable was: " + slot2_lens_env);
 	if (slot2_lens_env.empty()) {
-		if (GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
-			// We somewhat arbitrarily require the slot2 lens type to be set if we're running in single-pi mode.
-			GS_LOG_TRACE_MSG(error, "GolfSimConfiguration - PITRAC_SLOT2_LENS_TYPE environment variable must be set when running in single-pi mode, but was not.  Exiting.");
-			return false;
-		}
-		else {
-			GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT2_LENS_TYPE environment variable was not set.  Assuming default of: " + std::to_string(GolfSimCamera::kSystemSlot2LensType));
-		}
+		GS_LOG_TRACE_MSG(error, "PITRAC_SLOT2_LENS_TYPE must be set. Exiting.");
+		return false;
 	}
 	else {
 #ifndef __unix__  // Ignore in Windows environment
@@ -306,14 +293,8 @@ bool GolfSimConfiguration::ReadValues() {
 	std::string slot2_camera_orientation_env = safe_getenv("PITRAC_SLOT2_CAMERA_ORIENTATION");
 	GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT2_CAMERA_ORIENTATION environment variable was: " + slot2_camera_orientation_env);
 	if (slot2_camera_orientation_env.empty()) {
-		if (GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
-			// We somewhat arbitrarily require the slot2 lens type to be set if we're running in single-pi mode.
-			GS_LOG_TRACE_MSG(error, "GolfSimConfiguration - PITRAC_SLOT2_CAMERA_ORIENTATION environment variable must be set when running in single-pi mode, but was not.  Exiting.");
-			return false;
-		}
-		else {
-			GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT2_CAMERA_ORIENTATION environment variable was not set.  Assuming default of: " + std::to_string(GolfSimCamera::kSystemSlot2CameraOrientation));
-		}
+		GS_LOG_TRACE_MSG(error, "PITRAC_SLOT2_CAMERA_ORIENTATION must be set. Exiting.");
+		return false;
 	}
 	else {
 #ifndef __unix__  // Ignore in Windows environment
@@ -669,43 +650,5 @@ bool GolfSimConfiguration::ReadValues() {
 
 		 return true;
 	 }
-
-	 std::string GolfSimConfiguration::GetSystemID() {
-
-		 std::string system_id;
-
-		 bool single_pi_mode = GolfSimOptions::GetCommandLineOptions().run_single_pi_;
-
-		 GS_LOG_MSG(trace, "GolfSimConfiguration::GetSystemID - run_single_pi = " + std::to_string(single_pi_mode) +
-				", cameraNumber = " + std::to_string(GolfSimOptions::GetCommandLineOptions().GetCameraNumber()) + 
-				", system_mode_ = " + std::to_string(GolfSimOptions::GetCommandLineOptions().system_mode_) + ".");
-
-		 // Ensure we identify who we are so that we can avoid getting our own
-		 // messages reflected back to us (and chewing up time + bandwidth)
-		 // Note that if the system is in still or auto-calibrate modes, this is system 1, regardless of which
-		 // camera is going to take the picture.
-		 // In cases where the Pi 2/ Camera 2 system needs to take a picture, that will happen in a separate
-		 // process that (as far as it knows) will run just like it does when operating in the normal launch
-		 // monitor mode.
-		 if ((GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera1 && 
-					(GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kRunCam2ProcessForPi1Processing)) ||
-			 (GolfSimOptions::GetCommandLineOptions().camera_still_mode_ && 
-					GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera2) ||
-			 GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1AutoCalibrate ||
-			 GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2AutoCalibrate ||
-			 GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1BallLocation ||
-			 GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2BallLocation) {
-
-			 system_id = "LM_1";
-		 }
-		 else {
-			 system_id = "LM_2";
-		 }
-
-		 GS_LOG_MSG(trace, "GolfSimConfiguration::GetSystemID returning: " + system_id);
-
-		 return system_id;
-	 }
-
 
 } // namespace golf_sim

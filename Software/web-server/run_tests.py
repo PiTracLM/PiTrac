@@ -9,7 +9,6 @@ def check_dependencies():
         import pytest  # noqa: F401
         import httpx  # noqa: F401
         import websocket  # noqa: F401
-        import msgpack  # noqa: F401
         import yaml  # noqa: F401
 
         return True
@@ -70,7 +69,6 @@ def run_module_tests(module_name):
             "tests/test_smoke.py::TestSmoke::test_parser",
             "tests/test_shot_simulation.py::TestShotSimulation::test_parser_validation",
         ],
-        "listeners": ["tests/test_activemq_integration.py"],
         "server": ["tests/test_api_endpoints.py"],
         "websocket": ["tests/test_websocket.py"],
     }

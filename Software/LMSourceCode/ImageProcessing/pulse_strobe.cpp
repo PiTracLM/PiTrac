@@ -617,14 +617,10 @@ namespace golf_sim {
 			return false;
 		}
 
-		// Make sure the camera 2 system has had a chance to receive the IPC "arm" message
+		// Camera2 thread is already armed and waiting for trigger — minimal settle time
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kCam2SetupPeriodMilliseconds", kCam2SetupPeriodMilliseconds);
-
-		long wait_time_in_ms = kCam2SetupPeriodMilliseconds;
-
-		GS_LOG_TRACE_MSG(trace, "Waiting " + std::to_string(wait_time_in_ms) + " milliseconds for the Camera2 system to prepare its camera.");
-		usleep(wait_time_in_ms * 1000);
-		GS_LOG_TRACE_MSG(trace, "Assuming camera 2 is ready.  Sending PRIMING pulses...");
+		usleep(200 * 1000);  // 200ms — pipeline pre-opened, just StartCamera + settle
+		GS_LOG_TRACE_MSG(trace, "Sending PRIMING pulses...");
 
 		// Generate a short low pulse (aka shutter speed) at a
 		// relatively low frame rate as priming pulses
@@ -648,7 +644,7 @@ namespace golf_sim {
 
 			// The camera 2 system only needs to set up an InnoMaker camera external trigger once after the camera has started running
 			if (i == 0 && camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
-				GS_LOG_TRACE_MSG(trace, "Pausing after first trigger for camera 2 system to setup external triggering for InnoMaker Camera.  Will delay:  " + std::to_string(kPauseToSetUpInnoMakerExternalTriggerMilliseconds) + " mS.");				usleep(kPauseToSetUpInnoMakerExternalTriggerMilliseconds);
+				GS_LOG_TRACE_MSG(trace, "Pausing for InnoMaker external trigger setup: " + std::to_string(kPauseToSetUpInnoMakerExternalTriggerMilliseconds) + " ms");
 				usleep(kPauseToSetUpInnoMakerExternalTriggerMilliseconds * 1000);
 			}
 		}
@@ -656,8 +652,6 @@ namespace golf_sim {
 		GS_LOG_TRACE_MSG(trace, "Sent " + std::to_string(kNumberPrimingPulses) + " initial priming pulses.  About to pause for " + 
 				std::to_string(kPauseBeforeReadyForFinalPrimingPulseMs) + " milliSeconds before sending penultimate priming pulse.");
 
-		// Wait a little longer to make sure the camera 2 system has ended its period looking for priming pulses --
-		// The next pulses will cause the camera 2 system to ready itself for the REAL shot trigger
 		usleep(kPauseBeforeReadyForFinalPrimingPulseMs * 1000);
 
 		// This next priming pulses gets the camera2 state machine ready to take an actual image

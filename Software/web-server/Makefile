@@ -22,7 +22,6 @@ help:
 	@echo "  make test-models   - Test data models"
 	@echo "  make test-managers - Test connection/store managers"
 	@echo "  make test-parsers  - Test data parsers"
-	@echo "  make test-listeners - Test ActiveMQ listeners"
 	@echo "  make test-server   - Test server/API endpoints"
 	@echo ""
 	@echo "Code Quality:"
@@ -77,9 +76,6 @@ test-managers:
 test-parsers:
 	python run_tests.py --module parsers
 
-test-listeners:
-	python run_tests.py --module listeners
-
 test-server:
 	python run_tests.py --module server
 
@@ -92,14 +88,14 @@ lint:
 
 type-check:
 	@echo "Running mypy type checker..."
-	mypy models.py managers.py parsers.py listeners.py server.py \
+	mypy models.py managers.py parsers.py server.py \
 		--ignore-missing-imports \
 		--no-error-summary \
 		--pretty
 
 format:
 	@echo "Formatting code with black..."
-	black models.py managers.py parsers.py listeners.py server.py constants.py main.py \
+	black models.py managers.py parsers.py server.py constants.py main.py \
 		--line-length 100 \
 		--skip-string-normalization
 

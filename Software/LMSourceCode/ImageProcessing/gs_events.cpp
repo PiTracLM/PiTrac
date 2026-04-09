@@ -58,14 +58,11 @@ namespace golf_sim {
         GolfSimEvent::ControlMessage* controlMessage = nullptr;
         GolfSimEvent::FoundMultipleBalls* foundMultipleBalls = nullptr;
         GolfSimEvent::Camera2ImageReceived* cam2ImageReceived = nullptr;
-        GolfSimEvent::Camera2PreImageReceived* cam2PreImageReceived = nullptr;
         GolfSimEvent::Restart* restart = nullptr;
         GolfSimEvent::CheckForBallStable* checkForBallStable = nullptr;
         GolfSimEvent::BeginWatchingForBallHit* beginWatchingForBallHit = nullptr;
         GolfSimEvent::Exit* exit = nullptr;
         GolfSimEvent::CheckForCam2ImageReceived* checkForCam2ImageReceived = nullptr;
-        GolfSimEvent::Camera2Triggered* cam2Triggered = nullptr;
-        GolfSimEvent::ArmCamera2MessageReceived* armCamera2MessageReceived = nullptr;
 
 
         if ((beginWaitingForSimulatorArmed = dynamic_cast<GolfSimEvent::BeginWaitingForSimulatorArmed*>(event))) {
@@ -95,20 +92,11 @@ namespace golf_sim {
         else if ((foundMultipleBalls = dynamic_cast<GolfSimEvent::FoundMultipleBalls*>(event))) {
             possible_event = *foundMultipleBalls;
         }
-        else if ((cam2Triggered = dynamic_cast<GolfSimEvent::Camera2Triggered*>(event))) {
-            possible_event = *cam2Triggered;
-        }
         else if ((cam2ImageReceived = dynamic_cast<GolfSimEvent::Camera2ImageReceived*>(event))) {
             possible_event = *cam2ImageReceived;
         }
-        else if ((cam2PreImageReceived = dynamic_cast<GolfSimEvent::Camera2PreImageReceived*>(event))) {
-            possible_event = *cam2PreImageReceived;
-        }
         else if ((checkForCam2ImageReceived = dynamic_cast<GolfSimEvent::CheckForCam2ImageReceived*>(event))) {
             possible_event = *checkForCam2ImageReceived;
-        }
-        else if ((armCamera2MessageReceived = dynamic_cast<GolfSimEvent::ArmCamera2MessageReceived*>(event))) {
-            possible_event = *armCamera2MessageReceived;
         }
         else if ((restart = dynamic_cast<GolfSimEvent::Restart*>(event))) {
             possible_event = *restart;

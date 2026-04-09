@@ -18,19 +18,13 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
-#include <opencv2/dnn.hpp>
-
-#ifdef __unix__
-#include <onnxruntime/core/session/onnxruntime_cxx_api.h>
-#else
-#include <onnxruntime_cxx_api.h>
-#endif
 
 #include "logging_tools.h"
 #include "gs_camera.h"
 #include "colorsys.h"
 #include "golf_ball.h"
-#include "onnx_runtime_detector.hpp"
+#include "ncnn_detector.hpp"
+#include "spin_predictor.hpp"
 
 
 namespace golf_sim {
@@ -72,6 +66,7 @@ public:
     static int kCoarseZRotationDegreesIncrement;
     static int kCoarseZRotationDegreesStart;
     static int kCoarseZRotationDegreesEnd;
+    static int kCoarseSearchResolution;
 
     static double kPlacedBallCannyLower;
     static double kPlacedBallCannyUpper;
@@ -194,22 +189,17 @@ public:
 
     static int kGaborMaxWhitePercent;
     static int kGaborMinWhitePercent;
+    static std::string kSpinDetectionMethod;
 
-    // ONNX Detection Configuration
+    // Model Detection Configuration
     static std::string kStrobedBallDetectionMethod;
     static std::string kBallPlacementDetectionMethod;
-    static std::string kONNXModelPath;
-    static float kONNXConfidenceThreshold;
-    static float kONNXNMSThreshold;
-    static int kONNXInputSize;
-    static int kSAHISliceHeight;
-    static int kSAHISliceWidth;
-    static float kSAHIOverlapRatio;
-    static std::string kONNXDeviceType;
-
-    static std::string kONNXBackend;  // "onnxruntime" (primary) or "opencv_dnn" (fallback)
-    static bool kONNXRuntimeAutoFallback;  // Enable automatic fallback to OpenCV DNN
-    static int kONNXRuntimeThreads;  // Number of threads for ONNX Runtime (ARM optimization)
+    static std::string kModelPath;
+    static float kModelConfidenceThreshold;
+    static float kModelNMSThreshold;
+    static int kModelInputWidth;
+    static int kModelInputHeight;
+    static int kInferenceThreads;
 
     // This determines which potential 3D angles will be searched for spin processing
     struct RotationSearchSpace {
@@ -342,23 +332,28 @@ public:
 
     bool PreProcessStrobedImage(cv::Mat& search_image, BallSearchMode search_mode);
 
-    // ONNX Detection Methods
-    static bool DetectBalls(const cv::Mat& preprocessed_img, 
-                            BallSearchMode search_mode, 
-                            std::vector<GsCircle>& detected_circles, 
+    // Converts a bounding box to a GsCircle, rejecting edge-clipped detections
+    // whose inscribed circle extends outside the image bounds.
+    // Returns true if the detection was accepted, false if rejected.
+    static bool BboxToCircle(float bbox_x, float bbox_y, float bbox_w, float bbox_h,
+                             int image_cols, int image_rows,
+                             const char* backend_name,
+                             GsCircle& out_circle);
+
+    // Detection Methods
+    static bool DetectBalls(const cv::Mat& preprocessed_img,
+                            BallSearchMode search_mode,
+                            std::vector<GsCircle>& detected_circles,
                             bool report_find_failures);
     static bool DetectBallsHoughCircles(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
-    static bool DetectBallsONNX(const cv::Mat& preprocessed_img, 
-                                BallSearchMode search_mode, 
+    static bool DetectBallsNCNN(const cv::Mat& preprocessed_img,
+                                BallSearchMode search_mode,
                                 std::vector<GsCircle>& detected_circles,
                                 bool report_find_failures);
 
-    static bool DetectBallsONNXRuntime(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
-    static bool DetectBallsOpenCVDNN(const cv::Mat& preprocessed_img, BallSearchMode search_mode, std::vector<GsCircle>& detected_circles);
-
-    static bool PreloadYOLOModel();
-    static bool PreloadONNXRuntimeModel();
-    static void CleanupONNXRuntime();
+    static bool PreloadNCNNModel();
+    static bool PreloadSpinModel();
+    static void CleanupNCNN();
 
     // Load configuration values from JSON after config is initialized
     static void LoadConfigurationValues();
@@ -370,22 +365,14 @@ public:
                                           float nms_threshold);
 
 private:
-    // ONNX Runtime detector instance - replaces all static ONNX members
-    static std::unique_ptr<ONNXRuntimeDetector> onnx_detector_;
-    static std::atomic<bool> onnx_detector_initialized_;
-    static std::mutex onnx_detector_mutex_;
+    // NCNN detector
+    static std::unique_ptr<NCNNDetector> ncnn_detector_;
+    static std::atomic<bool> ncnn_detector_initialized_;
+    static std::mutex ncnn_detector_mutex_;
 
-    static cv::dnn::Net yolo_model_;
-    static bool yolo_model_loaded_;
-    static std::mutex yolo_model_mutex_;  // Thread safety for model loading
-    // Prevents allocating ~1.2MB per frame (640x640x3 multiple times)
-    static cv::Mat yolo_input_buffer_;        // Reusable input conversion buffer
-    static cv::Mat yolo_letterbox_buffer_;    // 640x640x3 letterboxed image
-    static cv::Mat yolo_resized_buffer_;      // Resized image before letterboxing
-    static cv::Mat yolo_blob_buffer_;         // Blob for network input
-    static std::vector<cv::Rect> yolo_detection_boxes_;     // Detection results
-    static std::vector<float> yolo_detection_confidences_;  // Detection confidences
-    static std::vector<cv::Mat> yolo_outputs_;              // Network outputs
+    static std::unique_ptr<SpinPredictor> spin_predictor_;
+    static std::atomic<bool> spin_predictor_initialized_;
+    static std::mutex spin_predictor_mutex_;
 
     // Experimental flag to have YOLO process either monochrome or color images
     static YOLOImageTypeToUse kImageTypeToProcessWithYOLO;
@@ -436,14 +423,21 @@ private:
     // in the calibrated_binary_threshold variable.
     static cv::Mat ApplyGaborFilterToBall(const cv::Mat& img, const GolfBall& ball, float& calibrated_binary_threshold, float prior_binary_threshold = -1);
 
-    // Applies the gabor filter with the specified parameters and returns the final image and white percentage
+    // Compute max Gabor response across all orientations — expensive, run once per ball
+    static cv::Mat ComputeGaborAccumulation(const cv::Mat& img_f32,
+        const int kernel_size, double sig, double lm, double th, double ps, double gm);
+
+    // Apply binary threshold to pre-computed accumulation — cheap, used in calibration loop
+    static cv::Mat ThresholdGaborAccumulation(const cv::Mat& accumGray, float binary_threshold, int& white_percent);
+
+    // Legacy: runs both stages (backward compat for any external callers)
     static cv::Mat ApplyTestGaborFilter(const cv::Mat& img_f32,
         const int kernel_size, double sig, double lm, double th, double ps, double gm, float binary_threshold,
         int& white_percent);
 
     static cv::Mat CreateGaborKernel(int ks, double sig, double th, double lm, double gm, double ps);
 
-    static cv::Mat Project2dImageTo3dBall(const cv::Mat& image_gray, const GolfBall& ball, const cv::Vec3i& rotation_angles_degrees);
+    static cv::Mat Project2dImageTo3dBall(const cv::Mat& image_gray, const GolfBall& ball, const cv::Vec3i& rotation_angles_degrees, bool force_serial = false);
 
     static void Unproject3dBallTo2dImage(const cv::Mat& src3D, cv::Mat& destination_image_gray, const GolfBall& ball);
 

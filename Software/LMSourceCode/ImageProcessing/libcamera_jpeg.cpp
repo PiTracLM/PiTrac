@@ -9,6 +9,7 @@
 #include <chrono>
 #include <signal.h>
 #include <sys/stat.h>
+#include <thread>
 
 #include "core/rpicam_encoder.hpp"
 #include "encoder/encoder.hpp"
@@ -83,35 +84,13 @@ void SetExternalTrigger(bool& flag) {
 	}
 }
 
-// The main event loop for the the externally-triggered camera.
-
-bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
+// Run the triggered capture event loop on an already-opened camera.
+// The camera must have been opened and configured before calling this.
+// Calls StartCamera at entry and StopCamera when the final image arrives.
+bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_priming_pulses)
 {
-	GS_LOG_TRACE_MSG(trace, "ball_flight_camera_event_loop started.  Waiting for external trigger....");
-
-	// MJLMODs BELOW
-
-	StillOptions const * options = app.GetOptions();
-
-	if (options == nullptr) {
-		GS_LOG_TRACE_MSG(trace, "ball_flight_camera_event_loop could not get app.GetOptions()");
-		return false;
-	}
-
-	GS_LOG_TRACE_MSG(trace, "ball_flight_camera_event_loop started.  Opening Camera at slot: " + std::to_string(options->Set().camera));
-
-
-	app.OpenCamera();
-
-	GS_LOG_TRACE_MSG(trace, "ball_flight_camera_event_loop started.  Opened Camera....");
-
-	// The RGB flag still works for grayscale mono images
-	uint flags = RPiCamApp::FLAG_STILL_RGB;
-	app.ConfigureViewfinder(flags);
-
 	app.StartCamera();
-
-	GS_LOG_TRACE_MSG(trace, "ball_flight_camera_event_loop started.  Started Camera....");
+	GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop: camera started, waiting for triggers");
 
 
 	auto start_time = std::chrono::high_resolution_clock::now();
@@ -151,6 +130,41 @@ bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 	bool dummy = false;
 	SetExternalTrigger(dummy);
 
+	// Send priming pulses + trigger in a background thread so the event loop
+	// can process the resulting hardware trigger events as they arrive.
+	// Skipped in normal mode -- the FSM handles pulse timing externally.
+	std::thread pulse_sender;
+	if (send_priming_pulses) {
+		GS_LOG_TRACE_MSG(trace, "Sending priming pulses from event loop");
+		pulse_sender = std::thread([&app]() {
+			try {
+				if (!gs::PulseStrobe::SendCameraPrimingPulses(true)) {
+					GS_LOG_MSG(error, "Failed to send priming pulses.");
+					app.PostQuit();
+					return;
+				}
+				// Give the event loop time to transition before the capture trigger
+				std::this_thread::sleep_for(std::chrono::milliseconds(200));
+				if (!gs::PulseStrobe::SendExternalTrigger()) {
+					GS_LOG_MSG(error, "Failed to send external trigger.");
+					app.PostQuit();
+					return;
+				}
+			} catch (const std::exception& e) {
+				GS_LOG_MSG(error, "Pulse sender exception: " + std::string(e.what()));
+				app.PostQuit();
+			} catch (...) {
+				GS_LOG_MSG(error, "Pulse sender unknown exception.");
+				app.PostQuit();
+			}
+		});
+	}
+
+	struct PulseThreadGuard {
+		std::thread& t;
+		~PulseThreadGuard() { if (t.joinable()) t.join(); }
+	} pulse_guard{pulse_sender};
+
 	bool return_status = true;
 
 	for (;state != kFinalImageReceived;)
@@ -174,10 +188,14 @@ bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 
 		if (msg.type == RPiCamApp::MsgType::Quit) {
 			GS_LOG_TRACE_MSG(trace, "Received Quit message.");
-			return true;
+			return_status = false;
+			break;
 		}
-		else if (msg.type != RPiCamApp::MsgType::RequestComplete)
-			throw std::runtime_error("Unrecognised message!");
+		else if (msg.type != RPiCamApp::MsgType::RequestComplete) {
+			GS_LOG_MSG(error, "Unrecognised camera message type, aborting event loop.");
+			return_status = false;
+			break;
+		}
 		else {
 			// GS_LOG_TRACE_MSG(trace, "RECEIVED libcamera-app message-------");
 		}
@@ -211,8 +229,9 @@ bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 
 			if (stream == nullptr) {
 				GS_LOG_MSG(error, "Got a null stream");
-
-				return false;
+				return_status = false;
+				state = kFinalImageReceived;
+				break;
 			}
 
 			StreamInfo info = app.GetStreamInfo(stream);
@@ -227,8 +246,9 @@ bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 
 			if (image == nullptr) {
 				GS_LOG_MSG(error, "Got a null image");
-				
-				return false;
+				return_status = false;
+				state = kFinalImageReceived;
+				break;
 			}
 
 			GS_LOG_TRACE_MSG(trace, "About to create Mat frame in kWaitingForFinalImageFlush.  Info.height, width = " + std::to_string(info.height) + 
@@ -400,9 +420,19 @@ bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 		} // switching on state
 	} // for loop
 
-	GS_LOG_TRACE_MSG(trace, "ball_flight_camera_event_loop ended.  Return final image.");
+	GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop ended.");
 
 	return return_status;
+}
+
+// Full pipeline open + capture + close. Used by WaitForCam2Trigger in still-picture mode.
+bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
+{
+	app.OpenCamera();
+	uint flags = RPiCamApp::FLAG_STILL_RGB;
+	app.ConfigureViewfinder(flags);
+	bool result = cam2_run_event_loop(app, returnImg, true);
+	return result;
 }
 
 	// The main event loop for the camera 1 system.
@@ -438,17 +468,23 @@ bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg)
 			if (msg.type == RPiCamApp::MsgType::Timeout)
 			{
 				GS_LOG_MSG(error, "ERROR: Device timeout detected, attempting a restart.");
-				GS_LOG_MSG(error, "		Check to make sure the .yaml file in use by libcamera has a long timeout set, for example,  \"camera_timeout_value_ms\": 10000000,  in the appropriate file.");
+				GS_LOG_MSG(error, "		Check to make sure the .yaml file in use by libcamera has a long timeout set, for example,  \"camera_timeout_value_ms\": 86400000,  in the appropriate file.");
 				GS_LOG_MSG(error, "			On a Pi 4, check both /usr/local/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml and /usr/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml");
 				GS_LOG_MSG(error, "			On a Pi 5, check both /usr/local/share/libcamera/pipeline/rpi/pisp/rpi_apps.yaml and /usr/share/libcamera/pipeline/rpi/pisp/rpi_apps.yaml");
 				app.StopCamera();
 				app.StartCamera();
 				continue;
 			}
-			if (msg.type == RPiCamApp::MsgType::Quit)
+			if (msg.type == RPiCamApp::MsgType::Quit) {
+				GS_LOG_TRACE_MSG(trace, "Received Quit message in still_image_event_loop.");
+				app.StopCamera();
 				return false;
-			else if (msg.type != RPiCamApp::MsgType::RequestComplete)
-				throw std::runtime_error("unrecognised message!");
+			}
+			else if (msg.type != RPiCamApp::MsgType::RequestComplete) {
+				GS_LOG_MSG(error, "Unrecognised camera message type in still_image_event_loop, aborting.");
+				app.StopCamera();
+				return false;
+			}
 
 			// In viewfinder mode, simply run until the timeout. When that happens, switch to
 			// capture mode.

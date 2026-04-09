@@ -7,7 +7,7 @@
 // This module defines the events, event queue, and associated processing for the various
 // types of events that occur within the launch monitor system.
 // These events largely drive the transitions in the system's finite state machine
-// These events are separate from IPC events that deal with external messaging.
+// These events drive the transitions in the system's finite state machine.
 
 #pragma once
 
@@ -22,7 +22,7 @@
 #include <opencv2/core.hpp>
 
 #include "golf_ball.h"
-#include "gs_ipc_control_msg.h"
+#include "gs_control_msg.h"
 
 namespace golf_sim {
 
@@ -159,49 +159,6 @@ namespace golf_sim {
             cv::Mat ball_flight_image_;
         };
 
-        class Camera2PreImageReceived : public GolfSimEventBase
-        {
-        public:
-            Camera2PreImageReceived(const cv::Mat& ball_pre_image) { ball_pre_image_ = ball_pre_image; };
-            ~Camera2PreImageReceived() {};
-
-            virtual std::string Format() override { return "Camera2PreImageReceived"; };
-
-            const cv::Mat& GetBallFlightPreImage() const { return ball_pre_image_; };
-
-        private:
-            cv::Mat ball_pre_image_;
-        };
-
-        // The camera1 system has determined that the ball is ready to be hit.
-        // The camera2 system should be ready to take a picture and send it
-        // back to the other system when the camera2 is triggered.
-        class ArmCamera2MessageReceived : public GolfSimEventBase
-        {
-        public:
-            ArmCamera2MessageReceived(){ };
-            ~ArmCamera2MessageReceived() {};
-
-            virtual std::string Format() override { return "ArmCamera2MessageReceived"; };
-
-            // TBD - Not sure if the camera1 system will send any additional information
-        };
-
-        // The camera2 has been triggered and a picture of the ball in flight has been taken. 
-        class Camera2Triggered : public GolfSimEventBase
-        {
-        public:
-            Camera2Triggered(cv::Mat &ball_flight_image) { ball_flight_image_ = ball_flight_image; };
-            ~Camera2Triggered() {};
-
-            virtual std::string Format() override { return "Camera2Triggered"; };
-
-            const cv::Mat& GetBallFlightImage() const { return ball_flight_image_; };
-
-        private:
-            cv::Mat ball_flight_image_;
-        };
-       
         // Reset the FSM to the initializing state
         class Restart : public GolfSimEventBase
         { 
@@ -235,11 +192,8 @@ namespace golf_sim {
                                         GolfSimEvent::ControlMessage,
                                         GolfSimEvent::BeginWatchingForBallHit,
                                         GolfSimEvent::FoundMultipleBalls,
-                                        GolfSimEvent::ArmCamera2MessageReceived,
-                                        GolfSimEvent::Camera2Triggered,
                                         GolfSimEvent::CheckForCam2ImageReceived,
                                         GolfSimEvent::Camera2ImageReceived,
-                                        GolfSimEvent::Camera2PreImageReceived,
                                         GolfSimEvent::Exit,
                                         GolfSimEvent::Restart>;
 

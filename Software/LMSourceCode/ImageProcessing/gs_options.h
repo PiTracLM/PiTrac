@@ -16,11 +16,9 @@
 namespace golf_sim {
 
 	enum SystemMode {
-		kTest = 0,			// Just run unit tests.  Generally used when compiled in Windows
-		kCamera1 = 1,		// The mode when PiTrac is running normally and processing hits.  This mode is only used by the Pi 1/Camera 1 half of the system.
-		kCamera2 = 2,		// The mode when PiTrac is running normally and processing hits.  This mode is only used by the Pi 2/Camera 2 half of the system.
+		kTest = 0,
+		kCamera1 = 1,		// Normal shot-detection mode. Camera2 runs as internal thread.
 		kCamera1TestStandalone = 3,
-		kCamera2TestStandalone = 4,
 		kCamera1Calibrate = 5,
 		kCamera2Calibrate = 6,
 		kTestSpin = 7,
@@ -31,8 +29,6 @@ namespace golf_sim {
 		kAutomatedTesting = 12,
 		kCamera1AutoCalibrate = 13,
 		kCamera2AutoCalibrate = 14,
-		kRunCam2ProcessForPi1Processing = 15,  // This is for when a process is running on camera 2 for the purpose of auto-calibration or taking pictures for ball location
-		kCamera2OnePulseOnly = 16,
 	};
 
 	enum LoggingLevel {
@@ -77,19 +73,19 @@ namespace golf_sim {
 				("golfer_orientation", value<std::string>(&golfer_orientation_string_)->default_value("right_handed"),
 					"Set the golfer's handed-ness (right_handed, left_handed)")
 				("system_mode", value<std::string>(&system_mode_string_)->default_value("test"),
-					"Set the system's operating mode (test, camera1, camera2, camera1Calibrate, camera2Calibrate, camera1_test_standalone, camera2_test_standalone, test_spin, camera1_ball_location, camera2_ball_location, test_gspro_message, test_gspro_server, automated_testing, camera1AutoCalibrate, camera2AutoCalibrate, runCam2ProcessForPi1Processing, camera2_one_pulse_only)")
+					"Set the system's operating mode (camera1, camera1_test_standalone, camera1Calibrate, camera2Calibrate, test_spin, camera1_ball_location, camera2_ball_location, test_gspro_server, automated_testing, camera1AutoCalibrate, camera2AutoCalibrate, test)")
 				("logging_level", value<std::string>(&logging_level_string_)->default_value("warn"),
 					"Set the system's logging level (trace, debug, info, warn, error, none)")
 				("artifact_save_level", value<std::string>(&artifact_save_level_string_)->default_value("final_results_only"),
 					"Set the system's level of saving artifact images to files (none, final_results_only, all)")
 				("shutdown", value<bool>(&shutdown_)->default_value(false)->implicit_value(true),
-					"Instructs any GolfSim instance connected to the ActiveMQ broker to shutdown")
+					"Request clean shutdown")
 				("cam_still_mode", value<bool>(&camera_still_mode_)->default_value(false)->implicit_value(true),
 					"Take a single camera2 still picture (using one strobe flash) and exit")
 				("lm_comparison_mode", value<bool>(&lm_comparison_mode_)->default_value(false)->implicit_value(true),
 					"Configure for operating in another infrared-based LM environment")
 				("send_test_results", value<bool>(&send_test_results_)->default_value(false)->implicit_value(true),
-					"Send a single IPC results message (e.g., for testing) and exit")
+					"Send test shot results to the web server and exit")
 				("skip_wait_armed", value<bool>(&skip_wait_armed_)->default_value(false)->implicit_value(true),
 					"Skip waiting for simulator armed state (for hardware-less testing)")
 				("output_filename", value<std::string>(&output_filename_)->default_value("out.png"),
@@ -100,8 +96,8 @@ namespace golf_sim {
 					"Configure system to expect a lightweight, soft, practice ball")
 				("wait_keys", value<bool>(&wait_for_key_on_images_)->default_value(false)->implicit_value(true),
 					"0 = Don't wait for a key press after showing each debug image, 1 = Do wait")
-				("run_single_pi", value<bool>(&run_single_pi_)->default_value(false)->implicit_value(true),
-					"0 =  System will run on separate Pi's, each with its own camer.  1 = This system will run both cameras on a single Pi.")
+				("run_single_pi", value<bool>(&run_single_pi_)->default_value(true)->implicit_value(true),
+					"Deprecated — always single Pi. Accepted for backward compatibility.")
 				("show_images", value<bool>(&show_images_)->default_value(false)->implicit_value(true),
 					"0 = Don't show any debug/trace images in windows on the screen, 1 = Do")
 				("use_non_IR_camera", value<bool>(&use_non_IR_camera_)->default_value(false)->implicit_value(true),
@@ -115,7 +111,7 @@ namespace golf_sim {
 				("camera_gain", value<double>(&camera_gain_)->default_value(0.0),
 					"Amount of gain for taking pictures")
 				("msg_broker_address", value<std::string>(&msg_broker_address_)->default_value(""),
-					"Specify the full hostname or ip address and port of the host of the Active MQ broker. For example: tcp://10.0.0.41:61616 . Default is: <empty string>")
+					"Deprecated — no longer used")
 				("base_image_logging_dir", value<std::string>(&base_image_logging_dir_)->default_value(""),
 					"Specify the full path (with an ending '/') where diagnostic images are to be written. Default is: <empty>")
 				("web_server_share_dir", value<std::string>(&web_server_share_dir_)->default_value(""),
@@ -170,7 +166,7 @@ namespace golf_sim {
 		ArtifactSaveLevel artifact_save_level_ = kNoArtifacts;
 		GolferOrientation golfer_orientation_ = kRightHanded;
 		bool wait_for_key_on_images_;
-		bool run_single_pi_;
+		bool run_single_pi_ = true;  // Always true — dual-Pi support removed
 		bool show_images_;
 		unsigned int search_center_x_ = 0;
 		unsigned int search_center_y_ = 0;

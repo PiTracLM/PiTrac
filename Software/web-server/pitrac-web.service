@@ -1,7 +1,6 @@
 [Unit]
 Description=PiTrac Web Server
-After=network.target activemq.service multi-user.target
-Wants=activemq.service
+After=network.target multi-user.target
 
 [Service]
 Type=simple

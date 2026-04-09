@@ -10,10 +10,9 @@
 #ifdef __unix__  // Ignore in Windows environment
 
 
-#include <gs_ipc_system.h>
-
 #include "logging_tools.h"
 #include "golf_ball.h"
+#include "gs_result_types.h"
 
 
 // The primary object for communications to the Golf Sim user interface

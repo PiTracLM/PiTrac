@@ -161,7 +161,7 @@ class TestConfigManager:
     def test_environment_parameters(self, config_manager):
         """Test getting environment parameters from config"""
         config_manager.system_config = {
-            "gs_config": {"ipc_interface": {"kWebActiveMQHostAddress": "tcp://localhost:61616"}}
+            "gs_config": {"ipc_interface": {"kWebServerShareDirectory": "~/LM_Shares/WebShare"}}
         }
         config_manager.reload()
 

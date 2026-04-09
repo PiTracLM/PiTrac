@@ -68,87 +68,44 @@ class TestAPIEndpoints:
         assert response.status_code == 200
         data = response.json()
         assert "websocket_connections" in data
-        assert "listener" in data
+        assert "transport" in data
         assert "shot_history_count" in data
 
     @patch("subprocess.run")
-    def test_health_check(self, mock_subprocess, client, mock_activemq):
-        """Test health check endpoint with all services running"""
-        mock_activemq.is_connected.return_value = True
-
+    def test_health_check(self, mock_subprocess, client):
+        """Test health check endpoint with pitrac running"""
         pgrep_result = type("obj", (object,), {"returncode": 0, "stdout": "", "stderr": ""})()
-        ss_result = type(
-            "obj",
-            (object,),
-            {"returncode": 0, "stdout": "LISTEN 0 128 *:61616 *:*\n", "stderr": ""},
-        )()
-
-        mock_subprocess.side_effect = [pgrep_result, ss_result]
+        mock_subprocess.return_value = pgrep_result
 
         response = client.get("/health")
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] in ["healthy", "degraded"]
-        assert data["activemq_connected"] is True
-        assert data["activemq_running"] is True
+        assert data["status"] == "healthy"
         assert data["pitrac_running"] is True
         assert "websocket_clients" in data
-        assert "listener_stats" in data
 
     @patch("subprocess.run")
-    def test_health_check_mq_disconnected(self, mock_subprocess, client, mock_activemq):
-        """Test health check when ActiveMQ is disconnected but running"""
-        mock_activemq.is_connected.return_value = False
-
+    def test_health_check_not_running(self, mock_subprocess, client):
+        """Test health check when pitrac is not running"""
         pgrep_result = type("obj", (object,), {"returncode": 1, "stdout": "", "stderr": ""})()
-        ss_result = type(
-            "obj",
-            (object,),
-            {"returncode": 0, "stdout": "LISTEN 0 128 *:61616 *:*\n", "stderr": ""},
-        )()
-
-        mock_subprocess.side_effect = [pgrep_result, ss_result]
+        mock_subprocess.return_value = pgrep_result
 
         response = client.get("/health")
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "degraded"
-        assert data["activemq_connected"] is False
-        assert data["activemq_running"] is True
+        assert data["status"] == "healthy"
         assert data["pitrac_running"] is False
 
     @patch("subprocess.run")
-    def test_health_check_services_not_running(self, mock_subprocess, client, mock_activemq):
-        """Test health check when both services are not running"""
-        mock_activemq.is_connected.return_value = False
-
-        pgrep_result = type("obj", (object,), {"returncode": 1, "stdout": "", "stderr": ""})()
-        ss_result = type("obj", (object,), {"returncode": 0, "stdout": "", "stderr": ""})()
-
-        mock_subprocess.side_effect = [pgrep_result, ss_result]
-
-        response = client.get("/health")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "degraded"
-        assert data["activemq_connected"] is False
-        assert data["activemq_running"] is False
-        assert data["pitrac_running"] is False
-
-    @patch("subprocess.run")
-    def test_health_check_subprocess_exception(self, mock_subprocess, client, mock_activemq):
+    def test_health_check_subprocess_exception(self, mock_subprocess, client):
         """Test health check when subprocess commands fail"""
-        mock_activemq.is_connected.return_value = True
-
         mock_subprocess.side_effect = Exception("Command failed")
 
         response = client.get("/health")
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
-        assert data["activemq_connected"] is True
-        assert data["activemq_running"] is False  # Defaults to False on exception
-        assert data["pitrac_running"] is False  # Defaults to False on exception
+        assert data["pitrac_running"] is False
 
     def test_static_files_served(self, client):
         """Test that static files are accessible"""

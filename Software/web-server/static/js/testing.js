@@ -62,9 +62,11 @@ function createToolCard(tool) {
 }
 
 async function runTool(toolId) {
+    if (!(await requireStrobeSafe())) return;
+
     const card = document.querySelector(`[data-tool-id="${toolId}"]`);
     const runBtn = card.querySelector('.run-btn');
-    
+
     runBtn.disabled = true;
     runBtn.textContent = 'Starting...';
     

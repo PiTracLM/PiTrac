@@ -10,6 +10,7 @@ project('pitrac_lm', 'c', 'cpp',
     default_options : [
         'werror=true',
         'warning_level=2',
+        'b_lto=true',
         'cpp_std=c++20',
     ],
     license : 'LGPL 2.1+')
@@ -23,8 +24,8 @@ add_global_arguments('-D_FILE_OFFSET_BITS=64', language : 'cpp')
 add_global_arguments('-DLIBCXX_ENABLE_INCOMPLETE_FEATURES=ON', language : 'cpp')
 add_global_arguments('-DBOOST_LOG_DYN_LINK', language : 'cpp')
 add_global_arguments('-DBOOST_BIND_GLOBAL_PLACEHOLDERS', language : 'cpp')
-# Enable XNNPACK execution provider for ONNX Runtime
-add_global_arguments('-DUSE_XNNPACK', language : 'cpp')
+# NCNN is the primary inference backend
+add_global_arguments('-DHAS_NCNN', language : 'cpp')
 
 
 fs = import('fs')
@@ -63,8 +64,6 @@ elif neon == 'armv8-neon'
 endif
 
 ssl_dep = dependency('openssl', required : true)
-activemq_dep = dependency('activemq-cpp', required : true)
-apr_dep = cxx.find_library('apr-1', required : true)
 
 libcamera_dep = dependency('libcamera', required : true)
 thread_dep = dependency('threads', required : true)
@@ -77,7 +76,11 @@ boost_dep = dependency('boost', method: 'pkg-config', version : '>=1.74.0', modu
 
 msgpack_dep = dependency('msgpack-cxx', required : true)
 yamlcpp_dep = dependency('yaml-cpp', required : true)
-onnxruntime_dep = dependency('onnxruntime', required : true)
+ncnn_dep = dependency('ncnn', required : true)
+omp_dep = dependency('openmp', language : 'cpp', required : false)
+if not omp_dep.found()
+    omp_dep = declare_dependency(link_args : '-lgomp')
+endif
 
 
 summary({
@@ -93,7 +96,7 @@ conf_data = configuration_data()
 
 pitrac_lm_module_deps = [
 	libcamera_dep, thread_dep, opencv_dep, lgpio_dep, rpicam_app_dep,
-	fmt_dep, boost_dep, activemq_dep, ssl_dep, apr_dep, msgpack_dep, yamlcpp_dep, onnxruntime_dep,]
+	fmt_dep, boost_dep, ssl_dep, msgpack_dep, yamlcpp_dep, ncnn_dep, omp_dep,]
 
 
 subdir('core')
@@ -180,13 +183,15 @@ pitrac_lm_sources += ([
 			'lm_main.cpp',
 			'gs_globals.cpp',
 			'gs_fsm.cpp',
+			'cam2_thread.cpp',
 			'libcamera_interface.cpp',
 			'libcamera_jpeg.cpp',
 			'ball_watcher.cpp',
 			'ball_watcher_image_buffer.cpp',
 			'libcamera_jpeg.cpp',
 			'ball_image_proc.cpp',
-			'onnx_runtime_detector.cpp',
+			'ncnn_detector.cpp',
+			'spin_predictor.cpp',
 			'pulse_strobe.cpp',
 			'colorsys.cpp',
 			'cv_utils.cpp',
@@ -214,17 +219,12 @@ pitrac_lm_sources += ([
 			'gs_events.cpp',
 			'worker_thread.cpp',
 			'camera_hardware.cpp',
-                        'gs_ipc_message.cpp',
-                        'gs_ipc_control_msg.cpp',
+                        'gs_control_msg.cpp',
                         'gs_results.cpp',
                         'gs_gspro_results.cpp',
                         'gs_ui_system.cpp',
-                        'gs_ipc_mat.cpp',
-                        'gs_ipc_result.cpp',
-                        'gs_ipc_test.cpp',
-                        'gs_ipc_system.cpp',
-                        'gs_message_consumer.cpp',
-                        'gs_message_producer.cpp',
+                        'gs_result_types.cpp',
+                        'gs_http_client.cpp',
 ])
 
 pitrac_lm_sources += ([
@@ -243,12 +243,13 @@ pitrac_lm_module_deps += ([
 			rpicam_app_dep,
 ])
 
-exec = executable('pitrac_lm', 
+exec = executable('pitrac_lm',
 	pitrac_lm_sources,
 	include_directories : pitrac_lm_include_dirs,
 	install : true,
         objects : closed_source_object_files,
-	dependencies : pitrac_lm_module_deps
+	dependencies : pitrac_lm_module_deps,
+	cpp_args : cpp_arguments
 	)
 
 # Hacky two targets, because can't figure out how to execute more than one command

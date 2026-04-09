@@ -485,7 +485,7 @@ class ConfigurationManager:
             setting_type = setting_info.get("type", "")
 
             if setting_type == "select" and "options" in setting_info:
-                if key == "gs_config.ball_identification.kONNXModelPath":
+                if key in ("gs_config.ball_identification.kModelPath", "gs_config.spin_analysis.kSpinModelPath"):
                     available_models = self.get_available_models()
                     if available_models:
                         valid_options = list(available_models.values())
@@ -634,7 +634,8 @@ class ConfigurationManager:
     def get_available_models(self) -> Dict[str, str]:
         """
         Discover available YOLO models from the models directory.
-        Returns a dict of {display_name: path} for dropdown options.
+        Returns a dict of {display_name: model_dir_path} for dropdown options.
+        The C++ backend loads NCNN model files from the selected directory.
         """
         models = {}
         metadata = self._raw_metadata if hasattr(self, "_raw_metadata") else self._load_raw_metadata()
@@ -654,16 +655,11 @@ class ConfigurationManager:
 
             for model_dir in base_dir.iterdir():
                 if model_dir.is_dir():
-                    onnx_paths = []
                     for pattern in model_file_patterns:
-                        onnx_paths.append(model_dir / pattern)
-
-                    for onnx_path in onnx_paths:
-                        if onnx_path.exists():
+                        if (model_dir / pattern).exists():
                             display_name = model_dir.name
                             if display_name not in models:
-                                path_str = str(onnx_path.resolve())
-                                models[display_name] = path_str
+                                models[display_name] = str(model_dir.resolve())
                             break
 
         return dict(sorted(models.items()))
@@ -679,69 +675,45 @@ class ConfigurationManager:
 
             model_options = self.get_available_models()
             if model_options and "settings" in metadata:
-                model_key = "gs_config.ball_identification.kONNXModelPath"
-                if model_key in metadata["settings"]:
-                    metadata["settings"][model_key]["options"] = model_options
+                for model_key in ("gs_config.ball_identification.kModelPath", "gs_config.spin_analysis.kSpinModelPath"):
+                    if model_key in metadata["settings"]:
+                        metadata["settings"][model_key]["options"] = model_options
 
             return metadata
         except Exception as e:
             print(f"Error loading configurations.json: {e}")
             return {"settings": {}}
 
-    def get_cli_parameters(self, target: str = "both") -> List[Dict[str, Any]]:
-        """Get all CLI parameters for a specific target (camera1, camera2, both)
-
-        Args:
-            target: Target to filter by ('camera1', 'camera2', or 'both')
-
-        Returns:
-            List of CLI parameter metadata dictionaries
-        """
+    def get_cli_parameters(self) -> List[Dict[str, Any]]:
+        """Get all CLI parameters to pass to the pitrac_lm process."""
         metadata = self.load_configurations_metadata()
         settings = metadata.get("settings", {})
 
         cli_params = []
         for key, info in settings.items():
             if info.get("passedVia") == "cli":
-                passed_to = info.get("passedTo", "both")
-                if passed_to == target or passed_to == "both" or target == "both":
-                    cli_params.append(
-                        {
-                            "key": key,
-                            "cliArgument": info.get("cliArgument"),
-                            "passedTo": passed_to,
-                            "type": info.get("type"),
-                            "default": info.get("default"),
-                        }
-                    )
+                cli_params.append({
+                    "key": key,
+                    "cliArgument": info.get("cliArgument"),
+                    "type": info.get("type"),
+                    "default": info.get("default"),
+                })
         return cli_params
 
-    def get_environment_parameters(self, target: str = "both") -> List[Dict[str, Any]]:
-        """Get all environment parameters for a specific target
-
-        Args:
-            target: Target to filter by ('camera1', 'camera2', or 'both')
-
-        Returns:
-            List of environment parameter metadata dictionaries
-        """
+    def get_environment_parameters(self) -> List[Dict[str, Any]]:
+        """Get all environment parameters to set for the pitrac_lm process."""
         metadata = self.load_configurations_metadata()
         settings = metadata.get("settings", {})
 
         env_params = []
         for key, info in settings.items():
             if info.get("passedVia") == "environment":
-                passed_to = info.get("passedTo", "both")
-                if passed_to == target or passed_to == "both" or target == "both":
-                    env_params.append(
-                        {
-                            "key": key,
-                            "envVariable": info.get("envVariable"),
-                            "passedTo": passed_to,
-                            "type": info.get("type"),
-                            "default": info.get("default"),
-                        }
-                    )
+                env_params.append({
+                    "key": key,
+                    "envVariable": info.get("envVariable"),
+                    "type": info.get("type"),
+                    "default": info.get("default"),
+                })
         return env_params
 
     def flatten_config(self, config: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
@@ -834,11 +806,6 @@ class ConfigurationManager:
         return any(pattern in key for pattern in calibration_patterns)
 
     # Auto-categorization removed - all items must have explicit categories
-
-    def get_basic_subcategories(self):
-        """DEPRECATED: Use get_categories() instead which now includes subcategories."""
-        # Return empty dict for backward compatibility
-        return {}
 
     def export_config(self) -> Dict[str, Any]:
         """Export current configuration for backup or sharing

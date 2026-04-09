@@ -460,7 +460,7 @@ function createConfigItem(key, value, defaultValue, isModified) {
 function createInput(key, value, defaultValue, isUserSet) {
     const metadata = configMetadata[key] || {};
 
-    if (key.includes('ONNXModelPath') || key.includes('onnx_model')) {
+    if (key.includes('kModelPath')) {
         const select = document.createElement('select');
 
         if (metadata.options && Object.keys(metadata.options).length > 0) {
@@ -480,7 +480,7 @@ function createInput(key, value, defaultValue, isUserSet) {
                 const parts = value.split('/');
                 let displayName = 'Unknown Model';
                 for (let i = parts.length - 2; i >= 0; i--) {
-                    if (parts[i] && parts[i] !== 'weights' && parts[i] !== 'best.onnx') {
+                    if (parts[i] && parts[i] !== 'weights') {
                         displayName = parts[i];
                         break;
                     }

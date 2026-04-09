@@ -321,14 +321,8 @@ class CalibrationManager:
         }
 
         config = self.config_manager.get_config()
-        system_mode = config.get("system", {}).get("mode", "single")
 
-        cmd = [self.pitrac_binary]
-
-        if system_mode == "single":
-            cmd.extend(["--run_single_pi", f"--system_mode={camera}_ball_location"])
-        else:
-            cmd.append(f"--system_mode={camera}_ball_location")
+        cmd = [self.pitrac_binary, f"--system_mode={camera}_ball_location"]
 
         if camera == "camera1":
             search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
@@ -396,20 +390,15 @@ class CalibrationManager:
         generated_config_path = self.config_manager.generate_golf_sim_config()
         logger.info(f"Generated config file at: {generated_config_path}")
 
-        if camera == "camera2":
-            return await self._run_camera2_auto_calibration()
-        else:
-            return await self._run_camera1_auto_calibration()
+        return await self._run_auto_calibration(camera)
 
-    async def _run_camera1_auto_calibration(self) -> Dict[str, Any]:
+    async def _run_auto_calibration(self, camera: str = "camera1") -> Dict[str, Any]:
         """
-        Run camera1 auto calibration with hybrid API + process completion detection.
-        Timeout: 30 seconds
+        Run auto calibration with hybrid API + process completion detection.
         """
-        camera = "camera1"
-        timeout = CAMERA1_CALIBRATION_TIMEOUT
+        timeout = CAMERA1_CALIBRATION_TIMEOUT if camera == "camera1" else CAMERA2_CALIBRATION_TIMEOUT
 
-        logger.info(f"Starting camera1 auto calibration with hybrid detection (timeout={timeout}s)")
+        logger.info(f"Starting {camera} auto calibration with hybrid detection (timeout={timeout}s)")
 
         self.calibration_status[camera] = {
             "status": "calibrating",
@@ -424,14 +413,7 @@ class CalibrationManager:
             logger.info(f"Pre-registered calibration session {session_id} for {camera}")
 
         config = self.config_manager.get_config()
-        system_mode = config.get("system", {}).get("mode", "single")
-
-        cmd = [self.pitrac_binary]
-
-        if system_mode == "single":
-            cmd.extend(["--run_single_pi", "--system_mode=camera1AutoCalibrate"])
-        else:
-            cmd.append("--system_mode=camera1AutoCalibrate")
+        cmd = [self.pitrac_binary, f"--system_mode={camera}AutoCalibrate"]
 
         search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
         if search_x is None:
@@ -543,7 +525,7 @@ class CalibrationManager:
                 }
 
         except Exception as e:
-            logger.error(f"Camera1 auto calibration failed: {e}", exc_info=True)
+            logger.error(f"{camera} auto calibration failed: {e}", exc_info=True)
             self.calibration_status[camera]["status"] = "error"
             self.calibration_status[camera]["message"] = str(e)
             return {"status": "error", "message": str(e)}
@@ -574,286 +556,8 @@ class CalibrationManager:
                                 await proc.wait()
                     del self.current_processes[camera]
 
-    async def _run_camera2_auto_calibration(self) -> Dict[str, Any]:
-        """
-        Run camera2 auto calibration with two-process workflow.
-
-        Camera2 in single-Pi mode requires:
-        1. Background process: runCam2ProcessForPi1Processing (captures images via IPC)
-        2. Foreground process: camera2AutoCalibrate (performs calibration)
-
-        The background process must be started first, run indefinitely,
-        and be manually killed after foreground completes.
-
-        Timeout: 120 seconds
-        """
-        camera = "camera2"
-        timeout = CAMERA2_CALIBRATION_TIMEOUT
-
-        logger.info(f"Starting camera2 auto calibration with two-process workflow (timeout={timeout}s)")
-
-        self.calibration_status[camera] = {
-            "status": "calibrating",
-            "message": "Starting camera2 background process...",
-            "progress": 10,
-            "last_run": datetime.now().isoformat(),
-        }
-
-        session_id, session_data = self._create_calibration_session(camera)
-        async with self._calibration_lock:
-            self._active_calibrations[session_id] = session_data
-            logger.info(f"Pre-registered calibration session {session_id} for {camera}")
-
-        config = self.config_manager.get_config()
-        system_mode = config.get("system", {}).get("mode", "single")
-
-        if system_mode != "single":
-            logger.info("Dual-Pi mode detected, using standard calibration")
-            return await self._run_standard_calibration_fallback(camera, timeout)
-
-        env = self._build_environment(camera)
-        logging_level = config.get("logging", {}).get("level", "warn")
-
-        camera2_gain = self.config_manager.get_config("gs_config.cameras.kCamera2Gain")
-        if camera2_gain is None:
-            camera2_gain = 6.0
-
-        bg_cmd = [
-            self.pitrac_binary,
-            "--run_single_pi",
-            "--system_mode",
-            "runCam2ProcessForPi1Processing",
-            f"--camera_gain={camera2_gain}",
-            f"--logging_level={logging_level}",
-            "--artifact_save_level=final_results_only",
-        ]
-        bg_cmd.extend(self._build_cli_args_from_metadata(camera))
-
-        log_file_bg = self.log_dir / f"calibration_camera2_bg_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-        log_file_fg = self.log_dir / f"calibration_camera2_fg_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-
-        logger.info(f"Starting background process: {' '.join(bg_cmd)}")
-        logger.info(f"Background log: {log_file_bg}")
-
-        background_process = None
-        foreground_process = None
-
-        try:
-            background_process = await asyncio.create_subprocess_exec(
-                *bg_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env=env
-            )
-            logger.info(f"Background process started (PID {background_process.pid})")
-
-            logger.info(f"Waiting {CAMERA2_BACKGROUND_INIT_WAIT}s for background process initialization")
-            await asyncio.sleep(CAMERA2_BACKGROUND_INIT_WAIT)
-
-            if background_process.returncode is not None:
-                raise Exception(f"Background process exited prematurely with code {background_process.returncode}")
-
-            self.calibration_status[camera]["message"] = "Running camera2 calibration..."
-            self.calibration_status[camera]["progress"] = 30
-
-            search_x = config.get("calibration", {}).get("camera2_search_center_x", 700)
-            search_y = config.get("calibration", {}).get("camera2_search_center_y", 500)
-
-            fg_cmd = [
-                "sudo",
-                "-E",
-                self.pitrac_binary,
-                "--system_mode",
-                "camera2AutoCalibrate",
-                f"--search_center_x={search_x}",
-                f"--search_center_y={search_y}",
-                f"--logging_level={logging_level}",
-                "--artifact_save_level=final_results_only",
-            ]
-            fg_cmd.extend(self._build_cli_args_from_metadata(camera))
-
-            logger.info(f"Starting foreground process: {' '.join(fg_cmd)}")
-            logger.info(f"Foreground log: {log_file_fg}")
-
-            async with self._process_lock:
-                if camera in self.current_processes:
-                    raise Exception(f"A calibration process is already running for {camera}")
-
-                foreground_process = await asyncio.create_subprocess_exec(
-                    *fg_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env=env
-                )
-                self.current_processes[camera] = foreground_process
-                logger.info(f"Foreground process started (PID {foreground_process.pid})")
-
-            completion_result = await self.wait_for_calibration_completion(
-                foreground_process, session_id, timeout=timeout
-            )
-
-            logger.info(f"{camera}: Completion result: {completion_result}")
-
-            fg_output = ""
-            try:
-                if foreground_process.stdout and not foreground_process.stdout.at_eof():
-                    remaining = await asyncio.wait_for(foreground_process.stdout.read(), timeout=2.0)
-                    fg_output = remaining.decode() if remaining else ""
-            except Exception as e:
-                logger.debug(f"Could not read foreground output: {e}")
-
-            bg_output = ""
-            try:
-                if background_process.stdout and not background_process.stdout.at_eof():
-                    remaining = await asyncio.wait_for(background_process.stdout.read(), timeout=2.0)
-                    bg_output = remaining.decode() if remaining else ""
-            except Exception as e:
-                logger.debug(f"Could not read background output: {e}")
-
-            # Check if output contains failure messages even if exit code was 0
-            if fg_output and self._check_calibration_failed(fg_output):
-                logger.warning(
-                    f"{camera}: Detected calibration failure in output despite exit code {foreground_process.returncode}"
-                )
-                completion_result["completed"] = False
-                completion_result["method"] = "output_parse"
-
-            with open(log_file_fg, "w") as f:
-                f.write(f"Completion method: {completion_result['method']}\n")
-                f.write(f"API success: {completion_result['api_success']}\n")
-                f.write(f"Process exit code: {completion_result['process_exit_code']}\n")
-                f.write(f"\n--- Output ---\n{fg_output}")
-
-            with open(log_file_bg, "w") as f:
-                f.write("Background process log\n")
-                f.write(f"\n--- Output ---\n{bg_output}")
-
-            if completion_result["completed"]:
-                self.calibration_status[camera]["status"] = "completed"
-                self.calibration_status[camera][
-                    "message"
-                ] = f"Calibration successful (via {completion_result['method']})"
-                self.calibration_status[camera]["progress"] = 100
-
-                self.config_manager.reload()
-
-                return {
-                    "status": "success",
-                    "completion_method": completion_result["method"],
-                    "api_success": completion_result["api_success"],
-                    "focal_length_received": completion_result["focal_length_received"],
-                    "angles_received": completion_result["angles_received"],
-                    "output": fg_output,
-                    "log_file_fg": str(log_file_fg),
-                    "log_file_bg": str(log_file_bg),
-                }
-            else:
-                self.calibration_status[camera]["status"] = "failed"
-                self.calibration_status[camera]["message"] = f"Calibration failed ({completion_result['method']})"
-                return {
-                    "status": "failed",
-                    "message": f"Calibration failed via {completion_result['method']}",
-                    "completion_result": completion_result,
-                    "output": fg_output,
-                    "log_file_fg": str(log_file_fg),
-                    "log_file_bg": str(log_file_bg),
-                }
-
-        except Exception as e:
-            logger.error(f"Camera2 auto calibration failed: {e}", exc_info=True)
-            self.calibration_status[camera]["status"] = "error"
-            self.calibration_status[camera]["message"] = str(e)
-            return {"status": "error", "message": str(e)}
-
-        finally:
-            async with self._calibration_lock:
-                if session_id in self._active_calibrations:
-                    logger.debug(f"Cleaning up calibration session {session_id}")
-                    self._active_calibrations.pop(session_id, None)
-
-            if background_process is not None and background_process.returncode is None:
-                logger.info("Terminating background process (runCam2ProcessForPi1Processing)")
-                try:
-                    background_process.terminate()
-                    await asyncio.wait_for(background_process.wait(), timeout=5.0)
-                    logger.info("Background process terminated gracefully")
-                except asyncio.TimeoutError:
-                    logger.warning("Force killing background process")
-                    background_process.kill()
-                    await background_process.wait()
-                    logger.info("Background process killed")
-
-            async with self._process_lock:
-                if camera in self.current_processes:
-                    proc = self.current_processes[camera]
-                    if proc.returncode is None:
-                        logger.info(f"Terminating {camera} foreground process")
-                        try:
-                            proc.terminate()
-                            await asyncio.wait_for(proc.wait(), timeout=5.0)
-                        except asyncio.TimeoutError:
-                            logger.warning(f"Force killing {camera} foreground process")
-                            proc.kill()
-                            await proc.wait()
-                    del self.current_processes[camera]
-
-    async def _run_standard_calibration_fallback(self, camera: str, timeout: float) -> Dict[str, Any]:
-        """
-        Fallback for non-single-Pi modes (dual-Pi, etc).
-        Uses the old _run_calibration_command logic.
-        """
-        logger.info(f"Using standard calibration for {camera}")
-
-        config = self.config_manager.get_config()
-        cmd = [self.pitrac_binary, f"--system_mode={camera}AutoCalibrate"]
-
-        if camera == "camera1":
-            search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
-            if search_x is None:
-                search_x = 850  # Default from configurations.json
-            search_y = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterY")
-            if search_y is None:
-                search_y = 500  # Default from configurations.json
-        else:
-            # Camera2 doesn't have SearchCenter in config, use hardcoded defaults
-            search_x = 700
-            search_y = 500
-
-        logging_level = config.get("logging", {}).get("level", "warn")
-
-        camera_gain_key = "kCamera1Gain" if camera == "camera1" else "kCamera2Gain"
-        camera_gain = self.config_manager.get_config(f"gs_config.cameras.{camera_gain_key}")
-        if camera_gain is None:
-            camera_gain = 6.0
-
-        cmd.extend(
-            [
-                f"--search_center_x={search_x}",
-                f"--search_center_y={search_y}",
-                f"--logging_level={logging_level}",
-                "--artifact_save_level=all",
-                "--show_images=0",
-                f"--camera_gain={camera_gain}",
-            ]
-        )
-        cmd.extend(self._build_cli_args_from_metadata(camera))
-
-        result = await self._run_calibration_command(cmd, camera, timeout=int(timeout))
-        output = result.get("output", "")
-
-        # Check for failure messages in output
-        if self._check_calibration_failed(output):
-            self.calibration_status[camera]["status"] = "failed"
-            self.calibration_status[camera]["message"] = "Calibration failed - no ball detected"
-            return {"status": "failed", "message": "Calibration failed - no ball detected", "output": output}
-
-        calibration_data = self._parse_calibration_results(output)
-
-        if calibration_data:
-            self.calibration_status[camera]["status"] = "completed"
-            self.calibration_status[camera]["message"] = "Calibration successful"
-            self.calibration_status[camera]["progress"] = 100
-            self.config_manager.reload()
-            return {"status": "success", "calibration_data": calibration_data, "output": output}
-        else:
-            self.calibration_status[camera]["status"] = "failed"
-            self.calibration_status[camera]["message"] = "Calibration failed - check logs"
-            return {"status": "failed", "message": "Calibration failed", "output": output}
-
+    # _run_camera2_auto_calibration and _run_standard_calibration_fallback removed
+    # Camera2 auto-calibration now uses the same single-process path as camera1
     async def run_manual_calibration(self, camera: str = "camera1") -> Dict[str, Any]:
         """
         Run manual calibration for specified camera
@@ -874,14 +578,7 @@ class CalibrationManager:
         }
 
         config = self.config_manager.get_config()
-        system_mode = config.get("system", {}).get("mode", "single")
-
-        cmd = [self.pitrac_binary]
-
-        if system_mode == "single":
-            cmd.extend(["--run_single_pi", f"--system_mode={camera}Calibrate"])
-        else:
-            cmd.append(f"--system_mode={camera}Calibrate")
+        cmd = [self.pitrac_binary, f"--system_mode={camera}Calibrate"]
 
         if camera == "camera1":
             search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
@@ -956,14 +653,7 @@ class CalibrationManager:
         logger.info(f"Capturing still image for {camera}")
 
         config = self.config_manager.get_config()
-        system_mode = config.get("system", {}).get("mode", "single")
-
-        cmd = [self.pitrac_binary]
-
-        if system_mode == "single":
-            cmd.extend(["--run_single_pi", f"--system_mode={camera}", "--cam_still_mode"])
-        else:
-            cmd.extend([f"--system_mode={camera}", "--cam_still_mode"])
+        cmd = [self.pitrac_binary, f"--system_mode={camera}", "--cam_still_mode"]
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_file = f"calibration_{camera}_{timestamp}.png"
@@ -1013,20 +703,17 @@ class CalibrationManager:
     def _build_cli_args_from_metadata(self, camera: str = "camera1") -> list:
         """Build CLI arguments using metadata from configurations.json
 
-        This method uses the passedVia and passedTo metadata to automatically
+        This method uses the passedVia metadata to automatically
         build CLI arguments, similar to pitrac_manager.py
         """
         args = []
         merged_config = self.config_manager.get_config()
 
-        target = camera  # "camera1" or "camera2"
-
-        cli_params = self.config_manager.get_cli_parameters(target)
+        cli_params = self.config_manager.get_cli_parameters()
 
         # Skip args that we handle separately or need special handling
         skip_args = {
             "--system_mode",
-            "--run_single_pi",
             "--search_center_x",
             "--search_center_y",
             "--logging_level",
@@ -1089,6 +776,9 @@ class CalibrationManager:
         # Set PITRAC_ROOT if not already set (required by camera discovery)
         if "PITRAC_ROOT" not in env:
             env["PITRAC_ROOT"] = "/usr/lib/pitrac"
+        env["OMP_WAIT_POLICY"] = "PASSIVE"
+        env.setdefault("LIBPISP_LOG_LEVEL", "4")
+        env.setdefault("LIBCAMERA_LOG_LEVELS", "*:ERROR")
 
         # Camera types come from cameras.slot1.type and cameras.slot2.type (default 5 = InnoMaker IMX296)
         slot1_type = config.get("cameras", {}).get("slot1", {}).get("type", 5)
@@ -1237,7 +927,7 @@ class CalibrationManager:
         """
         failure_indicators = [
             "Failed to AutoCalibrateCamera",
-            "ONNX detection failed - no balls found",
+            "Model detection failed to find any balls",
             "GetBall() failed to get a ball",
             "Could not DetermineFocalLengthForAutoCalibration",
         ]

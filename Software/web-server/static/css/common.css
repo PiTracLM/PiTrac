@@ -1,44 +1,45 @@
 /* Common styles shared across all PiTrac pages */
 
-/* CSS Variables for Theming */
-:root[data-theme="light"],
-:root {
-    /* Light mode colors */
-    --bg-primary: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    --bg-card: #ffffff;
-    --bg-hover: #f8f9fa;
-    --text-primary: #1a202c;
-    --text-secondary: #4a5568;
-    --text-muted: #718096;
-    --border-color: #e2e8f0;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06);
-    --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
-    --shadow-lg: 0 10px 25px rgba(0,0,0,0.1);
-    --shadow-xl: 0 20px 40px rgba(0,0,0,0.15);
+/* Theme Variables */
+:root,
+:root[data-theme="dark"] {
+    --bg-primary: #0a0a0f;
+    --bg-card: #141419;
+    --bg-elevated: #1c1c24;
+    --bg-hover: #24242e;
+    --text-primary: #f0f0f5;
+    --text-secondary: #a0a0b8;
+    --text-muted: #6b6b80;
+    --border-color: #2a2a38;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.4);
+    --shadow-lg: 0 10px 25px rgba(0,0,0,0.5);
+    --shadow-xl: 0 20px 40px rgba(0,0,0,0.6);
     --accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     --accent-primary: #667eea;
     --accent-secondary: #764ba2;
     --success: #48bb78;
     --error: #f56565;
-    --error-dark: #e53e3e;
+    --error-dark: #c53030;
     --warning: #ed8936;
     --info: #4299e1;
 }
 
-/* Dark mode colors */
-:root[data-theme="dark"] {
-    --bg-primary: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
-    --bg-card: #2d3748;
-    --bg-hover: #374151;
-    --text-primary: #f7fafc;
-    --text-secondary: #e2e8f0;
-    --text-muted: #a0aec0;
-    --border-color: #4a5568;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-    --shadow-md: 0 4px 6px rgba(0,0,0,0.3);
-    --shadow-lg: 0 10px 25px rgba(0,0,0,0.4);
-    --shadow-xl: 0 20px 40px rgba(0,0,0,0.5);
-    --error-dark: #c53030;
+/* Light mode colors */
+:root[data-theme="light"] {
+    --bg-primary: #f5f7fa;
+    --bg-card: #ffffff;
+    --bg-elevated: #f8f9fb;
+    --bg-hover: #eef0f4;
+    --text-primary: #1a202c;
+    --text-secondary: #4a5568;
+    --text-muted: #718096;
+    --border-color: #e2e8f0;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
+    --shadow-lg: 0 10px 25px rgba(0,0,0,0.08);
+    --shadow-xl: 0 20px 40px rgba(0,0,0,0.1);
+    --error-dark: #e53e3e;
 }
 
 /* Base Styles */
@@ -79,11 +80,12 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    margin-bottom: 2rem;
-    padding: 1rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
     background: var(--bg-card);
-    border-radius: 1rem;
+    border-radius: 0.75rem;
     box-shadow: var(--shadow-md);
+    border: 1px solid var(--border-color);
     position: relative;
 }
 
@@ -103,18 +105,22 @@ body {
 }
 
 .header-logo {
-    height: 3.5rem;
+    height: 2.5rem;
     width: auto;
     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+:root:not([data-theme="light"]) .header-logo {
+    filter: invert(1) drop-shadow(0 2px 4px rgba(0,0,0,0.3));
 }
 
 /* Status Indicators */
 .status-indicators-vertical {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.4rem;
     padding-right: 0.75rem;
-    border-right: 2px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
     min-width: fit-content;
 }
 
@@ -125,26 +131,34 @@ body {
 }
 
 .status-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 50%;
-    background: var(--success);
+    width: 0.75rem;
+    height: 0.75rem;
+    background-color: var(--success);
+    -webkit-mask-image: url('/static/golf_ball.svg');
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-image: url('/static/golf_ball.svg');
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: center;
     transition: all 0.3s ease;
-    box-shadow: 0 0 4px var(--success);
+    filter: drop-shadow(0 0 3px var(--success));
     cursor: help;
 }
 
 .status-dot.disconnected {
-    background: var(--error);
-    box-shadow: 0 0 4px var(--error);
+    background-color: var(--error);
+    filter: drop-shadow(0 0 3px var(--error));
     animation: pulse 2s infinite;
 }
 
 .status-label {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     font-weight: 600;
     color: var(--text-muted);
     letter-spacing: 0.03em;
+    text-transform: uppercase;
 }
 
 /* Dropdown Menu */
@@ -395,9 +409,11 @@ body {
 
 /* Timestamp display */
 #timestamp {
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
     font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 /* Animations */
@@ -423,35 +439,35 @@ body {
     .desktop-only {
         display: none;
     }
-    
+
     .mobile-only {
         display: block;
     }
-    
+
     .header {
         flex-wrap: wrap;
         padding: 0.75rem;
     }
-    
+
     .status-indicators-vertical {
         flex-direction: row;
         border-right: none;
-        border-bottom: 2px solid var(--border-color);
+        border-bottom: 1px solid var(--border-color);
         padding-right: 0;
         padding-bottom: 0.75rem;
         width: 100%;
     }
-    
+
     .header-content {
         order: 2;
         width: 100%;
         justify-content: flex-start;
     }
-    
+
     .header-right {
         order: 3;
     }
-    
+
     .pitrac-controls {
         display: none;
     }

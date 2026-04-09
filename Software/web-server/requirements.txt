@@ -2,8 +2,6 @@ fastapi==0.120.4
 uvicorn[standard]==0.38.0
 python-multipart==0.0.20
 jinja2==3.1.6
-msgpack==1.1.2
-stomp.py==8.2.0
 pillow==11.3.0
 pyyaml==6.0.3
 aiofiles==25.1.0

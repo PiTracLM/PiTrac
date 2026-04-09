@@ -12,7 +12,6 @@ def mock_config_manager():
     """Create a mock config manager"""
     manager = MagicMock()
     manager.get_config.return_value = {
-        "system": {"mode": "single"},
         "gs_config": {
             "ipc_interface": {"kWebServerShareDirectory": "~/LM_Shares/Images/"}
         },
@@ -175,19 +174,26 @@ class TestRunTool:
         assert "Test log content" in result["output"]
 
     @pytest.mark.asyncio
-    async def test_run_tool_with_sudo(self, testing_manager, mock_config_manager):
+    async def test_run_tool_with_sudo(self, testing_manager, mock_config_manager, tmp_path):
         """Test running a tool that requires sudo"""
+        config_file = tmp_path / "test_config.json"
+        config_file.write_text('{"gs_config": {"testing": {}}}')
+        mock_config_manager.generate_golf_sim_config.return_value = str(config_file)
+
         mock_process = AsyncMock()
         mock_process.returncode = 0
         mock_process.communicate.return_value = (b"Output", b"")
 
-        with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
-            await testing_manager.run_tool("test_images")
+        config_content = '{"gs_config": {}}'
 
-            # Verify sudo was added to command
-            args, kwargs = mock_exec.call_args
-            assert args[0] == "sudo"
-            assert "-E" in args
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+            with patch("builtins.open", mock_open(read_data=config_content)):
+                with patch.object(testing_manager, "_find_and_read_test_log", return_value=None):
+                    await testing_manager.run_tool("test_images")
+
+                    args, kwargs = mock_exec.call_args
+                    assert args[0] == "sudo"
+                    assert "-E" in args
 
     @pytest.mark.asyncio
     async def test_run_tool_exception(self, testing_manager, mock_config_manager):
@@ -419,37 +425,6 @@ class TestExtractTimingSummary:
         assert "Grayscale Conversion" in result
         assert "150" in result
 
-    def test_extract_timing_onnx_preload(self, testing_manager):
-        """Test extracting ONNX preload timing"""
-        log_lines = ["ONNX Runtime detector preloaded successfully in 450ms"]
-        result = testing_manager._extract_timing_summary(log_lines)
-        assert result is not None
-        assert "ONNX Runtime Preload" in result
-        assert "450ms" in result
-
-    def test_extract_timing_onnx_warmup(self, testing_manager):
-        """Test extracting ONNX warmup timing"""
-        # Need preload timing as well for output to be generated
-        log_lines = [
-            "ONNX Runtime detector preloaded successfully in 450ms",
-            "Warmup complete. Final inference time: 23.5 ms",
-        ]
-        result = testing_manager._extract_timing_summary(log_lines)
-        assert result is not None
-        assert "Warmup Inference" in result or "Final Warmup Inference" in result
-        assert "23.5" in result or "23.50" in result
-
-    def test_extract_timing_onnx_detection(self, testing_manager):
-        """Test extracting ONNX detection timing"""
-        log_lines = [
-            "ONNX Runtime detected 1 balls in 25ms",
-            "ONNX Runtime detected 2 balls in 30ms",
-        ]
-        result = testing_manager._extract_timing_summary(log_lines)
-        assert result is not None
-        assert "Ball Detection (ONNX Runtime)" in result
-        assert "Average" in result
-
     def test_extract_timing_opencv_fallback(self, testing_manager):
         """Test extracting OpenCV fallback timing"""
         log_lines = ["OpenCV DNN completed processing in 45 ms"]
@@ -477,11 +452,10 @@ class TestExtractTimingSummary:
     def test_extract_timing_complete_pipeline(self, testing_manager):
         """Test extracting complete pipeline timing"""
         log_lines = [
-            "ONNX Runtime detector preloaded successfully in 450ms",
-            "Warmup complete. Final inference time: 23.5 ms",
+            "NCNN model preloaded in 250ms",
             "Grayscale conversion completed in 150us",
-            "ONNX Runtime detected 1 balls in 25ms",
-            "ONNX Runtime detected 2 balls in 30ms",
+            "NCNN detected 1 balls in 25ms",
+            "NCNN detected 2 balls in 30ms",
             "Spin detection completed in 35ms",
             "Spin detection completed in 40ms",
         ]
@@ -489,16 +463,16 @@ class TestExtractTimingSummary:
         assert result is not None
         assert "Initialization" in result
         assert "Image Preprocessing" in result
-        assert "Ball Detection (ONNX Runtime)" in result
+        assert "Ball Detection (NCNN)" in result
         assert "Spin Analysis" in result
         assert "Total Per-Shot Time" in result
 
     def test_extract_timing_multiple_detections_range(self, testing_manager):
         """Test that range is shown for multiple detections"""
         log_lines = [
-            "ONNX Runtime detected 1 balls in 20ms",
-            "ONNX Runtime detected 1 balls in 25ms",
-            "ONNX Runtime detected 1 balls in 30ms",
+            "NCNN detected 1 balls in 20ms",
+            "NCNN detected 1 balls in 25ms",
+            "NCNN detected 1 balls in 30ms",
         ]
         result = testing_manager._extract_timing_summary(log_lines)
         assert result is not None

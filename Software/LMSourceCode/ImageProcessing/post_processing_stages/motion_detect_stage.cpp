@@ -207,8 +207,8 @@ bool MotionDetectStage::Process(CompletedRequestPtr& completed_request)
 
     StreamInfo info = app_->GetStreamInfo(stream_);
 
-	// We need to protect access to first_time_, previous_frame_ and motion_detected_.
-	std::lock_guard<std::mutex> lock(mutex_);
+	// Process() is called synchronously from the single ball_watcher event loop thread.
+	// No mutex needed — previous_frame_ and motion_detected_ are only accessed here.
 
 	unsigned int sampledFrameStride = info.stride * config_.vskip;
 
@@ -289,8 +289,7 @@ bool MotionDetectStage::Process(CompletedRequestPtr& completed_request)
 			GS_LOG_MSG(trace, "---> SendExternalTrigger");
 		}
 		else {
-			// simulate the other system sending an image back
-			// TBD gs::GolfSimIpcSystem::SimulateCamera2ImageMessage();
+			// Camera2 image is captured by the in-process Camera2Thread
 		}
 
 		if (config_.verbose)

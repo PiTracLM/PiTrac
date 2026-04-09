@@ -187,6 +187,7 @@ dtparam=spi=on"
         log_info "  dtparam=spi=on already exists, skipping"
     fi
 
+    # dtoverlay=spi1-2cs is needed for V3 connector board calibration (SPI1 DAC/ADC)
     if ! grep -q "^dtoverlay=spi1-2cs" "$config_path"; then
         config_block="$config_block
 dtoverlay=spi1-2cs"

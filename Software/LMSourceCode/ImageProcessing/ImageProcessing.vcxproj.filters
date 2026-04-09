@@ -69,21 +69,6 @@
     <ClCompile Include="gs_globals.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="gs_ipc_message.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="gs_ipc_mat.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="gs_message_consumer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="gs_ipc_system.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="gs_message_producer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="ball_watcher_image_buffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -93,7 +78,7 @@
     <ClCompile Include="pulse_strobe.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="gs_ipc_result.cpp">
+    <ClCompile Include="gs_result_types.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gs_results.cpp">
@@ -106,9 +91,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gs_gspro_results.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="gs_ipc_test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gs_sim_interface.cpp">
@@ -135,7 +117,7 @@
     <ClCompile Include="gs_clubs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="gs_ipc_control_msg.cpp">
+    <ClCompile Include="gs_control_msg.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gs_e6_interface.cpp">
@@ -344,28 +326,13 @@
     <ClInclude Include="gs_options.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="gs_ipc_message.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gs_ipc_mat.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gs_message_consumer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gs_ipc_system.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gs_message_producer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="ball_watcher_image_buffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="pulse_strobe.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="gs_ipc_result.h">
+    <ClInclude Include="gs_result_types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gs_results.h">
@@ -378,9 +345,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gs_gspro_results.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gs_ipc_test.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gs_sim_interface.h">
@@ -410,7 +374,7 @@
     <ClInclude Include="gs_clubs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="gs_ipc_control_msg.h">
+    <ClInclude Include="gs_control_msg.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gs_e6_interface.h">

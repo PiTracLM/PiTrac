@@ -18,7 +18,7 @@
 #include <opencv2/core.hpp>
 
 #include "golf_ball.h"
-#include "gs_ipc_result.h"
+#include "gs_result_types.h"
 #include "gs_events.h"
 
 
@@ -61,47 +61,21 @@ namespace golf_sim {
             cv::Mat camera2_pre_image_;
         };
 
-        struct WaitingForCamera2PreImage {
-            std::chrono::steady_clock::time_point  startTime_;
-            GolfBall cam1_ball_;
-            cv::Mat ball_image_;
-        };
-
-
-        // The following states are relevant to the camera 2 system.  That system
-        // sets up the camera for external triggering and waits for it to be
-        // triggered by the camera 1 system.
-        struct InitializingCamera2System {
-        };
-
-        struct WaitingForCameraArmMessage {
-            std::chrono::steady_clock::time_point startTime_;
-        };
-
-        struct WaitingForCameraTrigger {
-            std::chrono::steady_clock::time_point startTime_;
-        };
-
         struct Exiting {
         };
 
     }
 
-    // Must contain each of the above states
     using GolfSimState = std::variant<  state::InitializingCamera1System,
                                         state::Exiting,
                                         state::WaitingForSimulatorArmed,
                                         state::WaitingForBall,
                                         state::WaitingForBallStabilization,
                                         state::WaitingForBallHit,
-                                        state::WaitingForCamera2PreImage,
-                                        state::BallHitNowWaitingForCam2Image,
-                                        state::InitializingCamera2System,
-                                        state::WaitingForCameraArmMessage,
-                                        state::WaitingForCameraTrigger
+                                        state::BallHitNowWaitingForCam2Image
                                     >;
 
-    // Send an Active-MQ message to any listeners, such as the PiTrac GUI
+    // Send a status message to the web server via HTTP POST
     // Such messages can be states like "WaitingForBallStabilization"
     bool SendIPCStatusMessage(GsIPCResultType& message_type);
     void SendIPCErrorStatusMessage(const std::string& error_message);

@@ -36,10 +36,9 @@ case "$1" in
                     mkdir -p "$SYSTEM_MODELS_DIR"
                     cp -r /usr/share/pitrac/models/* "$SYSTEM_MODELS_DIR/" 2>/dev/null || true
                     # Set proper permissions - models should be readable by all users
-                    chmod -R 644 "$SYSTEM_MODELS_DIR"/*/*.onnx 2>/dev/null || true
                     chmod -R 755 "$SYSTEM_MODELS_DIR"/* 2>/dev/null || true
                     chmod 755 "$SYSTEM_MODELS_DIR"
-                    echo "Installed ONNX models to $SYSTEM_MODELS_DIR"
+                    echo "Installed models to $SYSTEM_MODELS_DIR"
                 fi
             fi
 
@@ -154,13 +153,13 @@ case "$1" in
                 if [ -f "$EXAMPLE_FILE" ] && [ ! -f "$CAMERA_CONFIG" ]; then
                     echo "Creating ${pipeline} config from example..."
                     cp "$EXAMPLE_FILE" "$CAMERA_CONFIG"
-                    # Uncomment and set the camera timeout to 1 second (1000000 ms)
-                    sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 1000000/' "$CAMERA_CONFIG"
+                    # Uncomment and set the camera timeout to 24 hours (86400000 ms)
+                    sed -i 's/# *"camera_timeout_value_ms": *[0-9][0-9]*/"camera_timeout_value_ms": 86400000/' "$CAMERA_CONFIG"
                 elif [ -f "$CAMERA_CONFIG" ]; then
                     # Config exists, check if timeout needs updating
                     if grep -q '# *"camera_timeout_value_ms"' "$CAMERA_CONFIG"; then
                         echo "Updating ${pipeline} camera timeout..."
-                        sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 1000000/' "$CAMERA_CONFIG"
+                        sed -i 's/# *"camera_timeout_value_ms": *[0-9][0-9]*/"camera_timeout_value_ms": 86400000/' "$CAMERA_CONFIG"
                     fi
                 fi
             fi

@@ -16,7 +16,7 @@
 #include "gs_options.h"
 #include "gs_config.h"
 #include "gs_events.h"
-#include "gs_ipc_control_msg.h"
+#include "gs_control_msg.h"
 
 #include "gs_gspro_interface.h"
 #include "gs_gspro_response.h"

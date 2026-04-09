@@ -853,9 +853,16 @@ class TestReadDiagnostics:
     async def test_returns_all_readings(self):
         from strobe_calibration_manager import StrobeCalibrationManager
 
-        mgr = StrobeCalibrationManager(Mock())
+        cm = Mock()
+        cm.get_config.side_effect = lambda key: {
+            "gs_config.strobing.kConnectionBoardVersion": 3,
+            "gs_config.strobing.kDAC_setting": 150,
+        }.get(key)
+
+        mgr = StrobeCalibrationManager(cm)
         mgr._open_hardware = Mock()
         mgr._close_hardware = Mock()
+        mgr._set_dac = Mock()
         mgr.get_ldo_voltage = Mock(return_value=7.5)
         mgr.get_led_current = Mock(return_value=9.2)
         mgr._read_adc = Mock(side_effect=[1234, 2345])
@@ -866,14 +873,22 @@ class TestReadDiagnostics:
         assert result["led_current"] == 9.2
         assert result["adc_ch0_raw"] == 1234
         assert result["adc_ch1_raw"] == 2345
+        mgr._set_dac.assert_called_once_with(150)
 
     @pytest.mark.asyncio
     async def test_skips_current_when_ldo_unsafe(self):
         from strobe_calibration_manager import StrobeCalibrationManager
 
-        mgr = StrobeCalibrationManager(Mock())
+        cm = Mock()
+        cm.get_config.side_effect = lambda key: {
+            "gs_config.strobing.kConnectionBoardVersion": 3,
+            "gs_config.strobing.kDAC_setting": 150,
+        }.get(key)
+
+        mgr = StrobeCalibrationManager(cm)
         mgr._open_hardware = Mock()
         mgr._close_hardware = Mock()
+        mgr._set_dac = Mock()
         mgr.get_ldo_voltage = Mock(return_value=3.0)
         mgr._read_adc = Mock(side_effect=[100, 200])
 
@@ -882,6 +897,41 @@ class TestReadDiagnostics:
         assert result["ldo_voltage"] == 3.0
         assert result["led_current"] is None
         assert "unsafe" in result.get("warning", "").lower()
+
+    @pytest.mark.asyncio
+    async def test_skips_current_when_no_calibration(self):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        cm = Mock()
+        cm.get_config.side_effect = lambda key: {
+            "gs_config.strobing.kConnectionBoardVersion": 3,
+            "gs_config.strobing.kDAC_setting": None,
+        }.get(key)
+
+        mgr = StrobeCalibrationManager(cm)
+        mgr._open_hardware = Mock()
+        mgr._close_hardware = Mock()
+        mgr.get_ldo_voltage = Mock(return_value=7.5)
+        mgr._read_adc = Mock(side_effect=[100, 200])
+
+        result = await mgr.read_diagnostics()
+
+        assert result["led_current"] is None
+        assert "calibration" in result.get("warning", "").lower()
+
+    @pytest.mark.asyncio
+    async def test_rejects_non_v3_board(self):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        cm = Mock()
+        cm.get_config.return_value = 2
+
+        mgr = StrobeCalibrationManager(cm)
+
+        result = await mgr.read_diagnostics()
+
+        assert result["status"] == "error"
+        assert "V3" in result["message"]
 
     @pytest.mark.asyncio
     async def test_closes_hardware_on_error(self):

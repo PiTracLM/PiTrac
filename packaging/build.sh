@@ -58,14 +58,9 @@ check_artifacts() {
 
     if [[ "$use_debs" == "true" ]]; then
         # Check for DEB packages first
-        if [ ! -f "$ARTIFACT_DIR/libopencv4.11_4.11.0-1_arm64.deb" ] && [ ! -f "$ARTIFACT_DIR/libopencv-dev_4.11.0-1_arm64.deb" ]; then
-            if [ ! -f "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" ]; then
+        if [ ! -f "$ARTIFACT_DIR/libopencv4.13_4.13.0-1_arm64.deb" ] && [ ! -f "$ARTIFACT_DIR/libopencv-dev_4.13.0-1_arm64.deb" ]; then
+            if [ ! -f "$ARTIFACT_DIR/opencv-4.13.0-arm64.tar.gz" ]; then
                 missing+=("opencv")
-            fi
-        fi
-        if [ ! -f "$ARTIFACT_DIR/libactivemq-cpp_3.9.5-1_arm64.deb" ] && [ ! -f "$ARTIFACT_DIR/libactivemq-cpp-dev_3.9.5-1_arm64.deb" ]; then
-            if [ ! -f "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" ]; then
-                missing+=("activemq")
             fi
         fi
         if [ ! -f "$ARTIFACT_DIR/liblgpio1_0.2.2-1_arm64.deb" ]; then
@@ -78,16 +73,10 @@ check_artifacts() {
                 missing+=("msgpack")
             fi
         fi
-        if [ ! -f "$ARTIFACT_DIR/libonnxruntime1.17.3_1.17.3-xnnpack3_arm64.deb" ]; then
-            missing+=("onnxruntime")
-        fi
     else
         # Check for tar.gz packages
-        if [ ! -f "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" ]; then
+        if [ ! -f "$ARTIFACT_DIR/opencv-4.13.0-arm64.tar.gz" ]; then
             missing+=("opencv")
-        fi
-        if [ ! -f "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" ]; then
-            missing+=("activemq")
         fi
         if [ ! -f "$ARTIFACT_DIR/lgpio-0.2.2-arm64.tar.gz" ]; then
             missing+=("lgpio")
@@ -101,7 +90,7 @@ check_artifacts() {
         log_warn "Missing artifacts: ${missing[*]}"
         return 1
     else
-        if [[ "$use_debs" == "true" ]] && [ -f "$ARTIFACT_DIR/libopencv4.11_4.11.0-1_arm64.deb" ]; then
+        if [[ "$use_debs" == "true" ]] && [ -f "$ARTIFACT_DIR/libopencv4.13_4.13.0-1_arm64.deb" ]; then
             log_success "All DEB packages present"
         else
             log_success "All artifacts present"
@@ -221,7 +210,6 @@ clean_all() {
 
     # Remove Docker images
     docker rmi opencv-builder:arm64 2>/dev/null || true
-    docker rmi activemq-builder:arm64 2>/dev/null || true
     docker rmi lgpio-builder:arm64 2>/dev/null || true
     docker rmi pitrac-poc:arm64 2>/dev/null || true
 
@@ -360,10 +348,6 @@ build_dev() {
         missing_deps+=("yq")
     fi
 
-    # ActiveMQ message broker
-    if ! dpkg -l | grep -q "^ii  activemq"; then
-        missing_deps+=("activemq")
-    fi
 
     # ========================================================================
     # Fix initramfs-tools configuration issues on Raspberry Pi
@@ -477,7 +461,7 @@ build_dev() {
     export PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
     export LD_LIBRARY_PATH="/usr/lib/aarch64-linux-gnu:/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
     export CMAKE_PREFIX_PATH="/usr"
-    export CPLUS_INCLUDE_PATH="/usr/include/opencv4:/usr/include/activemq-cpp-3.9.5"
+    export CPLUS_INCLUDE_PATH="/usr/include/opencv4"
     export PITRAC_ROOT="$REPO_ROOT/Software/LMSourceCode"
     export CXXFLAGS="-I/usr/include/opencv4"
 
@@ -496,9 +480,9 @@ build_dev() {
     # are installed (which use /usr/ paths instead).
     # ========================================================================
     if [[ -f "build/build.ninja" ]]; then
-        if grep -q "/opt/opencv\|/opt/activemq" build/build.ninja 2>/dev/null; then
+        if grep -q "/opt/opencv" build/build.ninja 2>/dev/null; then
             # Check if DEB packages are installed (they use /usr/, not /opt/)
-            if dpkg -l 2>/dev/null | grep -qE "^ii\s+(libopencv4\.11|libactivemq-cpp)\s"; then
+            if dpkg -l 2>/dev/null | grep -qE "^ii\s+(libopencv4\.(11|12|13))\s"; then
                 log_warn "Detected build directory with /opt/ paths but DEB packages use /usr/"
                 log_warn "This causes linker failures - cached paths are stale"
                 log_info "Automatically cleaning build directory for compatibility..."
@@ -506,14 +490,14 @@ build_dev() {
                 FORCE_REBUILD="true"
 
                 # Warn if old /opt/ installations still exist alongside DEB packages
-                if [[ -d "/opt/opencv" ]] || [[ -d "/opt/activemq-cpp" ]]; then
+                if [[ -d "/opt/opencv" ]]; then
                     echo
                     log_warn "Old tarball installations detected in /opt/ alongside DEB packages"
                     log_warn "This may cause runtime library conflicts"
                     log_info "Recommended: Run 'sudo ./uninstall-tar-deps.sh' to remove old installations"
                     echo
                 fi
-            elif [[ ! -d "/opt/opencv" ]] && [[ ! -d "/opt/activemq-cpp" ]]; then
+            elif [[ ! -d "/opt/opencv" ]]; then
                 log_warn "Detected build directory expects /opt/ libraries but they don't exist"
                 log_info "Cleaning build directory - will reconfigure for system paths..."
                 rm -rf build
@@ -555,6 +539,12 @@ build_dev() {
     log_info "Installing PiTrac binary..."
     install -m 755 build/pitrac_lm /usr/lib/pitrac/pitrac_lm
 
+    # Remove any stale file capabilities — file capabilities trigger AT_SECURE
+    # which breaks libcamera's secure_getenv() config file reading.
+    # CAP_SYS_NICE for SCHED_FIFO is granted via AmbientCapabilities in the
+    # pitrac-web systemd service instead.
+    setcap -r /usr/lib/pitrac/pitrac_lm 2>/dev/null || true
+
     log_info "Installing CLI tool..."
     install -m 755 "$SCRIPT_DIR/pitrac" /usr/bin/pitrac
 
@@ -569,7 +559,7 @@ build_dev() {
 
     install_test_suites "/usr/share/pitrac/test-suites" "$REPO_ROOT"
 
-    install_onnx_models "$REPO_ROOT" "${SUDO_USER:-$(whoami)}"
+    install_models "$REPO_ROOT" "${SUDO_USER:-$(whoami)}"
 
     # Install calibration tools
     log_info "Installing calibration tools..."
@@ -596,54 +586,7 @@ EOF
     # Create base directory for models and other system files
     mkdir -p /etc/pitrac
 
-    # Configure ActiveMQ
-    if command -v activemq &>/dev/null || [[ -f /usr/share/activemq/bin/activemq ]]; then
-        log_info "Configuring ActiveMQ using template system..."
-        
-        mkdir -p /usr/share/pitrac/templates
-        cp "$SCRIPT_DIR/templates/activemq.xml.template" /usr/share/pitrac/templates/
-        cp "$SCRIPT_DIR/templates/log4j2.properties.template" /usr/share/pitrac/templates/
-        cp "$SCRIPT_DIR/templates/activemq-options.template" /usr/share/pitrac/templates/
-        
-        mkdir -p /usr/lib/pitrac
-        cp "$SCRIPT_DIR/src/lib/activemq-service-install.sh" /usr/lib/pitrac/
-        chmod 755 /usr/lib/pitrac/activemq-service-install.sh
-        
-        log_info "Installing ActiveMQ configuration..."
-        if /usr/lib/pitrac/activemq-service-install.sh install activemq; then
-            log_success "ActiveMQ configuration installed successfully"
-            
-            log_info "Restarting ActiveMQ service..."
-            # First enable the service (for boot)
-            systemctl enable activemq 2>/dev/null || true
-            
-
-            manage_service_restart "activemq"
-            
-            if systemctl is-active --quiet activemq; then
-                
-                # Verify it's actually listening
-                if netstat -tln 2>/dev/null | grep -q ":61616 "; then
-                    log_success "ActiveMQ broker listening on port 61616"
-                else
-                    log_warn "ActiveMQ started but not listening on port 61616 yet"
-                    log_info "It may take a few seconds to fully initialize"
-                fi
-                
-                /usr/lib/pitrac/activemq-service-install.sh verify || true
-            else
-                log_warn "ActiveMQ configured but may need manual restart"
-                log_info "Check logs with: journalctl -u activemq -n 50"
-            fi
-        else
-            log_error "Failed to configure ActiveMQ"
-            log_info "Try running manually: /usr/lib/pitrac/activemq-service-install.sh install"
-        fi
-    else
-        log_error "ActiveMQ installation failed! This is a critical component."
-        log_info "Try manually installing with: sudo apt install activemq"
-        exit 1
-    fi
+    # ActiveMQ removed — results sent via HTTP POST from C++ to Python web server
 
     # Clean up old PiTrac systemd service and processes if they exist
     log_info "Checking for existing PiTrac systemd service and processes..."
@@ -713,19 +656,11 @@ EOF
     # Give the system a moment to release resources
     sleep 1
     
-    log_info "Installing web server and ActiveMQ services..."
+    log_info "Installing web server service..."
     
     mkdir -p /usr/share/pitrac/templates
     cp "$SCRIPT_DIR/templates/pitrac-web.service.template" /usr/share/pitrac/templates/
-    cp "$SCRIPT_DIR/templates/activemq.xml.template" /usr/share/pitrac/templates/ 2>/dev/null || true
-    cp "$SCRIPT_DIR/templates/log4j2.properties.template" /usr/share/pitrac/templates/ 2>/dev/null || true
-    cp "$SCRIPT_DIR/templates/activemq-options.template" /usr/share/pitrac/templates/ 2>/dev/null || true
     
-    
-    if [[ -f "$SCRIPT_DIR/src/lib/activemq-service-install.sh" ]]; then
-        cp "$SCRIPT_DIR/src/lib/activemq-service-install.sh" /usr/lib/pitrac/
-        chmod 755 /usr/lib/pitrac/activemq-service-install.sh
-    fi
     
     if [[ -f "$SCRIPT_DIR/src/lib/web-service-install.sh" ]]; then
         cp "$SCRIPT_DIR/src/lib/web-service-install.sh" /usr/lib/pitrac/
@@ -824,13 +759,6 @@ EOF
         echo "  Enable on boot: sudo systemctl enable pitrac-web.service"
     fi
     echo ""
-    echo "ActiveMQ status:"
-    if systemctl is-active --quiet activemq; then
-        echo "  ActiveMQ broker is running on port 61616"
-    else
-        echo "  ActiveMQ is not running"
-        echo "  Start with: sudo systemctl start activemq"
-    fi
     echo ""
     echo "Manual testing (optional):"
     echo "  pitrac test quick   # Test image processing locally"

@@ -19,8 +19,6 @@
 
 #include <opencv2/calib3d/calib3d.hpp>
 
-// TBD - May need to be before ball_watcher, as there is a mman.h conflict
-#include "gs_ipc_system.h"
 
 
 #include "ball_watcher.h"
@@ -142,29 +140,6 @@ namespace golf_sim {
 
         return true;
     }
-
-    bool LibCameraInterface::SendCamera2PreImage(const cv::Mat& raw_image) {
-
-        // TBD -Not currently implemented
-        return false;
-
-        /*** 
-        // We must undistort here, because we are going to immediately send the pre-image and the receiver
-        // may not know what camera (and what distortion matrix) is in use.
-        CameraHardware::CameraModel  camera_model = CameraHardware::PiGS;
-        cv::Mat return_image = undistort_camera_image(raw_image, GsCameraNumber::kGsCamera2, camera_model);
-
-        // Send the image back to the cam1 system
-        GolfSimIPCMessage ipc_message(GolfSimIPCMessage::IPCMessageType::kCamera2ReturnPreImage);
-        ipc_message.SetImageMat(return_image);
-        GolfSimIpcSystem::SendIpcMessage(ipc_message);
-
-        // Save the image for later analysis
-        LoggingTools::LogImage("", return_image, std::vector < cv::Point >{}, true, "log_cam2_last_pre_image.png");
-        ***/
-        return true;
-    }
-
 
     bool WatchForBallMovement(GolfSimCamera& camera, const GolfBall& ball, bool& motion_detected) {
 
@@ -350,11 +325,11 @@ namespace golf_sim {
         // If we need to correct something, preserve the crop width and correct the offset.
         // NOTE - Camera resolutions are 1 greater than the greatest pixel position
         if ((((camera.camera_hardware_.resolution_x_ - 1) - crop_offset_x) + watching_crop_width) >= camera.camera_hardware_.resolution_x_) {
-            crop_offset_x = (camera.camera_hardware_.video_resolution_x_ - crop_offset_x) - 1;
+            crop_offset_x = (camera.camera_hardware_.resolution_x_ - crop_offset_x) - 1;
         }
 
         if ((((camera.camera_hardware_.resolution_y_ - 1) - crop_offset_y) + watching_crop_height) >= camera.camera_hardware_.resolution_y_) {
-            crop_offset_y = (camera.camera_hardware_.video_resolution_y_ - crop_offset_y) - 1;
+            crop_offset_y = (camera.camera_hardware_.resolution_y_ - crop_offset_y) - 1;
         }
 
         cv::Vec2i watching_crop_size = cv::Vec2i((uint)watching_crop_width, (uint)watching_crop_height);
@@ -369,19 +344,26 @@ namespace golf_sim {
             return true;
         }
 
-		// If the camera is flipped, the cropping has to be adjusted accordingly so that the crop offset is flipped vertically
+		// If the camera is flipped (VFlip + HFlip = 180-degree rotation), the cropping
+        // offset must be adjusted for both axes to match the rotated coordinate system.
         GsCameraNumber camera_number = camera.camera_hardware_.camera_number_;
         const CameraHardware::CameraOrientation  camera_orientation = (camera_number == GsCameraNumber::kGsCamera1) ? GolfSimCamera::kSystemSlot1CameraOrientation : GolfSimCamera::kSystemSlot2CameraOrientation;
 
         if (camera_orientation == CameraHardware::CameraOrientation::kUpsideDown) {
-            GS_LOG_TRACE_MSG(trace, "Original watching_crop_offset[1] = " + std:: to_string(watching_crop_offset[1]));
-            float half_screen_height = std::round(camera.camera_hardware_.video_resolution_y_ / 2);
+            GS_LOG_TRACE_MSG(trace, "Original watching_crop_offset = (" + std::to_string(watching_crop_offset[0]) + ", " + std::to_string(watching_crop_offset[1]) + ")");
+
+            float half_screen_width = std::round(camera.camera_hardware_.resolution_x_ / 2);
+            float half_screen_height = std::round(camera.camera_hardware_.resolution_y_ / 2);
+
+            // Reflect both axes around screen center for 180-degree rotation
+            watching_crop_offset[0] = half_screen_width - (watching_crop_offset[0] - half_screen_width);
             watching_crop_offset[1] = half_screen_height - (watching_crop_offset[1] - half_screen_height);
 
-	    // We essentially need to swap the top and bottom of the cropping rectangle 
+            // Swap the origin from bottom-right to top-left of the cropping rectangle
+            watching_crop_offset[0] -= watching_crop_size[0];
             watching_crop_offset[1] -= watching_crop_size[1];
 
-            GS_LOG_TRACE_MSG(trace, "Flipped watching_crop_offset[1] = " + std::to_string(watching_crop_offset[1]));
+            GS_LOG_TRACE_MSG(trace, "Flipped watching_crop_offset = (" + std::to_string(watching_crop_offset[0]) + ", " + std::to_string(watching_crop_offset[1]) + ")");
         }
 
         if (!SendCameraCroppingCommand(camera, watching_crop_size, watching_crop_offset)) {
@@ -540,12 +522,8 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
     const std::string script_name = "/tmp/pi_cam_location.sh";
 
 	// Ensure that we can write to the output file if it was already created
-    std::string script_command = "sudo rm " + script_name;
+    std::string script_command = "sudo rm -f " + script_name;
     system(script_command.c_str());
-
-    int cmdResult = system(script_command.c_str());
-
-	// It's ok if the file wasn't there.  No need to check the return code
     
     // Write the script out to file to run.  
     // Otherwise, system() would try to run the script as a sh script,
@@ -567,7 +545,7 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
 
     script_command = script_name;
 
-    cmdResult = system(script_command.c_str());
+    int cmdResult = system(script_command.c_str());
 
     if (cmdResult != 0) {
         GS_LOG_TRACE_MSG(error, "system(DiscoverCameraLocation) failed.  Return value was: " + std::to_string(cmdResult));
@@ -601,21 +579,12 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
     // <media number> <space> <device number>
     try {
 
-        // Using a single pi requires both cameras to be connected to that Pi.
-        // If we are not receiving two sets of camera data, then something is wrong.
+        // Both cameras must be connected to this Pi.
         int new_line_position = line.find('\n');
 
-        if (new_line_position == (int)string::npos) {
-
-            // There is only one line of discovered information
-
-            if (GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
-                GS_LOG_TRACE_MSG(error, "No expected new line found in camera location output.  Missing camera when running in single-pi mode.");
-                return false;
-            }
-            else {
-                // We have only a single line of information.  Do not need to do anything else
-            }
+        if (new_line_position == (int)std::string::npos) {
+            GS_LOG_TRACE_MSG(error, "Only one camera detected. Both cameras must be connected.");
+            return false;
         }
         else {
             // Assume (TBD - Confirm with Pi people) that the camera on camera unit 0
@@ -640,7 +609,7 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
 
         std::string device_number_str;
 
-        if (last_space_position != (int)string::npos) {
+        if (last_space_position != (int)std::string::npos) {
             device_number_str = line.substr(last_space_position + 1);
         }
         else {
@@ -652,7 +621,7 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
 
         std::string media_number_str;
 
-        if (first_space_position != (int)string::npos) {
+        if (first_space_position != (int)std::string::npos) {
             media_number_str = line.substr(0, first_space_position);
         }
         else {
@@ -806,7 +775,7 @@ bool ConfigureLibCameraOptions(const GolfSimCamera& camera, RPiCamEncoder& app, 
 
     if (camera_orientation == CameraHardware::CameraOrientation::kUpsideDown) {
      // Tell libcamera to flip the image vertically back to where it should be
-        options->Set().transform = libcamera::Transform::VFlip;
+        options->Set().transform = libcamera::Transform::VFlip | libcamera::Transform::HFlip;
         GS_LOG_MSG(trace, "Flipping still picture upside down.");
     }
     else {
@@ -890,7 +859,7 @@ bool RetrieveCameraInfo(const GsCameraNumber camera_number, cv::Vec2i& resolutio
                 options->Set().no_raw = true;  // See https://forums.raspberrypi.com/viewtopic.php?t=369927
 
                 // Set the camera number (0 or 1, likely) when we have more than one camera
-                options->Set().camera = (camera_number == GsCameraNumber::kGsCamera1 || !GolfSimOptions::GetCommandLineOptions().run_single_pi_) ? 0 : 1;
+                options->Set().camera = (camera_number == GsCameraNumber::kGsCamera1) ? 0 : 1;
 
                 // Get the camera open for a moment so that we can read its settings
                 app.OpenCamera();
@@ -917,7 +886,7 @@ bool RetrieveCameraInfo(const GsCameraNumber camera_number, cv::Vec2i& resolutio
         return false;
     }
 
-    int camera_slot_number = (camera_number == GsCameraNumber::kGsCamera1 || !GolfSimOptions::GetCommandLineOptions().run_single_pi_) ? 0 : 1;
+    int camera_slot_number = (camera_number == GsCameraNumber::kGsCamera1) ? 0 : 1;
 
     auto const& cam = cameras[camera_slot_number];
 
@@ -1128,7 +1097,6 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
             // TBD - This code seems backward.  But everything is working right now, 
             // so let's not change until we can really test it all.
             if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2Calibrate ||
-                GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2OnePulseOnly ||
                 GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2BallLocation ||
                 GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2AutoCalibrate) {
 
@@ -1142,7 +1110,7 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
 
         // Assume camera 1 will be at slot 0 in all cases.  Camera 2 will be at slot 1
         // only in a single Pi system.
-        options->Set().camera = (camera_number == GsCameraNumber::kGsCamera1 || !GolfSimOptions::GetCommandLineOptions().run_single_pi_) ? 0 : 1;
+        options->Set().camera = (camera_number == GsCameraNumber::kGsCamera1) ? 0 : 1;
 
         // Shouldn't need a special gain to take a "normal" picture.   Default will be 1.0
         // from the command line options.
@@ -1174,7 +1142,7 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
 
         if (camera_orientation == CameraHardware::CameraOrientation::kUpsideDown) {
     	    // Tell libcamera to flip the image vertically back to where it should be
-            options->Set().transform = libcamera::Transform::VFlip;
+            options->Set().transform = libcamera::Transform::VFlip | libcamera::Transform::HFlip;
             GS_LOG_MSG(trace, "Flipping still picture upside down.");
         }
 	else {
@@ -1317,38 +1285,33 @@ bool CheckForBallEnhanced(GolfBall& ball, cv::Mat& img) {
     cv::Vec2i search_center = camera.GetExpectedBallCenter();
     
     if (use_yolo) {
-        if (!golf_sim::BallImageProc::PreloadYOLOModel()) {
-            GS_LOG_MSG(warning, "YOLO model not available, using legacy detection");
-        } else {
-            std::vector<GsCircle> detected_circles;
-            // Don't worry if there is no ball.  We're not certain there would be.
-            bool detected = golf_sim::BallImageProc::DetectBallsONNX(img, 
-                                                          golf_sim::BallImageProc::BallSearchMode::kFindPlacedBall,
-                                                          detected_circles, false);
-            
-            if (detected && !detected_circles.empty()) {
-                GsCircle best_circle;
-                float best_distance = FLT_MAX;
-                
-                for (const auto& circle : detected_circles) {
-                    float dx = circle[0] - search_center[0];
-                    float dy = circle[1] - search_center[1];
-                    float distance = sqrt(dx*dx + dy*dy);
-                    
-                    if (distance < best_distance) {
-                        best_distance = distance;
-                        best_circle = circle;
-                    }
-                }
-                
-                if (best_distance < 200) {
-                    ball.ball_circle_ = best_circle;
-                    ball.measured_radius_pixels_ = best_circle[2];
-                    ball.search_area_center_ = search_center;
-                    ball.search_area_radius_ = 200;
+        std::vector<GsCircle> detected_circles;
+        bool detected = golf_sim::BallImageProc::DetectBalls(img,
+                                                      golf_sim::BallImageProc::BallSearchMode::kFindPlacedBall,
+                                                      detected_circles, false);
 
-                    return true;
+        if (detected && !detected_circles.empty()) {
+            GsCircle best_circle;
+            float best_distance = FLT_MAX;
+
+            for (const auto& circle : detected_circles) {
+                float dx = circle[0] - search_center[0];
+                float dy = circle[1] - search_center[1];
+                float distance = sqrt(dx*dx + dy*dy);
+
+                if (distance < best_distance) {
+                    best_distance = distance;
+                    best_circle = circle;
                 }
+            }
+
+            if (best_distance < 200) {
+                ball.ball_circle_ = best_circle;
+                ball.measured_radius_pixels_ = best_circle[2];
+                ball.search_area_center_ = search_center;
+                ball.search_area_radius_ = 200;
+
+                return true;
             }
         }
     }
@@ -1426,15 +1389,7 @@ bool WaitForCam2Trigger(cv::Mat& return_image) {
 
         SetLibCameraLoggingOff();
 
-        // On a two-Pi system, each Pi has just one camera, and that camera will be in slot 0
-        // On a single-pi system the one Pi 5 has both cameras.  And Camera 2 will be in slot 1
-        // because Camera 1 is in slot 0.
-        if (GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
-            options->Set().camera = 1;
-        }
-        else {
-            options->Set().camera = 0;
-        }
+        options->Set().camera = 1;  // Camera2 is always slot 1
 
         if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2Calibrate ||
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2BallLocation ||
@@ -1484,7 +1439,7 @@ bool WaitForCam2Trigger(cv::Mat& return_image) {
 	// We know we are using camera 2
         if (GolfSimCamera::kSystemSlot2CameraOrientation == CameraHardware::CameraOrientation::kUpsideDown) {
     	    // Tell libcamera to flip the image vertically back to where it should be
-            options->Set().transform = libcamera::Transform::VFlip;
+            options->Set().transform = libcamera::Transform::VFlip | libcamera::Transform::HFlip;
             GS_LOG_MSG(trace, "Flipping still picture upside down.");
         }
 	else {
@@ -1545,76 +1500,8 @@ bool PerformCameraSystemStartup() {
         case SystemMode::kCamera1:
         case SystemMode::kCamera1TestStandalone:
         case SystemMode::kTestSpin: {
-
-            if (!GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
-                std::string trigger_mode_command = "sudo $PITRAC_ROOT/ImageProcessing/CameraTools/setCameraTriggerInternal.sh";
-
-                int command_result = system(trigger_mode_command.c_str());
-
-                if (command_result != 0) {
-                    GS_LOG_TRACE_MSG(trace, "system(trigger_mode_command) failed.");
-                    return false;
-                }
-            }
-            else {
-                /****
-                const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot1CameraType;
-                if (camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
-                    std::string trigger_mode_command = "$PITRAC_ROOT/ImageProcessing/CameraTools/imx296_trigger 6 0";
-
-                    GS_LOG_TRACE_MSG(trace, "Camera 1 trigger_mode_command = " + trigger_mode_command);
-                    int command_result = system(trigger_mode_command.c_str());
-
-                    if (command_result != 0) {
-                        GS_LOG_TRACE_MSG(trace, "system(trigger_mode_command) failed.");
-                        return false;
-                    }
-                }
-                else {
-                    GS_LOG_TRACE_MSG(trace, "Running in single-pi mode, so not setting camera triggering (internal or external) programmatically.  Instead, please see the following discussion on how to setup the boot/firmware.config.txt dtoverlays for triggering:  https://forums.raspberrypi.com/viewtopic.php?p=2315464#p2315464.");
-                }
-                    ****/
-            }
-        }
-        break;
-
-        case SystemMode::kCamera2:
-        case SystemMode::kRunCam2ProcessForPi1Processing:
-        case SystemMode::kCamera2TestStandalone: {
-
-            if (!GolfSimOptions::GetCommandLineOptions().run_single_pi_) {
-                std::string trigger_mode_command = "sudo $PITRAC_ROOT/ImageProcessing/CameraTools/setCameraTriggerExternal.sh";
-
-                int command_result = system(trigger_mode_command.c_str());
-
-                if (command_result != 0) {
-                    GS_LOG_TRACE_MSG(trace, "system(trigger_mode_command) failed.");
-                    return false;
-                }
-            }
-            else {
-                const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot2CameraType;
-
-                if (camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
-                    std::string trigger_mode_command = "$PITRAC_ROOT/ImageProcessing/CameraTools/imx296_trigger 4 1";
-
-                    int command_result = system(trigger_mode_command.c_str());
-
-                    if (command_result != 0) {
-                        GS_LOG_TRACE_MSG(trace, "system(trigger_mode_command) failed.");
-                        return false;
-                    }
-                }
-            }
-
-            // Create a camera just for purposes of setting the tuning file variable
-            GolfSimCamera camera;
-            camera.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera2, GolfSimCamera::kSystemSlot2CameraType, GolfSimCamera::kSystemSlot2LensType, GolfSimCamera::kSystemSlot1CameraOrientation);
-
-            if (!SetLibcameraTuningFileEnvVariable(camera)) {
-                GS_LOG_TRACE_MSG(error, "failed to SetLibcameraTuningFileEnvVariable");
-                return false;
-            }
+            // Camera triggering is configured via firmware config.txt dtoverlays,
+            // not programmatically. Nothing to do here.
         }
         break;
 

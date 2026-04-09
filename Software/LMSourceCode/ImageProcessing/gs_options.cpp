@@ -57,9 +57,7 @@ bool GolfSimOptions::Parse(int argc, char *argv[])
 	std::map<std::string, int> mode_table =
 	{	{ "test", SystemMode::kTest },
 		{ "camera1", SystemMode::kCamera1 },
-		{ "camera2", SystemMode::kCamera2 },
 		{ "camera1_test_standalone", SystemMode::kCamera1TestStandalone },
-		{ "camera2_test_standalone", SystemMode::kCamera2TestStandalone },
 		{ "camera1Calibrate", SystemMode::kCamera1Calibrate },
 		{ "camera2Calibrate", SystemMode::kCamera2Calibrate },
 		{ "test_spin", SystemMode::kTestSpin },
@@ -70,8 +68,6 @@ bool GolfSimOptions::Parse(int argc, char *argv[])
 		{ "automated_testing", SystemMode::kAutomatedTesting },
 		{ "camera1AutoCalibrate", SystemMode::kCamera1AutoCalibrate },
 		{ "camera2AutoCalibrate", SystemMode::kCamera2AutoCalibrate },
-		{ "runCam2ProcessForPi1Processing", SystemMode::kRunCam2ProcessForPi1Processing },
-		{ "camera2_one_pulse_only", SystemMode::kCamera2OnePulseOnly },
 	};
 	if (mode_table.count(system_mode_string_) == 0)
 		throw std::runtime_error("Invalid system_mode: " + system_mode_string_);
@@ -135,8 +131,6 @@ void GolfSimOptions::Print() const
 	std::cout << "    send_test_results: " << std::to_string(send_test_results_) << std::endl;
 	if (!output_filename_.empty())
 		std::cout << "    output_filename: " << output_filename_ << std::endl;
-	if (!msg_broker_address_.empty())
-		std::cout << "    msg_broker_address_: " << msg_broker_address_ << std::endl;
 	if (!base_image_logging_dir_.empty())
 		std::cout << "    base_image_logging_dir_: " << base_image_logging_dir_ << std::endl;
 	if (!web_server_share_dir_.empty())
@@ -152,7 +146,6 @@ void GolfSimOptions::Print() const
 	std::cout << "    practice_ball: " << std::to_string(practice_ball_) << std::endl;
 	std::cout << "    wait_keys: " << std::to_string(wait_for_key_on_images_) << std::endl;
 	
-	std::cout << "    run_single_pi: " << std::to_string(run_single_pi_) << std::endl;
 	std::cout << "    show_images: " << std::to_string(show_images_) << std::endl;
 	std::cout << "    use_non_IR_camera: " << std::to_string(use_non_IR_camera_) << std::endl;
 	if (!command_line_file_.empty())

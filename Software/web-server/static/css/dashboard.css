@@ -1,158 +1,39 @@
 /* Dashboard-specific styles */
 
-/* Metrics Grid */
-.metrics-grid {
+/* ===== Dashboard Layout ===== */
+.dashboard-layout {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1.25rem;
-    margin-bottom: 2rem;
-}
-
-/* Metric Cards */
-.metric-card {
-    background: var(--bg-card);
-    border-radius: 1rem;
-    overflow: hidden;
-    box-shadow: var(--shadow-md);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    border: 1px solid var(--border-color);
-}
-
-.metric-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-xl);
-}
-
-.metric-header {
-    background: var(--accent-gradient);
-    color: white;
-    padding: 0.875rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    text-align: center;
-}
-
-.metric-value {
-    padding: 1.5rem 1rem;
-    text-align: center;
-    background: var(--bg-card);
-    position: relative;
-    overflow: hidden;
-}
-
-.metric-value::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: var(--accent-gradient);
-    opacity: 0.2;
-}
-
-.metric-value span:first-child {
-    font-size: clamp(2rem, 5vw, 3rem);
-    font-weight: 700;
-    color: var(--text-primary);
-    display: inline-block;
-    transition: all 0.3s ease;
-}
-
-.metric-value.updated span:first-child {
-    animation: bounce 0.5s ease-out;
-    color: var(--accent-primary);
-}
-
-.metric-unit {
-    font-size: clamp(0.875rem, 2vw, 1.25rem);
-    color: var(--text-muted);
-    font-weight: 400;
-    margin-left: 0.25rem;
-}
-
-/* Message Section */
-.message-section {
-    background: var(--bg-card);
-    border-radius: 1rem;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--border-color);
-}
-
-.result-type {
-    font-size: clamp(1.25rem, 3vw, 1.75rem);
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 0.5rem;
-}
-
-.message {
-    color: var(--text-secondary);
-    font-size: clamp(0.875rem, 2vw, 1rem);
-    line-height: 1.5;
-}
-
-/* Image Gallery */
-.image-gallery {
-    background: var(--bg-card);
-    border-radius: 1rem;
-    padding: 1.5rem;
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--border-color);
-}
-
-.image-gallery h2 {
-    color: var(--text-primary);
-    margin-bottom: 1rem;
-    font-size: clamp(1.25rem, 3vw, 1.5rem);
-}
-
-.image-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: minmax(320px, 1fr) minmax(400px, 1.2fr);
     gap: 1rem;
+    align-items: stretch;
 }
 
-.shot-image {
-    width: 100%;
-    height: auto;
-    border-radius: 0.5rem;
-    box-shadow: var(--shadow-sm);
-    transition: transform 0.3s ease;
-    cursor: pointer;
-}
-
-.shot-image:hover {
-    transform: scale(1.02);
-}
-
-/* Ball Ready Indicator */
-.ball-ready-indicator {
+/* ===== Status Strip ===== */
+.status-strip {
+    grid-column: 1 / -1;
     display: flex;
     align-items: center;
-    gap: 1.5rem;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
+    gap: 0.75rem;
+    padding: 0.625rem 1rem;
     background: var(--bg-card);
-    border-radius: 1rem;
-    box-shadow: var(--shadow-lg);
+    border-radius: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--text-muted);
+    box-shadow: var(--shadow-sm);
     transition: all 0.3s ease;
+    min-height: 0;
 }
 
-.ball-status-icon {
-    width: 80px;
-    height: 80px;
+.status-strip-icon {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s ease;
 }
 
-.ball-icon {
+.status-strip-icon .ball-icon {
     width: 100%;
     height: 100%;
     background-color: var(--text-muted);
@@ -167,128 +48,372 @@
     transition: all 0.3s ease;
 }
 
-.ball-status-text {
+.status-strip-content {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex-wrap: wrap;
 }
 
-.ball-status-title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 0.5rem;
-}
-
-.ball-status-message {
+.status-strip-title {
     font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.status-strip-separator {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    user-select: none;
+}
+
+.status-strip-message {
+    font-size: 0.9rem;
     color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* Ball Status States */
-.ball-ready-indicator.initializing {
-    border-left: 4px solid var(--info);
+.status-strip-actions {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
-.ball-ready-indicator.initializing .ball-icon {
+.status-strip .btn-reset {
+    padding: 0.35rem 0.85rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.status-strip .btn-reset:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--accent-primary);
+}
+
+/* Status Strip States */
+.status-strip.initializing {
+    border-left-color: var(--info);
+}
+.status-strip.initializing .ball-icon {
     background-color: var(--info);
     animation: pulse 2s infinite;
 }
 
-.ball-ready-indicator.waiting {
-    border-left: 4px solid var(--warning);
+.status-strip.waiting {
+    border-left-color: var(--warning);
 }
-
-.ball-ready-indicator.waiting .ball-icon {
+.status-strip.waiting .ball-icon {
     background-color: var(--warning);
     animation: pulse 2s infinite;
 }
 
-.ball-ready-indicator.stabilizing {
-    border-left: 4px solid #fbbf24;
+.status-strip.stabilizing {
+    border-left-color: #fbbf24;
 }
-
-.ball-ready-indicator.stabilizing .ball-icon {
+.status-strip.stabilizing .ball-icon {
     background-color: #fbbf24;
     animation: bounce 1s infinite;
 }
 
-.ball-ready-indicator.ready {
-    border-left: 4px solid var(--success);
-    background: linear-gradient(135deg, var(--bg-card) 0%, rgba(72, 187, 120, 0.1) 100%);
+.status-strip.ready {
+    border-left-color: var(--success);
+    background: linear-gradient(90deg, rgba(72, 187, 120, 0.06) 0%, var(--bg-card) 40%);
 }
-
-.ball-ready-indicator.ready .ball-icon {
+.status-strip.ready .ball-icon {
     background-color: var(--success);
-    transform: scale(1.1);
+    transform: scale(1.05);
 }
-
-.ball-ready-indicator.ready .ball-status-title {
+.status-strip.ready .status-strip-title {
     color: var(--success);
 }
 
-.ball-ready-indicator.hit {
-    border-left: 4px solid var(--accent-primary);
+.status-strip.hit {
+    border-left-color: var(--accent-primary);
 }
-
-.ball-ready-indicator.hit .ball-icon {
+.status-strip.hit .ball-icon {
     background-color: var(--accent-primary);
     animation: none;
 }
 
-.ball-ready-indicator.error {
-    border-left: 4px solid var(--error);
+.status-strip.error {
+    border-left-color: var(--error);
 }
-
-.ball-ready-indicator.error .ball-icon {
+.status-strip.error .ball-icon {
     background-color: var(--error);
 }
 
-@media (max-width: 768px) {
-    .metrics-grid {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
-
-    .metric-value {
-        padding: 1.25rem 0.75rem;
-    }
+/* ===== Metrics Panel ===== */
+.metrics-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
 }
 
-@media (min-width: 769px) and (max-width: 1024px) {
-    .metrics-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
+/* ===== Metric Cards — shared ===== */
+.metric-card {
+    background: var(--bg-card);
+    border-radius: 0.75rem;
+    padding: 1.5rem 1.5rem;
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--accent-primary);
+    box-shadow: var(--shadow-sm);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@media (min-width: 481px) and (max-width: 768px) {
-    .metrics-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .image-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
+.metric-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
 }
 
-@media (max-width: 480px) {
-    .ball-ready-indicator {
-        flex-direction: column;
-        text-align: center;
-        gap: 1rem;
+.metric-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+}
+
+.metric-number {
+    font-size: clamp(2.5rem, 5vw, 3.25rem);
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.3s ease;
+}
+
+.metric-unit {
+    font-size: clamp(1rem, 1.8vw, 1.25rem);
+    font-weight: 400;
+    color: var(--text-muted);
+    margin-left: 0.25rem;
+}
+
+.metric-number.updated {
+    animation: metricPop 0.5s ease-out;
+    color: var(--accent-primary);
+}
+
+@keyframes metricPop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.06); }
+    100% { transform: scale(1); }
+}
+
+/* ===== Hero Card (Ball Speed) ===== */
+.metric-card.hero {
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-elevated) 100%);
+}
+
+.metric-card.hero .metric-number {
+    font-size: clamp(3.25rem, 7vw, 4.5rem);
+}
+
+.metric-card.hero .metric-label {
+    font-size: 0.9rem;
+}
+
+/* ===== 2x2 Sub-Grid ===== */
+.metrics-sub-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+/* ===== Image Panel ===== */
+.image-panel {
+    background: var(--bg-card);
+    border-radius: 0.75rem;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.image-panel-inner {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    position: relative;
+}
+
+.shot-image {
+    width: 100%;
+    height: auto;
+    max-height: 70vh;
+    object-fit: contain;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: opacity 0.3s ease;
+}
+
+.shot-image:hover {
+    opacity: 0.92;
+}
+
+/* When multiple images, use a grid inside the panel */
+.image-panel-inner.multi-image {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    align-items: start;
+}
+
+.image-panel-inner.multi-image .shot-image {
+    max-height: 50vh;
+}
+
+/* ===== Empty State ===== */
+.image-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 3rem 2rem;
+    text-align: center;
+    width: 100%;
+}
+
+.image-empty-state .empty-icon {
+    width: 64px;
+    height: 64px;
+    background-color: var(--text-muted);
+    opacity: 0.25;
+    -webkit-mask-image: url('/static/golf_ball.svg');
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-image: url('/static/golf_ball.svg');
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: center;
+}
+
+.image-empty-state .empty-text {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    max-width: 220px;
+    line-height: 1.5;
+}
+
+/* ===== Responsive: Tablet (768-1023px) ===== */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .dashboard-layout {
+        grid-template-columns: minmax(280px, 1fr) minmax(300px, 1.1fr);
+        gap: 0.75rem;
+    }
+
+    .metric-card {
         padding: 1rem;
     }
-    
-    .ball-status-icon {
-        width: 60px;
-        height: 60px;
+
+    .metric-card.hero .metric-number {
+        font-size: clamp(2.25rem, 5vw, 3rem);
+    }
+
+    .image-panel {
+        min-height: 350px;
     }
 }
 
-@media (min-width: 1400px) {
-    .metrics-grid {
-        grid-template-columns: repeat(3, 1fr);
+/* ===== Responsive: Mobile (< 768px) ===== */
+@media (max-width: 767px) {
+    .dashboard-layout {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
     }
 
-    .metric-value span:first-child {
+    .status-strip {
+        flex-wrap: wrap;
+    }
+
+    .status-strip-content {
+        flex-direction: column;
+        gap: 0.125rem;
+    }
+
+    .status-strip-separator {
+        display: none;
+    }
+
+    .metric-card.hero .metric-number {
+        font-size: 2.5rem;
+    }
+
+    .metrics-sub-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.625rem;
+    }
+
+    .metric-card {
+        padding: 0.875rem;
+    }
+
+    .metric-number {
+        font-size: 1.75rem;
+    }
+
+    .image-panel {
+        min-height: 280px;
+    }
+
+    .image-panel-inner.multi-image {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== Responsive: Small mobile ===== */
+@media (max-width: 380px) {
+    .status-strip-icon {
+        width: 28px;
+        height: 28px;
+    }
+
+    .metrics-sub-grid {
+        gap: 0.5rem;
+    }
+
+    .metric-card {
+        padding: 0.75rem;
+    }
+}
+
+/* ===== Large Desktop (>= 1400px) ===== */
+@media (min-width: 1400px) {
+    .metric-card.hero .metric-number {
+        font-size: 5rem;
+    }
+
+    .metric-number {
         font-size: 3.5rem;
+    }
+
+    .metric-label {
+        font-size: 0.9rem;
+    }
+
+    .metric-unit {
+        font-size: 1.35rem;
     }
 }

@@ -1,8 +1,0 @@
-MessagePack C++ 6.1.1 ARM64 Build
-Build Date: Thu Sep 25 20:25:35 UTC 2025
-Architecture: aarch64
-Target CPU: Cortex-A76 (Raspberry Pi 5)
-Optimizations: -O3 -flto -march=armv8.2-a+crc+crypto
-Debian Version: bookworm
-Type: Header-only library
-9eb146d57a4bbd31bba0100b879aaa4a  /msgpack-cxx-6.1.1-arm64.tar.gz

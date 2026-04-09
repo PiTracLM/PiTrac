@@ -462,8 +462,7 @@ namespace golf_sim {
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2Calibrate ||
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1BallLocation ||
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2BallLocation ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1TestStandalone ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2TestStandalone) {
+            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1TestStandalone) {
 
             if (kCamera1CalibrationDistanceToBall > 0.01) {
                 if (GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera1) {
@@ -1690,11 +1689,11 @@ namespace golf_sim {
 
                     double ball_distance = current_ball.PixelDistanceFromBall(b);
                     
-                    // For ONNX balls, use position-based quality instead of HoughCircles quality ranking
+                    // NCNN detections lack HoughCircles quality scores, so use spatial ordering as a proxy
                     int quality_difference;
-                    if (b.ball_color_ == GolfBall::BallColor::kONNXDetected && 
-                        current_ball.ball_color_ == GolfBall::BallColor::kONNXDetected) {
-                        // For ONNX balls, all have high confidence - use position difference as quality proxy
+                    if (b.ball_color_ == GolfBall::BallColor::kModelDetected &&
+                        current_ball.ball_color_ == GolfBall::BallColor::kModelDetected) {
+
                         quality_difference = std::abs(i - (int)outer_index); // Position difference in sorted list
                     } else {
                         // Legacy HoughCircles quality ranking
@@ -2056,9 +2055,8 @@ namespace golf_sim {
             for (int i = (int)initial_balls.size() - 1; i >= 0; i--) {
                 GolfBall& b = initial_balls[i];
 
-                // Skip color analysis for ONNX-detected balls
-                if (b.ball_color_ == GolfBall::BallColor::kONNXDetected) {
-                    GS_LOG_TRACE_MSG(trace, "Skipping color analysis for ONNX-detected ball " + std::to_string(i));
+                if (b.ball_color_ == GolfBall::BallColor::kModelDetected) {
+                    GS_LOG_TRACE_MSG(trace, "Skipping color analysis for model-detected ball " + std::to_string(i));
                     continue;
                 }
 
@@ -2295,22 +2293,20 @@ namespace golf_sim {
 
             double max_color_difference = (GolfSimClubs::GetCurrentClubType() == GolfSimClubs::kPutter) ? kMaxPuttingBallColorDifferenceRelaxed : kMaxStrobedBallColorDifferenceRelaxed;
             
-            // *** ONNX PHYSICS CALCULATION - Essential distance/angle calculations for ONNX balls ***
+            // Model-detected balls skip the normal pipeline, so compute spatial data explicitly
             for (auto& ball : initial_balls) {
-                if (ball.ball_color_ == GolfBall::BallColor::kONNXDetected) {
-                    GS_LOG_TRACE_MSG(trace, "Adding physics calculations for ONNX ball at (" + 
+                if (ball.ball_color_ == GolfBall::BallColor::kModelDetected) {
+                    GS_LOG_TRACE_MSG(trace, "Computing spatial data for model-detected ball at (" +
                                    std::to_string(ball.x()) + "," + std::to_string(ball.y()) + ")");
-                    
-                    // 1. Compute essential distance/angle/calibration data
+
                     if (!ComputeSingleBallXYZOrthoCamPerspective(*this, ball)) {
-                        GS_LOG_MSG(warning, "Failed to compute spatial physics for ONNX ball - continuing anyway");
+                        GS_LOG_MSG(warning, "Failed to compute spatial physics for model-detected ball - continuing anyway");
                     }
-                    
-                    // 2. Get color information for display/logging (avgC, stdC fields)
+
                     GetBallColorInformation(strobed_balls_color_image, ball);
-                    
-                    GS_LOG_TRACE_MSG(trace, "ONNX ball physics complete: DistFromLens=" + 
-                                   std::to_string(ball.distance_to_z_plane_from_lens_) + "m, CalFocLen=" + 
+
+                    GS_LOG_TRACE_MSG(trace, "Model-detected ball physics complete: DistFromLens=" +
+                                   std::to_string(ball.distance_to_z_plane_from_lens_) + "m, CalFocLen=" +
                                    std::to_string(ball.calibrated_focal_length_));
                 }
             }
@@ -4293,40 +4289,9 @@ namespace golf_sim {
                 return true;
             }
 
-            // We are taking a picture with the camera that is (presumably) controlled from
-            // the Pi2/Camera2 executable (at least until we can work with a single Pi))
-
-            // Let the second camera know to be ready for a ball hit
-            GolfSimIPCMessage ipc_message(GolfSimIPCMessage::IPCMessageType::kRequestForCamera2Image);
-            GolfSimIpcSystem::SendIpcMessage(ipc_message);
-
-            // Give the camera2 system a moment to set up
-            sleep(1);
-
-            if (!PulseStrobe::SendCameraPrimingPulses(true)) {
-                GS_LOG_MSG(error, "FAILED to PulseStrobe::SendCameraPrimingPulses");
-                return false;
-            }
-
-            // Give the camera2 system another moment
-            sleep(1);
-
-            PulseStrobe::SendExternalTrigger();
-
-            // At this point, the camera2 system should take a image and return it via IPC
-            // We will give the IPC system to receive and process this image
-            // TBD - Figure a better way than just waiting for a long time.
-            GS_LOG_TRACE_MSG(trace, "Waiting to receive one strobed picture from camera2 system.");
-            sleep(6);
-
-            // Get the image that the IPC system should have saved
-            {
-                std::lock_guard<std::mutex> lock(GolfSimIpcSystem::last_received_image_mutex_);
-                color_image = GolfSimIpcSystem::last_received_image_.clone();
-            }
-
-            if (color_image.empty()) {
-                GS_LOG_MSG(error, "FAILED to find an image from the IPC system.");
+            // Take a still picture with Camera2 directly (single-process mode)
+            if (!WaitForCam2Trigger(color_image)) {
+                GS_LOG_MSG(error, "FAILED to WaitForCam2Trigger for still picture.");
                 return false;
             }
 #else

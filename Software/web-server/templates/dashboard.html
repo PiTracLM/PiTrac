@@ -7,83 +7,62 @@
 {% endblock %}
 
 {% block content %}
-<div class="ball-ready-indicator" id="ball-ready-indicator">
-    <div class="ball-status-icon" id="ball-status-icon">
-        <div class="ball-icon"></div>
-    </div>
-    <div class="ball-status-text">
-        <div class="ball-status-title" id="ball-status-title">System Status</div>
-        <div class="ball-status-message" id="ball-status-message">Initializing...</div>
-    </div>
-</div>
+<div class="dashboard-layout">
 
-<div class="metrics-grid">
-    <div class="metric-card">
-        <div class="metric-header">Ball Speed</div>
-        <div class="metric-value">
-            <span id="speed">{{ shot.speed }}</span>
-            <span class="metric-unit">mph</span>
+    <!-- Status Strip -->
+    <div class="status-strip" id="status-strip">
+        <div class="status-strip-icon">
+            <div class="ball-icon"></div>
+        </div>
+        <div class="status-strip-content">
+            <span class="status-strip-title" id="status-strip-title">System Status</span>
+            <span class="status-strip-separator">&mdash;</span>
+            <span class="status-strip-message" id="status-strip-message">Initializing...</span>
+        </div>
+        <div class="status-strip-actions">
+            <button class="btn-reset" id="btn-reset" onclick="resetShot()" style="display: none;">Reset</button>
         </div>
     </div>
 
-    <div class="metric-card">
-        <div class="metric-header">Carry Distance</div>
-        <div class="metric-value">
-            <span id="carry">{{ shot.carry }}</span>
-            <span class="metric-unit">yds</span>
+    <!-- Left Column: Metrics Panel -->
+    <div class="metrics-panel" id="metrics-panel">
+        <!-- Hero Card: Ball Speed -->
+        <div class="metric-card hero">
+            <div class="metric-label">Ball Speed</div>
+            <div class="metric-number" id="speed">{{ shot.speed }}<span class="metric-unit">mph</span></div>
+        </div>
+
+        <!-- 2x2 Sub-Grid -->
+        <div class="metrics-sub-grid">
+            <div class="metric-card">
+                <div class="metric-label">Launch Angle</div>
+                <div class="metric-number" id="launch_angle">{{ shot.launch_angle }}<span class="metric-unit">&deg;</span></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Side Angle</div>
+                <div class="metric-number" id="side_angle">{{ shot.side_angle }}<span class="metric-unit">&deg;</span></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Back Spin</div>
+                <div class="metric-number" id="back_spin">{{ shot.back_spin }}<span class="metric-unit">rpm</span></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Side Spin</div>
+                <div class="metric-number" id="side_spin">{{ shot.side_spin }}<span class="metric-unit">rpm</span></div>
+            </div>
         </div>
     </div>
 
-    <div class="metric-card">
-        <div class="metric-header">Launch Angle</div>
-        <div class="metric-value">
-            <span id="launch_angle">{{ shot.launch_angle }}</span>
-            <span class="metric-unit">°</span>
+    <!-- Right Column: Image Panel -->
+    <div class="image-panel">
+        <div class="image-panel-inner" id="image-panel-inner">
+            <div class="image-empty-state">
+                <div class="empty-icon"></div>
+                <div class="empty-text">Hit a shot to see the image here</div>
+            </div>
         </div>
     </div>
 
-    <div class="metric-card">
-        <div class="metric-header">Side Angle</div>
-        <div class="metric-value">
-            <span id="side_angle">{{ shot.side_angle }}</span>
-            <span class="metric-unit">°</span>
-        </div>
-    </div>
-
-    <div class="metric-card">
-        <div class="metric-header">Back Spin</div>
-        <div class="metric-value">
-            <span id="back_spin">{{ shot.back_spin }}</span>
-            <span class="metric-unit">rpm</span>
-        </div>
-    </div>
-
-    <div class="metric-card">
-        <div class="metric-header">Side Spin</div>
-        <div class="metric-value">
-            <span id="side_spin">{{ shot.side_spin }}</span>
-            <span class="metric-unit">rpm</span>
-        </div>
-    </div>
-</div>
-
-<!-- <div class="message-section">
-    <div class="result-type" id="result_type">{{ shot.result_type }}</div>
-    <div class="message" id="message">{{ shot.message }}</div>
-</div> -->
-
-<div class="image-gallery">
-    <h2>Shot Images</h2>
-    <div class="image-grid" id="image-grid">
-        {% for image in shot.images %}
-        <img src="/images/{{ image }}" alt="Shot {{ loop.index }}" class="shot-image" loading="lazy">
-        {% endfor %}
-    </div>
-</div>
-
-<div class="controls">
-    <button class="btn btn-primary" onclick="resetShot()">Reset</button>
-    <button class="btn btn-secondary" onclick="location.reload()">Refresh</button>
 </div>
 {% endblock %}
 

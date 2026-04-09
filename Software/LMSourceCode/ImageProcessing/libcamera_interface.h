@@ -47,7 +47,6 @@ namespace golf_sim {
 		};
 
 		static cv::Mat undistort_camera_image(const cv::Mat& img, const GolfSimCamera& camera);
-		static bool SendCamera2PreImage(const cv::Mat& raw_image);
 
 		static uint kMaxWatchingCropWidth;
 		static uint kMaxWatchingCropHeight;

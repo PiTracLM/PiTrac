@@ -32,7 +32,7 @@
       "kUsePreImageSubtraction": "0"
     },
     "ball_identification": {
-      "kBallPlacementDetectionMethod": "legacy",
+      "kBallPlacementDetectionMethod": "experimental",
       "kBestCircleCannyLower": "55",
       "kBestCircleCannyUpper": "110",
       "kBestCircleHoughDpParam1": "1.5",
@@ -45,17 +45,13 @@
       "kCLAHEClipLimit": "8",
       "kCLAHETilesGridSize": "6",
       "kStrobedBallDetectionMethod": "experimental",
-      "kInferenceBackend": "onnxruntime",
       "kNumberRadiiToAverageForDynamicAdjustment": "2",
-      "kONNXConfidenceThreshold": "0.5",
-      "kONNXDeviceType": "CPU",
-      "kONNXInputSize": "1472",
-      "kONNXModelPath": "../ml_models/pitrac-ball-detection-09-25-25/weights/best.onnx",
-      "kONNXNMSThreshold": "0.4",
-      "kONNXRuntimeAutoFallback": "1",
-      "kONNXRuntimeMemoryPoolMB": "64",
-      "kONNXRuntimeThreads": "4",
-      "kONNXRuntimeUseNEON": "1",
+      "kModelConfidenceThreshold": "0.5",
+      "kModelInputWidth": "736",
+      "kModelInputHeight": "544",
+      "kModelPath": "../ml_models/yolo26-ball-detector",
+      "kModelNMSThreshold": "0.4",
+      "kInferenceThreads": "4",
       "kPlacedBallCannyLower": "35",
       "kPlacedBallCannyUpper": "80",
       "kPlacedBallCurrentParam1": "130",
@@ -83,9 +79,6 @@
       "kPuttingMaxHoughReturnCircles": "25",
       "kPuttingMinHoughReturnCircles": "6",
       "kPuttingPreHoughBlurSize": "9",
-      "kSAHIOverlapRatio": "0.2",
-      "kSAHISliceHeight": "320",
-      "kSAHISliceWidth": "320",
       "kStrobedBallsAltCannyLower": "35",
       "kStrobedBallsAltCannyUpper": "70",
       "kStrobedBallsAltCurrentParam1": "130",
@@ -393,6 +386,7 @@
       "kBallRadiusMeters": "0.021335"
     },
     "spin_analysis": {
+      "kCoarseSearchResolution": "90",
       "kCoarseXRotationDegreesEnd": "36",
       "kCoarseXRotationDegreesIncrement": "4",
       "kCoarseXRotationDegreesStart": "-36",
@@ -403,7 +397,10 @@
       "kCoarseZRotationDegreesIncrement": "4",
       "kCoarseZRotationDegreesStart": "-10",
       "kGaborMaxWhitePercent": "45",
-      "kGaborMinWhitePercent": "39"
+      "kGaborMinWhitePercent": "39",
+      "kSpinDetectionMethod": "ml",
+      "kSpinModelPath": "/etc/pitrac/models/spin-predictor",
+      "kSpinMLZFallbackThreshold": "60.0"
     },
     "strobing": {
       "kBaudRateForFastPulses": "115200",

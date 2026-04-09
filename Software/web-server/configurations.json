@@ -16,8 +16,6 @@
     }
   },
   "systemDefaults": {
-    "mode": "single",
-    "cameraRole": "camera1",
     "configStructure": {
       "systemKey": "system",
       "camerasKey": "cameras"
@@ -74,8 +72,8 @@
       "description": "File patterns to match when searching for models",
       "type": "array",
       "default": [
-        "best.onnx",
-        "weights/best.onnx"
+        "best.ncnn.param",
+        "weights/best.ncnn.param"
       ],
       "internal": true
     }
@@ -88,46 +86,11 @@
       "default": "pitrac.log",
       "internal": true
     },
-    "camera2LogFile": {
-      "displayName": "Camera 2 Log File",
-      "description": "Log file for camera 2 process",
-      "type": "string",
-      "default": "pitrac_camera2.log",
-      "internal": true
-    },
-    "camera1PidFile": {
-      "displayName": "Camera 1 PID File",
-      "description": "Process ID file for camera 1",
-      "type": "string",
-      "default": "pitrac.pid",
-      "internal": true
-    },
-    "camera2PidFile": {
-      "displayName": "Camera 2 PID File",
-      "description": "Process ID file for camera 2",
-      "type": "string",
-      "default": "pitrac_camera2.pid",
-      "internal": true
-    },
     "processCheckCommand": {
       "displayName": "Process Check Command",
       "description": "Command pattern to validate process",
       "type": "string",
       "default": "pitrac_lm",
-      "internal": true
-    },
-    "startupDelayCamera2": {
-      "displayName": "Camera 2 Startup Delay",
-      "description": "Seconds to wait after starting camera 2",
-      "type": "number",
-      "default": 2,
-      "internal": true
-    },
-    "startupWaitCamera2Ready": {
-      "displayName": "Camera 2 Ready Wait",
-      "description": "Seconds to wait for camera 2 to be ready",
-      "type": "number",
-      "default": 1,
       "internal": true
     },
     "startupDelayCamera1": {
@@ -215,13 +178,6 @@
       "type": "string",
       "default": "~/LM_Shares/WebShare/",
       "internal": true
-    },
-    "msgBrokerFullAddress": {
-      "displayName": "Message Broker Address",
-      "description": "Legacy environment variable for backward compatibility",
-      "type": "string",
-      "default": "tcp://localhost:61616",
-      "internal": true
     }
   },
   "validationRules": {
@@ -261,8 +217,7 @@
         "cameras.slot2.lens",
         "gs_config.cameras.kCamera2Gain"
       ],
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kConnectionBoardVersion": {
       "category": "System",
@@ -278,8 +233,7 @@
       },
       "default": "3",
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kDAC_setting": {
       "category": "Strobing",
@@ -305,8 +259,7 @@
       },
       "default": "2",
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "system.camera_role": {
       "category": "System",
@@ -323,8 +276,7 @@
       "visibleWhen": {
         "system.mode": "dual"
       },
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.modes.kStartInPuttingMode": {
       "category": "System",
@@ -335,8 +287,7 @@
       "type": "boolean",
       "default": false,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.player.kGolferOrientation": {
       "category": "System",
@@ -352,7 +303,6 @@
       "default": "right_handed",
       "requiresRestart": true,
       "passedVia": "cli",
-      "passedTo": "both",
       "cliArgument": "--golfer_orientation"
     },
     "gs_config.player.kUsePracticeBalls": {
@@ -365,7 +315,6 @@
       "default": false,
       "requiresRestart": true,
       "passedVia": "cli",
-      "passedTo": "both",
       "cliArgument": "--practice_ball"
     },
     "cameras.slot1.type": {
@@ -385,7 +334,6 @@
       "default": "5",
       "requiresRestart": true,
       "passedVia": "environment",
-      "passedTo": "camera1",
       "envVariable": "PITRAC_SLOT1_CAMERA_TYPE"
     },
     "cameras.slot1.lens": {
@@ -402,7 +350,6 @@
       "default": "1",
       "requiresRestart": true,
       "passedVia": "environment",
-      "passedTo": "camera1",
       "envVariable": "PITRAC_SLOT1_LENS_TYPE"
     },
     "cameras.kSlot1CustomLensFocalLength": {
@@ -412,7 +359,6 @@
       "description": "Focal length when using custom lens in Slot 1 (mm)",
       "ui_name": "Custom Lens Focal Length Slot 1",
       "passedVia": "json",
-      "passedTo": "both",
       "requiresRestart": true
     },
     "cameras.slot1.orientation": {
@@ -428,7 +374,6 @@
       "default": "1",
       "requiresRestart": true,
       "passedVia": "environment",
-      "passedTo": "camera1",
       "envVariable": "PITRAC_SLOT1_CAMERA_ORIENTATION"
     },
     "cameras.slot2.type": {
@@ -451,7 +396,6 @@
       "default": "5",
       "requiresRestart": true,
       "passedVia": "environment",
-      "passedTo": "camera2",
       "envVariable": "PITRAC_SLOT2_CAMERA_TYPE"
     },
     "cameras.slot2.lens": {
@@ -471,7 +415,6 @@
       "default": "1",
       "requiresRestart": true,
       "passedVia": "environment",
-      "passedTo": "camera2",
       "envVariable": "PITRAC_SLOT2_LENS_TYPE"
     },
     "cameras.kSlot2CustomLensFocalLength": {
@@ -481,7 +424,6 @@
       "description": "Focal length when using custom lens in Slot 2 (mm)",
       "ui_name": "Custom Lens Focal Length Slot 2",
       "passedVia": "json",
-      "passedTo": "both",
       "requiresRestart": true
     },
     "cameras.slot2.orientation": {
@@ -497,7 +439,6 @@
       "default": "1",
       "requiresRestart": true,
       "passedVia": "environment",
-      "passedTo": "camera2",
       "envVariable": "PITRAC_SLOT2_CAMERA_ORIENTATION"
     },
     "logging.level": {
@@ -517,7 +458,6 @@
       "default": "info",
       "requiresRestart": true,
       "passedVia": "cli",
-      "passedTo": "both",
       "cliArgument": "--logging_level"
     },
     "gs_config.logging.kArtifactSaveLevel": {
@@ -535,7 +475,6 @@
       "default": "final_results_only",
       "requiresRestart": true,
       "passedVia": "cli",
-      "passedTo": "both",
       "cliArgument": "--artifact_save_level"
     },
     "gs_config.debug.kShowDebugImages": {
@@ -547,7 +486,6 @@
       "default": false,
       "requiresRestart": true,
       "passedVia": "cli",
-      "passedTo": "both",
       "cliArgument": "--show_images"
     },
     "gs_config.debug.kWaitForKeyOnImages": {
@@ -559,7 +497,6 @@
       "default": false,
       "requiresRestart": true,
       "passedVia": "cli",
-      "passedTo": "both",
       "cliArgument": "--wait_keys"
     },
     "gs_config.ball_identification.kStrobedBallDetectionMethod": {
@@ -570,14 +507,12 @@
       "description": "Algorithm for detecting strobed balls in flight",
       "type": "select",
       "options": {
-        "legacy": "HoughCircles (Most Stable)",
-        "experimental": "YOLO Neural Network (Fast)",
-        "experimental_sahi": "YOLO + SAHI Slicing (Most Accurate)"
+        "legacy": "HoughCircles (Legacy)",
+        "experimental": "YOLO Neural Network"
       },
       "default": "experimental",
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kBallPlacementDetectionMethod": {
       "category": "Ball Detection",
@@ -592,21 +527,19 @@
       },
       "default": "experimental",
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
-    "gs_config.ball_identification.kONNXModelPath": {
+    "gs_config.ball_identification.kModelPath": {
       "category": "AI Detection",
       "subcategory": "basic",
       "basicSubcategory": "Detection Methods",
       "displayName": "AI Model",
-      "description": "Select YOLO model for AI-based ball detection",
+      "description": "Model directory \u2014 NCNN model files are loaded from this path",
       "type": "select",
       "options": {},
-      "default": "/etc/pitrac/models/pitrac-ball-detection-09-25-25/best.onnx",
+      "default": "/etc/pitrac/models/yolo26-ball-detector",
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kImageTypeToProcessWithYOLO": {
       "category": "Ball Detection",
@@ -621,8 +554,7 @@
       },
       "default": "0",
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera1Gain": {
       "category": "Cameras",
@@ -636,8 +568,7 @@
       "step": 0.1,
       "default": 6.0,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera2Gain": {
       "category": "Cameras",
@@ -654,8 +585,7 @@
       "step": 0.1,
       "default": 3.0,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera1Saturation": {
       "category": "Cameras",
@@ -669,8 +599,7 @@
       "step": 0.1,
       "default": 1.0,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera2Saturation": {
       "category": "Cameras",
@@ -684,8 +613,7 @@
       "step": 0.1,
       "default": 1.0,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera1SearchCenterX": {
       "category": "Cameras",
@@ -699,7 +627,6 @@
       "default": 850,
       "requiresRestart": true,
       "passedVia": "cli",
-      "passedTo": "camera1",
       "cliArgument": "--search_center_x"
     },
     "gs_config.cameras.kCamera1SearchCenterY": {
@@ -714,7 +641,6 @@
       "default": 500,
       "requiresRestart": true,
       "passedVia": "cli",
-      "passedTo": "camera1",
       "cliArgument": "--search_center_y"
     },
     "gs_config.cameras.kHLAOffset": {
@@ -729,8 +655,7 @@
       "step": 1.0,
       "default": 0.0,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kVLAOffset": {
       "category": "Cameras",
@@ -744,8 +669,7 @@
       "step": 1.0,
       "default": 0.0,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress": {
       "category": "Simulators",
@@ -753,11 +677,10 @@
       "basicSubcategory": "Simulators",
       "displayName": "E6 Connect Address",
       "description": "IP address of E6 Connect simulator",
-      "type": "text",
+      "type": "ip_address",
       "default": "",
       "requiresRestart": false,
       "passedVia": "cli",
-      "passedTo": "both",
       "cliArgument": "--e6_host_address"
     },
     "gs_config.golf_simulator_interfaces.E6.kE6ConnectPort": {
@@ -771,8 +694,7 @@
       "max": 65535,
       "default": 2483,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress": {
       "category": "Simulators",
@@ -784,7 +706,6 @@
       "default": "",
       "requiresRestart": false,
       "passedVia": "cli",
-      "passedTo": "both",
       "cliArgument": "--gspro_host_address"
     },
     "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectPort": {
@@ -798,8 +719,7 @@
       "max": 65535,
       "default": 921,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kUseCLAHEProcessing": {
       "category": "Ball Detection",
@@ -810,8 +730,7 @@
       "type": "boolean",
       "default": true,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kCLAHEClipLimit": {
       "category": "Ball Detection",
@@ -824,8 +743,7 @@
       "max": 40,
       "default": 8,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_position.kExpectedBallRadiusPixelsAt40cm": {
       "category": "Ball Detection",
@@ -838,8 +756,7 @@
       "max": 200,
       "default": 87,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kStandardBallSpeedSlowdownPercentage": {
       "category": "Strobing",
@@ -853,8 +770,7 @@
       "step": 0.1,
       "default": 0.1,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kPracticeBallSpeedSlowdownPercentage": {
       "category": "Strobing",
@@ -868,8 +784,7 @@
       "step": 0.1,
       "default": 4.0,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kPuttingBallSpeedSlowdownPercentage": {
       "category": "Strobing",
@@ -883,8 +798,7 @@
       "step": 0.1,
       "default": 5.2,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.number_bits_for_fast_on_pulse_": {
       "category": "Strobing",
@@ -896,8 +810,7 @@
       "max": 16,
       "default": 1,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.number_bits_for_slow_on_pulse_": {
       "category": "Strobing",
@@ -909,8 +822,7 @@
       "max": 16,
       "default": 1,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kPrimingPulseFPS": {
       "category": "Strobing",
@@ -922,8 +834,7 @@
       "max": 60,
       "default": 15,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.logging.kLogIntermediateExposureImagesToFile": {
       "category": "Logging",
@@ -934,8 +845,7 @@
       "type": "boolean",
       "default": false,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.logging.kLogIntermediateSpinImagesToFile": {
       "category": "Logging",
@@ -946,8 +856,7 @@
       "type": "boolean",
       "default": false,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.logging.kLogWebserverImagesToFile": {
       "category": "Logging",
@@ -958,8 +867,7 @@
       "type": "boolean",
       "default": true,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.logging.kLogDiagnosticImagesToUniqueFiles": {
       "category": "Logging",
@@ -970,8 +878,7 @@
       "type": "boolean",
       "default": true,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.logging.kLinuxBaseImageLoggingDir": {
       "category": "Storage",
@@ -983,8 +890,7 @@
       "default": "~/LM_Shares/Images/",
       "requiresRestart": false,
       "passedVia": "cli",
-      "cliArgument": "--base_image_logging_dir",
-      "passedTo": "both"
+      "cliArgument": "--base_image_logging_dir"
     },
     "gs_config.ipc_interface.kWebServerShareDirectory": {
       "category": "Network",
@@ -995,8 +901,7 @@
       "type": "path",
       "default": "~/LM_Shares/Images/",
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ipc_interface.kWebServerTomcatShareDirectory": {
       "category": "Network",
@@ -1007,21 +912,7 @@
       "type": "path",
       "default": "~/LM_Shares/WebShare",
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
-    },
-    "gs_config.ipc_interface.kWebActiveMQHostAddress": {
-      "category": "Network",
-      "subcategory": "basic",
-      "basicSubcategory": "Network",
-      "displayName": "ActiveMQ Broker Address",
-      "description": "ActiveMQ message broker address for dual camera mode",
-      "type": "text",
-      "default": "tcp://127.0.0.1:61616",
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "passedTo": "both",
-      "cliArgument": "--msg_broker_address"
+      "passedVia": "json"
     },
     "gs_config.ipc_interface.kRefreshTimeSeconds": {
       "category": "Network",
@@ -1034,8 +925,7 @@
       "max": 60,
       "default": 3,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.golf_simulator_interfaces.kSkipSpinCalculation": {
       "category": "Spin Analysis",
@@ -1046,8 +936,7 @@
       "type": "boolean",
       "default": false,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.golf_simulator_interfaces.kWriteSpinAnalysisCsvFiles": {
       "category": "Spin Analysis",
@@ -1058,13 +947,12 @@
       "type": "boolean",
       "default": true,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
-    "gs_config.ball_identification.kONNXConfidenceThreshold": {
+    "gs_config.ball_identification.kModelConfidenceThreshold": {
       "category": "AI Detection",
       "subcategory": "advanced",
-      "displayName": "ONNX Confidence Threshold",
+      "displayName": "Model Confidence Threshold",
       "description": "Minimum confidence for AI ball detection",
       "type": "number",
       "min": 0.1,
@@ -1072,13 +960,12 @@
       "step": 0.05,
       "default": 0.5,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
-    "gs_config.ball_identification.kONNXNMSThreshold": {
+    "gs_config.ball_identification.kModelNMSThreshold": {
       "category": "AI Detection",
       "subcategory": "advanced",
-      "displayName": "ONNX NMS Threshold",
+      "displayName": "Model NMS Threshold",
       "description": "Non-Maximum Suppression threshold for overlapping detections",
       "type": "number",
       "min": 0.1,
@@ -1086,144 +973,46 @@
       "step": 0.05,
       "default": 0.4,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
-    "gs_config.ball_identification.kONNXInputSize": {
+    "gs_config.ball_identification.kModelInputWidth": {
       "category": "AI Detection",
       "subcategory": "advanced",
-      "displayName": "ONNX Input Size",
-      "description": "Neural network input image size",
+      "displayName": "Model Input Width",
+      "description": "Neural network input width in pixels (must match exported model, multiple of 32)",
       "type": "number",
       "min": 320,
       "max": 2048,
       "step": 32,
-      "default": 1472,
-      "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
-    },
-    "gs_config.ball_identification.kSAHISliceHeight": {
-      "category": "AI Detection",
-      "subcategory": "advanced",
-      "displayName": "SAHI Slice Height",
-      "description": "Height of slices for SAHI (Slicing Aided Hyper Inference)",
-      "type": "number",
-      "min": 160,
-      "max": 1024,
-      "step": 32,
-      "default": 320,
-      "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
-    },
-    "gs_config.ball_identification.kSAHISliceWidth": {
-      "category": "AI Detection",
-      "subcategory": "advanced",
-      "displayName": "SAHI Slice Width",
-      "description": "Width of slices for SAHI (Slicing Aided Hyper Inference)",
-      "type": "number",
-      "min": 160,
-      "max": 1024,
-      "step": 32,
-      "default": 320,
-      "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
-    },
-    "gs_config.ball_identification.kSAHIOverlapRatio": {
-      "category": "AI Detection",
-      "subcategory": "advanced",
-      "displayName": "SAHI Overlap Ratio",
-      "description": "Overlap ratio between SAHI slices",
-      "type": "number",
-      "min": 0.0,
-      "max": 0.5,
-      "step": 0.05,
-      "default": 0.2,
-      "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
-    },
-    "gs_config.ball_identification.kInferenceBackend": {
-      "category": "AI Detection",
-      "subcategory": "advanced",
-      "displayName": "Inference Backend",
-      "description": "Neural network inference backend for YOLO model",
-      "type": "select",
-      "options": {
-        "onnxruntime": "ONNX Runtime (Faster)",
-        "opencv_dnn": "OpenCV DNN (Fallback)"
-      },
-      "default": "onnxruntime",
+      "default": 736,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
-    "gs_config.ball_identification.kONNXRuntimeAutoFallback": {
+    "gs_config.ball_identification.kModelInputHeight": {
       "category": "AI Detection",
       "subcategory": "advanced",
-      "displayName": "Auto Fallback to OpenCV",
-      "description": "Automatically fallback to OpenCV DNN if ONNX Runtime fails",
-      "type": "boolean",
-      "default": true,
-      "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "displayName": "Model Input Height",
+      "description": "Neural network input height in pixels (must match exported model, multiple of 32)",
+      "type": "number",
+      "min": 320,
+      "max": 2048,
+      "step": 32,
+      "default": 544,
+      "requiresRestart": true,
+      "passedVia": "json"
     },
-    "gs_config.ball_identification.kONNXRuntimeThreads": {
+    "gs_config.ball_identification.kInferenceThreads": {
       "category": "AI Detection",
       "subcategory": "advanced",
-      "displayName": "ONNX Runtime Threads",
-      "description": "Number of threads for ONNX Runtime inference (0 = auto)",
+      "displayName": "Inference Threads",
+      "description": "Number of threads for inference (0 = auto)",
       "type": "number",
       "min": 0,
       "max": 8,
       "step": 1,
       "default": 4,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
-    },
-    "gs_config.ball_identification.kONNXRuntimeMemoryPoolMB": {
-      "category": "AI Detection",
-      "subcategory": "advanced",
-      "displayName": "ONNX Memory Pool (MB)",
-      "description": "Memory pool size for ONNX Runtime (reduces allocation overhead)",
-      "type": "number",
-      "min": 32,
-      "max": 256,
-      "step": 32,
-      "default": 64,
-      "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
-    },
-    "gs_config.ball_identification.kONNXRuntimeUseNEON": {
-      "category": "AI Detection",
-      "subcategory": "advanced",
-      "displayName": "Use NEON Optimization",
-      "description": "Enable ARM NEON SIMD optimizations for preprocessing",
-      "type": "boolean",
-      "default": true,
-      "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
-    },
-    "gs_config.ball_identification.kONNXDeviceType": {
-      "category": "AI Detection",
-      "subcategory": "advanced",
-      "displayName": "ONNX Device Type",
-      "description": "Device type for ONNX inference (CPU/GPU)",
-      "type": "select",
-      "options": {
-        "CPU": "CPU",
-        "GPU": "GPU (if available)"
-      },
-      "default": "CPU",
-      "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsCannyLower": {
       "category": "Ball Detection",
@@ -1235,8 +1024,7 @@
       "max": 255,
       "default": 33,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsCannyUpper": {
       "category": "Ball Detection",
@@ -1248,8 +1036,7 @@
       "max": 255,
       "default": 90,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kCLAHETilesGridSize": {
       "category": "Ball Detection",
@@ -1261,18 +1048,16 @@
       "max": 16,
       "default": 6,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "cli.system_mode": {
       "category": "System",
       "subcategory": "advanced",
       "displayName": "CLI System Mode",
-      "description": "System mode passed via command line (camera1, camera2, test modes)",
+      "description": "System mode passed via command line",
       "type": "select",
       "options": {
-        "camera1": "Camera 1 Mode",
-        "camera2": "Camera 2 Mode",
+        "camera1": "Normal Mode",
         "test_gspro_server": "Test GSPro Server",
         "test_images": "Test Images",
         "test_spin": "Test Spin"
@@ -1280,7 +1065,6 @@
       "default": "camera1",
       "requiresRestart": true,
       "passedVia": "cli",
-      "passedTo": "both",
       "cliArgument": "--system_mode",
       "internal": true
     },
@@ -1293,7 +1077,6 @@
       "default": false,
       "requiresRestart": true,
       "passedVia": "cli",
-      "passedTo": "camera1",
       "cliArgument": "--run_single_pi",
       "internal": true
     },
@@ -1308,8 +1091,7 @@
       "step": 0.1,
       "default": 15.0,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera1Contrast": {
       "category": "Cameras",
@@ -1322,8 +1104,7 @@
       "step": 0.1,
       "default": 1.0,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera2Contrast": {
       "category": "Cameras",
@@ -1336,8 +1117,7 @@
       "step": 0.1,
       "default": 1.2,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera2ComparisonGain": {
       "category": "Cameras",
@@ -1350,8 +1130,7 @@
       "step": 0.1,
       "default": 0.8,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera2CalibrateOrLocationGain": {
       "category": "Cameras",
@@ -1364,8 +1143,7 @@
       "step": 0.1,
       "default": 1.0,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera2PuttingGain": {
       "category": "Cameras",
@@ -1378,8 +1156,7 @@
       "step": 0.1,
       "default": 4.0,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera2PuttingContrast": {
       "category": "Cameras",
@@ -1392,8 +1169,7 @@
       "step": 0.1,
       "default": 1.2,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera1StillShutterTimeuS": {
       "category": "Cameras",
@@ -1405,8 +1181,7 @@
       "max": 100000,
       "default": 40000,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera2StillShutterTimeuS": {
       "category": "Cameras",
@@ -1418,8 +1193,7 @@
       "max": 100000,
       "default": 15000,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.physical_constants.kBallRadiusMeters": {
       "category": "System",
@@ -1433,8 +1207,7 @@
       "default": 0.021335,
       "requiresRestart": false,
       "internal": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_position.kMinMovedBallRadiusRatio": {
       "category": "Ball Detection",
@@ -1447,8 +1220,7 @@
       "step": 0.05,
       "default": 0.6,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_position.kMaxMovedBallRadiusRatio": {
       "category": "Ball Detection",
@@ -1461,8 +1233,7 @@
       "step": 0.05,
       "default": 1.5,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_position.kMinRadiusRatio": {
       "category": "Ball Detection",
@@ -1475,8 +1246,7 @@
       "step": 0.05,
       "default": 0.8,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_position.kMaxRadiusRatio": {
       "category": "Ball Detection",
@@ -1489,8 +1259,7 @@
       "step": 0.05,
       "default": 1.7,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_position.kMinRadiusOffset": {
       "category": "Ball Detection",
@@ -1502,8 +1271,7 @@
       "max": 50,
       "default": 20,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_position.kMaxRadiusOffset": {
       "category": "Ball Detection",
@@ -1515,8 +1283,7 @@
       "max": 50,
       "default": 20,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_position.kTeedBallSearchAreaMaskRadiusRatio": {
       "category": "Ball Detection",
@@ -1529,8 +1296,7 @@
       "step": 0.1,
       "default": 0.0,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_position.kMinBallRadiusPixelsForProximityWarning": {
       "category": "Ball Detection",
@@ -1542,8 +1308,7 @@
       "max": 300,
       "default": 160,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kBaudRateForFastPulses": {
       "category": "Strobing",
@@ -1555,8 +1320,7 @@
       "max": 921600,
       "default": 115200,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kBaudRateForSlowPulses": {
       "category": "Strobing",
@@ -1568,8 +1332,7 @@
       "max": 921600,
       "default": 115200,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kBaudRatePulseMultiplier": {
       "category": "Strobing",
@@ -1582,8 +1345,7 @@
       "step": 0.1,
       "default": 1.0,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kCam2SetupPeriodMilliseconds": {
       "category": "Strobing",
@@ -1595,8 +1357,7 @@
       "max": 5000,
       "default": 2000,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kNumberPrimingPulses": {
       "category": "Strobing",
@@ -1608,8 +1369,7 @@
       "max": 30,
       "default": 12,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kPuttingStrobeDelayMs": {
       "category": "Strobing",
@@ -1621,8 +1381,7 @@
       "max": 200,
       "default": 50,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kPauseBeforeReadyForFinalPrimingPulseMs": {
       "category": "Strobing",
@@ -1634,8 +1393,7 @@
       "max": 1000,
       "default": 400,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kPauseBeforeSendingPreImageTriggerMs": {
       "category": "Strobing",
@@ -1647,8 +1405,7 @@
       "max": 1000,
       "default": 300,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kPauseAfterSendingPreImageTriggerMs": {
       "category": "Strobing",
@@ -1660,8 +1417,7 @@
       "max": 5000,
       "default": 2000,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kPauseBeforeSendingImageFlushMs": {
       "category": "Strobing",
@@ -1673,8 +1429,7 @@
       "max": 1000,
       "default": 300,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kPauseBeforeSendingFinalImageTriggerMs": {
       "category": "Strobing",
@@ -1686,8 +1441,7 @@
       "max": 5000,
       "default": 2000,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kPauseToSetUpInnoMakerExternalTriggerMilliseconds": {
       "category": "Strobing",
@@ -1699,8 +1453,7 @@
       "max": 2000,
       "default": 500,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.image_capture.kMaxWatchingCropWidth": {
       "category": "Cameras",
@@ -1712,8 +1465,7 @@
       "max": 256,
       "default": 96,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.image_capture.kMaxWatchingCropHeight": {
       "category": "Cameras",
@@ -1725,8 +1477,34 @@
       "max": 256,
       "default": 88,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
+    },
+    "gs_config.spin_analysis.kSpinDetectionMethod": {
+      "category": "Spin Analysis",
+      "subcategory": "basic",
+      "basicSubcategory": "Detection Methods",
+      "displayName": "Spin Detection Method",
+      "description": "Algorithm for calculating ball spin",
+      "type": "select",
+      "options": {
+        "ml": "ML Prediction (NCNN)",
+        "legacy": "Rotation Search (Legacy)"
+      },
+      "default": "ml",
+      "requiresRestart": true,
+      "passedVia": "json"
+    },
+    "gs_config.spin_analysis.kCoarseSearchResolution": {
+      "category": "Spin Analysis",
+      "subcategory": "advanced",
+      "displayName": "Coarse Search Resolution",
+      "description": "Resolution (pixels) for downsampled dimple images during coarse spin search. Lower is faster, higher preserves more detail.",
+      "type": "number",
+      "min": 45,
+      "max": 120,
+      "default": 90,
+      "requiresRestart": false,
+      "passedVia": "json"
     },
     "gs_config.spin_analysis.kGaborMaxWhitePercent": {
       "category": "Spin Analysis",
@@ -1738,8 +1516,7 @@
       "max": 60,
       "default": 45,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.spin_analysis.kGaborMinWhitePercent": {
       "category": "Spin Analysis",
@@ -1751,8 +1528,7 @@
       "max": 50,
       "default": 39,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.spin_analysis.kCoarseXRotationDegreesIncrement": {
       "category": "Spin Analysis",
@@ -1764,8 +1540,7 @@
       "max": 10,
       "default": 4,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.spin_analysis.kCoarseXRotationDegreesStart": {
       "category": "Spin Analysis",
@@ -1777,8 +1552,7 @@
       "max": 0,
       "default": -36,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.spin_analysis.kCoarseXRotationDegreesEnd": {
       "category": "Spin Analysis",
@@ -1790,8 +1564,7 @@
       "max": 90,
       "default": 36,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.spin_analysis.kCoarseYRotationDegreesIncrement": {
       "category": "Spin Analysis",
@@ -1803,8 +1576,7 @@
       "max": 10,
       "default": 5,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.spin_analysis.kCoarseYRotationDegreesStart": {
       "category": "Spin Analysis",
@@ -1816,8 +1588,7 @@
       "max": 0,
       "default": -15,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.spin_analysis.kCoarseYRotationDegreesEnd": {
       "category": "Spin Analysis",
@@ -1829,8 +1600,7 @@
       "max": 45,
       "default": 15,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.spin_analysis.kCoarseZRotationDegreesIncrement": {
       "category": "Spin Analysis",
@@ -1842,8 +1612,7 @@
       "max": 10,
       "default": 4,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.spin_analysis.kCoarseZRotationDegreesStart": {
       "category": "Spin Analysis",
@@ -1855,8 +1624,7 @@
       "max": 0,
       "default": -10,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.spin_analysis.kCoarseZRotationDegreesEnd": {
       "category": "Spin Analysis",
@@ -1868,8 +1636,30 @@
       "max": 180,
       "default": 110,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
+    },
+    "gs_config.spin_analysis.kSpinModelPath": {
+      "category": "Spin Analysis",
+      "subcategory": "advanced",
+      "displayName": "Spin Prediction Model",
+      "description": "Path to the NCNN spin prediction model directory",
+      "type": "select",
+      "options": {},
+      "default": "/etc/pitrac/models/spin-predictor",
+      "requiresRestart": true,
+      "passedVia": "json"
+    },
+    "gs_config.spin_analysis.kSpinMLZFallbackThreshold": {
+      "category": "Spin Analysis",
+      "subcategory": "advanced",
+      "displayName": "ML Spin Z Fallback Threshold",
+      "description": "Z rotation threshold (degrees) that triggers traditional search fallback",
+      "type": "number",
+      "min": 10,
+      "max": 180,
+      "default": 60,
+      "requiresRestart": false,
+      "passedVia": "json"
     },
     "gs_config.ipc_interface.kMaxCam2ImageReceivedTimeMs": {
       "category": "Network",
@@ -1881,8 +1671,7 @@
       "max": 60000,
       "default": 40000,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.golf_simulator_interfaces.E6.kE6InterMessageDelayMs": {
       "category": "Simulators",
@@ -1894,8 +1683,7 @@
       "max": 500,
       "default": 50,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.golf_simulator_interfaces.kLaunchMonitorIdString": {
       "category": "Simulators",
@@ -1905,8 +1693,7 @@
       "type": "text",
       "default": "PiTrac LM 0.1",
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.club_data.kEnableClubImages": {
       "category": "Club Data",
@@ -1916,8 +1703,7 @@
       "type": "boolean",
       "default": false,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.club_data.kClubImageOutputDir": {
       "category": "Storage",
@@ -1927,8 +1713,7 @@
       "type": "path",
       "default": "~/LM_Shares/Images/",
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.club_data.kNumberFramesToSaveBeforeHit": {
       "category": "Club Data",
@@ -1940,8 +1725,7 @@
       "max": 20,
       "default": 6,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.club_data.kNumberFramesToSaveAfterHit": {
       "category": "Club Data",
@@ -1953,8 +1737,7 @@
       "max": 20,
       "default": 8,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.club_data.kClubImageWidthPixels": {
       "category": "Club Data",
@@ -1966,8 +1749,7 @@
       "max": 1920,
       "default": 340,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.club_data.kClubImageHeightPixels": {
       "category": "Club Data",
@@ -1979,8 +1761,7 @@
       "max": 1080,
       "default": 200,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.club_data.kClubImageCameraGain": {
       "category": "Club Data",
@@ -1992,8 +1773,7 @@
       "max": 100,
       "default": 40,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.club_data.kClubImageShutterSpeedMultiplier": {
       "category": "Club Data",
@@ -2006,8 +1786,7 @@
       "step": 0.1,
       "default": 0.4,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "cli.cam_still_mode": {
       "category": "Testing",
@@ -2017,7 +1796,6 @@
       "default": false,
       "requiresRestart": true,
       "passedVia": "cli",
-      "passedTo": "both",
       "cliArgument": "--cam_still_mode",
       "internal": true
     },
@@ -2029,7 +1807,6 @@
       "default": false,
       "requiresRestart": true,
       "passedVia": "cli",
-      "passedTo": "both",
       "cliArgument": "--pulse_test",
       "internal": true
     },
@@ -2041,7 +1818,6 @@
       "default": false,
       "requiresRestart": true,
       "passedVia": "cli",
-      "passedTo": "both",
       "cliArgument": "--send_test_results",
       "internal": true
     },
@@ -2053,7 +1829,6 @@
       "default": false,
       "requiresRestart": true,
       "passedVia": "cli",
-      "passedTo": "both",
       "cliArgument": "--lm_comparison_mode",
       "internal": true
     },
@@ -2065,7 +1840,6 @@
       "default": false,
       "requiresRestart": true,
       "passedVia": "cli",
-      "passedTo": "both",
       "cliArgument": "--skip_wait_armed",
       "internal": true
     },
@@ -2079,8 +1853,7 @@
       "max": 20,
       "default": 6,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsMaxHoughReturnCircles": {
       "category": "Ball Detection",
@@ -2092,8 +1865,7 @@
       "max": 50,
       "default": 20,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsMinParam2": {
       "category": "Ball Detection",
@@ -2105,8 +1877,7 @@
       "max": 200,
       "default": 18,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsMaxParam2": {
       "category": "Ball Detection",
@@ -2118,8 +1889,7 @@
       "max": 300,
       "default": 140,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsStartingParam2": {
       "category": "Ball Detection",
@@ -2131,8 +1901,7 @@
       "max": 150,
       "default": 60,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsParam2Increment": {
       "category": "Ball Detection",
@@ -2144,8 +1913,7 @@
       "max": 20,
       "default": 4,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsCurrentParam1": {
       "category": "Ball Detection",
@@ -2157,8 +1925,7 @@
       "max": 300,
       "default": 120,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsHoughDpParam1": {
       "category": "Ball Detection",
@@ -2171,8 +1938,7 @@
       "step": 0.1,
       "default": 1.5,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsPreCannyBlurSize": {
       "category": "Ball Detection",
@@ -2185,8 +1951,7 @@
       "step": 2,
       "default": 3,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsPreHoughBlurSize": {
       "category": "Ball Detection",
@@ -2199,8 +1964,7 @@
       "step": 2,
       "default": 13,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsUseAltHoughAlgorithm": {
       "category": "Ball Detection",
@@ -2210,8 +1974,7 @@
       "type": "boolean",
       "default": true,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPuttingBallMinParam2": {
       "category": "Ball Detection",
@@ -2224,8 +1987,7 @@
       "step": 0.1,
       "default": 0.8,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPuttingBallMaxParam2": {
       "category": "Ball Detection",
@@ -2238,8 +2000,7 @@
       "step": 0.1,
       "default": 1.0,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPuttingBallStartingParam2": {
       "category": "Ball Detection",
@@ -2252,8 +2013,7 @@
       "step": 0.05,
       "default": 0.9,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPuttingBallParam2Increment": {
       "category": "Ball Detection",
@@ -2266,8 +2026,7 @@
       "step": 0.01,
       "default": 0.03,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPuttingBallCurrentParam1": {
       "category": "Ball Detection",
@@ -2279,8 +2038,7 @@
       "max": 500,
       "default": 300,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPuttingMinHoughReturnCircles": {
       "category": "Ball Detection",
@@ -2292,8 +2050,7 @@
       "max": 20,
       "default": 6,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPuttingMaxHoughReturnCircles": {
       "category": "Ball Detection",
@@ -2305,8 +2062,7 @@
       "max": 50,
       "default": 25,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPuttingHoughDpParam1": {
       "category": "Ball Detection",
@@ -2319,8 +2075,7 @@
       "step": 0.1,
       "default": 1.5,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPuttingPreHoughBlurSize": {
       "category": "Ball Detection",
@@ -2333,8 +2088,7 @@
       "step": 2,
       "default": 9,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera1FocalLength": {
       "category": "Calibration",
@@ -2347,8 +2101,7 @@
       "step": 0.001,
       "default": 5.868,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera2FocalLength": {
       "category": "Calibration",
@@ -2361,8 +2114,7 @@
       "step": 0.001,
       "default": 5.511,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kNumberHighQualityBallsToRetain": {
       "category": "Ball Detection",
@@ -2374,8 +2126,7 @@
       "max": 10,
       "default": 2,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kMaximumOffTrajectoryDistance": {
       "category": "Ball Detection",
@@ -2387,8 +2138,7 @@
       "max": 50,
       "default": 8,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kMaxDistanceFromTrajectory": {
       "category": "Ball Detection",
@@ -2400,8 +2150,7 @@
       "max": 100,
       "default": 30,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kMaxStrobedBallColorDifferenceRelaxed": {
       "category": "Ball Detection",
@@ -2413,8 +2162,7 @@
       "max": 100000,
       "default": 70000,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kMaxPuttingBallColorDifferenceRelaxed": {
       "category": "Ball Detection",
@@ -2426,8 +2174,7 @@
       "max": 100000,
       "default": 40000,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kMaxStrobedBallColorDifferenceStrict": {
       "category": "Ball Detection",
@@ -2439,8 +2186,7 @@
       "max": 100000,
       "default": 30000,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kUseOnlyHighQualityBallImagesForHLA": {
       "category": "Ball Detection",
@@ -2450,8 +2196,7 @@
       "type": "boolean",
       "default": false,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.motion_detect_stage.kDifferenceM": {
       "category": "Ball Detection",
@@ -2464,8 +2209,7 @@
       "step": 0.1,
       "default": 0.6,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.motion_detect_stage.kDifferenceC": {
       "category": "Ball Detection",
@@ -2478,8 +2222,7 @@
       "step": 0.5,
       "default": 3.0,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.motion_detect_stage.kRegionThreshold": {
       "category": "Ball Detection",
@@ -2492,8 +2235,7 @@
       "step": 0.01,
       "default": 0.05,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kStrobePulseVectorDriver": {
       "category": "Strobing",
@@ -2512,8 +2254,7 @@
         0
       ],
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kStrobePulseVectorPutter": {
       "category": "Strobing",
@@ -2530,8 +2271,7 @@
         0
       ],
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.user_interface.kWebServerResultBallExposureCandidates": {
       "category": "Display",
@@ -2541,8 +2281,7 @@
       "type": "text",
       "default": "ball_exposure_candidates",
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.user_interface.kWebServerResultSpinBall1Image": {
       "category": "Display",
@@ -2552,8 +2291,7 @@
       "type": "text",
       "default": "spin_ball_1_gray_image1",
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.user_interface.kWebServerResultSpinBall2Image": {
       "category": "Display",
@@ -2563,8 +2301,7 @@
       "type": "text",
       "default": "spin_ball_2_gray_image1",
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.user_interface.kWebServerResultBallRotatedByBestAngles": {
       "category": "Display",
@@ -2574,8 +2311,7 @@
       "type": "text",
       "default": "ball1_rotated_by_best_angles",
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.user_interface.kWebServerCamera2Image": {
       "category": "Display",
@@ -2585,8 +2321,7 @@
       "type": "text",
       "default": "log_cam2_last_strobed_img",
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.user_interface.kWebServerLastTeedBallImage": {
       "category": "Display",
@@ -2596,8 +2331,7 @@
       "type": "text",
       "default": "log_ball_final_found_ball_img",
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.user_interface.kWebServerErrorExposuresImage": {
       "category": "Display",
@@ -2607,8 +2341,7 @@
       "type": "text",
       "default": "log_cam2_last_strobed_img",
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.user_interface.kWebServerBallSearchAreaImage": {
       "category": "Display",
@@ -2618,8 +2351,7 @@
       "type": "text",
       "default": "log_cam1_search_area_img",
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsAltCannyLower": {
       "category": "Ball Detection",
@@ -2631,8 +2363,7 @@
       "max": 100,
       "default": 35,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsAltCannyUpper": {
       "category": "Ball Detection",
@@ -2644,8 +2375,7 @@
       "max": 150,
       "default": 70,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsAltCurrentParam1": {
       "category": "Ball Detection",
@@ -2657,8 +2387,7 @@
       "max": 300,
       "default": 130,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsAltHoughDpParam1": {
       "category": "Ball Detection",
@@ -2671,8 +2400,7 @@
       "step": 0.1,
       "default": 0.8,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsAltMinParam2": {
       "category": "Ball Detection",
@@ -2685,8 +2413,7 @@
       "step": 0.05,
       "default": 0.5,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsAltMaxParam2": {
       "category": "Ball Detection",
@@ -2699,8 +2426,7 @@
       "step": 0.05,
       "default": 1.0,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsAltStartingParam2": {
       "category": "Ball Detection",
@@ -2713,8 +2439,7 @@
       "step": 0.05,
       "default": 0.65,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsAltParam2Increment": {
       "category": "Ball Detection",
@@ -2727,8 +2452,7 @@
       "step": 0.01,
       "default": 0.05,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsAltPreCannyBlurSize": {
       "category": "Ball Detection",
@@ -2741,8 +2465,7 @@
       "step": 2,
       "default": 9,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedBallsAltPreHoughBlurSize": {
       "category": "Ball Detection",
@@ -2755,8 +2478,7 @@
       "step": 2,
       "default": 15,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedBallCannyLower": {
       "category": "Ball Detection",
@@ -2768,8 +2490,7 @@
       "max": 100,
       "default": 35,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedBallCannyUpper": {
       "category": "Ball Detection",
@@ -2781,8 +2502,7 @@
       "max": 150,
       "default": 80,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedBallMinParam2": {
       "category": "Ball Detection",
@@ -2795,8 +2515,7 @@
       "step": 0.05,
       "default": 0.8,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedBallMaxParam2": {
       "category": "Ball Detection",
@@ -2809,8 +2528,7 @@
       "step": 0.05,
       "default": 1.0,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedBallStartingParam2": {
       "category": "Ball Detection",
@@ -2823,8 +2541,7 @@
       "step": 0.05,
       "default": 0.9,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedBallParam2Increment": {
       "category": "Ball Detection",
@@ -2837,8 +2554,7 @@
       "step": 0.01,
       "default": 0.03,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedBallCurrentParam1": {
       "category": "Ball Detection",
@@ -2850,8 +2566,7 @@
       "max": 300,
       "default": 130,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedBallHoughDpParam1": {
       "category": "Ball Detection",
@@ -2864,8 +2579,7 @@
       "step": 0.1,
       "default": 1.5,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedPreCannyBlurSize": {
       "category": "Ball Detection",
@@ -2878,8 +2592,7 @@
       "step": 2,
       "default": 11,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedPreHoughBlurSize": {
       "category": "Ball Detection",
@@ -2892,8 +2605,7 @@
       "step": 2,
       "default": 13,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedMinHoughReturnCircles": {
       "category": "Ball Detection",
@@ -2905,8 +2617,7 @@
       "max": 10,
       "default": 1,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedMaxHoughReturnCircles": {
       "category": "Ball Detection",
@@ -2918,8 +2629,7 @@
       "max": 10,
       "default": 4,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedBallUseLargestBall": {
       "category": "Ball Detection",
@@ -2929,8 +2639,7 @@
       "type": "boolean",
       "default": false,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kUseBestCircleRefinement": {
       "category": "Ball Detection",
@@ -2940,8 +2649,7 @@
       "type": "boolean",
       "default": false,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kUseBestCircleLargestCircle": {
       "category": "Ball Detection",
@@ -2951,8 +2659,7 @@
       "type": "boolean",
       "default": false,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kBestCircleCannyLower": {
       "category": "Ball Detection",
@@ -2964,8 +2671,7 @@
       "max": 100,
       "default": 55,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kBestCircleCannyUpper": {
       "category": "Ball Detection",
@@ -2977,8 +2683,7 @@
       "max": 200,
       "default": 110,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kBestCirclePreCannyBlurSize": {
       "category": "Ball Detection",
@@ -2991,8 +2696,7 @@
       "step": 2,
       "default": 5,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kBestCirclePreHoughBlurSize": {
       "category": "Ball Detection",
@@ -3005,8 +2709,7 @@
       "step": 2,
       "default": 13,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kBestCircleParam1": {
       "category": "Ball Detection",
@@ -3018,8 +2721,7 @@
       "max": 500,
       "default": 300,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kBestCircleParam2": {
       "category": "Ball Detection",
@@ -3032,8 +2734,7 @@
       "step": 0.05,
       "default": 0.65,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kBestCircleHoughDpParam1": {
       "category": "Ball Detection",
@@ -3046,8 +2747,7 @@
       "step": 0.1,
       "default": 1.5,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kBestCircleIdentificationMinRadiusRatio": {
       "category": "Ball Detection",
@@ -3060,8 +2760,7 @@
       "step": 0.05,
       "default": 0.9,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kBestCircleIdentificationMaxRadiusRatio": {
       "category": "Ball Detection",
@@ -3074,8 +2773,7 @@
       "step": 0.05,
       "default": 1.2,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kUseDynamicRadiiAdjustment": {
       "category": "Ball Detection",
@@ -3085,8 +2783,7 @@
       "type": "boolean",
       "default": false,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kNumberRadiiToAverageForDynamicAdjustment": {
       "category": "Ball Detection",
@@ -3098,8 +2795,7 @@
       "max": 10,
       "default": 2,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedNarrowingRadiiMinRatio": {
       "category": "Ball Detection",
@@ -3112,8 +2808,7 @@
       "step": 0.05,
       "default": 0.7,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedNarrowingRadiiMaxRatio": {
       "category": "Ball Detection",
@@ -3126,8 +2821,7 @@
       "step": 0.05,
       "default": 1.6,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedNarrowingRadiiDpParam": {
       "category": "Ball Detection",
@@ -3140,8 +2834,7 @@
       "step": 0.1,
       "default": 1.5,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kStrobedNarrowingRadiiParam2": {
       "category": "Ball Detection",
@@ -3154,8 +2847,7 @@
       "step": 0.05,
       "default": 0.8,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedNarrowingRadiiMinRatio": {
       "category": "Ball Detection",
@@ -3168,8 +2860,7 @@
       "step": 0.05,
       "default": 0.9,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedNarrowingRadiiMaxRatio": {
       "category": "Ball Detection",
@@ -3182,8 +2873,7 @@
       "step": 0.05,
       "default": 1.1,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedNarrowingStartingParam2": {
       "category": "Ball Detection",
@@ -3196,8 +2886,7 @@
       "step": 0.05,
       "default": 0.9,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedNarrowingParam1": {
       "category": "Ball Detection",
@@ -3209,8 +2898,7 @@
       "max": 500,
       "default": 300,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_identification.kPlacedNarrowingRadiiDpParam": {
       "category": "Ball Detection",
@@ -3223,8 +2911,7 @@
       "step": 0.1,
       "default": 1.5,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kBallProximityMarginPercentRelaxed": {
       "category": "Ball Detection",
@@ -3236,8 +2923,7 @@
       "max": 100,
       "default": 65,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kBallProximityMarginPercentStrict": {
       "category": "Ball Detection",
@@ -3249,8 +2935,7 @@
       "max": 50,
       "default": 15,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kClosestBallPairEdgeBackoffPixels": {
       "category": "Ball Detection",
@@ -3262,8 +2947,7 @@
       "max": 500,
       "default": 200,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kColorDifferenceRgbPostMultiplierForDarker": {
       "category": "Ball Detection",
@@ -3276,8 +2960,7 @@
       "step": 0.5,
       "default": 4.0,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kColorDifferenceRgbPostMultiplierForLighter": {
       "category": "Ball Detection",
@@ -3290,8 +2973,7 @@
       "step": 0.1,
       "default": 1.0,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kColorDifferenceStdPostMultiplierForDarker": {
       "category": "Ball Detection",
@@ -3304,8 +2986,7 @@
       "step": 0.5,
       "default": 3.0,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kColorDifferenceStdPostMultiplierForLighter": {
       "category": "Ball Detection",
@@ -3318,8 +2999,7 @@
       "step": 0.5,
       "default": 5.0,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kMaxBallsToRetain": {
       "category": "Ball Detection",
@@ -3331,8 +3011,7 @@
       "max": 100,
       "default": 30,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kMaxIntermediateBallRadiusChangePercent": {
       "category": "Ball Detection",
@@ -3344,8 +3023,7 @@
       "max": 20,
       "default": 5,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kMaxPuttingIntermediateBallRadiusChangePercent": {
       "category": "Ball Detection",
@@ -3357,8 +3035,7 @@
       "max": 20,
       "default": 8,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kMaxOverlappedBallRadiusChangeRatio": {
       "category": "Ball Detection",
@@ -3371,8 +3048,7 @@
       "step": 0.1,
       "default": 1.3,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kMaxRadiusDifferencePercentageFromBest": {
       "category": "Ball Detection",
@@ -3384,8 +3060,7 @@
       "max": 100,
       "default": 35,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kUnlikelyAngleMinimumDistancePixels": {
       "category": "Ball Detection",
@@ -3397,8 +3072,7 @@
       "max": 100,
       "default": 40,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kMaxQualityExposureLaunchAngle": {
       "category": "Ball Detection",
@@ -3410,8 +3084,7 @@
       "max": 60,
       "default": 35,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kMinQualityExposureLaunchAngle": {
       "category": "Ball Detection",
@@ -3423,8 +3096,7 @@
       "max": 10,
       "default": -5,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kMaxPuttingQualityExposureLaunchAngle": {
       "category": "Ball Detection",
@@ -3436,8 +3108,7 @@
       "max": 20,
       "default": 8,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kMinPuttingQualityExposureLaunchAngle": {
       "category": "Ball Detection",
@@ -3449,8 +3120,7 @@
       "max": 5,
       "default": -5,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kNumberAngleCheckExposures": {
       "category": "Ball Detection",
@@ -3462,8 +3132,7 @@
       "max": 10,
       "default": 4,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kUsePreImageSubtraction": {
       "category": "Ball Detection",
@@ -3473,8 +3142,7 @@
       "type": "boolean",
       "default": false,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kPreImageWeightingOverall": {
       "category": "Ball Detection",
@@ -3487,8 +3155,7 @@
       "step": 0.05,
       "default": 0.0,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kPreImageWeightingRed": {
       "category": "Ball Detection",
@@ -3501,8 +3168,7 @@
       "step": 0.05,
       "default": 1.0,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kPreImageWeightingGreen": {
       "category": "Ball Detection",
@@ -3515,8 +3181,7 @@
       "step": 0.05,
       "default": 1.2,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.ball_exposure_selection.kPreImageWeightingBlue": {
       "category": "Ball Detection",
@@ -3529,8 +3194,7 @@
       "step": 0.05,
       "default": 1.05,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.motion_detect_stage.kMaxRegionThreshold": {
       "category": "Ball Detection",
@@ -3543,8 +3207,7 @@
       "step": 0.01,
       "default": 0.05,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.motion_detect_stage.kFramePeriod": {
       "category": "Ball Detection",
@@ -3556,8 +3219,7 @@
       "max": 10,
       "default": 0,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.motion_detect_stage.kHSkip": {
       "category": "Ball Detection",
@@ -3569,8 +3231,7 @@
       "max": 10,
       "default": 2,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.motion_detect_stage.kVSkip": {
       "category": "Ball Detection",
@@ -3582,8 +3243,7 @@
       "max": 10,
       "default": 2,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.motion_detect_stage.kCroppedImagePixelOffsetLeft": {
       "category": "Ball Detection",
@@ -3595,8 +3255,7 @@
       "max": 50,
       "default": 0,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.motion_detect_stage.kCroppedImagePixelOffsetUp": {
       "category": "Ball Detection",
@@ -3608,8 +3267,7 @@
       "max": 50,
       "default": -3,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera1XOffsetForTilt": {
       "category": "Calibration",
@@ -3621,8 +3279,7 @@
       "max": 100,
       "default": 0,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera1YOffsetForTilt": {
       "category": "Calibration",
@@ -3634,8 +3291,7 @@
       "max": 100,
       "default": 0,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera2XOffsetForTilt": {
       "category": "Calibration",
@@ -3647,8 +3303,7 @@
       "max": 100,
       "default": 0,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.cameras.kCamera2YOffsetForTilt": {
       "category": "Calibration",
@@ -3660,8 +3315,7 @@
       "max": 100,
       "default": 0,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kLastPulsePutterRepeats": {
       "category": "Strobing",
@@ -3673,8 +3327,7 @@
       "max": 10,
       "default": 0,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kLongerStrobePulseVectorDriver": {
       "category": "Strobing",
@@ -3698,8 +3351,7 @@
         0
       ],
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.strobing.kDynamicFollowOnPulseVectorPutter": {
       "category": "Strobing",
@@ -3711,8 +3363,7 @@
         444.0
       ],
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.calibration.kNumberPicturesForFocalLengthAverage": {
       "category": "Calibration",
@@ -3724,8 +3375,7 @@
       "max": 20,
       "default": 6,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.calibration.kNumberOfCalibrationFailuresToTolerate": {
       "category": "Calibration",
@@ -3737,8 +3387,7 @@
       "max": 20,
       "default": 4,
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.user_interface.kRefreshTimeSeconds": {
       "category": "Network",
@@ -3750,8 +3399,7 @@
       "max": 30,
       "default": 3,
       "requiresRestart": false,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.testing.kAutomatedTestExpectedResultsCSV": {
       "type": "string",
@@ -4082,8 +3730,7 @@
       },
       "default": "1",
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.calibration.kCustomCalibrationRigPositionFromCamera1": {
       "category": "Calibration",
@@ -4092,13 +3739,12 @@
       "description": "Position of ball if using non-standard calibration rig",
       "type": "array",
       "default": [
-        -0.120,
+        -0.12,
         -0.28,
         0.44
       ],
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.calibration.kCustomCalibrationRigPositionFromCamera2": {
       "category": "Calibration",
@@ -4112,8 +3758,7 @@
         "0.435"
       ],
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.calibration.kAutoCalibrationBallPositionFromCam1MetersForStraightOutCamerasV2Enclosure": {
       "category": "Calibration",
@@ -4127,8 +3772,7 @@
         "0.44"
       ],
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.calibration.kAutoCalibrationBallPositionFromCam2MetersForStraightOutCamerasV2Enclosure": {
       "category": "Calibration",
@@ -4142,8 +3786,7 @@
         "0.435"
       ],
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.calibration.kAutoCalibrationBallPositionFromCam1MetersForSkewedCamerasV2Enclosure": {
       "category": "Calibration",
@@ -4157,8 +3800,7 @@
         "0.44"
       ],
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.calibration.kAutoCalibrationBallPositionFromCam2MetersForSkewedCamerasV2Enclosure": {
       "category": "Calibration",
@@ -4172,8 +3814,7 @@
         "0.435"
       ],
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.calibration.kAutoCalibrationBallPositionFromCam1MetersForStraightOutCamerasV3Enclosure": {
       "category": "Calibration",
@@ -4187,8 +3828,7 @@
         "0.481"
       ],
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.calibration.kAutoCalibrationBallPositionFromCam2MetersForStraightOutCamerasV3Enclosure": {
       "category": "Calibration",
@@ -4202,8 +3842,7 @@
         "0.481"
       ],
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.calibration.kAutoCalibrationBallPositionFromCam1MetersForSkewedCamerasV3Enclosure": {
       "category": "Calibration",
@@ -4217,8 +3856,7 @@
         "0.481"
       ],
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.calibration.kAutoCalibrationBallPositionFromCam2MetersForSkewedCamerasV3Enclosure": {
       "category": "Calibration",
@@ -4232,8 +3870,7 @@
         "0.472"
       ],
       "requiresRestart": true,
-      "passedVia": "json",
-      "passedTo": "both"
+      "passedVia": "json"
     },
     "gs_config.calibration.kTestAutoCalibrationFileName": {
       "type": "string",
@@ -4250,121 +3887,121 @@
       "ui_name": "ALT Pre-Hough Blur Size"
     }
   },
-    "categoryList": [
-      "System",
-      "Cameras",
-      "Simulators",
-      "Ball Detection",
-      "AI Detection",
-      "Storage",
-      "Network",
-      "Logging",
-      "Strobing",
-      "Spin Analysis",
-      "Calibration",
-      "Testing",
-      "Debugging",
-      "Club Data",
-      "Display"
-    ],
-    "categories": {
-      "System": {
-        "displayName": "System Settings",
-        "description": "Core system configuration",
-        "icon": "settings"
-      },
-      "Ball Detection": {
-        "displayName": "Ball Detection",
-        "description": "Ball detection algorithms and parameters",
-        "icon": "target"
-      },
-      "AI Detection": {
-        "displayName": "AI Detection",
-        "description": "Neural network detection settings",
-        "icon": "brain"
-      },
-      "Cameras": {
-        "displayName": "Cameras",
-        "description": "Camera hardware and settings",
-        "icon": "camera"
-      },
-      "Simulators": {
-        "displayName": "Simulator Interfaces",
-        "description": "Golf simulator connections",
-        "icon": "game"
-      },
-      "Strobing": {
-        "displayName": "LED Strobing",
-        "description": "LED timing and speed adjustments",
-        "icon": "flash"
-      },
-      "Storage": {
-        "displayName": "Storage",
-        "description": "File paths and directories",
-        "icon": "folder"
-      },
-      "Logging": {
-        "displayName": "Logging",
-        "description": "Image and data logging options",
-        "icon": "file"
-      },
-      "Network": {
-        "displayName": "Network",
-        "description": "Network and communication settings",
-        "icon": "network"
-      },
-      "Spin Analysis": {
-        "displayName": "Spin Analysis",
-        "description": "Spin calculation settings",
-        "icon": "rotate"
-      },
-      "Calibration": {
-        "displayName": "Calibration",
-        "description": "Camera calibration parameters",
-        "icon": "adjust"
-      },
-      "Advanced": {
-        "displayName": "Advanced",
-        "description": "Advanced configuration options",
-        "icon": "expert"
-      }
+  "categoryList": [
+    "System",
+    "Cameras",
+    "Simulators",
+    "Ball Detection",
+    "AI Detection",
+    "Storage",
+    "Network",
+    "Logging",
+    "Strobing",
+    "Spin Analysis",
+    "Calibration",
+    "Testing",
+    "Debugging",
+    "Club Data",
+    "Display"
+  ],
+  "categories": {
+    "System": {
+      "displayName": "System Settings",
+      "description": "Core system configuration",
+      "icon": "settings"
     },
-    "basicSubcategories": {
-      "System": {
-        "displayName": "System",
-        "order": 1
-      },
-      "Detection Methods": {
-        "displayName": "Detection Methods",
-        "order": 2
-      },
-      "Cameras": {
-        "displayName": "Cameras",
-        "order": 3
-      },
-      "Simulators": {
-        "displayName": "Simulators",
-        "order": 4
-      },
-      "Ball Detection": {
-        "displayName": "Ball Detection",
-        "order": 5
-      },
-      "Strobing": {
-        "displayName": "Strobing",
-        "order": 6
-      },
-      "Storage": {
-        "displayName": "Storage",
-        "order": 7
-      },
-      "Network": {
-        "displayName": "Network",
-        "order": 8
-      },
-      "Spin": {
-        "displayName": "Spin",
-        "order": 9
-      }
+    "Ball Detection": {
+      "displayName": "Ball Detection",
+      "description": "Ball detection algorithms and parameters",
+      "icon": "target"
+    },
+    "AI Detection": {
+      "displayName": "AI Detection",
+      "description": "Neural network detection settings",
+      "icon": "brain"
+    },
+    "Cameras": {
+      "displayName": "Cameras",
+      "description": "Camera hardware and settings",
+      "icon": "camera"
+    },
+    "Simulators": {
+      "displayName": "Simulator Interfaces",
+      "description": "Golf simulator connections",
+      "icon": "game"
+    },
+    "Strobing": {
+      "displayName": "LED Strobing",
+      "description": "LED timing and speed adjustments",
+      "icon": "flash"
+    },
+    "Storage": {
+      "displayName": "Storage",
+      "description": "File paths and directories",
+      "icon": "folder"
+    },
+    "Logging": {
+      "displayName": "Logging",
+      "description": "Image and data logging options",
+      "icon": "file"
+    },
+    "Network": {
+      "displayName": "Network",
+      "description": "Network and communication settings",
+      "icon": "network"
+    },
+    "Spin Analysis": {
+      "displayName": "Spin Analysis",
+      "description": "Spin calculation settings",
+      "icon": "rotate"
+    },
+    "Calibration": {
+      "displayName": "Calibration",
+      "description": "Camera calibration parameters",
+      "icon": "adjust"
+    },
+    "Advanced": {
+      "displayName": "Advanced",
+      "description": "Advanced configuration options",
+      "icon": "expert"
+    }
+  },
+  "basicSubcategories": {
+    "System": {
+      "displayName": "System",
+      "order": 1
+    },
+    "Detection Methods": {
+      "displayName": "Detection Methods",
+      "order": 2
+    },
+    "Cameras": {
+      "displayName": "Cameras",
+      "order": 3
+    },
+    "Simulators": {
+      "displayName": "Simulators",
+      "order": 4
+    },
+    "Ball Detection": {
+      "displayName": "Ball Detection",
+      "order": 5
+    },
+    "Strobing": {
+      "displayName": "Strobing",
+      "order": 6
+    },
+    "Storage": {
+      "displayName": "Storage",
+      "order": 7
+    },
+    "Network": {
+      "displayName": "Network",
+      "order": 8
+    },
+    "Spin": {
+      "displayName": "Spin",
+      "order": 9
     }
   }
+}

@@ -7,6 +7,6 @@
 
 namespace golf_sim {
 
-	bool GolfSimGlobals::golf_sim_running_ = true;
+	std::atomic<bool> GolfSimGlobals::golf_sim_running_{true};
 
 }

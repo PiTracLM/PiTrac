@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List
 
-from constants import EXPECTED_DATA_LENGTH, MPS_TO_MPH
+from constants import MPS_TO_MPH
 from models import ResultType, ShotData
 
 logger = logging.getLogger(__name__)
@@ -54,83 +54,6 @@ class ShotDataParser:
             return result_type_enum.name.replace("_", " ").title()
 
     @staticmethod
-    def parse_array_format(data: List[Any]) -> ShotData:
-        if len(data) < EXPECTED_DATA_LENGTH:
-            raise ValueError(f"Expected at least {EXPECTED_DATA_LENGTH} elements, got {len(data)}")
-
-        carry_meters = data[0]
-        speed_mpers = data[1]
-        launch_angle_deg = data[2]
-        side_angle_deg = data[3]
-        back_spin_rpm = data[4]
-        side_spin_rpm = data[5]
-        # confidence = data[6]  # Currently unused
-        # club_type = data[7]   # Currently unused
-        result_type = data[8]
-        message = data[9]
-
-        logger.debug(f"Received result_type={result_type}, message='{message}'")
-        # log_messages = data[10] if len(data) > 10 else []  # Currently unused
-        image_file_paths = data[11] if len(data) > 11 else []
-
-        try:
-            result_type_str = ShotDataParser._get_result_type_string(result_type)
-        except ValueError:
-            result_type_str = f"Type {result_type}"
-            logger.warning(f"Unknown result type: {result_type}")
-
-        # Special handling for result_type 7 which is overloaded in C++
-        # Real hits vs configuration messages that misuse kHit type
-        is_fake_hit_message = result_type == 7 and message in [
-            "Club type was set",
-            "Test message",
-            "Configuration update",
-        ]
-
-        is_status_message = (
-            result_type
-            in [
-                ResultType.BALL_READY.value,  # 6 - kBallPlacedAndReadyForHit
-                ResultType.INITIALIZING.value,  # 1
-                ResultType.WAITING_FOR_BALL.value,  # 2
-                ResultType.WAITING_FOR_SIMULATOR.value,  # 3
-                ResultType.PAUSING_FOR_STABILIZATION.value,  # 4
-                ResultType.MULTIPLE_BALLS.value,  # 5
-                ResultType.ERROR.value,  # 8
-                ResultType.CALIBRATION.value,  # 9
-                ResultType.UNKNOWN.value,  # 0
-            ]
-            or is_fake_hit_message
-        )
-
-        if is_status_message:
-            return ShotData(
-                carry=0.0,  # Status messages don't contain shot data
-                speed=0.0,
-                launch_angle=0.0,
-                side_angle=0.0,
-                back_spin=0,
-                side_spin=0,
-                result_type=result_type_str,
-                message=message,
-                timestamp=datetime.now().isoformat(),
-                images=[],
-            )
-        else:
-            return ShotData(
-                carry=carry_meters,
-                speed=round(speed_mpers * MPS_TO_MPH, 1),
-                launch_angle=round(launch_angle_deg, 1),
-                side_angle=round(side_angle_deg, 1),
-                back_spin=int(back_spin_rpm),
-                side_spin=int(side_spin_rpm),
-                result_type=result_type_str,
-                message=message,
-                timestamp=datetime.now().isoformat(),
-                images=image_file_paths,
-            )
-
-    @staticmethod
     def parse_dict_format(data: Dict[str, Any], current: ShotData) -> ShotData:
         updates = {}
 
@@ -160,8 +83,6 @@ class ShotDataParser:
 
         if "message" in data:
             updates["message"] = str(data["message"])
-        if "image_paths" in data:
-            updates["images"] = list(data["image_paths"])
 
         updates["timestamp"] = datetime.now().isoformat()
 

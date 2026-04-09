@@ -8,12 +8,14 @@
 
 #include "logging_tools.h"
 
-#include "gs_ipc_result.h"
+#include "gs_result_types.h"
 #include "gs_options.h"
 #include "gs_clubs.h"
 #include "gs_ui_system.h"
 #include "gs_sim_interface.h"
 #include "gs_camera.h"
+#include "gs_http_client.h"
+#include "cv_utils.h"
 
 namespace golf_sim {
 
@@ -25,128 +27,132 @@ namespace golf_sim {
     std::string GsUISystem::kWebServerErrorExposuresImage;
     std::string GsUISystem::kWebServerBallSearchAreaImage;
 
+    static std::string EscapeJson(const std::string& s) {
+        std::string out;
+        out.reserve(s.size() + 16);
+        for (char c : s) {
+            switch (c) {
+                case '"':  out += "\\\""; break;
+                case '\\': out += "\\\\"; break;
+                case '\n': out += "\\n";  break;
+                case '\r': out += "\\r";  break;
+                case '\t': out += "\\t";  break;
+                default:   out += c;
+            }
+        }
+        return out;
+    }
+
+    static std::string BuildResultJson(int result_type, const std::string& message,
+                                       float speed_mps = 0, float launch_deg = 0,
+                                       float side_deg = 0, int back_spin = 0,
+                                       int side_spin = 0, int carry_m = 0,
+                                       const std::vector<std::string>& images = {}) {
+        std::string json = "{";
+        json += "\"result_type\":" + std::to_string(result_type);
+        json += ",\"speed_mps\":" + std::to_string(speed_mps);
+        json += ",\"launch_angle\":" + std::to_string(launch_deg);
+        json += ",\"side_angle\":" + std::to_string(side_deg);
+        json += ",\"back_spin\":" + std::to_string(back_spin);
+        json += ",\"side_spin\":" + std::to_string(side_spin);
+        json += ",\"carry\":" + std::to_string(carry_m);
+        json += ",\"message\":\"" + EscapeJson(message) + "\"";
+        json += ",\"images\":[";
+        for (size_t i = 0; i < images.size(); i++) {
+            if (i > 0) json += ",";
+            json += "\"" + EscapeJson(images[i]) + "\"";
+        }
+        json += "]}";
+        return json;
+    }
+
 
     void GsUISystem::SendIPCErrorStatusMessage(const std::string& error_message) {
-
-        GolfSimIPCMessage ipc_message(GolfSimIPCMessage::IPCMessageType::kResults);
-        GsIPCResult& error_result = ipc_message.GetResultsForModification();
-
-        error_result.result_type_ = GsIPCResultType::kError;
-
-        if (LoggingTools::current_error_root_cause_ != "") {
-            error_result.message_ = LoggingTools::current_error_root_cause_;
-            // We've effectively consumed the root cause error, so reset it to empty for 
-            // any future errors
+        std::string msg;
+        if (!LoggingTools::current_error_root_cause_.empty()) {
+            msg = LoggingTools::current_error_root_cause_;
             LoggingTools::current_error_root_cause_ = "";
+        } else {
+            msg = error_message;
         }
-        else {
-            error_result.message_ = error_message;
-        }
 
-        error_result.log_messages_ = LoggingTools::GetRecentLogMessages();
-
-        GS_LOG_TRACE_MSG(trace, "FSM is sending an Error-Type IPC Results Message:" + error_result.Format());
-
-        GolfSimIpcSystem::SendIpcMessage(ipc_message);
+        GS_LOG_TRACE_MSG(trace, "Sending error result: " + msg);
+        GsHttpClient::PostResult(BuildResultJson(
+            static_cast<int>(GsIPCResultType::kError), msg));
     }
 
 
     bool GsUISystem::SendIPCStatusMessage(const GsIPCResultType message_type, const std::string& custom_message) {
-
-        GolfSimIPCMessage ipc_message(GolfSimIPCMessage::IPCMessageType::kResults);
-        GsIPCResult& results = ipc_message.GetResultsForModification();
-        results.club_type_ = GolfSimClubs::GetCurrentClubType();
-
-        results.result_type_ = message_type;
+        std::string msg;
 
         switch (message_type) {
         case GsIPCResultType::kInitializing:
-            results.message_ = "Version 0.0X.  System Mode: " + std::to_string(GolfSimOptions::GetCommandLineOptions().system_mode_);
+            msg = "Version 0.0X.  System Mode: " + std::to_string(GolfSimOptions::GetCommandLineOptions().system_mode_);
             break;
-
         case GsIPCResultType::kWaitingForBallToAppear:
             if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1Calibrate ||
-                GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2Calibrate)
-            {
-                results.message_ = "Waiting for ball to be teed up at " + std::to_string(GolfSimCamera::kCamera1CalibrationDistanceToBall) + "cm in order to perform calibration.";
-            }
-            else {
-                results.message_ = "Waiting for ball to be teed up.";
+                GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2Calibrate) {
+                msg = "Waiting for ball to be teed up at " + std::to_string(GolfSimCamera::kCamera1CalibrationDistanceToBall) + "cm in order to perform calibration.";
+            } else {
+                msg = "Waiting for ball to be teed up.";
             }
             break;
-
         case GsIPCResultType::kPausingForBallStabilization:
-            results.message_ = "Ball teed.  Confirming ball is stable.";
+            msg = "Ball teed.  Confirming ball is stable.";
             break;
-
         case GsIPCResultType::kWaitingForSimulatorArmed:
-            results.message_ = "Waiting on the simulator to be armed (ready to accept a shot).";
+            msg = "Waiting on the simulator to be armed (ready to accept a shot).";
             break;
-
         case GsIPCResultType::kMultipleBallsPresent:
-            results.message_ = "Multiple balls present.";
+            msg = "Multiple balls present.";
             break;
-
         case GsIPCResultType::kBallPlacedAndReadyForHit:
-            results.message_ = "Ball placed - Let's Golf!";
+            msg = "Ball placed - Let's Golf!";
             break;
-
         case GsIPCResultType::kHit:
-            results.message_ = "Ball hit - waiting for Results.";
+            msg = "Ball hit - waiting for Results.";
             break;
-
         case GsIPCResultType::kCalibrationResults:
-            results.message_ = "Returning Camera Calibration Results - see message.";
+            msg = "Returning Camera Calibration Results - see message.";
             break;
-
         default:
             GS_LOG_TRACE_MSG(trace, "SendIPCStatusMessage received unknown GsIPCResultType : " + std::to_string((int)message_type));
             return false;
-            break;
         }
 
         if (!custom_message.empty()) {
-            results.message_ = custom_message;
+            msg = custom_message;
         }
 
-        GS_LOG_TRACE_MSG(trace, "FSM is sending an IPC Results Message: " + results.Format());
-
-        GolfSimIpcSystem::SendIpcMessage(ipc_message);
-
+        GS_LOG_TRACE_MSG(trace, "Sending status result: " + msg);
+        GsHttpClient::PostResult(BuildResultJson(static_cast<int>(message_type), msg));
         return true;
     }
 
     void GsUISystem::SendIPCHitMessage(const GolfBall& result_ball, const std::string& secondary_message) {
-        GolfSimIPCMessage ipc_message(GolfSimIPCMessage::IPCMessageType::kResults);
+        float speed = result_ball.velocity_;
+        float launch = result_ball.angles_ball_perspective_[1];
+        float side = result_ball.angles_ball_perspective_[0];
+        int back_spin = static_cast<int>(result_ball.rotation_speeds_RPM_[2]);
+        int side_spin = static_cast<int>(result_ball.rotation_speeds_RPM_[0]);
+        int carry = 100 + rand() % 150;
 
-        GsIPCResult& results = ipc_message.GetResultsForModification();
+        std::vector<std::string> images;
 
-        results.result_type_ = GsIPCResultType::kHit;
-        results.speed_mpers_ = result_ball.velocity_;
-        results.carry_meters_ = 100 + rand() % 150;
-        results.launch_angle_deg_ = result_ball.angles_ball_perspective_[1];
-        results.side_angle_deg_ = result_ball.angles_ball_perspective_[0];
-        results.back_spin_rpm_ = result_ball.rotation_speeds_RPM_[2];
-        results.side_spin_rpm_ = result_ball.rotation_speeds_RPM_[0];
-        results.confidence_ = 5;  // TBD - Set from analysis
-        results.message_ = "Ball Hit - Results returned." + secondary_message;
+        std::string msg = "Ball Hit - Results returned." + secondary_message;
 
+        GS_LOG_MSG(info, "BALL_HIT_CSV, " + std::to_string(GsSimInterface::GetShotCounter())
+            + ", (carry - NA), (Total - NA), (Side Dest - NA), (Smash Factor - NA), (Club Speed - NA), "
+            + std::to_string(CvUtils::MetersPerSecondToMPH(speed)) + ", "
+            + std::to_string(back_spin) + ", "
+            + std::to_string(side_spin) + ", "
+            + std::to_string(launch) + ", "
+            + std::to_string(side)
+            + ", (Descent Angle-NA), (Apex-NA), (Flight Time-NA), (Type-NA)");
 
-        results.image_file_paths_.clear();
-        
-        results.image_file_paths_.push_back(kWebServerResultBallExposureCandidates + ".png");  // Shows ball trajectory
-        results.image_file_paths_.push_back(kWebServerResultBallRotatedByBestAngles + ".png");  // Rotation analysis result
-
-        GS_LOG_MSG(info, "BALL_HIT_CSV, " + std::to_string(GsSimInterface::GetShotCounter()) + ", (carry - NA), (Total - NA), (Side Dest - NA), (Smash Factor - NA), (Club Speed - NA), "
-            + std::to_string(CvUtils::MetersPerSecondToMPH(results.speed_mpers_)) + ", "
-            + std::to_string(results.back_spin_rpm_) + ", "
-            + std::to_string(results.side_spin_rpm_) + ", "
-            + std::to_string(results.launch_angle_deg_) + ", "
-            + std::to_string(results.side_angle_deg_) 
-            + ", (Descent Angle-NA), (Apex-NA), (Flight Time-NA), (Type-NA)"
-            );
-
-        GolfSimIpcSystem::SendIpcMessage(ipc_message);
+        GsHttpClient::PostResult(BuildResultJson(
+            static_cast<int>(GsIPCResultType::kHit), msg,
+            speed, launch, side, back_spin, side_spin, carry, images));
     }
 
 
@@ -164,11 +170,6 @@ namespace golf_sim {
         std::string file_name(input_file_name);
 
         if (GolfSimCamera::kLogDiagnosticImagesToUniqueFiles  && !suppress_diagnostic_saving) {
-
-            // Save a unique version of the webserver image into a directory that will not get
-            // over-written.  A unque timestamp will be added to the file name
-            std::string fname(file_name);
-
             LoggingTools::LogImage(file_name + "_", img, std::vector < cv::Point >{}, false, "", "_Shot_" + std::to_string(GsSimInterface::GetShotCounter()));
         }
 
@@ -180,8 +181,6 @@ namespace golf_sim {
             file_name += ".png";
         }
 
-
-        // The kWebServerShareDirectory is already setup to have a trailing "/"
         std::string fname = kWebServerShareDirectory + file_name;
 
         try {
@@ -211,11 +210,9 @@ namespace golf_sim {
 
         cv::Mat ball_image = img.clone();
 
-        // Show the final candidates for 
         for (size_t i = 0; i < balls.size(); i++) {
             const GolfBall& b = balls[i];
             const GsCircle& c = b.ball_circle_;
-
             std::string label = std::to_string(i);
             LoggingTools::DrawCircleOutlineAndCenter(ball_image, c, label);
         }
@@ -224,18 +221,8 @@ namespace golf_sim {
     }
 
     void GsUISystem::ClearWebserverImages() {
-	// TBD - At least for now, disable this function.  We're often losing images
-	// that people need for debugging.
-	return;
-
-        // The kWebServerShareDirectory is already setup to have a trailing "/"
-        std::string command = "rm -f " + kWebServerShareDirectory + "*.png";
-
-        int cmdResult = system(command.c_str());
-
-        if (cmdResult != 0) {
-            GS_LOG_TRACE_MSG(trace, "system(" + command + ") failed.");
-        }
+        // Disabled — images are needed for debugging
+        return;
     }
 
 }

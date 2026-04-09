@@ -8,6 +8,8 @@
 #include <chrono>
 #include <signal.h>
 #include <sys/stat.h>
+#include <sched.h>
+#include <pthread.h>
 
 #include "core/rpicam_encoder.hpp"
 #include "encoder/encoder.hpp"
@@ -52,6 +54,14 @@ static int get_colourspace_flags(std::string const &codec)
 
 bool ball_watcher_event_loop(RPiCamEncoder &app, bool & motion_detected)
 {
+	// Elevate to real-time priority for the trigger-critical motion detection loop.
+	// Prevents the kernel from preempting us for 1-4ms during normal scheduling.
+	// Requires CAP_SYS_NICE (granted via AmbientCapabilities in the systemd service).
+	struct sched_param sp = {};
+	sp.sched_priority = 80;
+	if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp) != 0) {
+		GS_LOG_MSG(warning, "Could not set SCHED_FIFO — trigger latency may have jitter. Grant CAP_SYS_NICE to pitrac_lm.");
+	}
 
 	VideoOptions const *options = app.GetOptions();
 	std::unique_ptr<Output> output = std::unique_ptr<Output>(Output::Create(options));
@@ -86,8 +96,10 @@ bool ball_watcher_event_loop(RPiCamEncoder &app, bool & motion_detected)
 	for (unsigned int count = 0; ; count++)
 	{
 		if (!gs::GolfSimGlobals::golf_sim_running_) {
-			app.StopCamera(); // stop complains if encoder very slow to close
+			app.StopCamera();
 			app.StopEncoder();
+			sp.sched_priority = 0;
+			pthread_setschedparam(pthread_self(), SCHED_OTHER, &sp);
 			return false;
 		}
 
@@ -101,34 +113,40 @@ bool ball_watcher_event_loop(RPiCamEncoder &app, bool & motion_detected)
 			continue;
 		}
 
-		if (msg.type == RPiCamEncoder::MsgType::Quit)
+		if (msg.type == RPiCamEncoder::MsgType::Quit) {
+			GS_LOG_TRACE_MSG(trace, "Received Quit message in ball_watcher_event_loop.");
+			app.StopCamera();
+			app.StopEncoder();
+			sp.sched_priority = 0;
+			pthread_setschedparam(pthread_self(), SCHED_OTHER, &sp);
 			return motion_detected;
-		else if (msg.type != RPiCamEncoder::MsgType::RequestComplete)
-			throw std::runtime_error("unrecognised message!");
+		}
+		else if (msg.type != RPiCamEncoder::MsgType::RequestComplete) {
+			GS_LOG_MSG(error, "Unrecognised camera message type in ball_watcher_event_loop, aborting.");
+			app.StopCamera();
+			app.StopEncoder();
+			sp.sched_priority = 0;
+			pthread_setschedparam(pthread_self(), SCHED_OTHER, &sp);
+			return false;
+		}
 
-		// We have a completed request for an image
 		CompletedRequestPtr &completed_request = std::get<CompletedRequestPtr>(msg.payload);
-        if (!app.EncodeBuffer(completed_request, app.VideoStream()))
-        {
-                // Keep advancing our "start time" if we're still waiting to start recording (e.g.
-                // waiting for synchronisation with another camera).
-                start_time = std::chrono::high_resolution_clock::now();
-                count = 0; // reset the "frames encoded" counter too
-        }
- 
-		// Immediately have the motion detection stage determine if there was movement.
 
+		// Motion detection FIRST — this is the latency-critical path.
+		// EncodeBuffer is deferred until after we check for motion.
 		bool result = motion_detect_stage.Process(completed_request);
 
 		bool mdResult = false;
 		int getStatus = completed_request->post_process_metadata.Get("motion_detect.result", mdResult);
 		if (getStatus == 0) {
 			if (mdResult) {
-				app.StopCamera(); // stop complains if encoder very slow to close
+				// Trigger already fired inside Process() — stop immediately
+				app.StopCamera();
 				app.StopEncoder();
 				motion_detected = true;
-				
-				// TBD - for now, once we have motion, get out immediately
+				// Drop RT priority before returning to normal processing
+				sp.sched_priority = 0;
+				pthread_setschedparam(pthread_self(), SCHED_OTHER, &sp);
 				return true;
 			}
 			else {
@@ -138,6 +156,9 @@ bool ball_watcher_event_loop(RPiCamEncoder &app, bool & motion_detected)
 		else {
 			// std::cout << "WARNING:  Could not find motion_detect.result." << std::endl;
 		}
+
+		// Encode after motion check — keeps encoding out of the trigger-critical path
+		app.EncodeBuffer(completed_request, app.VideoStream());
 	}
 
 	return true;

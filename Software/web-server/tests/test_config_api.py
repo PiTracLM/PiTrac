@@ -14,13 +14,11 @@ class TestConfigurationAPI:
         """Create a mock configuration manager using factory"""
         manager = MockConfigManagerFactory.create_basic_config_manager()
         manager.get_all_defaults_with_metadata.return_value = {
-            "system": {"mode": "single", "camera_role": "camera1"},
             "cameras": {"camera1_gain": 1.0, "camera2_gain": 4.0},
         }
         manager.load_configurations_metadata.return_value = {
             "settings": {
                 "cameras.camera1_gain": {"type": "number", "default": 1.0},
-                "system.mode": {"type": "select", "options": {"single": "Single"}},
             }
         }
         manager.get_diff.return_value = {"cameras.camera1_gain": {"user": 2.0, "default": 1.0}}
@@ -46,8 +44,6 @@ class TestConfigurationAPI:
 
         data = response.json()
         assert "data" in data
-        assert "system" in data["data"]
-        assert data["data"]["system"]["mode"] == "single"
         assert data["data"]["cameras"]["camera1_gain"] == 2.0
 
     def test_get_config_defaults(self, client, server_instance, mock_config_manager):

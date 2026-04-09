@@ -16,6 +16,7 @@
 #include <vector>
 #include <chrono>
 #include <fstream>
+#include <omp.h>
 #include "gs_format_lib.h"
 
 #include <boost/timer/timer.hpp>
@@ -26,6 +27,7 @@
 #include <opencv2/core/cvdef.h>
 
 #include "ball_image_proc.h"
+#include "spin_predictor.hpp"
 #include "logging_tools.h"
 #include "cv_utils.h"
 #include "gs_config.h"
@@ -78,6 +80,7 @@ namespace golf_sim {
     int BallImageProc::kCoarseZRotationDegreesIncrement = 6;
     int BallImageProc::kCoarseZRotationDegreesStart = -50;
     int BallImageProc::kCoarseZRotationDegreesEnd = 60;
+    int BallImageProc::kCoarseSearchResolution = 90;
 
     double BallImageProc::kPlacedBallCannyLower;
     double BallImageProc::kPlacedBallCannyUpper;
@@ -200,47 +203,30 @@ namespace golf_sim {
 
     int BallImageProc::kGaborMaxWhitePercent = 44; // Nominal 46;
     int BallImageProc::kGaborMinWhitePercent = 38; // Nominal 40;
+    std::string BallImageProc::kSpinDetectionMethod = "ml";
 
-    // ONNX Detection Configuration
-    // TODO: Fix defaults or remove these entirely
-    std::string BallImageProc::kStrobedBallDetectionMethod = "legacy";
-    std::string BallImageProc::kBallPlacementDetectionMethod = "legacy";
-    // Default ONNX model path - can be overridden by config file or (more likely) the PITRAC_ROOT environment variable
+    // Model Detection Configuration
+    std::string BallImageProc::kStrobedBallDetectionMethod = "experimental";
+    std::string BallImageProc::kBallPlacementDetectionMethod = "experimental";
     #ifdef _WIN32
-    std::string BallImageProc::kONNXModelPath = "../../Software/LMSourceCode/ml_models/pitrac-ball-detection-09-25-25/weights/best.onnx";
+    std::string BallImageProc::kModelPath = "../../Software/LMSourceCode/ml_models/yolo26-ball-detector";
     #else
-    std::string BallImageProc::kONNXModelPath = "../ml_models/pitrac-ball-detection-09-25-25/weights/best.onnx";
+    std::string BallImageProc::kModelPath = "../ml_models/yolo26-ball-detector";
     #endif
-    float BallImageProc::kONNXConfidenceThreshold = 0.5f;
-    float BallImageProc::kONNXNMSThreshold = 0.4f;
-    int BallImageProc::kONNXInputSize = 640;
-    int BallImageProc::kSAHISliceHeight = 320;
-    int BallImageProc::kSAHISliceWidth = 320;
-    float BallImageProc::kSAHIOverlapRatio = 0.2f;
-    std::string BallImageProc::kONNXDeviceType = "CPU";
+    float BallImageProc::kModelConfidenceThreshold = 0.5f;
+    float BallImageProc::kModelNMSThreshold = 0.4f;
+    int BallImageProc::kModelInputWidth = 736;
+    int BallImageProc::kModelInputHeight = 544;
+    int BallImageProc::kInferenceThreads = 4;
 
-    // Dual-Backend Configuration
-    std::string BallImageProc::kONNXBackend = "onnxruntime";  // Default to ONNX Runtime
-    bool BallImageProc::kONNXRuntimeAutoFallback = true;     // Enable automatic fallback
-    int BallImageProc::kONNXRuntimeThreads = 4;              // ARM64 optimized default
+    // NCNN detector
+    std::unique_ptr<NCNNDetector> BallImageProc::ncnn_detector_;
+    std::atomic<bool> BallImageProc::ncnn_detector_initialized_{false};
+    std::mutex BallImageProc::ncnn_detector_mutex_;
 
-    // ONNX Runtime detector instance - replaces all static ONNX members
-    std::unique_ptr<ONNXRuntimeDetector> BallImageProc::onnx_detector_;
-    std::atomic<bool> BallImageProc::onnx_detector_initialized_{false};
-    std::mutex BallImageProc::onnx_detector_mutex_;
-
-    cv::dnn::Net BallImageProc::yolo_model_;
-    bool BallImageProc::yolo_model_loaded_ = false;
-    std::mutex BallImageProc::yolo_model_mutex_;
-
-    // Pre-allocated buffers - static members
-    cv::Mat BallImageProc::yolo_input_buffer_;
-    cv::Mat BallImageProc::yolo_letterbox_buffer_;
-    cv::Mat BallImageProc::yolo_resized_buffer_;
-    cv::Mat BallImageProc::yolo_blob_buffer_;
-    std::vector<cv::Rect> BallImageProc::yolo_detection_boxes_;
-    std::vector<float> BallImageProc::yolo_detection_confidences_;
-    std::vector<cv::Mat> BallImageProc::yolo_outputs_;
+    std::unique_ptr<SpinPredictor> BallImageProc::spin_predictor_;
+    std::atomic<bool> BallImageProc::spin_predictor_initialized_{false};
+    std::mutex BallImageProc::spin_predictor_mutex_;
 
     BallImageProc::YOLOImageTypeToUse BallImageProc::kImageTypeToProcessWithYOLO = BallImageProc::YOLOImageTypeToUse::kUseYOLOWithColorImages;
 
@@ -269,6 +255,8 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseZRotationDegreesIncrement", kCoarseZRotationDegreesIncrement);
         GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseZRotationDegreesStart", kCoarseZRotationDegreesStart);
         GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseZRotationDegreesEnd", kCoarseZRotationDegreesEnd);
+
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseSearchResolution", kCoarseSearchResolution);
 
         GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kGaborMinWhitePercent", kGaborMinWhitePercent);
         GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kGaborMaxWhitePercent", kGaborMaxWhitePercent);
@@ -394,45 +382,30 @@ namespace golf_sim {
         kImageTypeToProcessWithYOLO= static_cast<YOLOImageTypeToUse>(kImageTypeToProcessWithYOLOAsInt);
 
 
-        // ONNX Detection Configuration values will be loaded later via LoadConfigurationValues()
-        // which is called after the JSON config file has been loaded in main()
-
         GolfSimConfiguration::SetConstant("gs_config.logging.kLogIntermediateSpinImagesToFile", kLogIntermediateSpinImagesToFile);
-        
-        // Preload model at startup if using experimental detection for either ball placement or flight
-        if (kStrobedBallDetectionMethod == "experimental" || kStrobedBallDetectionMethod == "experimental_sahi" ||
-            kBallPlacementDetectionMethod == "experimental") {
-            GS_LOG_MSG(info, "Detection method is '" + kStrobedBallDetectionMethod + "' / Placement method is '" + kBallPlacementDetectionMethod + "', preloading YOLO model at startup...");
 
-            // Try ONNX Runtime first if configured
-            if (kONNXBackend == "onnxruntime") {
-                if (PreloadONNXRuntimeModel()) {
-                    GS_LOG_MSG(info, "ONNX Runtime model preloaded successfully - first detection will be fast!");
-                } else {
-                    GS_LOG_MSG(warning, "Failed to preload ONNX Runtime model");
-                    if (kONNXRuntimeAutoFallback) {
-                        GS_LOG_MSG(info, "Auto-fallback enabled, attempting to preload OpenCV DNN model...");
-                        if (PreloadYOLOModel()) {
-                            GS_LOG_MSG(info, "OpenCV DNN fallback model preloaded successfully!");
-                        } else {
-                            GS_LOG_MSG(warning, "Failed to preload both ONNX Runtime and OpenCV DNN models");
-                        }
-                    }
-                }
+        // Preload model at startup if using experimental detection for either ball placement or flight
+        if (kStrobedBallDetectionMethod == "experimental" ||
+            kBallPlacementDetectionMethod == "experimental") {
+            GS_LOG_MSG(info, "Detection method is '" + kStrobedBallDetectionMethod + "' / Placement method is '" + kBallPlacementDetectionMethod + "', preloading NCNN model at startup...");
+
+            if (PreloadNCNNModel()) {
+                GS_LOG_MSG(info, "NCNN model preloaded - first detection will be fast");
             } else {
-                // Use OpenCV DNN backend
-                if (PreloadYOLOModel()) {
-                    GS_LOG_MSG(info, "OpenCV DNN model preloaded successfully - first detection will be fast!");
-                } else {
-                    GS_LOG_MSG(warning, "Failed to preload OpenCV DNN model - will load on first detection");
-                }
+                GS_LOG_MSG(warning, "Failed to preload NCNN model");
+            }
+        }
+
+        if (kSpinDetectionMethod == "ml") {
+            if (PreloadSpinModel()) {
+                GS_LOG_MSG(info, "ML spin model preloaded - spin detection will use ML path");
+            } else {
+                GS_LOG_MSG(warning, "Failed to preload ML spin model - will fall back to rotation search");
             }
         }
     }
 
     BallImageProc::~BallImageProc() {
-        // Cleanup is handled by static cleanup, since model is shared across instances
-        // Call CleanupONNXRuntime() only on program exit, not per-instance destruction
     }
 
     /**
@@ -612,24 +585,22 @@ namespace golf_sim {
 
         GS_LOG_TRACE_MSG(trace, "Using detection method: " + detection_method);
 
-        // *** ONNX DETECTION INTEGRATION - Process through full trajectory analysis pipeline ***
-        if (detection_method == "experimental" || detection_method == "experimental_sahi") {
-            std::vector<GsCircle> onnx_circles;
-            if (DetectBallsONNX(rgbImg, search_mode, onnx_circles, report_find_failures)) {
+        if (detection_method == "experimental") {
+            std::vector<GsCircle> detected_circles;
+            if (DetectBalls(rgbImg, search_mode, detected_circles, report_find_failures)) {
                 // Convert GsCircle results to GolfBall objects for trajectory analysis
                 return_balls.clear();
-                for (size_t i = 0; i < onnx_circles.size(); ++i) {
+                for (size_t i = 0; i < detected_circles.size(); ++i) {
                     GolfBall ball;
-                    ball.quality_ranking = static_cast<int>(i); // ONNX confidence-based ranking
-                    ball.set_circle(onnx_circles[i]);
-                    ball.ball_color_ = GolfBall::BallColor::kONNXDetected; // Mark as ONNX-detected
-                    ball.measured_radius_pixels_ = onnx_circles[i][2];
+                    ball.quality_ranking = static_cast<int>(i);
+                    ball.set_circle(detected_circles[i]);
+                    ball.ball_color_ = GolfBall::BallColor::kModelDetected;
+                    ball.measured_radius_pixels_ = detected_circles[i][2];
                     ball.radius_at_calibration_pixels_ = baseBallWithSearchParams.radius_at_calibration_pixels_;
 
-                    // Set color info - ONNX doesn't analyze color but we need placeholders
                     ball.average_color_ = baseBallWithSearchParams.average_color_;
                     ball.median_color_ = baseBallWithSearchParams.average_color_;
-                    ball.std_color_ = GsColorTriplet(0, 0, 0); // Zero std indicates no color analysis
+                    ball.std_color_ = GsColorTriplet(0, 0, 0);
 
                     return_balls.push_back(ball);
                 }
@@ -638,9 +609,7 @@ namespace golf_sim {
             }
             else {
                 if (report_find_failures) {
-                    // We might be waiting for a ball to appear.  In that case,
-		    // the failure to find one is nothing to worry about.
-                    GS_LOG_MSG(warning, "ONNX detection failed - no balls found");
+                    GS_LOG_MSG(warning, "ML detection failed - no balls found");
                 }
                 return false;
             }
@@ -1133,16 +1102,14 @@ namespace golf_sim {
 
         }
 
-        // NEW: ONNX detection bypass - skip adaptive parameter tuning for ONNX
-        if (detection_method == "experimental" || detection_method == "experimental_sahi") {
-            GS_LOG_TRACE_MSG(trace, "Using ONNX detection - bypassing adaptive parameter tuning");
-            
+        if (detection_method == "experimental") {
+            GS_LOG_TRACE_MSG(trace, "Using model detection - bypassing adaptive parameter tuning");
+
             std::vector<GsCircle> test_circles;
             if (DetectBalls(final_search_image, search_mode, test_circles, report_find_failures)) {
 
                 GS_LOG_MSG(trace, "DetectBalls succeeded - initially found " + std::to_string(test_circles.size()) + " circles.");
 
-                // Apply radius filtering to ONNX results
                 auto it = test_circles.begin();
                 while (it != test_circles.end()) {
                     if ((*it)[2] < minimum_search_radius || (*it)[2] > maximum_search_radius) {
@@ -1151,13 +1118,11 @@ namespace golf_sim {
                         ++it;
                     }
                 }
-                
+
                 if (!test_circles.empty()) {
                     circles.assign(test_circles.begin(), test_circles.end());
 
-                    // ⚠️  WARNING: This old ONNX coordinate offset logic should NEVER execute
-                    // with the new early bypass. If you see this, the early bypass failed!
-                    GS_LOG_MSG(error, "OLD ONNX path executed - this indicates early bypass failure!");
+                    GS_LOG_MSG(error, "OLD detection path executed - this indicates early bypass failure!");
 
                     // Apply coordinate transformation if using sub-image
                     for (auto& c : circles) {
@@ -1168,17 +1133,17 @@ namespace golf_sim {
                     finalNumberOfFoundCircles = (int)circles.size();
                 } else {
                     if (report_find_failures) {
-                        GS_LOG_MSG(warning, "ONNX detection found no balls within radius constraints");
+                        GS_LOG_MSG(warning, "Model detection found no balls within radius constraints");
                     }
                     return false;
                 }
             } else {
                 if (report_find_failures) {
-                    GS_LOG_MSG(warning, "ONNX detection failed to find any balls");
+                    GS_LOG_MSG(warning, "Model detection failed to find any balls");
                 }
                 return false;
             }
-            
+
             // Skip to post-processing (jump past the HoughCircles adaptive loop)
             goto post_detection_processing;
         }
@@ -1341,7 +1306,6 @@ namespace golf_sim {
         }
 
     post_detection_processing:
-        // Post-detection processing continues here for both HoughCircles and ONNX
 
         GS_LOG_MSG(trace, "Stating post_detection_processing.");
 
@@ -1573,8 +1537,8 @@ namespace golf_sim {
             std::string detection_method = (search_mode == BallSearchMode::kFindPlacedBall) ? kBallPlacementDetectionMethod : kStrobedBallDetectionMethod;
 
             // Specially mark the color of the ball to allow downstream stages to effectively ignore color-related filtering.
-            if (detection_method == "experimental" || detection_method == "experimental_sahi") {
-                b.ball_color_ = GolfBall::BallColor::kONNXDetected; // Mark as ONNX-detected
+            if (detection_method == "experimental") {
+                b.ball_color_ = GolfBall::BallColor::kModelDetected;
             }
 
             return_balls.push_back(b);
@@ -2007,8 +1971,8 @@ namespace golf_sim {
             // TBD - Need to retest everything with the new aspect ratio restriction
             if ((std::abs(xc - circleX) > (ballRadius / 1.5)) ||
                 (std::abs(yc - circleY) > (ballRadius / 1.5)) ||
-                area < pow(ballRadius, 2.0) ||
-                area > 6 * pow(ballRadius, 2.0) ||
+                area < (ballRadius * ballRadius) ||
+                area > 6 * (ballRadius * ballRadius) ||
                 (!CvUtils::IsUprightRect(theta) && false) ||
                 aspectRatio > 1.15) {
                 GS_LOG_TRACE_MSG(trace, "Found and REJECTED ellipse, x,y = " + std::to_string(xc) + "," + std::to_string(yc) + " rw,rh = " + std::to_string(a) + "," + std::to_string(b) + " rectArea = " + std::to_string(a * b) + " theta = " + std::to_string(theta) + " aspectRatio = " + std::to_string(aspectRatio) + "(REJECTED)");
@@ -2193,8 +2157,8 @@ namespace golf_sim {
                 // NOTE - there were too many non-upright ellipses
                 if ((std::abs(xc - circleX) > (ballRadius / 1.5)) ||
                         (std::abs(yc - circleY) > (ballRadius / 1.5)) ||
-                        area < pow(ballRadius, 2.0) ||
-                        area > 5 * pow(ballRadius, 2.0) ||
+                        area < (ballRadius * ballRadius) ||
+                        area > 5 * (ballRadius * ballRadius) ||
                         (!CvUtils::IsUprightRect(theta) && false) )  {
                     GS_LOG_TRACE_MSG(trace, "Found and REJECTED ellipse, x,y = " + std::to_string(xc) + "," + std::to_string(yc) + " rw,rh = " + std::to_string(a) + "," + std::to_string(b) + " rectArea = " + std::to_string(a * b) + " theta = " + std::to_string(theta) + "(REJECTED)");
 
@@ -2419,7 +2383,7 @@ namespace golf_sim {
         GS_LOG_TRACE_MSG(trace, "wait_for_movement called with ball = " + ball.Format());
 
         //min area of motion detectable - based on ball radius, should be at least as large as a third of a ball
-        int min_area = (int)pow(ball.ball_circle_[2],2.0);  // Rougly a third of the ball size
+        int min_area = (int)(ball.ball_circle_[2] * ball.ball_circle_[2]);  // Rougly a third of the ball size
 
         boost::timer::cpu_timer timer1;
 
@@ -2891,8 +2855,8 @@ namespace golf_sim {
         LoggingTools::DebugShowImage("full_gray_image1", full_gray_image1);
         LoggingTools::DebugShowImage("full_gray_image2", full_gray_image2);
 
-        // First, get a clean picture of each ball with nothing in the background, both sized the exactly same way 
-        // Resize the images so that the balls are the same radius. 
+        // First, get a clean picture of each ball with nothing in the background, both sized the exactly same way
+        // Resize the images so that the balls are the same radius.
 
         GolfBall local_ball1 = ball1;
         GolfBall local_ball2 = ball2;
@@ -2902,6 +2866,7 @@ namespace golf_sim {
         // to have the new x, y, and radius values relative to the smaller, isolated picture
         cv::Mat ball_image1 = IsolateBall(full_gray_image1, local_ball1);
         cv::Mat ball_image2 = IsolateBall(full_gray_image2, local_ball2);
+
 
         LoggingTools::DebugShowImage("ISOLATED full_gray_image1", ball_image1);
         LoggingTools::DebugShowImage("ISOLATED full_gray_image2", ball_image2);
@@ -2955,10 +2920,14 @@ namespace golf_sim {
         LoggingTools::DebugShowImage("Ball2 Image", ball_image2, center2);
         GS_LOG_TRACE_MSG(trace, "Updated (local) ball2 data: " + local_ball2.Format());
 
+
         float calibrated_binary_threshold = 0;
         cv::Mat ball_image1DimpleEdges = ApplyGaborFilterToBall(ball_image1, local_ball1, calibrated_binary_threshold);
+
+
         //  Suggest the same binary threshold between the images as a starting point for the second ball - they are probably similar
         cv::Mat ball_image2DimpleEdges = ApplyGaborFilterToBall(ball_image2, local_ball2, calibrated_binary_threshold, calibrated_binary_threshold);
+
    
         // TBD = Consider inverting the image to focus only on the inner parts of the dimples that will
         // have fewer pixels?
@@ -2972,15 +2941,11 @@ namespace golf_sim {
         RemoveReflections(ball_image1, ball_image1DimpleEdges, area_mask_image_);
         RemoveReflections(ball_image2, ball_image2DimpleEdges, area_mask_image_);
 
-        // TBD - In addition to removing reflections, we may also want to remove really dark areas which will
-        // comprise the registration marks.  That seems counter-intuitive, but those marks sometimes create large
-        // "positive" (on) areas in the Gabor filters
-
-        // The outer edge of the ball doesn't provide much information, so ignore it
         const float finalBallMaskReductionFactor = 0.92f;
         cv::Scalar ignoreColor = cv::Scalar(kPixelIgnoreValue, kPixelIgnoreValue, kPixelIgnoreValue);
         ball_image1DimpleEdges = MaskAreaOutsideBall(ball_image1DimpleEdges, local_ball1, finalBallMaskReductionFactor, ignoreColor);
         ball_image2DimpleEdges = MaskAreaOutsideBall(ball_image2DimpleEdges, local_ball2, finalBallMaskReductionFactor, ignoreColor);
+
         LoggingTools::DebugShowImage("Final ball_image1DimpleEdges after masking outside", ball_image1DimpleEdges);
         LoggingTools::DebugShowImage("Final ball_image2DimpleEdges after masking outside", ball_image2DimpleEdges);
 
@@ -3044,132 +3009,137 @@ namespace golf_sim {
 #endif
 
 
-
-        // Now compute all the possible rotations of the first image so we can figure out which angles make it look like the second ball image
-        RotationSearchSpace initialSearchSpace;
-
-        // Initial angle search will be fairly coarse
-        initialSearchSpace.anglex_rotation_degrees_increment = kCoarseXRotationDegreesIncrement;
-        initialSearchSpace.anglex_rotation_degrees_start = kCoarseXRotationDegreesStart;
-        initialSearchSpace.anglex_rotation_degrees_end = kCoarseXRotationDegreesEnd;
-        initialSearchSpace.angley_rotation_degrees_increment = kCoarseYRotationDegreesIncrement;
-        initialSearchSpace.angley_rotation_degrees_start = kCoarseYRotationDegreesStart;
-        initialSearchSpace.angley_rotation_degrees_end = kCoarseYRotationDegreesEnd;
-        initialSearchSpace.anglez_rotation_degrees_increment = kCoarseZRotationDegreesIncrement;
-        initialSearchSpace.anglez_rotation_degrees_start = kCoarseZRotationDegreesStart;
-        initialSearchSpace.anglez_rotation_degrees_end = kCoarseZRotationDegreesEnd;
-
-        cv::Mat outputCandidateElementsMat;
-        std::vector< RotationCandidate> candidates;
-        cv::Vec3i output_candidate_elements_mat_size;
-
-        ComputeCandidateAngleImages(ball_image1DimpleEdges, initialSearchSpace, outputCandidateElementsMat, output_candidate_elements_mat_size, candidates, local_ball1);
-
-        // Compare the second (presumably rotated) ball image to different candidate rotations of the first ball image to determine the angular change
-        std::vector<std::string> comparison_csv_data;
-        int best_candidate_index = CompareCandidateAngleImages(&ball_image2DimpleEdges, &outputCandidateElementsMat, &output_candidate_elements_mat_size, &candidates, comparison_csv_data);
-        
         cv::Vec3f rotationResult;
-
-        if (best_candidate_index < 0) {
-            LoggingTools::Warning("No best candidate found.");
-            return rotationResult;
-        }
-
-        bool write_spin_analysis_CSV_files = false;
-
-        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kWriteSpinAnalysisCsvFiles", write_spin_analysis_CSV_files);
-        
-        if (write_spin_analysis_CSV_files) {
-            // This data export can be used for, say, Excel analysis - CSV format
-            std::string csv_fname_coarse = "spin_analysis_coarse.csv";
-            ofstream csv_file_coarse(csv_fname_coarse);
-            GS_LOG_TRACE_MSG(trace, "Writing CSV spin data to: " + csv_fname_coarse);
-            for (auto& element : comparison_csv_data)
-            {
-                // Don't use logging utility so that we don't have all the timing crap in the output
-                csv_file_coarse << element;
-            }
-            csv_file_coarse.close();
-        }
-
-        // See which angle looked best and then iterate more closely near those angles
-        RotationCandidate c = candidates[best_candidate_index];
-
-        std::string s = "Best Coarse Initial Rotation Candidate was #" + std::to_string(best_candidate_index) + " - Rot: (" + std::to_string(c.x_rotation_degrees) + ", " + std::to_string(c.y_rotation_degrees) + ", " + std::to_string(c.z_rotation_degrees) + ") ";
-        GS_LOG_MSG(debug, s);
-
-        // Now iterate more closely in the area that looks best
-        RotationSearchSpace finalSearchSpace;
-
-        int anglex_window_width = (int)std::round(ceil(initialSearchSpace.anglex_rotation_degrees_increment / 2.));
-        int angley_window_width = (int)std::round(ceil(initialSearchSpace.angley_rotation_degrees_increment / 2.));
-        int anglez_window_width = (int)std::round(ceil(initialSearchSpace.anglez_rotation_degrees_increment / 2.));
-
-
-        finalSearchSpace.anglex_rotation_degrees_increment = 1;
-        finalSearchSpace.anglex_rotation_degrees_start = c.x_rotation_degrees - anglex_window_width;
-        finalSearchSpace.anglex_rotation_degrees_end = c.x_rotation_degrees + anglex_window_width;
-        // Probably not worth it to be too fine-grained on the Y axis.
-        finalSearchSpace.angley_rotation_degrees_increment = (int) std::round(kCoarseYRotationDegreesIncrement / 2.);
-        finalSearchSpace.angley_rotation_degrees_start = c.y_rotation_degrees - angley_window_width;
-        finalSearchSpace.angley_rotation_degrees_end = c.y_rotation_degrees + angley_window_width;
-        finalSearchSpace.anglez_rotation_degrees_increment = 1;
-        finalSearchSpace.anglez_rotation_degrees_start = c.z_rotation_degrees - anglez_window_width;
-        finalSearchSpace.anglez_rotation_degrees_end = c.z_rotation_degrees + anglez_window_width;
-
-        cv::Mat finalOutputCandidateElementsMat;
-        cv::Vec3i finalOutputCandidateElementsMatSize;
-        std::vector< RotationCandidate> finalCandidates;
-
-        // After this, the finalOutputCandidateElementsMat will have X,Y,Z elements with an index into the finalCandidates vector.
-        // Each candidate in finalCandidates will have an image, associated X,Y,Z information and a place to put a score
-        ComputeCandidateAngleImages(ball_image1DimpleEdges, finalSearchSpace, finalOutputCandidateElementsMat, finalOutputCandidateElementsMatSize, finalCandidates, local_ball1);
-
-        // TBD - change CompareCandidateAngleImages to work directly with the "3D" images
-        best_candidate_index = CompareCandidateAngleImages(&ball_image2DimpleEdges, &finalOutputCandidateElementsMat, &finalOutputCandidateElementsMatSize, &finalCandidates, comparison_csv_data);
-
-        // Save all the candidate scores to a CSV file if requested
-        if (write_spin_analysis_CSV_files) {
-
-            std::string csv_fname_fine = "spin_analysis_fine.csv";
-            ofstream csv_file_fine(csv_fname_fine);
-            GS_LOG_TRACE_MSG(trace, "Writing CSV spin data to: " + csv_fname_fine);
-            for (auto& element : comparison_csv_data)
-            {
-                // Don't use logging utility so that we don't have all the timing crap in the output
-                csv_file_fine << element;
-            }
-            csv_file_fine.close();
-        }
-
-        // Analyze the fine-grained results
         int best_rot_x = 0;
         int best_rot_y = 0;
         int best_rot_z = 0;
 
-        if (best_candidate_index >= 0) {
-            RotationCandidate finalC = finalCandidates[best_candidate_index];
-            best_rot_x = finalC.x_rotation_degrees;
-            best_rot_y = finalC.y_rotation_degrees;
-            best_rot_z = finalC.z_rotation_degrees;
+        bool use_ml = (kSpinDetectionMethod == "ml") &&
+                      spin_predictor_initialized_.load(std::memory_order_acquire);
 
-            // TBD - Experiment - are Y and X reversed?  Try it here...
-            // best_rot_x = finalC.y_rotation_degrees;
-            // best_rot_y = finalC.x_rotation_degrees;
+        if (kSpinDetectionMethod == "ml" && !use_ml) {
+            GS_LOG_MSG(warning, "Spin method is 'ml' but model not initialized - using rotation search");
+        }
 
-            std::string s = "Best Raw Fine (and final) Rotation Candidate was #" + std::to_string(best_candidate_index) + " - Rot: (" + std::to_string(best_rot_x) + ", " + std::to_string(best_rot_y) + ", " + std::to_string(best_rot_z) + ") ";
-            GS_LOG_MSG(debug, s);
+        if (use_ml) {
+            auto ml_result = spin_predictor_->Predict(ball_image1DimpleEdges, ball_image2DimpleEdges);
 
-            /*** FOR DEBUG ***/
-            cv::Mat bestImg3D = finalCandidates[best_candidate_index].img;
-            cv::Mat bestImg2D = cv::Mat::zeros(ball_image1DimpleEdges.rows, ball_image1DimpleEdges.cols, ball_image1DimpleEdges.type());
-            Unproject3dBallTo2dImage(bestImg3D, bestImg2D, ball2);
-            LoggingTools::DebugShowImage("Best Final Rotation Candidate Image", bestImg2D);
-        } 
+            best_rot_x = (int)std::round(ml_result.x_deg);
+            best_rot_y = (int)std::round(ml_result.y_deg);
+            best_rot_z = (int)std::round(ml_result.z_deg);
+
+            GS_LOG_MSG(info, "ML spin prediction: (" + std::to_string(ml_result.x_deg) + ", " +
+                       std::to_string(ml_result.y_deg) + ", " + std::to_string(ml_result.z_deg) +
+                       ") in " + std::to_string(ml_result.inference_ms) + "ms");
+
+            if (ml_result.z_used_fallback) {
+                GS_LOG_MSG(info, "ML Z fallback triggered - running fine search for Z axis");
+
+                RotationSearchSpace zSearchSpace;
+                zSearchSpace.anglex_rotation_degrees_increment = 1;
+                zSearchSpace.anglex_rotation_degrees_start = best_rot_x;
+                zSearchSpace.anglex_rotation_degrees_end = best_rot_x;
+                zSearchSpace.angley_rotation_degrees_increment = 1;
+                zSearchSpace.angley_rotation_degrees_start = best_rot_y;
+                zSearchSpace.angley_rotation_degrees_end = best_rot_y;
+                zSearchSpace.anglez_rotation_degrees_increment = 2;
+                zSearchSpace.anglez_rotation_degrees_start = kCoarseZRotationDegreesStart;
+                zSearchSpace.anglez_rotation_degrees_end = kCoarseZRotationDegreesEnd;
+
+                cv::Mat zCandidateElementsMat;
+                cv::Vec3i zCandidateElementsMatSize;
+                std::vector<RotationCandidate> zCandidates;
+
+                ComputeCandidateAngleImages(ball_image1DimpleEdges, zSearchSpace,
+                    zCandidateElementsMat, zCandidateElementsMatSize, zCandidates, local_ball1);
+
+                std::vector<std::string> z_csv_data;
+                int z_best_idx = CompareCandidateAngleImages(&ball_image2DimpleEdges,
+                    &zCandidateElementsMat, &zCandidateElementsMatSize, &zCandidates, z_csv_data);
+
+                if (z_best_idx >= 0) {
+                    best_rot_z = zCandidates[z_best_idx].z_rotation_degrees;
+                    GS_LOG_MSG(info, "Z fallback result: " + std::to_string(best_rot_z) + " degrees");
+                }
+            }
+        }
         else {
-            LoggingTools::Warning("No best final candidate found.  Returning 0,0,0 spin results.");
-            rotationResult = cv::Vec3d(0, 0, 0);
+            cv::Mat coarse_dimple1, coarse_dimple2;
+            int coarseRes = kCoarseSearchResolution;
+            cv::Size coarseSize(coarseRes, coarseRes);
+            cv::resize(ball_image1DimpleEdges, coarse_dimple1, coarseSize, 0, 0, cv::INTER_NEAREST);
+            cv::resize(ball_image2DimpleEdges, coarse_dimple2, coarseSize, 0, 0, cv::INTER_NEAREST);
+
+            GolfBall coarse_ball1 = local_ball1;
+            GolfBall coarse_ball2 = local_ball2;
+            float scale = (float)coarseRes / (float)ball_image1DimpleEdges.cols;
+            coarse_ball1.set_x((float)(local_ball1.x() * scale));
+            coarse_ball1.set_y((float)(local_ball1.y() * scale));
+            coarse_ball1.measured_radius_pixels_ = local_ball1.measured_radius_pixels_ * scale;
+            coarse_ball2.set_x((float)(local_ball2.x() * scale));
+            coarse_ball2.set_y((float)(local_ball2.y() * scale));
+            coarse_ball2.measured_radius_pixels_ = local_ball2.measured_radius_pixels_ * scale;
+
+            RotationSearchSpace initialSearchSpace;
+            initialSearchSpace.anglex_rotation_degrees_increment = kCoarseXRotationDegreesIncrement;
+            initialSearchSpace.anglex_rotation_degrees_start = kCoarseXRotationDegreesStart;
+            initialSearchSpace.anglex_rotation_degrees_end = kCoarseXRotationDegreesEnd;
+            initialSearchSpace.angley_rotation_degrees_increment = kCoarseYRotationDegreesIncrement;
+            initialSearchSpace.angley_rotation_degrees_start = kCoarseYRotationDegreesStart;
+            initialSearchSpace.angley_rotation_degrees_end = kCoarseYRotationDegreesEnd;
+            initialSearchSpace.anglez_rotation_degrees_increment = kCoarseZRotationDegreesIncrement;
+            initialSearchSpace.anglez_rotation_degrees_start = kCoarseZRotationDegreesStart;
+            initialSearchSpace.anglez_rotation_degrees_end = kCoarseZRotationDegreesEnd;
+
+            cv::Mat outputCandidateElementsMat;
+            std::vector<RotationCandidate> candidates;
+            cv::Vec3i output_candidate_elements_mat_size;
+
+            ComputeCandidateAngleImages(coarse_dimple1, initialSearchSpace, outputCandidateElementsMat, output_candidate_elements_mat_size, candidates, coarse_ball1);
+
+            std::vector<std::string> comparison_csv_data;
+            int best_candidate_index = CompareCandidateAngleImages(&coarse_dimple2, &outputCandidateElementsMat, &output_candidate_elements_mat_size, &candidates, comparison_csv_data);
+
+            if (best_candidate_index < 0) {
+                LoggingTools::Warning("No best candidate found.");
+                return rotationResult;
+            }
+
+            RotationCandidate c = candidates[best_candidate_index];
+            GS_LOG_MSG(debug, "Best Coarse Rotation: (" + std::to_string(c.x_rotation_degrees) + ", " + std::to_string(c.y_rotation_degrees) + ", " + std::to_string(c.z_rotation_degrees) + ")");
+
+            RotationSearchSpace finalSearchSpace;
+            int anglex_window_width = (int)std::round(ceil(initialSearchSpace.anglex_rotation_degrees_increment / 2.));
+            int angley_window_width = (int)std::round(ceil(initialSearchSpace.angley_rotation_degrees_increment / 2.));
+            int anglez_window_width = (int)std::round(ceil(initialSearchSpace.anglez_rotation_degrees_increment / 2.));
+
+            finalSearchSpace.anglex_rotation_degrees_increment = 1;
+            finalSearchSpace.anglex_rotation_degrees_start = c.x_rotation_degrees - anglex_window_width;
+            finalSearchSpace.anglex_rotation_degrees_end = c.x_rotation_degrees + anglex_window_width;
+            finalSearchSpace.angley_rotation_degrees_increment = (int) std::round(kCoarseYRotationDegreesIncrement / 2.);
+            finalSearchSpace.angley_rotation_degrees_start = c.y_rotation_degrees - angley_window_width;
+            finalSearchSpace.angley_rotation_degrees_end = c.y_rotation_degrees + angley_window_width;
+            finalSearchSpace.anglez_rotation_degrees_increment = 1;
+            finalSearchSpace.anglez_rotation_degrees_start = c.z_rotation_degrees - anglez_window_width;
+            finalSearchSpace.anglez_rotation_degrees_end = c.z_rotation_degrees + anglez_window_width;
+
+            cv::Mat finalOutputCandidateElementsMat;
+            cv::Vec3i finalOutputCandidateElementsMatSize;
+            std::vector<RotationCandidate> finalCandidates;
+
+            ComputeCandidateAngleImages(ball_image1DimpleEdges, finalSearchSpace, finalOutputCandidateElementsMat, finalOutputCandidateElementsMatSize, finalCandidates, local_ball1);
+            best_candidate_index = CompareCandidateAngleImages(&ball_image2DimpleEdges, &finalOutputCandidateElementsMat, &finalOutputCandidateElementsMatSize, &finalCandidates, comparison_csv_data);
+
+            if (best_candidate_index >= 0) {
+                RotationCandidate finalC = finalCandidates[best_candidate_index];
+                best_rot_x = finalC.x_rotation_degrees;
+                best_rot_y = finalC.y_rotation_degrees;
+                best_rot_z = finalC.z_rotation_degrees;
+                GS_LOG_MSG(debug, "Best Fine Rotation: (" + std::to_string(best_rot_x) + ", " + std::to_string(best_rot_y) + ", " + std::to_string(best_rot_z) + ")");
+            } else {
+                LoggingTools::Warning("No best final candidate found.  Returning 0,0,0 spin results.");
+                rotationResult = cv::Vec3d(0, 0, 0);
+            }
         }
 
         // The above angular deltas were calculated relative to a coordinate system that is at an angle
@@ -3455,41 +3425,27 @@ namespace golf_sim {
 
         CV_Assert((img1.rows == img2.rows && img1.rows == img2.cols));
 
-        // DEBUG - create a binary image showing what pixels are the same between them
-        cv::Mat testCorrespondenceImg = cv::Mat::zeros(img1.rows, img1.cols, img1.type());
-
-        // This comparison is currently done serially, but we should be processing
-        // multiple such image comparisons in parallel
         long score = 0;
         long totalPixelsExamined = 0;
-        for (int x = 0; x < img1.cols; x++) {
-            for (int y = 0; y < img1.rows; y++) {
-                uchar p1 = img1.at<uchar>(x, y);
-                uchar p2 = img2.at<cv::Vec2i>(x, y)[1];
+
+        // Optimized: row-major traversal with pointer access, no debug Mat allocation
+        for (int y = 0; y < img1.rows; y++) {
+            const uchar* row1 = img1.ptr<uchar>(y);
+            const cv::Vec2i* row2 = img2.ptr<cv::Vec2i>(y);
+            for (int x = 0; x < img1.cols; x++) {
+                uchar p1 = row1[x];
+                uchar p2 = static_cast<uchar>(row2[x][1]);
 
                 if (p1 != kPixelIgnoreValue && p2 != kPixelIgnoreValue) {
-                    // Both points have values, so we can validly compare them
                     totalPixelsExamined++;
-
                     if (p1 == p2) {
                         score++;
-                        // The test image is already zero'd out, so only set the
-                        // pixel to 1 if there is a match
-                        testCorrespondenceImg.at<uchar>(x, y) = 255;
                     }
-                }
-                else
-                {
-                    testCorrespondenceImg.at<uchar>(x, y) = kPixelIgnoreValue;
                 }
             }
         }
 
-        // LoggingTools::DebugShowImage("testCorrespondenceImg #" + std::to_string(index), testCorrespondenceImg);
-        // WON'T WORK BECAUSE IMG2 is 3D LoggingTools::DebugShowImage("testCandidateImg #" + std::to_string(index), img2);
-
-        cv::Vec2i result(score, totalPixelsExamined);
-        return result;
+        return cv::Vec2i(score, totalPixelsExamined);
     }
 
 
@@ -3555,21 +3511,21 @@ namespace golf_sim {
 
         int white_percent = 0;
 
-        cv::Mat dimpleImg = ApplyTestGaborFilter(img_f32, kernel_size, sig, lm, th, ps, gm, binary_threshold,
-            white_percent);
+        // Compute the 32 Gabor convolutions ONCE — this is the expensive part (~80ms)
+        cv::Mat accumGray = ComputeGaborAccumulation(img_f32, kernel_size, sig, lm, th, ps, gm);
+
+        // Apply initial threshold — this is cheap (~0.01ms)
+        cv::Mat dimpleImg = ThresholdGaborAccumulation(accumGray, binary_threshold, white_percent);
 
         GS_LOG_TRACE_MSG(trace, "Initial Gabor filter white percent = " + std::to_string(white_percent));
 
         bool ratheting_threshold_down = (white_percent < kGaborMinWhitePercent);
 
-        // Give it a second go if we're too white or too black and haven't already overridden the binary threshold
-        if (prior_binary_threshold < 0 && 
+        // Calibration loop: only re-thresholds the pre-computed accumulation (no convolutions)
+        if (prior_binary_threshold < 0 &&
             (white_percent < kGaborMinWhitePercent || white_percent >= kGaborMaxWhitePercent)) {
 
-            // Keep going down or up (depending on the ractchet direction) until we get within a reasonable
-            // white-ness range
             while (white_percent < kGaborMinWhitePercent || white_percent >= kGaborMaxWhitePercent) {
-                // Try another gabor setting for less/more white
 
                 if (ratheting_threshold_down)
                 {
@@ -3591,19 +3547,17 @@ namespace golf_sim {
                     GS_LOG_TRACE_MSG(trace, "Trying higher gabor binary_threshold setting of " + std::to_string(binary_threshold) + " for better balance.");
                 }
 
-                dimpleImg = ApplyTestGaborFilter(img_f32, kernel_size, sig, lm, th, ps, gm, binary_threshold,
-                    white_percent);
+                // Re-threshold the SAME accumulation — no re-running 32 convolutions
+                dimpleImg = ThresholdGaborAccumulation(accumGray, binary_threshold, white_percent);
                 GS_LOG_TRACE_MSG(trace, "Next, refined, Gabor white percent = " + std::to_string(white_percent));
 
-                // If we've gone as far as we can, just return
                 if (binary_threshold > 30 || binary_threshold < 2) {
-                    GS_LOG_MSG(warning, "Binaary threshold for Gabor filter reached limit of " + std::to_string(binary_threshold));
+                    GS_LOG_MSG(warning, "Binary threshold for Gabor filter reached limit of " + std::to_string(binary_threshold));
                     break;
                 }
 
             }
 
-            // Return the final threshold so that the caller can use for subsequent calls
             calibrated_binary_threshold = binary_threshold;
 
             GS_LOG_TRACE_MSG(trace, "Final Gabor white percent = " + std::to_string(white_percent));
@@ -3612,40 +3566,64 @@ namespace golf_sim {
         return dimpleImg;
     }
 
-    cv::Mat BallImageProc::ApplyTestGaborFilter(const cv::Mat& img_f32,
-        const int kernel_size, double sig, double lm, double th, double ps, double gm, float binary_threshold,
-        int &white_percent  ) {
+    cv::Mat BallImageProc::ComputeGaborAccumulation(const cv::Mat& img_f32,
+        const int kernel_size, double sig, double lm, double th, double ps, double gm) {
 
-        cv::Mat dest = cv::Mat::zeros(img_f32.rows, img_f32.cols, img_f32.type());
-        cv::Mat accum = cv::Mat::zeros(img_f32.rows, img_f32.cols, img_f32.type());
-        cv::Mat kernel;
+        const int nOrientations = 33;
+        const double thetaIncrement = 11.25;
 
+        static std::once_flag kernelCacheFlag;
+        static std::vector<cv::Mat> cachedKernels;
+        std::call_once(kernelCacheFlag, [&]() {
+            cachedKernels.resize(nOrientations);
+            for (int i = 0; i < nOrientations; i++) {
+                double theta = i * thetaIncrement;
+                cachedKernels[i] = CreateGaborKernel(kernel_size, sig, theta, lm, gm, ps);
+            }
+        });
 
-        // Sweep through a bunch of different angles for the filter in order to pick up features
-        // in all directions
-        const double thetaIncrement = 11.25; //  5.625; // CURRENT 11.25;  // degrees.  Nominal: 11.25 also works 
-        for (double theta = 0; theta <= 360.0; theta += thetaIncrement) {
-            kernel = CreateGaborKernel(kernel_size, sig, theta, lm, gm, ps);
-            cv::filter2D(img_f32, dest, CV_32F, kernel);
+        int nThreads = std::min(omp_get_max_threads(), 4);
+        std::vector<cv::Mat> threadAccum(nThreads);
+        for (auto& a : threadAccum) {
+            a = cv::Mat::zeros(img_f32.rows, img_f32.cols, CV_32F);
+        }
 
-            cv::max(accum, dest, accum);
+        #pragma omp parallel num_threads(nThreads)
+        {
+            int tid = omp_get_thread_num();
+            cv::Mat dest;
+            #pragma omp for schedule(static)
+            for (int i = 0; i < nOrientations; i++) {
+                cv::filter2D(img_f32, dest, CV_32F, cachedKernels[i]);
+                cv::max(threadAccum[tid], dest, threadAccum[tid]);
+            }
+        }
+
+        cv::Mat accum = threadAccum[0];
+        for (int t = 1; t < nThreads; t++) {
+            cv::max(accum, threadAccum[t], accum);
         }
 
         cv::Mat accumGray;
-
-        // Convert from the 0.0 to 1.0 range into 0-255
         accum.convertTo(accumGray, CV_8U, 255, 0);
+        return accumGray;
+    }
 
-        cv::Mat dimpleEdges = cv::Mat::zeros(accum.rows, accum.cols, accum.type());
-
-        // Threshold the image to either 0 or 255
+    // Apply binary threshold to a pre-computed Gabor accumulation — the cheap part (~0.01ms).
+    cv::Mat BallImageProc::ThresholdGaborAccumulation(const cv::Mat& accumGray, float binary_threshold, int& white_percent) {
+        cv::Mat dimpleEdges;
         const int edgeThresholdLow = (int)std::round(binary_threshold * 10.);
-        const int edgeThresholdHigh = 255;
-        cv::threshold(accumGray, dimpleEdges, edgeThresholdLow, edgeThresholdHigh, cv::THRESH_BINARY);
-
+        cv::threshold(accumGray, dimpleEdges, edgeThresholdLow, 255, cv::THRESH_BINARY);
         white_percent = (int)std::round(((double)cv::countNonZero(dimpleEdges) * 100.) / ((double)dimpleEdges.rows * dimpleEdges.cols));
-
         return dimpleEdges;
+    }
+
+    // Legacy wrapper — calls both stages for backward compatibility
+    cv::Mat BallImageProc::ApplyTestGaborFilter(const cv::Mat& img_f32,
+        const int kernel_size, double sig, double lm, double th, double ps, double gm, float binary_threshold,
+        int &white_percent  ) {
+        cv::Mat accumGray = ComputeGaborAccumulation(img_f32, kernel_size, sig, lm, th, ps, gm);
+        return ThresholdGaborAccumulation(accumGray, binary_threshold, white_percent);
     }
  
    bool BallImageProc::ComputeCandidateAngleImages(const cv::Mat& base_dimple_image, 
@@ -3704,62 +3682,49 @@ namespace golf_sim {
 
         output_candidate_elements_mat_size = cv::Vec3i(xSize, ySize, zSize);
 
-        GS_LOG_TRACE_MSG(trace, "ComputeCandidateAngleImages will compute " + std::to_string(xSize * ySize * zSize) + " images.");
+        int totalCandidates = xSize * ySize * zSize;
+        GS_LOG_TRACE_MSG(trace, "ComputeCandidateAngleImages will compute " + std::to_string(totalCandidates) + " images.");
 
-        // Create a new 3D Mat to hold indexes to the results in the vector.  Use a Mat in order to exploit the forEach() function
+        // Create a new 3D Mat to hold indexes to the results in the vector
         int sizes[3] = { xSize, ySize, zSize };
         outputCandidateElementsMat = cv::Mat(3, sizes, CV_16U, cv::Scalar(0));
 
-        short vectorIndex = 0;
+        // Pre-allocate the candidate vector so threads can write by index without locking
+        output_candidates.resize(totalCandidates);
 
-        int xIndex = 0;
-        int yIndex = 0;
-        int zIndex = 0;
+        // Flatten the 3-level nested loop into a single parallel loop.
+        // Each iteration is independent — the 3D projection only reads from base_dimple_image
+        // and writes to its own candidate slot.
+        GS_LOG_MSG(info, "OMP: parallelizing " + std::to_string(totalCandidates) + " candidates across " + std::to_string(omp_get_max_threads()) + " threads (serial pixel loops)");
 
-        for (int x_rotation_degrees = anglex_rotation_degrees_start, xIndex = 0; x_rotation_degrees <= anglex_rotation_degrees_end; x_rotation_degrees += anglex_rotation_degrees_increment, xIndex++) {
-            for (int y_rotation_degrees = angley_rotation_degrees_start, yIndex = 0; y_rotation_degrees <= angley_rotation_degrees_end; y_rotation_degrees += angley_rotation_degrees_increment, yIndex++) {
-                for (int z_rotation_degrees = anglez_rotation_degrees_start, zIndex = 0; z_rotation_degrees <= anglez_rotation_degrees_end; z_rotation_degrees += anglez_rotation_degrees_increment, zIndex++) {
+        #pragma omp parallel for schedule(static) num_threads(4)
+        for (int flatIdx = 0; flatIdx < totalCandidates; flatIdx++) {
+            // Decompose flat index back to (xIndex, yIndex, zIndex)
+            int xIndex = flatIdx / (ySize * zSize);
+            int rem = flatIdx % (ySize * zSize);
+            int yIndex = rem / zSize;
+            int zIndex = rem % zSize;
 
-                    cv::Mat ball2DImage;
-                    // TBD - Instead of this, call the projectTo3D function and then use the resulting
-                    // matrix directly in the comparison
-                    // GetRotatedImage(base_dimple_image, ball, cv::Vec3i(x_rotation_degrees, y_rotation_degrees, z_rotation_degrees), ball2DImage);
+            int x_rotation_degrees = anglex_rotation_degrees_start + xIndex * anglex_rotation_degrees_increment;
+            int y_rotation_degrees = angley_rotation_degrees_start + yIndex * angley_rotation_degrees_increment;
+            int z_rotation_degrees = anglez_rotation_degrees_start + zIndex * anglez_rotation_degrees_increment;
 
-                    // Project the ball out onto a 3D hemisphere at the current x, y, and z-axis rotation
-                    cv::Mat ball13DImage = Project2dImageTo3dBall(base_dimple_image, ball, cv::Vec3i(x_rotation_degrees, y_rotation_degrees, z_rotation_degrees));
+            // Project the ball onto a 3D hemisphere at the current rotation
+            // force_serial=true because we're inside an OMP parallel region — each thread
+            // runs its own serial pixel loop instead of fighting over OpenCV's thread pool
+            cv::Mat ball13DImage = Project2dImageTo3dBall(base_dimple_image, ball,
+                cv::Vec3i(x_rotation_degrees, y_rotation_degrees, z_rotation_degrees), true);
 
-                    // Save the current image as a possible candidate to compare to later
-                    RotationCandidate c;
+            // Store candidate at its pre-determined index (no locking needed)
+            RotationCandidate& c = output_candidates[flatIdx];
+            c.index = static_cast<short>(flatIdx);
+            c.img = std::move(ball13DImage);
+            c.x_rotation_degrees = x_rotation_degrees - xAngleOffset;
+            c.y_rotation_degrees = y_rotation_degrees - yAngleOffset;
+            c.z_rotation_degrees = z_rotation_degrees;
+            c.score = 0.0;
 
-                    // The angles in the set of images we are building are angles calculated as if the ball was
-                    // centered in the camera's image
-                    c.index = vectorIndex;
-                    c.img = ball13DImage;
-                    c.x_rotation_degrees = x_rotation_degrees - xAngleOffset;
-                    c.y_rotation_degrees = y_rotation_degrees - yAngleOffset;
-                    c.z_rotation_degrees = z_rotation_degrees;
-                    c.score = 0.0;
-
-                    // For now, just throw all of the candidates into a big vector indexed by the entries in the matrix
-                    output_candidates.push_back(c);
-                    outputCandidateElementsMat.at<ushort>(xIndex, yIndex, zIndex) = vectorIndex;
-
-                    vectorIndex++;
-                    
-                    // Just for debug for small runs - probably too much information
-                    /* std::string s = "ComputeCandidateAngleImages - Rotation Candidate: Idx: " + std::to_string(c.index) +
-                        " Rot: (" + std::to_string(c.x_rotation_degrees) + ", " + std::to_string(c.y_rotation_degrees) + ", " + std::to_string(c.z_rotation_degrees) + ") ";
-                    GS_LOG_MSG(debug, s);
-                    */
-
-                    // FOR DEBUG
-                    /*
-                    cv::Mat outputGrayImg = cv::Mat::zeros(base_dimple_image.rows, base_dimple_image.cols, base_dimple_image.type());
-                    Unproject3dBallTo2dImage(ball13DImage, outputGrayImg, ball);
-                    LoggingTools::DebugShowImage("Candidate Image at Rot: (" + std::to_string(c.x_rotation_degrees) + ", " + std::to_string(c.y_rotation_degrees) + ", " + std::to_string(c.z_rotation_degrees) + "): ", outputGrayImg);
-                    */
-                }
-            }
+            outputCandidateElementsMat.at<ushort>(xIndex, yIndex, zIndex) = static_cast<ushort>(flatIdx);
         }
 
         timer1.stop();
@@ -3791,48 +3756,58 @@ namespace golf_sim {
    // After first being setup, the operator() will be called in parallel across
    // different processing cores.
     struct projectionOp {
-        // Must be called prior to using the iteration() operator
-        static void setup(const GolfBall *currentBall,
-                          cv::Mat& projectedImg,
-                          const double& x_rotation_degreesAngleRad,
-                          const double& y_rotation_degreesAngleRad,
-                          const double& z_rotation_degreesAngleRad ) {
-            currentBall_ = currentBall;
-            projectedImg_ = projectedImg;
-            // Copy the rows/cols from the image because openCV will not do so otherwise
-            // TBD - Kind of a hack
+        // Constructor initializes all state — no static members, thread-safe for OpenMP
+        projectionOp() = default;
+
+        projectionOp(const GolfBall *currentBall,
+                     cv::Mat& projectedImg,
+                     float x_rad, float y_rad, float z_rad)
+            : currentBall_(currentBall), projectedImg_(projectedImg),
+              x_rotation_degreesAngleRad_(x_rad),
+              y_rotation_degreesAngleRad_(y_rad),
+              z_rotation_degreesAngleRad_(z_rad),
+              sinX_(sinf(x_rad)), cosX_(cosf(x_rad)),
+              sinY_(sinf(y_rad)), cosY_(cosf(y_rad)),
+              sinZ_(sinf(z_rad)), cosZ_(cosf(z_rad)),
+              rotatingOnX_(std::abs(x_rad) > 0.001f),
+              rotatingOnY_(std::abs(y_rad) > 0.001f),
+              rotatingOnZ_(std::abs(z_rad) > 0.001f)
+        {
             projectedImg_.rows = projectedImg.rows;
             projectedImg_.cols = projectedImg.cols;
-            x_rotation_degreesAngleRad_ = x_rotation_degreesAngleRad;
-            y_rotation_degreesAngleRad_ = y_rotation_degreesAngleRad;
-            z_rotation_degreesAngleRad_ = z_rotation_degreesAngleRad;
+        }
 
-            // Pre-compute the trig functions for speed.  They will be the same for all pixels in the image
-            sinX_ = sin(x_rotation_degreesAngleRad_);
-            cosX_ = cos(x_rotation_degreesAngleRad_);
-            sinY_ = sin(y_rotation_degreesAngleRad_);
-            cosY_ = cos(y_rotation_degreesAngleRad_);
-            sinZ_ = sin(z_rotation_degreesAngleRad_);
-            cosZ_ = cos(z_rotation_degreesAngleRad_);
-
-            // If some of the angles are 0, then we don't need to do any math at all for that axis or axes
-            /* DELETE OLD
-            rotatingOnX_ = ((int)std::round(1000 * x_rotation_degreesAngleRad_) != 0) ? true : false;
-            rotatingOnY_ = ((int)std::round(1000 * y_rotation_degreesAngleRad_) != 0) ? true : false;
-            rotatingOnZ_ = ((int)std::round(1000 * z_rotation_degreesAngleRad_) != 0) ? true : false;
-            */
-            rotatingOnX_ = (std::abs(x_rotation_degreesAngleRad_) > 0.001) ? true : false;
-            rotatingOnY_ = (std::abs(y_rotation_degreesAngleRad_) > 0.001) ? true : false;
-            rotatingOnZ_ = (std::abs(z_rotation_degreesAngleRad_) > 0.001) ? true : false;
+        // Legacy static setup — kept for backward compat with non-OMP code paths
+        static void setup(const GolfBall *currentBall,
+                          cv::Mat& projectedImg,
+                          float x_rotation_degreesAngleRad,
+                          float y_rotation_degreesAngleRad,
+                          float z_rotation_degreesAngleRad ) {
+            s_currentBall_ = currentBall;
+            s_projectedImg_ = projectedImg;
+            s_projectedImg_.rows = projectedImg.rows;
+            s_projectedImg_.cols = projectedImg.cols;
+            s_x_rad_ = x_rotation_degreesAngleRad;
+            s_y_rad_ = y_rotation_degreesAngleRad;
+            s_z_rad_ = z_rotation_degreesAngleRad;
+            s_sinX_ = sinf(x_rotation_degreesAngleRad);
+            s_cosX_ = cosf(x_rotation_degreesAngleRad);
+            s_sinY_ = sinf(y_rotation_degreesAngleRad);
+            s_cosY_ = cosf(y_rotation_degreesAngleRad);
+            s_sinZ_ = sinf(z_rotation_degreesAngleRad);
+            s_cosZ_ = cosf(z_rotation_degreesAngleRad);
+            s_rotatingOnX_ = (std::abs(x_rotation_degreesAngleRad) > 0.001f);
+            s_rotatingOnY_ = (std::abs(y_rotation_degreesAngleRad) > 0.001f);
+            s_rotatingOnZ_ = (std::abs(z_rotation_degreesAngleRad) > 0.001f);
         }
 
         // The returned imageXFromCenter and imageYFromCenter are the original imageX & Y in a new coordinate system with the center of the ball at (0,0)
-        static void getBallZ(const double imageX, const double imageY, double& imageXFromCenter, double& imageYFromCenter, double& ball3dZ) {
+        void getBallZ(const float imageX, const float imageY, float& imageXFromCenter, float& imageYFromCenter, float& ball3dZ) const {
             // Basic idea:  x2 + y2 + z2 = r2  (2's are squared).  Just solve for z where we can
 
-            double r = currentBall_->measured_radius_pixels_;
-            double ballCenterX = currentBall_->x();
-            double ballCenterY = currentBall_->y();
+            float r = (float)currentBall_->measured_radius_pixels_;
+            float ballCenterX = (float)currentBall_->x();
+            float ballCenterY = (float)currentBall_->y();
 
             // Translate x and y into a new coordinate system that has the origin
             // at the center of the ball.
@@ -3846,33 +3821,33 @@ namespace golf_sim {
             }
             // Project the x,y coordinate onto the hemisphere to get the Z-axis position
             // Note that some of the image may be outside the sphere.  Ignore those
-            double rSquared = pow(r, 2);
-            double xSquarePlusYSquare = pow(imageXFromCenter, 2) + pow(imageYFromCenter, 2);
-            double diff = rSquared - xSquarePlusYSquare;
-            if (diff < 0.0) {
+            float rSquared = r * r;
+            float xSquarePlusYSquare = imageXFromCenter * imageXFromCenter + imageYFromCenter * imageYFromCenter;
+            float diff = rSquared - xSquarePlusYSquare;
+            if (diff < 0.0f) {
                 ball3dZ = 0;  // Point is off the hemisphere/circle
             }
             else
             {
                 // We seem to be spending a lot of time in round() - TBD
-                ball3dZ = sqrt(diff);  // (int)std::round(sqrt(diff));
+                ball3dZ = sqrtf(diff);  // (int)std::round(sqrtf(diff));
             }
         }
 
         // The sparse Z values associated with the X,Y pairs of the 3D images will be >= 0, because
         // the X,Y rays from the 2D image will be projected only on the closest hemisphere
         void operator ()(uchar& pixelValue, const int* position) const {
-            double imageX = position[0];
-            double imageY = position[1];
+            float imageX = (float)position[0];
+            float imageY = (float)position[1];
 
 
             // Figure out where the pre-rotated point is
-            double imageXFromCenter;
-            double imageYFromCenter;
-            double ball3dZOfUnrotatedPoint = 0.0;
+            float imageXFromCenter;
+            float imageYFromCenter;
+            float ball3dZOfUnrotatedPoint = 0.0f;
             getBallZ(imageX, imageY, imageXFromCenter, imageYFromCenter, ball3dZOfUnrotatedPoint);
 
-            bool prerotatedPointNotValid = (ball3dZOfUnrotatedPoint <= 0.0001);  // A 0 value from getBallZ means that the point was outside the ROI
+            bool prerotatedPointNotValid = (ball3dZOfUnrotatedPoint <= 0.0001f);  // A 0 value from getBallZ means that the point was outside the ROI
 
             // The following is a sort of safety feature - TBD - do we need this?
             // If the point we are rotating FROM is not on the visible hemisphere, set its pixel value to Ignore it.
@@ -3883,7 +3858,7 @@ namespace golf_sim {
                 // std::cout << "CV_ELEM_SIZE1(traits::Depth<_Tp>::value): " << CV_ELEM_SIZE1(projectedImg_.traits::Depth<_Tp>::value) << "elemSize1()" << projectedImg_.elemSize1() << std::endl;
                 // TBD - Not sure we even need to bother with this?
 
-                projectedImg_.at<cv::Vec2i>((int)imageX, (int)imageY)[0] = (int)ball3dZOfUnrotatedPoint;    // TBD - Wait, is this right?  Why change the Z??
+                // Channel [0] Z is dead data — only write channel [1]
                 projectedImg_.at<cv::Vec2i>((int)imageX, (int)imageY)[1] = kPixelIgnoreValue;
             }
 
@@ -3891,77 +3866,51 @@ namespace golf_sim {
             // Note - this method is likely to leave a lot of gaps in the unprojected image.  Consider interpolation?
             // GS_LOG_TRACE_MSG(trace, "projectionOp Result:  [" + std::to_string(imageX) + ", " + std::to_string(imageX) + ", " + std::to_string(ball3dZ) + "]=" + std::to_string(pixelValue));
 
-            double imageZ = ball3dZOfUnrotatedPoint; // Note - the z axis is already situated with the origin in the center
+            float imageZ = ball3dZOfUnrotatedPoint; // Note - the z axis is already situated with the origin in the center
 
             // X-axis rotation
             if (rotatingOnX_) {
-                double tmpImageYFromCenter = imageYFromCenter;  // Want to change both Y and Z at the same time
+                float tmpImageYFromCenter = imageYFromCenter;  // Want to change both Y and Z at the same time
                 imageYFromCenter = (imageYFromCenter * cosX_) - (imageZ * sinX_);
                 imageZ = (int)((tmpImageYFromCenter * sinX_) + (imageZ * cosX_));
             }
-    
+
             // Y-axis rotation
             if (rotatingOnY_) {
-                double tmpImageXFromCenter = imageXFromCenter;
+                float tmpImageXFromCenter = imageXFromCenter;
                 imageXFromCenter = (imageXFromCenter * cosY_) + (imageZ * sinY_);
                 imageZ = (int)((imageZ * cosY_) - (tmpImageXFromCenter * sinY_));
             }
 
             // Z-axis rotation
             if (rotatingOnZ_) {
-                double tmpImageXFromCenter = imageXFromCenter;
+                float tmpImageXFromCenter = imageXFromCenter;
                 imageXFromCenter = (imageXFromCenter * cosZ_) - (imageYFromCenter * sinZ_);
                 imageYFromCenter = (tmpImageXFromCenter * sinZ_) + (imageYFromCenter * cosZ_);
             }
 
             // Shift back to coordinates with the origin in the top-left
-            imageX = imageXFromCenter + projectionOp::currentBall_->x();
-            imageY = imageYFromCenter + projectionOp::currentBall_->y();
+            imageX = imageXFromCenter + (float)currentBall_->x();
+            imageY = imageYFromCenter + (float)currentBall_->y();
 
-            // Get the Z value of the destination, rotated-to point.
-            double ball3dZOfRotatedPoint = 0;
-            double dummy_rotatedImageXFromCenter;  // Just used as a dummy variable to get the new Z
-            double dummy_rotatedImageYFromCenter;  // Just used as a dummy variable to get the new Z
+            // Check if the rotated destination point is on the visible hemisphere.
+            // We only need to know if r² >= x² + y² (no sqrt needed — channel [0] Z value is dead data).
+            float destXFromCenter = imageX - (float)currentBall_->x();
+            float destYFromCenter = imageY - (float)currentBall_->y();
+            float r = (float)currentBall_->measured_radius_pixels_;
+            bool rotatedPointVisible = (destXFromCenter * destXFromCenter + destYFromCenter * destYFromCenter) < (r * r);
 
-            getBallZ(imageX, imageY, dummy_rotatedImageXFromCenter, dummy_rotatedImageYFromCenter, ball3dZOfRotatedPoint);
-
-            if (currentBall_->PointIsInsideBall(imageX, imageY) && ball3dZOfRotatedPoint < 0.001) {
-                GS_LOG_TRACE_MSG(trace, "Project2dImageTo3dBall Z-value pixel within ball at (" + std::to_string(imageX) +
-                    ", " + std::to_string(imageY) + ").");
-            }
-
-            // Some of the points (like the corners) may rotate out to a place that is outside of the image Mat
-            // If so, just ignore that point
-            // Also, if the Z point that we've rotated the current pixel to is now *behind* the ball surface that the camera sees, then just ignore it
-            // and do absolutely nothing
+            // Bounds check + hemisphere visibility
             if (imageX >= 0 &&
                 imageY >= 0 &&
                 imageX < projectedImg_.cols &&
                 imageY < projectedImg_.rows &&
-                ball3dZOfRotatedPoint > 0.0) {
-                    // The rotated-to point is on the visible surface of the hemisphere
+                rotatedPointVisible) {
 
-                    // Instead of performing a zillion round operations, we'll just effectively floor (truncate)
-                    // each x and y value.  We'll lose some accuracy, but if everything is floored, it should at least
-                    // still be consistent.
-                    // projectedImg_.at<cv::Vec2i>((int)imageX, (int)imageY)[0] = (int)std::round(ball3dZOfRotatedPoint);
+                    int roundedImageX = (int)(imageX + 0.5f);
+                    int roundedImageY = (int)(imageY + 0.5f);
 
-                    int roundedImageX = (int)(imageX + 0.5);
-                    int roundedImageY = (int)(imageY + 0.5);
-
-                    // GS_LOG_TRACE_MSG(trace, "RoundedImage X&Y were: (" + std::to_string(roundedImageX) + ", " + std::to_string(roundedImageY) + ").");
-
-
-                    // If the final, new pixel came from an invalid place, don't allow it to pollute the rotated image
-                    // Not rounding here helped increase performance
-                    projectedImg_.at<cv::Vec2i>(roundedImageX, roundedImageY)[0] = (int)(ball3dZOfRotatedPoint);
-
-                    /** TBD - DEBUG ONLY 
-                    if (currentBall_->PointIsInsideBall(roundedImageX, roundedImageY) && pixelValue == kPixelIgnoreValue) {
-                        GS_LOG_TRACE_MSG(trace, "Project2dImageTo3dBall found ignore pixel within ball at (" + std::to_string(roundedImageX) +
-                                    ", " + std::to_string(roundedImageY) + ").");
-                    }
-                    */
+                    // Channel [0] (Z depth) is never read downstream — skip the write
                     projectedImg_.at<cv::Vec2i>(roundedImageX, roundedImageY)[1] = (prerotatedPointNotValid ? kPixelIgnoreValue : pixelValue);
             }
             else {
@@ -3974,56 +3923,52 @@ namespace golf_sim {
             }
         }
 
-        // The ball information that we are currently operating with
-        // Null if not yet set
-        static const GolfBall* currentBall_;
+        // Instance members — each copy of the functor has its own state (thread-safe)
+        const GolfBall* currentBall_ = nullptr;
+        mutable cv::Mat projectedImg_;
+        float x_rotation_degreesAngleRad_ = 0;
+        float y_rotation_degreesAngleRad_ = 0;
+        float z_rotation_degreesAngleRad_ = 0;
+        float sinX_ = 0, cosX_ = 0;
+        float sinY_ = 0, cosY_ = 0;
+        float sinZ_ = 0, cosZ_ = 0;
+        bool rotatingOnX_ = true;
+        bool rotatingOnY_ = true;
+        bool rotatingOnZ_ = true;
 
-        // The 3D grayscale image we are working on
-        static cv::Mat projectedImg_;
-
-        // The angles to rotate the Mat when we project it to 3D
-        static double x_rotation_degreesAngleRad_;
-        static double y_rotation_degreesAngleRad_;
-        static double z_rotation_degreesAngleRad_;
-
-        // Precomputed trig results for rotation
-        static double sinX_;
-        static double cosX_;
-        static double sinY_;
-        static double cosY_;
-        static double sinZ_;
-        static double cosZ_;
-
-        static bool rotatingOnX_;
-        static bool rotatingOnY_;
-        static bool rotatingOnZ_;
+        // Static members — used only by legacy setup() path (non-OMP forEach)
+        static const GolfBall* s_currentBall_;
+        static cv::Mat s_projectedImg_;
+        static float s_x_rad_, s_y_rad_, s_z_rad_;
+        static float s_sinX_, s_cosX_, s_sinY_, s_cosY_, s_sinZ_, s_cosZ_;
+        static bool s_rotatingOnX_, s_rotatingOnY_, s_rotatingOnZ_;
     };
 
-    // Complete storage for projectionOp struct
-    const GolfBall* projectionOp::currentBall_ = NULL;
-    cv::Mat projectionOp::projectedImg_;
-    double projectionOp::x_rotation_degreesAngleRad_ = 0;
-    double projectionOp::y_rotation_degreesAngleRad_ = 0;
-    double projectionOp::z_rotation_degreesAngleRad_ = 0;
-    double projectionOp::sinX_ = 0;
-    double projectionOp::cosX_ = 0;
-    double projectionOp::sinY_ = 0;
-    double projectionOp::cosY_ = 0;
-    double projectionOp::sinZ_ = 0;
-    double projectionOp::cosZ_ = 0;
-    bool projectionOp::rotatingOnX_ = true;
-    bool projectionOp::rotatingOnY_ = true;
-    bool projectionOp::rotatingOnZ_ = true;
+    // Static storage for legacy setup() path
+    const GolfBall* projectionOp::s_currentBall_ = nullptr;
+    cv::Mat projectionOp::s_projectedImg_;
+    float projectionOp::s_x_rad_ = 0;
+    float projectionOp::s_y_rad_ = 0;
+    float projectionOp::s_z_rad_ = 0;
+    float projectionOp::s_sinX_ = 0;
+    float projectionOp::s_cosX_ = 0;
+    float projectionOp::s_sinY_ = 0;
+    float projectionOp::s_cosY_ = 0;
+    float projectionOp::s_sinZ_ = 0;
+    float projectionOp::s_cosZ_ = 0;
+    bool projectionOp::s_rotatingOnX_ = true;
+    bool projectionOp::s_rotatingOnY_ = true;
+    bool projectionOp::s_rotatingOnZ_ = true;
 
 
     // Positive X-axis angles rotate so that the ball appears to go from left to right
     // positive Y-axis angles move the ball from the top to the bottom
     // positive Z-Axis angles are counter-clockwise looking down the positive z-axis
     // The image_gray input Mat is expected to have pixels with only 0, 255, or kPixelIgnoreValue
-    cv::Mat BallImageProc::Project2dImageTo3dBall(const cv::Mat& image_gray, const GolfBall& ball, const cv::Vec3i& rotation_angles_degrees) {
+    cv::Mat BallImageProc::Project2dImageTo3dBall(const cv::Mat& image_gray, const GolfBall& ball, const cv::Vec3i& rotation_angles_degrees, bool force_serial) {
 
         // Create a new 3D Mat to hold the results
-        int sizes[2] = { image_gray.rows, image_gray.cols };  // , image_gray.rows };
+        int sizes[2] = { image_gray.rows, image_gray.cols };
         // It's possible that due to rotations, some of the 3D image might have "holes" where
         // the pixel was not set to a value.  Make sure anything we don't set is ignored.
         cv::Mat projectedImg = cv::Mat(2, sizes, CV_32SC2, cv::Scalar(0, kPixelIgnoreValue));
@@ -4032,37 +3977,28 @@ namespace golf_sim {
         projectedImg.rows = image_gray.rows;
         projectedImg.cols = image_gray.cols;
 
-        // Setup the global structures we need before we do the parallelized callback to process
-        // the 2D image
-        projectionOp::setup(&ball, 
-                            projectedImg, 
-                            -(float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[0]),  /* Negative due to rotation in X axis being backward */
-                            (float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[1]),
-                            (float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[2])  );
+        float x_rad = -(float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[0]);
+        float y_rad = (float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[1]);
+        float z_rad = (float)CvUtils::DegreesToRadians((double)rotation_angles_degrees[2]);
 
-        if (kSerializeOpsForDebug) {
-            /*  Serialized version for debugging - use the parallel stuff below for release */
+        // Create a thread-safe functor with all state in instance members
+        projectionOp op(&ball, projectedImg, x_rad, y_rad, z_rad);
+
+        if (kSerializeOpsForDebug || force_serial) {
+            // Serial path — used inside OMP parallel regions to avoid thread contention
+            // Keep original x-outer/y-inner order to match projectionOp's coordinate semantics
+            // (position[0]=x is treated as the first Mat index in at<>() calls)
             for (int x = 0; x < image_gray.cols; x++) {
                 for (int y = 0; y < image_gray.rows; y++) {
                     int position[]{ x, y };
                     uchar pixel = image_gray.at<uchar>(x, y);
-
-                    // FOR DEBUG ONLY
-
-                    // TBD - Translate x and y into a new coordinate system that has the origin
-                    // at the center of the ball.
-                    if (ball.PointIsInsideBall(x, y) && pixel == kPixelIgnoreValue) {
-                        GS_LOG_TRACE_MSG(trace, "Project2dImageTo3dBall found ignore pixel within ball at (" + std::to_string(x) + ", " + std::to_string(y) + ").");
-                    }
-
-
-                    projectionOp()(pixel, position);
+                    op(pixel, position);
                 }
             }
         }
         else {
-            // Parallel execution with function object.
-            image_gray.forEach<uchar>(projectionOp());
+            // forEach uses OpenCV's internal thread pool — only use outside OMP regions
+            image_gray.forEach<uchar>(op);
         }
 
         return projectedImg;
@@ -4154,23 +4090,46 @@ namespace golf_sim {
         // LoggingTools::DebugShowImage("(closed) destination_image_gray", destination_image_gray);
     }
 
+    bool BallImageProc::BboxToCircle(float bbox_x, float bbox_y, float bbox_w, float bbox_h,
+                                     int image_cols, int image_rows,
+                                     const char* backend_name,
+                                     GsCircle& out_circle) {
+        float cx = bbox_x + bbox_w * 0.5f;
+        float cy = bbox_y + bbox_h * 0.5f;
+        float r = std::max(bbox_w, bbox_h) * 0.5f;
+
+        if (cx - r < 0 || cy - r < 0 ||
+            cx + r > image_cols || cy + r > image_rows) {
+            GS_LOG_TRACE_MSG(trace, std::string(backend_name) +
+                           ": rejecting edge-clipped detection at (" +
+                           std::to_string((int)cx) + "," + std::to_string((int)cy) +
+                           ") r=" + std::to_string((int)r));
+            return false;
+        }
+
+        out_circle[0] = cx;
+        out_circle[1] = cy;
+        out_circle[2] = r;
+        return true;
+    }
+
     /**
      * Detection Algorithm Dispatcher
-     * Routes detection to HoughCircles or ONNX based on kStrobedBallDetectionMethod configuration
+
      */
-    bool BallImageProc::DetectBalls(const cv::Mat& preprocessed_img, BallSearchMode search_mode, 
+    bool BallImageProc::DetectBalls(const cv::Mat& preprocessed_img, BallSearchMode search_mode,
                                    std::vector<GsCircle>& detected_circles,
                                     bool report_find_failures) {
         GS_LOG_TRACE_MSG(trace, "BallImageProc::DetectBalls - Method: " + kStrobedBallDetectionMethod);
 
 		std::string detection_method = (search_mode == BallSearchMode::kFindPlacedBall) ? kBallPlacementDetectionMethod : kStrobedBallDetectionMethod;
-        
+
         if (detection_method == "legacy") {
             return DetectBallsHoughCircles(preprocessed_img, search_mode, detected_circles);
-        } else if (detection_method == "experimental" || detection_method == "experimental_sahi") {
-            return DetectBallsONNX(preprocessed_img, search_mode, detected_circles, report_find_failures);
+        } else if (detection_method == "experimental") {
+            return DetectBallsNCNN(preprocessed_img, search_mode, detected_circles, report_find_failures);
         } else {
-            GS_LOG_MSG(error, "Unknown detection method: " + detection_method + ". Falling back to legacy.");
+            GS_LOG_MSG(error, "Unknown detection method: " + detection_method);
             return DetectBallsHoughCircles(preprocessed_img, search_mode, detected_circles);
         }
     }
@@ -4189,7 +4148,7 @@ namespace golf_sim {
     }
 
     /**
-     * ONNX/YOLO Detection Pipeline
+     * Single-class NMS for golf ball detection
      */
     std::vector<int> BallImageProc::SingleClassNMS(const std::vector<cv::Rect>& boxes,
                                                    const std::vector<float>& confidences,
@@ -4255,517 +4214,197 @@ namespace golf_sim {
         
         return indices;
     }
-    
-    bool BallImageProc::PreloadYOLOModel() {
-        if (yolo_model_loaded_) {
-            GS_LOG_MSG(trace, "YOLO model already loaded, skipping preload");
-            return true;
-        }
 
-        try {
-            std::lock_guard<std::mutex> lock(yolo_model_mutex_);
-
-            if (yolo_model_loaded_) {
-                GS_LOG_MSG(trace, "YOLO model already loaded by another thread");
-                return true;
-            }
-
-            GS_LOG_MSG(info, "Preloading YOLO model at startup for detection method: " + kStrobedBallDetectionMethod);
-            GS_LOG_MSG(trace, "Loading YOLO model from: " + kONNXModelPath);
-            auto start_time = std::chrono::high_resolution_clock::now();
-            
-            yolo_model_ = cv::dnn::readNetFromONNX(kONNXModelPath);
-            if (yolo_model_.empty()) {
-                GS_LOG_MSG(error, "Failed to preload ONNX model: " + kONNXModelPath);
-                return false;
-            }
-            
-            if (kONNXDeviceType == "CPU") {
-                yolo_model_.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
-                yolo_model_.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
-            } else {
-                yolo_model_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
-                yolo_model_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
-            }
-            
-            yolo_letterbox_buffer_ = cv::Mat(kONNXInputSize, kONNXInputSize, CV_8UC3);
-            yolo_detection_boxes_.reserve(10);  // Max 10 golf balls
-            yolo_detection_confidences_.reserve(10);
-            yolo_outputs_.reserve(3);  // Network typically has 1-3 output layers
-            
-            yolo_model_loaded_ = true;
-            
-            auto end_time = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-            GS_LOG_MSG(trace, "YOLO model preloaded successfully in " + 
-                            std::to_string(duration.count()) + "ms. First detection will be fast!");
-            
-            return true;
-        } catch (const cv::Exception& e) {
-            GS_LOG_MSG(error, "OpenCV exception during YOLO model preload: " + std::string(e.what()));
-            return false;
-        } catch (const std::exception& e) {
-            GS_LOG_MSG(error, "Exception during YOLO model preload: " + std::string(e.what()));
-            return false;
-        } catch (...) {
-            GS_LOG_MSG(error, "Unknown exception during YOLO model preload");
-            return false;
-        }
-    }
-
-    bool BallImageProc::DetectBallsONNX(const cv::Mat& preprocessed_img, 
+    bool BallImageProc::DetectBallsNCNN(const cv::Mat& preprocessed_img,
                                         BallSearchMode search_mode,
                                         std::vector<GsCircle>& detected_circles,
                                         bool report_find_failures) {
-        GS_LOG_TRACE_MSG(trace, "BallImageProc::DetectBallsONNX - Dispatching to backend: " + kONNXBackend);
-
-        // Dual-Backend Dispatcher: Try ONNX Runtime first, fallback to OpenCV DNN if needed
-        if (kONNXBackend == "onnxruntime") {
-            if (DetectBallsONNXRuntime(preprocessed_img, search_mode, detected_circles)) {
-                return true;
-            } else if (kONNXRuntimeAutoFallback) {
-                if (!report_find_failures) {
-                    // We are probably waiting for a ball to get teed up, so don't sweat it
-                    // if we don't find one.
-                    return false;
-                }
-                else {
-                    GS_LOG_MSG(warning, "ONNX Runtime detection failed, falling back to OpenCV DNN");
-                    return DetectBallsOpenCVDNN(preprocessed_img, search_mode, detected_circles);
-                }
-            } else {
-                return false;
-            }
-        } else {
-            // Use OpenCV DNN backend directly
-            return DetectBallsOpenCVDNN(preprocessed_img, search_mode, detected_circles);
-        }
-    }
-
-    bool BallImageProc::DetectBallsONNXRuntime(const cv::Mat& preprocessed_img, BallSearchMode search_mode,
-                                              std::vector<GsCircle>& detected_circles) {
         auto detection_start = std::chrono::high_resolution_clock::now();
 
         try {
-            // Initialize detector only once with double-checked locking pattern (optimized for Pi)
-            if (!onnx_detector_initialized_.load(std::memory_order_acquire)) {
-                std::lock_guard<std::mutex> lock(onnx_detector_mutex_);
-                if (!onnx_detector_initialized_.load(std::memory_order_relaxed)) {
+            if (!ncnn_detector_initialized_.load(std::memory_order_acquire)) {
+                std::lock_guard<std::mutex> lock(ncnn_detector_mutex_);
+                if (!ncnn_detector_initialized_.load(std::memory_order_relaxed)) {
 
-                    // Configure detector with static configuration
-                    ONNXRuntimeDetector::Config config;
-                    config.model_path = kONNXModelPath;
-                    config.confidence_threshold = kONNXConfidenceThreshold;
-                    config.nms_threshold = kONNXNMSThreshold;
-                    config.input_width = kONNXInputSize;
-                    config.input_height = kONNXInputSize;
-                    config.num_threads = kONNXRuntimeThreads;
+                    NCNNDetector::Config config;
+                    config.param_path = kModelPath + "/best.ncnn.param";
+                    config.bin_path = kModelPath + "/best.ncnn.bin";
+                    config.confidence_threshold = kModelConfidenceThreshold;
+                    config.nms_threshold = kModelNMSThreshold;
+                    config.input_width = kModelInputWidth;
+                    config.input_height = kModelInputHeight;
+                    config.num_threads = kInferenceThreads;
+                    config.is_single_class_model = true;
+                    config.num_classes = 1;
 
-                    // Pi-optimized settings
-                    config.use_arm_compute_library = true;
-                    config.use_thread_affinity = true;
-                    config.use_memory_pool = true;
-                    config.use_neon_preprocessing = true;
-                    config.use_zero_copy = true;
+                    ncnn_detector_ = std::make_unique<NCNNDetector>(config);
 
-                    GS_LOG_MSG(info, "Attempting to initialize ONNX Runtime detector with model: " + config.model_path);
-                    onnx_detector_ = std::make_unique<ONNXRuntimeDetector>(config);
-
-                    if (!onnx_detector_->Initialize()) {
-                        GS_LOG_MSG(error, "Failed to initialize ONNX Runtime detector with model: " + config.model_path);
-                        onnx_detector_.reset();  // Clean up failed detector
+                    if (!ncnn_detector_->Initialize()) {
+                        GS_LOG_MSG(error, "Failed to initialize NCNN detector");
+                        ncnn_detector_.reset();
                         return false;
                     }
 
-                    onnx_detector_initialized_.store(true, std::memory_order_release);
-                    GS_LOG_MSG(info, "ONNX Runtime detector initialized successfully");
+                    ncnn_detector_initialized_.store(true, std::memory_order_release);
                 }
             }
-
-            // Convert to RGB if needed (minimal overhead) and/or desired
-
 
             cv::Mat input_image;
-
-			if (kImageTypeToProcessWithYOLO == BallImageProc::YOLOImageTypeToUse::kUseYOLOWithMonochromeImages) {
-
-				// NOTE - This convert-to-gray option is temporary.  The preferred approach is to retrain the model to accept a wider range of images directly.
-                // However, this code is here to experiment with (and hopefully learn something from!)
-                if (preprocessed_img.channels() == 3) {
-                    GS_LOG_MSG(info, "ONNX Runtime detector switching to use monochrome input image.");
-
-                    // We want to use a monochrome image for detection, but we have an RGB input
-					// For now, ONNX detection still requires a 3-channel image, so we convert to gray and then back to BGR
-                    cv::Mat gray_image;
-                    cv::cvtColor(preprocessed_img, gray_image, cv::COLOR_BGR2GRAY);
-                    cv::cvtColor(gray_image, input_image, cv::COLOR_GRAY2BGR);
-
-                    LoggingTools::DebugShowImage("Grayscaled Ball Image for YOLO processing", input_image);
-                }
-            } 
-            else {
-				// We want to use an RGB image for YOLO detection
-                if (preprocessed_img.channels() == 1) {
-                    cv::cvtColor(preprocessed_img, input_image, cv::COLOR_GRAY2RGB);
-                }
-                else {
-                    input_image = preprocessed_img;  // Use directly (no copy)
-                }
+            if (preprocessed_img.channels() == 1) {
+                cv::cvtColor(preprocessed_img, input_image, cv::COLOR_GRAY2BGR);
+            } else {
+                input_image = preprocessed_img;
             }
 
-            // The detection method may vary based on whether we're looking for a placed ball or a strobed ball
-            std::string detection_method = (search_mode == BallSearchMode::kFindPlacedBall) ? kBallPlacementDetectionMethod : kStrobedBallDetectionMethod;
+            auto detections = ncnn_detector_->Detect(input_image);
 
-            // Handle SAHI slicing if enabled
-            if (detection_method == "experimental_sahi") {
-                std::vector<cv::Mat> slices;
-                slices.reserve(16);  // Pre-allocate for typical slice count
-
-                const int overlap = static_cast<int>(kSAHISliceWidth * kSAHIOverlapRatio);
-                for (int y = 0; y < input_image.rows; y += kSAHISliceHeight - overlap) {
-                    for (int x = 0; x < input_image.cols; x += kSAHISliceWidth - overlap) {
-                        cv::Rect slice_rect(x, y,
-                                           std::min(kSAHISliceWidth, input_image.cols - x),
-                                           std::min(kSAHISliceHeight, input_image.rows - y));
-                        slices.push_back(input_image(slice_rect));
-                    }
-                }
-
-                // Process all slices in batch for efficiency
-                std::vector<std::vector<ONNXRuntimeDetector::Detection>> batch_detections =
-                    onnx_detector_->DetectBatch(slices);
-
-                // Convert and merge all detections
-                detected_circles.clear();
-                detected_circles.reserve(batch_detections.size() * 2);  // Estimate
-
-                size_t slice_idx = 0;
-                for (int y = 0; y < input_image.rows; y += kSAHISliceHeight - overlap) {
-                    for (int x = 0; x < input_image.cols; x += kSAHISliceWidth - overlap) {
-                        if (slice_idx < batch_detections.size()) {
-                            for (const auto& detection : batch_detections[slice_idx]) {
-                                GsCircle circle;
-                                circle[0] = detection.bbox.x + detection.bbox.width * 0.5f + x;   // center_x
-                                circle[1] = detection.bbox.y + detection.bbox.height * 0.5f + y;  // center_y
-                                circle[2] = std::max(detection.bbox.width, detection.bbox.height) * 0.5f;  // radius
-                                detected_circles.push_back(circle);
-                            }
-                        }
-                        ++slice_idx;
-                    }
-                }
-            } else {
-                // Single image detection (fastest path)
-                std::vector<ONNXRuntimeDetector::Detection> detections = onnx_detector_->Detect(input_image);
-
-                // Convert ONNXRuntimeDetector::Detection to GsCircle format
-                detected_circles.clear();
-                detected_circles.reserve(detections.size());
-
-                for (const auto& detection : detections) {
-                    GsCircle circle;
-                    circle[0] = detection.bbox.x + detection.bbox.width * 0.5f;   // center_x
-                    circle[1] = detection.bbox.y + detection.bbox.height * 0.5f;  // center_y
-                    circle[2] = std::max(detection.bbox.width, detection.bbox.height) * 0.5f;  // radius
+            detected_circles.clear();
+            detected_circles.reserve(detections.size());
+            for (const auto& d : detections) {
+                GsCircle circle;
+                if (BboxToCircle(d.bbox.x, d.bbox.y, d.bbox.width, d.bbox.height,
+                                 input_image.cols, input_image.rows, "NCNN", circle)) {
                     detected_circles.push_back(circle);
                 }
             }
 
             auto detection_end = std::chrono::high_resolution_clock::now();
-            auto detection_duration = std::chrono::duration_cast<std::chrono::milliseconds>(detection_end - detection_start);
-
-            GS_LOG_TRACE_MSG(trace, "ONNX Runtime detected " + std::to_string(detected_circles.size()) +
-                           " balls in " + std::to_string(detection_duration.count()) + "ms");
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(detection_end - detection_start);
+            if (detected_circles.empty() && !detections.empty()) {
+                GS_LOG_MSG(warning, "NCNN: model detected " + std::to_string(detections.size()) +
+                           " ball(s) but all were rejected as edge-clipped");
+            }
+            GS_LOG_TRACE_MSG(trace, "NCNN detected " + std::to_string(detected_circles.size()) +
+                           " balls in " + std::to_string(ms.count()) + "ms");
             return !detected_circles.empty();
 
         } catch (const std::exception& e) {
-            GS_LOG_MSG(error, "ONNX Runtime detection failed: " + std::string(e.what()));
+            GS_LOG_MSG(error, "NCNN detection failed: " + std::string(e.what()));
             return false;
         }
     }
 
+    bool BallImageProc::PreloadNCNNModel() {
+        if (ncnn_detector_initialized_.load(std::memory_order_relaxed)) return true;
 
-    bool BallImageProc::DetectBallsOpenCVDNN(const cv::Mat& preprocessed_img, BallSearchMode search_mode,
-                                            std::vector<GsCircle>& detected_circles) {
-        GS_LOG_TRACE_MSG(trace, "BallImageProc::DetectBallsOpenCVDNN - Fallback backend");
+        std::lock_guard<std::mutex> lock(ncnn_detector_mutex_);
+        if (ncnn_detector_initialized_.load(std::memory_order_relaxed)) return true;
 
         try {
-            {
-                std::lock_guard<std::mutex> lock(yolo_model_mutex_);
-                if (!yolo_model_loaded_) {
-                    GS_LOG_MSG(trace, "Loading YOLO model for OpenCV DNN backend...");
-                    auto start_time = std::chrono::high_resolution_clock::now();
+            auto start = std::chrono::high_resolution_clock::now();
 
-                    yolo_model_ = cv::dnn::readNetFromONNX(kONNXModelPath);
-                    if (yolo_model_.empty()) {
-                        GS_LOG_MSG(error, "Failed to load ONNX model for OpenCV DNN: " + kONNXModelPath);
-                        return false;
-                    }
+            NCNNDetector::Config config;
+            config.param_path = kModelPath + "/best.ncnn.param";
+            config.bin_path = kModelPath + "/best.ncnn.bin";
+            config.confidence_threshold = kModelConfidenceThreshold;
+            config.nms_threshold = kModelNMSThreshold;
+            config.input_width = kModelInputWidth;
+            config.input_height = kModelInputHeight;
+            config.num_threads = kInferenceThreads;
 
-                    // Set backend and target
-                    if (kONNXDeviceType == "CPU") {
-                        yolo_model_.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
-                        yolo_model_.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
-                    } else {
-                        yolo_model_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
-                        yolo_model_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
-                    }
-
-                    yolo_letterbox_buffer_ = cv::Mat(kONNXInputSize, kONNXInputSize, CV_8UC3);
-                    yolo_detection_boxes_.reserve(50);
-                    yolo_detection_confidences_.reserve(50);
-                    yolo_outputs_.reserve(3);
-
-                    yolo_model_loaded_ = true;
-
-                    auto end_time = std::chrono::high_resolution_clock::now();
-                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-                    GS_LOG_MSG(info, "OpenCV DNN model loaded successfully in " +
-                                   std::to_string(duration.count()) + "ms (fallback backend)");
-                }
-            }
-
-            auto processing_start_time = std::chrono::high_resolution_clock::now();
-            GS_LOG_MSG(trace, "OpenCV DNN processing started.");
-
-            cv::Mat input_image;
-            if (preprocessed_img.channels() == 1) {
-                cv::cvtColor(preprocessed_img, input_image, cv::COLOR_GRAY2RGB);
-            } else if (preprocessed_img.channels() == 3) {
-                input_image = preprocessed_img;
-            } else {
-                GS_LOG_MSG(error, "Unsupported number of channels: " + std::to_string(preprocessed_img.channels()));
+            ncnn_detector_ = std::make_unique<NCNNDetector>(config);
+            if (!ncnn_detector_->Initialize()) {
+                GS_LOG_MSG(error, "Failed to preload NCNN detector");
+                ncnn_detector_.reset();
                 return false;
             }
 
-            // The detection method may vary based on whether we're looking for a placed ball or a strobed ball
-            std::string detection_method = (search_mode == BallSearchMode::kFindPlacedBall) ? kBallPlacementDetectionMethod : kStrobedBallDetectionMethod;
+            ncnn_detector_initialized_.store(true, std::memory_order_release);
 
-            // SAHI slicing
-            bool use_sahi = (detection_method == "experimental_sahi");
-            std::vector<cv::Rect> slices;
+            auto end = std::chrono::high_resolution_clock::now();
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            GS_LOG_MSG(info, "NCNN model preloaded in " + std::to_string(ms.count()) + "ms");
+            return true;
 
-            if (use_sahi) {
-                int overlap = static_cast<int>(kSAHISliceWidth * kSAHIOverlapRatio);
-                for (int y = 0; y < input_image.rows; y += kSAHISliceHeight - overlap) {
-                    for (int x = 0; x < input_image.cols; x += kSAHISliceWidth - overlap) {
-                        cv::Rect slice(x, y,
-                                      std::min(kSAHISliceWidth, input_image.cols - x),
-                                      std::min(kSAHISliceHeight, input_image.rows - y));
-                        slices.push_back(slice);
-                    }
-                }
-                GS_LOG_TRACE_MSG(trace, "OpenCV DNN SAHI: Created " + std::to_string(slices.size()) + " slices");
-            } else {
-                slices.push_back(cv::Rect(0, 0, input_image.cols, input_image.rows));
-            }
-
-            yolo_detection_boxes_.clear();
-            yolo_detection_confidences_.clear();
-
-            for (const auto& slice : slices) {
-                cv::Mat slice_img = input_image(slice);
-
-                // Create letterboxed input
-                float scale = std::min(float(kONNXInputSize) / slice_img.cols,
-                                     float(kONNXInputSize) / slice_img.rows);
-                int new_width = int(slice_img.cols * scale);
-                int new_height = int(slice_img.rows * scale);
-
-                if (yolo_resized_buffer_.size() != cv::Size(new_width, new_height) || yolo_resized_buffer_.type() != CV_8UC3) {
-                    yolo_resized_buffer_ = cv::Mat(new_height, new_width, CV_8UC3);
-                }
-                cv::resize(slice_img, yolo_resized_buffer_, cv::Size(new_width, new_height));
-
-                // Create letterbox with gray padding
-                yolo_letterbox_buffer_.setTo(cv::Scalar(114, 114, 114));
-                int x_offset = (kONNXInputSize - new_width) / 2;
-                int y_offset = (kONNXInputSize - new_height) / 2;
-                yolo_resized_buffer_.copyTo(yolo_letterbox_buffer_(cv::Rect(x_offset, y_offset, new_width, new_height)));
-
-                // Create blob
-                cv::dnn::blobFromImage(yolo_letterbox_buffer_, yolo_blob_buffer_, 1.0/255.0,
-                                      cv::Size(kONNXInputSize, kONNXInputSize),
-                                      cv::Scalar(), false, false);  // swapRB=false for YOLOv8 BGR input
-
-                // Run inference
-                yolo_model_.setInput(yolo_blob_buffer_);
-                yolo_outputs_.clear();
-                yolo_model_.forward(yolo_outputs_, yolo_model_.getUnconnectedOutLayersNames());
-
-                // Parse output 
-                if (!yolo_outputs_.empty()) {
-                    cv::Mat output = yolo_outputs_[0];
-
-                    // Reshape and transpose YOLOv8 output to [detections, features] format
-                    if (output.dims == 3 && output.size[0] == 1) {
-                        output = output.reshape(1, output.size[1]); // [5, num_detections]
-                        cv::transpose(output, output);              // [num_detections, 5]
-                    }
-
-                    float* data = (float*)output.data;
-                    int num_detections = output.rows;
-
-                    for (int i = 0; i < num_detections; ++i) {
-                        float* detection = data + i * output.cols;
-
-                        float cx_letterbox = detection[0];
-                        float cy_letterbox = detection[1];
-                        float w_letterbox = detection[2];
-                        float h_letterbox = detection[3];
-                        float confidence = detection[4];
-
-                        if (confidence >= kONNXConfidenceThreshold) {
-                            // Convert from letterbox coordinates back to slice coordinates
-                            float cx_slice = (cx_letterbox - x_offset) / scale;
-                            float cy_slice = (cy_letterbox - y_offset) / scale;
-                            float w_slice = w_letterbox / scale;
-                            float h_slice = h_letterbox / scale;
-
-                            // Convert center format to top-left format
-                            int x = static_cast<int>(cx_slice - w_slice/2) + slice.x;
-                            int y = static_cast<int>(cy_slice - h_slice/2) + slice.y;
-                            int w = static_cast<int>(w_slice);
-                            int h = static_cast<int>(h_slice);
-
-                            // Bounds checking
-                            if (w > 0 && h > 0 && x >= 0 && y >= 0 &&
-                                x + w <= input_image.cols && y + h <= input_image.rows) {
-                                yolo_detection_boxes_.push_back(cv::Rect(x, y, w, h));
-                                yolo_detection_confidences_.push_back(confidence);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Apply NMS and convert to circles
-            std::vector<int> indices = SingleClassNMS(yolo_detection_boxes_, yolo_detection_confidences_,
-                                                      kONNXConfidenceThreshold, kONNXNMSThreshold);
-
-            detected_circles.clear();
-            detected_circles.reserve(indices.size());
-            for (int idx : indices) {
-                const cv::Rect& box = yolo_detection_boxes_[idx];
-                GsCircle circle;
-                circle[0] = (float)(box.x + (int)(std::round(box.width / 2.0)));
-                circle[1] = (float)(box.y + (int)(std::round(box.height / 2.0)));
-                circle[2] = (float)(std::max(box.width, (int)(std::round(box.height) / 2.0)));
-                detected_circles.push_back(circle);
-            }
-
-            auto processing_end_time = std::chrono::high_resolution_clock::now();
-            auto processing_duration = std::chrono::duration_cast<std::chrono::milliseconds>(processing_end_time - processing_start_time);
-            GS_LOG_MSG(trace, "OpenCV DNN completed processing in " + std::to_string(processing_duration.count()) + " ms (fallback)");
-
-            GS_LOG_TRACE_MSG(trace, "OpenCV DNN detected " + std::to_string(detected_circles.size()) + " balls after NMS");
-            return !detected_circles.empty();
-
-        } catch (const cv::Exception& e) {
-            GS_LOG_MSG(error, "OpenCV DNN detection failed: " + std::string(e.what()));
-            return false;
         } catch (const std::exception& e) {
-            GS_LOG_MSG(error, "OpenCV DNN fallback detection failed: " + std::string(e.what()));
+            GS_LOG_MSG(error, "NCNN preload failed: " + std::string(e.what()));
             return false;
         }
     }
 
-    bool BallImageProc::PreloadONNXRuntimeModel() {
-        if (onnx_detector_initialized_.load(std::memory_order_relaxed)) {
-            GS_LOG_MSG(trace, "ONNX Runtime detector already preloaded, skipping");
-            return true;
+    void BallImageProc::CleanupNCNN() {
+        std::lock_guard<std::mutex> lock(ncnn_detector_mutex_);
+        if (ncnn_detector_initialized_.load(std::memory_order_relaxed)) {
+            ncnn_detector_.reset();
+            ncnn_detector_initialized_.store(false, std::memory_order_release);
+            GS_LOG_MSG(info, "NCNN detector cleaned up");
         }
+    }
 
-        std::lock_guard<std::mutex> lock(onnx_detector_mutex_);
-        if (onnx_detector_initialized_.load(std::memory_order_relaxed)) {
-            GS_LOG_MSG(trace, "ONNX Runtime detector already preloaded by another thread");
-            return true;
-        }
+    bool BallImageProc::PreloadSpinModel() {
+        GS_LOG_MSG(info, "PreloadSpinModel called");
 
-        GS_LOG_MSG(info, "Preloading ONNX Runtime detector for ARM64 optimization...");
+        if (spin_predictor_initialized_.load(std::memory_order_acquire)) return true;
+
+        std::lock_guard<std::mutex> lock(spin_predictor_mutex_);
+        if (spin_predictor_initialized_.load(std::memory_order_relaxed)) return true;
 
         try {
-            auto start_time = std::chrono::high_resolution_clock::now();
+            auto start = std::chrono::high_resolution_clock::now();
 
-            // Configure detector with static configuration
-            ONNXRuntimeDetector::Config config;
-            config.model_path = kONNXModelPath;
-            config.confidence_threshold = kONNXConfidenceThreshold;
-            config.nms_threshold = kONNXNMSThreshold;
-            config.input_width = kONNXInputSize;
-            config.input_height = kONNXInputSize;
-            config.num_threads = kONNXRuntimeThreads;
+            std::string spin_model_path;
+            GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kSpinModelPath", spin_model_path);
+            if (spin_model_path.empty()) {
+                spin_model_path = "../ml_models/spin-predictor";
+            }
 
-            // Pi-optimized settings
-            config.use_arm_compute_library = true;
-            config.use_thread_affinity = true;
-            config.use_memory_pool = true;
-            config.use_neon_preprocessing = true;
-            config.use_zero_copy = true;
+            float z_threshold = 60.0f;
+            GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kSpinMLZFallbackThreshold", z_threshold);
 
-            onnx_detector_ = std::make_unique<ONNXRuntimeDetector>(config);
+            SpinPredictor::Config config;
+            config.param_path = spin_model_path + "/best.ncnn.param";
+            config.bin_path = spin_model_path + "/best.ncnn.bin";
+            config.input_size = 128;
+            config.num_threads = kInferenceThreads;
+            config.z_fallback_threshold = z_threshold;
 
-            if (!onnx_detector_->Initialize()) {
-                GS_LOG_MSG(error, "Failed to initialize ONNX Runtime detector");
+            spin_predictor_ = std::make_unique<SpinPredictor>(config);
+            if (!spin_predictor_->Initialize()) {
+                GS_LOG_MSG(warning, "Failed to initialize ML spin predictor — will use traditional search");
+                spin_predictor_.reset();
                 return false;
             }
 
-            onnx_detector_initialized_.store(true, std::memory_order_release);
+            spin_predictor_initialized_.store(true, std::memory_order_release);
 
-            auto end_time = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-            GS_LOG_MSG(info, "ONNX Runtime detector preloaded successfully in " +
-                           std::to_string(duration.count()) + "ms with " +
-                           std::to_string(kONNXRuntimeThreads) + " threads (ARM64 optimized)");
+            auto end = std::chrono::high_resolution_clock::now();
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            GS_LOG_MSG(info, "ML spin model preloaded in " + std::to_string(ms.count()) + "ms");
             return true;
 
         } catch (const std::exception& e) {
-            GS_LOG_MSG(error, "Failed to preload ONNX Runtime detector: " + std::string(e.what()));
+            GS_LOG_MSG(warning, "ML spin preload failed: " + std::string(e.what()) + " — will use traditional search");
             return false;
-        }
-    }
-
-    void BallImageProc::CleanupONNXRuntime() {
-        std::lock_guard<std::mutex> lock(onnx_detector_mutex_);
-        if (onnx_detector_initialized_.load(std::memory_order_relaxed)) {
-            GS_LOG_MSG(info, "Cleaning up ONNX Runtime detector...");
-
-            onnx_detector_.reset();
-            onnx_detector_initialized_.store(false, std::memory_order_release);
-
-            GS_LOG_MSG(info, "ONNX Runtime detector cleanup completed");
         }
     }
 
     void BallImageProc::LoadConfigurationValues() {
-        // This function should be called AFTER GolfSimConfiguration::Initialize() has loaded the JSON config
-        // It reads the ONNX configuration values FROM the JSON and updates the static variables
-
         GS_LOG_MSG(info, "Loading BallImageProc configuration values from JSON...");
 
-        // Read ONNX/AI Detection configuration values
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXModelPath", kONNXModelPath);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelPath", kModelPath);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallDetectionMethod", kStrobedBallDetectionMethod);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBallPlacementDetectionMethod", kBallPlacementDetectionMethod);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXConfidenceThreshold", kONNXConfidenceThreshold);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXNMSThreshold", kONNXNMSThreshold);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXInputSize", kONNXInputSize);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXBackend", kONNXBackend);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXRuntimeAutoFallback", kONNXRuntimeAutoFallback);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kONNXRuntimeThreads", kONNXRuntimeThreads);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelConfidenceThreshold", kModelConfidenceThreshold);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelNMSThreshold", kModelNMSThreshold);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelInputWidth", kModelInputWidth);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelInputHeight", kModelInputHeight);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kInferenceThreads", kInferenceThreads);
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kSpinDetectionMethod", kSpinDetectionMethod);
+        if (kSpinDetectionMethod != "ml" && kSpinDetectionMethod != "legacy") {
+            GS_LOG_MSG(error, "Unrecognized kSpinDetectionMethod: '" + kSpinDetectionMethod + "' - defaulting to 'ml'");
+            kSpinDetectionMethod = "ml";
+        }
 
-        GS_LOG_MSG(info, "Loaded ONNX Model Path: " + kONNXModelPath);
-        GS_LOG_MSG(info, "Loaded Detection Method: " + kStrobedBallDetectionMethod);
-        GS_LOG_MSG(info, "Loaded Backend: " + kONNXBackend);
+        GS_LOG_MSG(info, "Model directory: " + kModelPath);
+        GS_LOG_MSG(info, "Detection method: " + kStrobedBallDetectionMethod);
+        GS_LOG_MSG(info, "Spin detection: " + kSpinDetectionMethod);
+        GS_LOG_MSG(info, "Backend: ncnn");
 
-        if (!kONNXModelPath.empty()) {
-            std::ifstream model_file(kONNXModelPath);
-            if (model_file.good()) {
-                GS_LOG_MSG(info, "ONNX model file verified to exist at: " + kONNXModelPath);
-                model_file.close();
-            } else {
-                GS_LOG_MSG(error, "ONNX model file NOT FOUND at: " + kONNXModelPath);
-            }
+        std::string param = kModelPath + "/best.ncnn.param";
+        if (std::filesystem::exists(param)) {
+            GS_LOG_MSG(info, "NCNN model found: " + param);
+        } else {
+            GS_LOG_MSG(error, "NCNN model NOT FOUND: " + param);
         }
     }
 

@@ -97,7 +97,7 @@ class TestCalibrationManagerStatus:
         mock_config_manager = Mock()
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
-        mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
+        mock_config_manager.get_config.return_value = {"calibration": {}}
 
         manager = CalibrationManager(mock_config_manager)
 
@@ -191,7 +191,6 @@ class TestCommandBuilding:
         """Create mock config manager with typical configuration"""
         mock = Mock()
         mock.get_config.return_value = {
-            "system": {"mode": "single"},
             "calibration": {
                 "camera1_search_center_x": 800,
                 "camera1_search_center_y": 600,
@@ -209,10 +208,6 @@ class TestCommandBuilding:
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
         config = mock_config_manager.get_config()
-        system_mode = config.get("system", {}).get("mode", "single")
-
-        assert system_mode == "single"
-
         search_x = config.get("calibration", {}).get("camera1_search_center_x", 750)
         search_y = config.get("calibration", {}).get("camera1_search_center_y", 500)
 
@@ -225,7 +220,6 @@ class TestCommandBuilding:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {
-            "system": {"mode": "dual"},
             "calibration": {
                 "camera2_search_center_x": 700,
                 "camera2_search_center_y": 450,
@@ -236,10 +230,6 @@ class TestCommandBuilding:
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
         config = mock_config_manager.get_config()
-        system_mode = config.get("system", {}).get("mode", "single")
-
-        assert system_mode == "dual"
-
         search_x = config.get("calibration", {}).get("camera2_search_center_x", 750)
         search_y = config.get("calibration", {}).get("camera2_search_center_y", 500)
 
@@ -251,7 +241,7 @@ class TestCommandBuilding:
         mock_config_manager = Mock()
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
-        mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
+        mock_config_manager.get_config.return_value = {"calibration": {}}
 
         manager = CalibrationManager(mock_config_manager)
         config = mock_config_manager.get_config()
@@ -359,7 +349,7 @@ class TestStillImageCapture:
         mock_config_manager = Mock()
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
-        mock_config_manager.get_config.return_value = {"system": {"mode": "single"}}
+        mock_config_manager.get_config.return_value = {}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
@@ -384,7 +374,7 @@ class TestStillImageCapture:
         mock_config_manager = Mock()
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
-        mock_config_manager.get_config.return_value = {"system": {"mode": "single"}}
+        mock_config_manager.get_config.return_value = {}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
@@ -407,7 +397,7 @@ class TestStillImageCapture:
         mock_config_manager = Mock()
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
-        mock_config_manager.get_config.return_value = {"system": {"mode": "single"}}
+        mock_config_manager.get_config.return_value = {}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
@@ -445,7 +435,7 @@ class TestLogFileHandling:
         mock_config_manager = Mock()
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
-        mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
+        mock_config_manager.get_config.return_value = {"calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
@@ -490,7 +480,7 @@ class TestErrorHandling:
         mock_config_manager = Mock()
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
-        mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
+        mock_config_manager.get_config.return_value = {"calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
@@ -514,7 +504,7 @@ class TestErrorHandling:
         mock_config_manager = Mock()
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
-        mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
+        mock_config_manager.get_config.return_value = {"calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
@@ -551,7 +541,7 @@ class TestErrorHandling:
         mock_config_manager = Mock()
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
-        mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
+        mock_config_manager.get_config.return_value = {"calibration": {}}
 
         manager = CalibrationManager(mock_config_manager)
 
@@ -625,7 +615,6 @@ class TestRealCalibrationWorkflows:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {
-            "system": {"mode": "single"},
             "calibration": {
                 "camera1_search_center_x": 800,
                 "camera1_search_center_y": 600,
@@ -671,7 +660,6 @@ class TestRealCalibrationWorkflows:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {
-            "system": {"mode": "dual"},
             "calibration": {
                 "camera2_search_center_x": 700,
                 "camera2_search_center_y": 450,
@@ -707,7 +695,7 @@ class TestRealCalibrationWorkflows:
         mock_config_manager = Mock()
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
-        mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
+        mock_config_manager.get_config.return_value = {"calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
@@ -745,7 +733,6 @@ class TestRealCalibrationWorkflows:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {
-            "system": {"mode": "single"},
             "calibration": {
                 "camera1_search_center_x": 800,
                 "camera1_search_center_y": 600,
@@ -775,7 +762,7 @@ class TestRealCalibrationWorkflows:
         mock_config_manager = Mock()
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
-        mock_config_manager.get_config.return_value = {"system": {"mode": "dual"}}
+        mock_config_manager.get_config.return_value = {}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
@@ -804,7 +791,6 @@ class TestIntegrationScenarios:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {
-            "system": {"mode": "single"},
             "calibration": {
                 "camera1_search_center_x": 800,
                 "camera1_search_center_y": 600,
@@ -857,7 +843,7 @@ class TestIntegrationScenarios:
         mock_config_manager = Mock()
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
-        mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
+        mock_config_manager.get_config.return_value = {"calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
@@ -945,9 +931,6 @@ class TestConfigurationHandling:
         manager = CalibrationManager(mock_config_manager)
 
         config = mock_config_manager.get_config()
-        system_mode = config.get("system", {}).get("mode", "single")
-        assert system_mode == "single"
-
         search_x = config.get("calibration", {}).get("camera1_search_center_x", 750)
         assert search_x == 750
 
@@ -957,15 +940,11 @@ class TestConfigurationHandling:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {
-            "system": {"mode": "dual"},
-        }
+            }
 
         manager = CalibrationManager(mock_config_manager)
 
         config = mock_config_manager.get_config()
-        system_mode = config.get("system", {}).get("mode", "single")
-        assert system_mode == "dual"
-
         search_x = config.get("calibration", {}).get("camera1_search_center_x", 750)
         assert search_x == 750
 
@@ -974,7 +953,7 @@ class TestConfigurationHandling:
         mock_config_manager = Mock()
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
-        mock_config_manager.get_config.return_value = {"system": {"mode": "single"}, "calibration": {}}
+        mock_config_manager.get_config.return_value = {"calibration": {}}
         mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
         mock_config_manager.reload = Mock()
 

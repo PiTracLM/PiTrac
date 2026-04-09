@@ -93,22 +93,25 @@ configure_libcamera() {
                 # Check if we need sudo
                 if [[ -w "$config_dir" ]]; then
                     cp "$example_file" "$config_file"
-                    sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 1000000/' "$config_file"
+                    sed -i 's/# *"camera_timeout_value_ms": *[0-9][0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
                 else
                     sudo cp "$example_file" "$config_file"
-                    sudo sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 1000000/' "$config_file"
+                    sudo sed -i 's/# *"camera_timeout_value_ms": *[0-9][0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
                 fi
                 log_success "Created ${config_file} with extended timeout"
             elif [[ -f "$config_file" ]]; then
-                if grep -q '# *"camera_timeout_value_ms"' "$config_file"; then
-                    log_info "Updating ${pipeline} camera timeout..."
+                if ! grep -q '"camera_timeout_value_ms": *86400000' "$config_file"; then
+                    log_info "Updating ${pipeline} camera timeout to 86400000ms..."
                     if [[ -w "$config_file" ]]; then
-                        sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 1000000/' "$config_file"
+                        sed -i 's/# *"camera_timeout_value_ms": *[0-9][0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
+                        sed -i 's/"camera_timeout_value_ms": *[0-9][0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
                     else
-                        sudo sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 1000000/' "$config_file"
+                        sudo sed -i 's/# *"camera_timeout_value_ms": *[0-9][0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
+                        sudo sed -i 's/"camera_timeout_value_ms": *[0-9][0-9]*/"camera_timeout_value_ms": 86400000/' "$config_file"
                     fi
+                    log_success "Updated ${pipeline} camera timeout"
                 else
-                    log_info "${pipeline} config already configured"
+                    log_info "${pipeline} camera timeout already correct"
                 fi
             fi
         fi
@@ -276,11 +279,11 @@ install_test_suites() {
     fi
 }
 
-install_onnx_models() {
+install_models() {
     local repo_root="${1:-${REPO_ROOT:-/opt/PiTrac}}"
     local install_user="${2:-${SUDO_USER:-$(whoami)}}"
 
-    log_info "Installing ONNX models for AI detection..."
+    log_info "Installing models for AI detection..."
 
     local models_dir="$repo_root/Software/LMSourceCode/ml_models"
     if [[ -d "$models_dir" ]]; then
@@ -296,30 +299,30 @@ install_onnx_models() {
         mkdir -p "$system_models_dir"
 
         local models_found=0
-        for model_path in "$models_dir"/*/weights/best.onnx; do
-            if [[ -f "$model_path" ]]; then
-                # Extract model name from path (e.g., pitrac-ball-detection-09-23-25)
-                local model_name=$(basename "$(dirname "$(dirname "$model_path")")")
 
-                # Create folder and copy model
+        # Install ncnn models (param + bin files directly in model dirs)
+        for param_file in "$models_dir"/*/best.ncnn.param; do
+            if [[ -f "$param_file" ]]; then
+                local model_name=$(basename "$(dirname "$param_file")")
+                local bin_file="$(dirname "$param_file")/best.ncnn.bin"
                 mkdir -p "$system_models_dir/$model_name"
-                cp "$model_path" "$system_models_dir/$model_name/best.onnx"
-                log_info "  Installed model: $model_name/best.onnx"
+                cp "$param_file" "$system_models_dir/$model_name/"
+                [[ -f "$bin_file" ]] && cp "$bin_file" "$system_models_dir/$model_name/"
+                log_info "  Installed model: $model_name/best.ncnn.{param,bin}"
                 models_found=$((models_found + 1))
             fi
         done
 
         if [[ $models_found -gt 0 ]]; then
             # Set proper permissions - models should be readable by all users
-            chmod -R 644 "$system_models_dir"/*/*.onnx 2>/dev/null || true
-            chmod -R 755 "$system_models_dir"/* 2>/dev/null || true
-            chmod 755 "$system_models_dir"
-            log_success "Installed $models_found ONNX model(s) to $system_models_dir"
+            chmod -R a+r "$system_models_dir" 2>/dev/null || true
+            find "$system_models_dir" -type d -exec chmod 755 {} \; 2>/dev/null || true
+            log_success "Installed $models_found model(s) to $system_models_dir"
         else
-            log_warn "No ONNX models found in $models_dir"
+            log_warn "No models found in $models_dir"
         fi
     else
-        log_warn "ONNX models directory not found: $models_dir"
+        log_warn "Models directory not found: $models_dir"
     fi
 }
 
@@ -354,31 +357,6 @@ install_camera_tools() {
     else
         log_warn "Camera tools not found: $camera_tools_dir"
     fi
-}
-
-extract_dependency() {
-    local tar_file="$1"
-    local lib_name="$2"
-    local dest_dir="${3:-/usr/lib/pitrac}"
-    
-    if [[ ! -f "$tar_file" ]]; then
-        log_warn "Dependency archive not found: $tar_file"
-        return 1
-    fi
-    
-    log_info "  Extracting $lib_name..."
-    tar xzf "$tar_file" -C /tmp/
-    
-    local extracted_dir="/tmp/${lib_name}"
-    if [[ ! -d "$extracted_dir" ]]; then
-        extracted_dir="/tmp/${lib_name%%-*}"
-    fi
-    
-    if [[ -d "$extracted_dir/lib" ]]; then
-        cp -r "$extracted_dir"/lib/*.so* "$dest_dir/" 2>/dev/null || true
-    fi
-    
-    rm -rf "$extracted_dir"
 }
 
 create_pitrac_directories() {
@@ -448,121 +426,6 @@ set_config_permissions() {
         chmod "$perms" "$file"
         log_info "Set permissions for $(basename "$file"): $owner $perms"
     fi
-}
-
-install_deb_dependency() {
-    local deb_file="$1"
-    local package_name="$2"
-    local skip_if_installed="${3:-false}"
-
-    if [[ ! -f "$deb_file" ]]; then
-        log_warn "DEB package not found: $deb_file"
-        return 1
-    fi
-
-    # Check if package or similar is already installed
-    if [[ "$skip_if_installed" == "true" ]]; then
-        # For lgpio, check if system package is already installed
-        if [[ "$package_name" == "liblgpio1" ]] && dpkg -l | grep -qE "^ii\s+(liblgpio1|liblgpio-dev)"; then
-            log_info "  System lgpio packages already installed, skipping custom deb"
-            return 0
-        fi
-    fi
-
-    log_info "  Installing $package_name from deb package..."
-
-    # Use dpkg to install the package, force overwrite if needed for our packages
-    # INITRD=No prevents initramfs regeneration during library package installation
-    # This is safe because libraries (OpenCV, ActiveMQ, lgpio, etc.) don't require initramfs
-    # and it avoids triggering Pi OS initramfs.conf bugs (MODULES=dep issue)
-    if INITRD=No dpkg -i "$deb_file" 2>/dev/null; then
-        log_success "  $package_name installed successfully"
-    else
-        # Try to fix dependencies if installation fails
-        log_warn "  Attempting to fix dependencies for $package_name..."
-        INITRD=No apt-get -f install -y
-
-        # For lgpio conflicts, skip if system version exists
-        if [[ "$package_name" == "liblgpio1" ]] && dpkg -l | grep -qE "^ii\s+(liblgpio1|liblgpio-dev)"; then
-            log_warn "  Using system-installed lgpio instead of custom package"
-            return 0
-        fi
-
-        # Try again with force for other packages
-        INITRD=No dpkg -i "$deb_file" || {
-            log_error "  Failed to install $package_name"
-            return 1
-        }
-    fi
-}
-
-extract_all_dependencies() {
-    local artifacts_dir="${1:-/opt/PiTrac/packaging/deps-artifacts}"
-    local dest_dir="${2:-/usr/lib/pitrac}"
-    local use_debs="${USE_DEB_PACKAGES:-true}"
-
-    log_info "Installing all dependencies..."
-
-    # Check if packages were already installed from APT repository
-    local has_apt_packages=false
-    if dpkg -l | grep -qE "^ii\s+(libopencv4\.11|libactivemq-cpp)\s"; then
-        # Check if they came from our APT repo (not from local debs)
-        if grep -q "pitrac" /etc/apt/sources.list.d/pitrac.list 2>/dev/null; then
-            has_apt_packages=true
-            log_info "Dependencies already installed from PiTrac APT repository"
-            log_info "Skipping local package installation"
-            return 0
-        fi
-    fi
-
-    if [[ "$use_debs" == "true" ]]; then
-        # Check if deb packages exist
-        if [[ -f "$artifacts_dir/libopencv4.11_4.11.0-1_arm64.deb" ]]; then
-            log_info "Using DEB packages for dependency installation..."
-
-            # Check if system lgpio is already installed
-            if dpkg -l | grep -qE "^ii\s+(liblgpio1|liblgpio-dev)"; then
-                log_info "System lgpio packages detected - will use those instead of custom deb"
-            fi
-
-            # Install runtime packages first (order matters for dependencies)
-            # Skip lgpio if system version is installed
-            install_deb_dependency "$artifacts_dir/liblgpio1_0.2.2-1_arm64.deb" "liblgpio1" "true"
-            install_deb_dependency "$artifacts_dir/libactivemq-cpp_3.9.5-1_arm64.deb" "libactivemq-cpp"
-            install_deb_dependency "$artifacts_dir/libopencv4.11_4.11.0-1_arm64.deb" "libopencv4.11"
-            install_deb_dependency "$artifacts_dir/libonnxruntime1.17.3_1.17.3-xnnpack3_arm64.deb" "libonnxruntime1.17.3"
-
-            # Install development packages (these depend on runtime packages)
-            install_deb_dependency "$artifacts_dir/libactivemq-cpp-dev_3.9.5-1_arm64.deb" "libactivemq-cpp-dev"
-            install_deb_dependency "$artifacts_dir/libopencv-dev_4.11.0-1_arm64.deb" "libopencv-dev"
-
-            # msgpack is header-only, check if not already installed
-            if ! dpkg -l | grep -qE "^ii\s+libmsgpack-cxx-dev"; then
-                install_deb_dependency "$artifacts_dir/libmsgpack-cxx-dev_6.1.1-1_all.deb" "libmsgpack-cxx-dev"
-            else
-                log_info "System msgpack-cxx-dev already installed, skipping custom deb"
-            fi
-
-            log_success "All DEB packages installed"
-        elif [[ -f "$artifacts_dir/opencv-4.11.0-arm64.tar.gz" ]]; then
-            log_info "DEB packages not found, falling back to tar.gz extraction..."
-            use_debs="false"
-        else
-            log_error "No dependency packages found (neither .deb nor .tar.gz)"
-            return 1
-        fi
-    fi
-
-    # Fallback to tar.gz extraction if DEBs not available or disabled
-    if [[ "$use_debs" == "false" ]]; then
-        log_info "Using tar.gz archives for dependency installation..."
-        extract_dependency "$artifacts_dir/opencv-4.11.0-arm64.tar.gz" "opencv" "$dest_dir"
-        extract_dependency "$artifacts_dir/activemq-cpp-3.9.5-arm64.tar.gz" "activemq-cpp" "$dest_dir"
-        extract_dependency "$artifacts_dir/lgpio-0.2.2-arm64.tar.gz" "lgpio" "$dest_dir"
-        extract_dependency "$artifacts_dir/msgpack-cxx-6.1.1-arm64.tar.gz" "msgpack" "$dest_dir"
-    fi
-
-    log_success "All dependencies installed"
 }
 
 install_python_dependencies() {
@@ -773,7 +636,7 @@ detect_debian_codename() {
 # Configure PiTrac APT Repository
 # ========================================================================
 # Adds the PiTrac APT repository with GPG key and distribution detection
-# Returns: 0 on success, 1 if repo unavailable (falls back to local)
+# Returns: 0 on success, 1 if repo unavailable
 # ========================================================================
 configure_pitrac_apt_repo() {
     local repo_url="https://pitraclm.github.io/packages"
@@ -797,7 +660,7 @@ configure_pitrac_apt_repo() {
     # Check if repository is accessible
     if ! curl --head --silent --fail "$repo_url/dists/$codename/Release" > /dev/null 2>&1; then
         log_warn "PiTrac APT repository not accessible at $repo_url"
-        log_info "Will use local packages from deps-artifacts instead"
+        log_info "Check network connectivity and try again"
         return 1
     fi
 
@@ -847,9 +710,9 @@ install_dependencies_from_apt() {
         "libmsgpack-cxx-dev"      # MessagePack C++ (header-only)
         "libactivemq-cpp"         # ActiveMQ C++ client runtime
         "libactivemq-cpp-dev"     # ActiveMQ C++ client headers
-        "libopencv4.11"           # OpenCV runtime (Pi5-optimized build)
+        "libopencv4.13"           # OpenCV runtime (Pi5-optimized build)
         "libopencv-dev"           # OpenCV development headers
-        "libonnxruntime1.17.3"    # ONNX Runtime with XNNPACK (1.22.x has Pi5 issues)
+        "libncnn-dev"             # ncnn inference framework (static lib + headers)
     )
 
     # Check which packages are available
@@ -867,7 +730,6 @@ install_dependencies_from_apt() {
 
     if [ ${#missing_packages[@]} -gt 0 ]; then
         log_warn "Some packages not available in APT: ${missing_packages[*]}"
-        log_info "Will fall back to local packages for missing dependencies"
     fi
 
     if [ ${#available_packages[@]} -eq 0 ]; then

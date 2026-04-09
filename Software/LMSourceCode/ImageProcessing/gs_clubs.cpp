@@ -5,9 +5,9 @@
 
 #include "logging_tools.h"
 #include "gs_config.h"
-#include "gs_ipc_result.h"
-#include "gs_ipc_system.h"
-#include "gs_ipc_message.h"
+#include "gs_result_types.h"
+#include "gs_http_client.h"
+#include "gs_result_types.h"
 #include "gs_clubs.h"
 
 
@@ -30,19 +30,13 @@ namespace golf_sim {
 		// For now, just send a zero-results message with the
 		// new driver setting.
 
-#ifdef __unix__  // Ignore in Windows environment
-		GolfSimIPCMessage ipc_message(GolfSimIPCMessage::IPCMessageType::kResults);
-		GsIPCResult& ipc_results = ipc_message.GetResultsForModification();
-
-		// Really should be kControlMessage, but the GUI is not processing that yet
-		ipc_results.result_type_ = GsIPCResultType::kHit;  
-		ipc_results.club_type_ = club_type;
-		ipc_results.message_ = "Club type was set";
-
-		GS_LOG_TRACE_MSG(trace, "Sending Club Change to LM GUI.");
-		if (!GolfSimIpcSystem::SendIpcMessage(ipc_message)) {
-			GS_LOG_MSG(warning, "Failed to SendResultsToGolfSim to the LM GUI.");
-		}
+#ifdef __unix__
+		std::string club_name = (club_type == GolfSimClubs::GsClubType::kPutter) ? "Putter" : "Driver";
+		std::string json = "{\"result_type\":" + std::to_string(static_cast<int>(GsIPCResultType::kHit))
+			+ ",\"message\":\"Club type was set to " + club_name + "\""
+			+ ",\"speed_mps\":0,\"launch_angle\":0,\"side_angle\":0"
+			+ ",\"back_spin\":0,\"side_spin\":0,\"carry\":0,\"images\":[]}";
+		GsHttpClient::PostResult(json);
 #endif
 	}
 
