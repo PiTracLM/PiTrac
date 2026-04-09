@@ -104,7 +104,7 @@ This document provides a comprehensive list of all components needed to build a 
 
 ### Version 3 Enclosure Hardware (Work in Progress)
 
-**→ [V3 BOM]({% link Enclosure_Version3_assembly.md %})**
+**→ [V3 BOM]({% link hardware/Enclosure_Version3_assembly.md %})**
 
 ### Version 2 Enclosure Hardware (Work in Progress)
 
