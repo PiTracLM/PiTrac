@@ -2,6 +2,7 @@
 title: V3 Enclosure
 layout: default
 nav_order: 5
+parent: Hardware
 has_children: true
 description: V3 Enclosure overview, assembly guide and part printing guide
 keywords: DIY golf hardware, launch monitor parts, raspberry pi golf components, 3D print golf enclosure

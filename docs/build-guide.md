@@ -37,6 +37,9 @@ We're developing companion videos to the written documentation to better visuall
 - Part 5A - De-Distortion Configuration 
 - Part 5B - Calibration 
 
+Alternative to part 2A - 4A and 4D:
+- Enclosure V3 - Assembly (https://youtu.be/bVOIPczu9Nk?si=cu9BIsXWRHtM7RDG)
+
 Please note that the written documentation is meant to be the most up-to-date and accurate information on building PiTrac systems.  If there's a discrepancy between that documentation nand the vidoes, rely on the documents.  Or, ask a question on the Discord server!
 
 ---
@@ -44,6 +47,22 @@ Please note that the written documentation is meant to be the most up-to-date an
 ## Phase 1: Hardware Assembly
 
 Before you can run PiTrac, you'll need to build the physical hardware.
+Depending on your preferences, choose between different enclosure design variants:
+
+<div style="display: flex; gap: 10px; justify-content: center;">
+  <div style="text-align: center;">
+    <strong>V1</strong><br>
+    <img src="https://github.com/user-attachments/assets/fbdc9825-b340-47b5-83ad-6c58d4588f34" width="250">
+  </div>
+  <div style="text-align: center;">
+    <strong>V2</strong><br>
+    <img src="assets/images/PiTracV2EnclosureWithGolfBall.png" width="250">
+  </div>
+  <div style="text-align: center;">
+    <strong>V3</strong><br>
+    <img src="assets/images/V3_Enclosure/PiTrac_V3-Enclosure_crop.png" width="250">
+  </div>
+</div>
 
 ### Step 1: Gather Parts
 
@@ -69,7 +88,11 @@ Learn where to get the PCB files, how to order from manufacturers, and assembly 
 
 Print the enclosure and mounting hardware for your PiTrac.
 
-**→ [3D Printing Guide]({% link hardware/3d-printing.md %})**
+**→ [Enclosure V2 3D Printing Guide]({% link hardware/3d-printing.md %})** 
+
+or 
+
+**→ [Enclosure V3 Printing Guide]({% link hardware/Enclosure_Version3_printing.md %})**
 
 Download the STL files and get recommendations for print settings.
 
@@ -77,7 +100,11 @@ Download the STL files and get recommendations for print settings.
 
 Put all the pieces together to complete your PiTrac hardware.
 
-**→ [Assembly Guide]({% link hardware/assembly-guide.md %})**
+**→ [Enclosure V2 Assembly Guide]({% link hardware/assembly-guide.md %})**
+
+or 
+
+**→ [Enclosure V3 Assembly Guide]({% link hardware/Enclosure_Version3_assembly.md %})**
 
 Follow step-by-step instructions to assemble cameras, PCB, enclosure, and wiring.
 

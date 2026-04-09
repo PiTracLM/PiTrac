@@ -41,6 +41,11 @@ All 3D printable parts can be found in the main PiTrac GitHub repository under:
   1. **Compute Board variant:** For future integrated compute board
   2. **Connector Board variant:** For current OTS parts build
 
+### Version 3 (Current)
+- Modular design
+- One main design, many variant and legacy part options.
+
+
 ## Print Settings
 
 Refer to the individual part files for specific print settings. Generally:
