@@ -329,6 +329,18 @@ const distortionCalibration = {
             };
 
             ws.onmessage = (event) => {
+                // Text messages are JSON errors from the server
+                if (typeof event.data === 'string') {
+                    clearTimeout(timeout);
+                    try {
+                        const msg = JSON.parse(event.data);
+                        const errorText = msg.error || 'Camera error';
+                        document.getElementById('distortion-feed-placeholder').textContent = errorText;
+                        document.getElementById('distortion-feed-placeholder').style.display = 'block';
+                    } catch (_) {}
+                    reject(new Error('Camera could not be opened'));
+                    return;
+                }
                 if (firstFrame) {
                     firstFrame = false;
                     clearTimeout(timeout);
@@ -435,6 +447,15 @@ const distortionCalibration = {
         };
 
         ws.onmessage = (event) => {
+            if (typeof event.data === 'string') {
+                try {
+                    const msg = JSON.parse(event.data);
+                    alert(msg.error || 'Undistort preview error');
+                } catch (_) {
+                    alert('Undistort preview error');
+                }
+                return;
+            }
             this._updateFeedImage('undistort-feed', event.data);
         };
 
