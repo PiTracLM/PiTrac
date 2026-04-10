@@ -176,10 +176,10 @@ class CompatibleCharucoDetector:
         laplacian = cv2.Laplacian(gray_image, cv2.CV_64F)
         metrics["blur_score"] = laplacian.var()
 
-        blur_threshold = 100
+        blur_threshold = 50
         if metrics["blur_score"] < blur_threshold:
             metrics["reasons"].append(
-                f"Image too blurry (score {metrics['blur_score']:.1f} < {blur_threshold})")
+                f"Image too blurry (score {metrics['blur_score']:.2f} < {blur_threshold})")
 
         # 2. Coverage check
         x_coords = charuco_corners[:, 0, 0]

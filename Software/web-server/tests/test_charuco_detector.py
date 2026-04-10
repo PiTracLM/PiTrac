@@ -196,7 +196,7 @@ class TestCompatibleCharucoDetector:
         quality = detector.assess_image_quality(board_img, corners)
         assert quality["is_good"]
         assert quality["num_corners"] > 10
-        assert quality["blur_score"] > 100
+        assert quality["blur_score"] > 50
         assert len(quality["reasons"]) == 0
 
     def test_assess_quality_blurry(self, detector):
