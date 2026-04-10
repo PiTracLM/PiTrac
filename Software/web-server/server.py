@@ -54,8 +54,13 @@ class PiTracServer:
 
         self._setup_routes()
 
-        self.app.add_event_handler("startup", self.startup_event)
-        self.app.add_event_handler("shutdown", self.shutdown_event)
+        @self.app.on_event("startup")
+        async def _startup():
+            await self.startup_event()
+
+        @self.app.on_event("shutdown")
+        async def _shutdown():
+            await self.shutdown_event()
 
     def _setup_routes(self) -> None:
 
@@ -607,6 +612,10 @@ class PiTracServer:
                 "camera_types": detector.get_camera_types(),
                 "lens_types": detector.get_lens_types(),
             }
+
+        @self.app.get("/update", response_class=HTMLResponse)
+        async def update_page(request: Request) -> Response:
+            return self.templates.TemplateResponse("update.html", {"request": request})
 
         @self.app.get("/api/update/branches")
         async def get_branches() -> Dict[str, Any]:

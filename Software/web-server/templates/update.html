@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}System Update - PiTrac{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/update.css">
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <div class="update-container">
+
+        <div class="update-section">
+            <h2 class="section-title">
+                <i data-lucide="refresh-cw" class="icon-menu"></i>
+                System Update
+            </h2>
+
+            <div class="status-card" id="statusCard">
+                <div class="status-row">
+                    <span class="status-label">Current Branch</span>
+                    <span class="status-value" id="currentBranch">--</span>
+                </div>
+                <div class="status-row">
+                    <span class="status-label">Current Commit</span>
+                    <span class="status-value mono" id="currentHash">--</span>
+                </div>
+                <div class="status-row">
+                    <span class="status-label">Last Build</span>
+                    <span class="status-value" id="lastBuild">--</span>
+                </div>
+                <div class="status-row">
+                    <span class="status-label">Last Check</span>
+                    <span class="status-value" id="lastCheck">--</span>
+                </div>
+                <div class="status-row" id="warningRow" style="display:none;">
+                    <span class="status-label">Warning</span>
+                    <span class="status-value warning-text" id="warningText"></span>
+                </div>
+            </div>
+
+            <div class="branch-controls">
+                <div class="branch-selector">
+                    <label for="branchSelect">Branch</label>
+                    <select id="branchSelect" onchange="onBranchChange()">
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+                <div class="update-actions">
+                    <button class="action-btn" id="checkBtn" onclick="checkForUpdates()">
+                        <i data-lucide="rotate-cw" class="icon-sm"></i>
+                        <span>Check for Updates</span>
+                    </button>
+                    <button class="action-btn primary" id="updateBtn" onclick="startUpdate(false)" disabled>
+                        <i data-lucide="download" class="icon-sm"></i>
+                        <span>Update & Rebuild</span>
+                    </button>
+                    <button class="action-btn primary" id="switchBtn" onclick="switchBranch()" style="display:none;">
+                        <i data-lucide="git-branch" class="icon-sm"></i>
+                        <span>Switch Branch & Rebuild</span>
+                    </button>
+                    <button class="action-btn danger" id="cancelBtn" onclick="cancelUpdate()" style="display:none;">
+                        <i data-lucide="square" class="icon-sm"></i>
+                        <span>Cancel</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="commits-section" id="commitsSection" style="display:none;">
+            <h3 class="section-subtitle">
+                <span id="commitCount">0</span> new commits available
+            </h3>
+            <div class="commit-list" id="commitList"></div>
+        </div>
+
+        <div class="log-section" id="logSection" style="display:none;">
+            <div class="log-header">
+                <h3 class="section-subtitle">Build Output</h3>
+                <button class="action-btn small" onclick="clearLog()">Clear</button>
+            </div>
+            <div class="build-log" id="buildLog"></div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/update.js"></script>
+{% endblock %}

@@ -198,18 +198,20 @@ function togglePause() {
     const button = document.getElementById('pauseButton');
     const btnText = button.querySelector('.btn-text');
     
+    const iconEl = document.getElementById('pauseIcon');
     if (isPaused) {
         button.classList.add('paused');
         btnText.textContent = 'Resume';
-        button.querySelector('svg').innerHTML = '<path d="M8 3.5a5 5 0 0 0-5 5v1a5 5 0 0 0 10 0v-1a5 5 0 0 0-5-5z"/>';
+        iconEl.setAttribute('data-lucide', 'play');
     } else {
         button.classList.remove('paused');
         btnText.textContent = 'Pause';
-        button.querySelector('svg').innerHTML = '<path d="M6 3.5a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5zm4 0a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5z"/>';
-        
+        iconEl.setAttribute('data-lucide', 'pause');
+
         const viewer = document.getElementById('logViewer');
         viewer.scrollTop = viewer.scrollHeight;
     }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function clearLogs() {

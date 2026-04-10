@@ -42,6 +42,18 @@
     --error-dark: #e53e3e;
 }
 
+/* Lucide icon sizing — createIcons() replaces <i data-lucide> with <svg class="lucide"> */
+.lucide {
+    width: 20px;
+    height: 20px;
+    vertical-align: middle;
+}
+
+.lucide.icon-sm { width: 16px; height: 16px; }
+.lucide.icon-md { width: 24px; height: 24px; }
+.lucide.icon-lg { width: 48px; height: 48px; }
+.lucide.icon-menu { width: 20px; height: 20px; }
+
 /* Base Styles */
 * {
     margin: 0;
