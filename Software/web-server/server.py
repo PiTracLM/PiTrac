@@ -25,6 +25,7 @@ from parsers import ShotDataParser
 from pitrac_manager import PiTracProcessManager
 from strobe_calibration_manager import StrobeCalibrationManager
 from testing_tools_manager import TestingToolsManager
+from update_manager import UpdateManager
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,8 @@ class PiTracServer:
         self.calibration_manager = CalibrationManager(self.config_manager)
         self.testing_manager = TestingToolsManager(self.config_manager)
         self.strobe_calibration_manager = StrobeCalibrationManager(self.config_manager)
+        self.update_manager = UpdateManager()
+        self.update_manager.set_broadcast_callback(self.connection_manager.broadcast)
         self.shutdown_flag = False
         self.background_tasks: set[asyncio.Task] = set()
         IMAGES_DIR.mkdir(parents=True, exist_ok=True)
@@ -604,6 +607,39 @@ class PiTracServer:
                 "camera_types": detector.get_camera_types(),
                 "lens_types": detector.get_lens_types(),
             }
+
+        @self.app.get("/api/update/branches")
+        async def get_branches() -> Dict[str, Any]:
+            return await self.update_manager.get_branches()
+
+        @self.app.get("/api/update/check")
+        async def check_for_updates() -> Dict[str, Any]:
+            return await self.update_manager.check_for_updates()
+
+        @self.app.post("/api/update/start")
+        async def start_update(request: Request) -> Dict[str, Any]:
+            content_type = request.headers.get("content-type", "")
+            body = await request.json() if "application/json" in content_type else {}
+            force = bool(body.get("force", False))
+            branch = body.get("branch")
+            if branch is not None:
+                branch = str(branch)
+            result = await self.update_manager.start_update(force=force, branch=branch)
+
+            task = self.update_manager.get_update_task()
+            if task:
+                self.background_tasks.add(task)
+                task.add_done_callback(self.background_tasks.discard)
+
+            return result
+
+        @self.app.post("/api/update/cancel")
+        async def cancel_update() -> Dict[str, Any]:
+            return await self.update_manager.cancel_update()
+
+        @self.app.get("/api/update/status")
+        async def update_status() -> Dict[str, Any]:
+            return self.update_manager.get_status()
 
         @self.app.get("/logs", response_class=HTMLResponse)
         async def logs_page(request: Request) -> Response:

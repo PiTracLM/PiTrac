@@ -52,6 +52,7 @@
       "kModelPath": "../ml_models/yolo26-ball-detector",
       "kModelNMSThreshold": "0.4",
       "kInferenceThreads": "4",
+      "kUseModelCLAHEPreprocessing": "0",
       "kPlacedBallCannyLower": "35",
       "kPlacedBallCannyUpper": "80",
       "kPlacedBallCurrentParam1": "130",

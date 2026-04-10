@@ -586,6 +586,17 @@ EOF
     # Create base directory for models and other system files
     mkdir -p /etc/pitrac
 
+    # Record build environment so the web server can find the repo and run updates
+    log_info "Writing build environment to /etc/pitrac/environment..."
+    cat > /etc/pitrac/environment << ENVEOF
+# Written by build.sh dev — used by the web server for self-update
+PITRAC_REPO_ROOT=$REPO_ROOT
+PITRAC_BUILD_SCRIPT=$SCRIPT_DIR/build.sh
+PITRAC_BUILD_USER=${SUDO_USER:-$(whoami)}
+PITRAC_LAST_BUILD=$(date -Iseconds)
+ENVEOF
+    chmod 644 /etc/pitrac/environment
+
     # ActiveMQ removed — results sent via HTTP POST from C++ to Python web server
 
     # Clean up old PiTrac systemd service and processes if they exist
@@ -676,6 +687,22 @@ EOF
 
     # Add back from PostINT for hardening
     usermod -a -G video,gpio,i2c,spi,dialout "$INSTALL_USER" 2>/dev/null || true
+
+    # Allow the web server user to run build.sh dev via sudo without a password
+    # This enables UI-triggered updates (git pull + rebuild)
+    log_info "Configuring sudoers for web-triggered updates..."
+    cat > /etc/sudoers.d/pitrac-update << SUDOEOF
+# Allow PiTrac web server to run build.sh dev for self-updates
+$INSTALL_USER ALL=(root) NOPASSWD: $SCRIPT_DIR/build.sh dev, $SCRIPT_DIR/build.sh dev force
+SUDOEOF
+    chmod 440 /etc/sudoers.d/pitrac-update
+    # Validate the sudoers file
+    if visudo -c -f /etc/sudoers.d/pitrac-update 2>/dev/null; then
+        log_success "Sudoers entry installed for user: $INSTALL_USER"
+    else
+        log_error "Invalid sudoers file — removing to avoid lockout"
+        rm -f /etc/sudoers.d/pitrac-update
+    fi
 
     # Install Python web server (always update)
     log_info "Installing/Updating PiTrac web server..."
