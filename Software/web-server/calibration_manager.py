@@ -1240,6 +1240,16 @@ class CalibrationManager:
     async def _capture_image(
         self, camera_index: int, output_path: Path, gain: float
     ) -> Optional[Any]:
+        import cv2
+
+        # Prefer the shared frame from the live feed — avoids conflicting with
+        # rpicam-vid which holds exclusive libcamera access to the camera.
+        frame = self._shared_frames.get(camera_index)
+        if frame is not None:
+            frame = frame.copy()
+            cv2.imwrite(str(output_path), frame)
+            return frame
+
         if self._capture_backend == "rpicam":
             return await self._capture_rpicam_image(camera_index, output_path, gain)
         return await self._capture_webcam_image(camera_index, output_path)
