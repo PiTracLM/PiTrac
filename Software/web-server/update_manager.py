@@ -149,7 +149,7 @@ class UpdateManager:
                     if len(parts) != 2:
                         continue
                     ref, age = parts
-                    if ref == f"{remote}/HEAD":
+                    if ref in (f"{remote}/HEAD", remote):
                         continue
                     name = ref[len(prefix):] if ref.startswith(prefix) else ref
                     branches.append({"name": name, "last_commit": age})
