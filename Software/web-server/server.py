@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -35,6 +36,127 @@ CHARUCO_SQUARE_LENGTH = 0.025
 CHARUCO_MARKER_LENGTH = 0.020
 
 
+class RpicamVideoStream:
+    """cv2.VideoCapture-compatible wrapper around rpicam-vid for Pi CSI cameras."""
+
+    _MAX_BUF = 10 * 1024 * 1024  # 10 MB — far larger than any single JPEG frame
+
+    def __init__(self, camera_index: int, width: int, height: int):
+        import cv2
+        import numpy as np
+        self._cv2 = cv2
+        self._np = np
+        self._width = width
+        self._height = height
+        self._actual_width: Optional[int] = None
+        self._actual_height: Optional[int] = None
+        self._buf = bytearray()
+        self._proc = subprocess.Popen(
+            [
+                "rpicam-vid", "--camera", str(camera_index),
+                "--width", str(width), "--height", str(height),
+                "--framerate", "15",
+                "--codec", "mjpeg", "--output", "-",
+                "--timeout", "0", "--nopreview",
+            ],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        self._opened = self._proc.poll() is None
+
+    def isOpened(self) -> bool:
+        return self._opened and self._proc.poll() is None
+
+    def read(self):
+        """Read one JPEG frame, decode to BGR numpy array."""
+        CHUNK = 65536
+        while self.isOpened():
+            data = self._proc.stdout.read(CHUNK)
+            if not data:
+                self._opened = False
+                return False, None
+            self._buf.extend(data)
+
+            # Guard against unbounded growth from a corrupted stream
+            if len(self._buf) > self._MAX_BUF:
+                self._buf.clear()
+                continue
+
+            # Scan for a complete JPEG (SOI 0xFFD8 … EOI 0xFFD9)
+            start = self._buf.find(b'\xff\xd8')
+            if start < 0:
+                self._buf.clear()
+                continue
+            end = self._buf.find(b'\xff\xd9', start + 2)
+            if end < 0:
+                continue
+            jpeg = bytes(self._buf[start:end + 2])
+            del self._buf[:end + 2]
+            frame = self._cv2.imdecode(
+                self._np.frombuffer(jpeg, self._np.uint8), self._cv2.IMREAD_COLOR)
+            if frame is not None:
+                if self._actual_width is None:
+                    self._actual_height, self._actual_width = frame.shape[:2]
+                return True, frame
+        return False, None
+
+    def set(self, prop_id, value):
+        pass  # resolution is fixed at construction
+
+    def get(self, prop_id):
+        import cv2
+        if prop_id == cv2.CAP_PROP_FRAME_WIDTH:
+            return float(self._actual_width or self._width)
+        if prop_id == cv2.CAP_PROP_FRAME_HEIGHT:
+            return float(self._actual_height or self._height)
+        return 0.0
+
+    def release(self):
+        if self._proc and self._proc.poll() is None:
+            self._proc.terminate()
+            try:
+                self._proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                self._proc.kill()
+        if self._proc and self._proc.stderr:
+            try:
+                err = self._proc.stderr.read()
+                if err:
+                    logger.debug(f"rpicam-vid stderr: {err.decode(errors='replace').strip()}")
+            except Exception:
+                pass
+        self._opened = False
+
+    def __del__(self):
+        self.release()
+
+
+def open_camera(camera_index: int, width: int = 1280, height: int = 720):
+    """Open a camera, falling back to rpicam-vid for Pi CSI cameras."""
+    import cv2
+    cap = cv2.VideoCapture(camera_index)
+    if cap.isOpened():
+        # Validate with a test read — some V4L2 nodes report open but can't capture
+        ret, frame = cap.read()
+        if ret and frame is not None:
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+            return cap
+        logger.info(f"cv2.VideoCapture({camera_index}) opened but test read failed")
+        cap.release()
+
+    if shutil.which("rpicam-vid"):
+        logger.info(f"cv2.VideoCapture({camera_index}) unusable, trying rpicam-vid")
+        stream = RpicamVideoStream(camera_index, width, height)
+        if stream.isOpened():
+            ret, frame = stream.read()
+            if ret and frame is not None:
+                return stream
+            logger.info(f"rpicam-vid started but no frames for camera {camera_index}")
+        stream.release()
+
+    return None
+
+
 class PiTracServer:
 
     _BASE_DIR = Path(__file__).resolve().parent
@@ -54,6 +176,7 @@ class PiTracServer:
         self.update_manager.set_broadcast_callback(self.connection_manager.broadcast)
         self.shutdown_flag = False
         self.background_tasks: set[asyncio.Task] = set()
+        self._active_cameras: Dict[int, str] = {}  # camera_index -> endpoint name
         IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
         self.app.mount("/static", StaticFiles(directory=str(self._BASE_DIR / "static")), name="static")
@@ -485,6 +608,8 @@ class PiTracServer:
         @self.app.websocket("/ws/distortion-feed")
         async def distortion_camera_feed(websocket: WebSocket) -> None:
             await websocket.accept()
+            cap = None
+            camera_index = None
             try:
                 import cv2
                 import numpy as np
@@ -494,81 +619,90 @@ class PiTracServer:
                 camera = data.get("camera", "camera1")
                 camera_index = 0 if camera == "camera1" else 1
 
+                if camera_index in self._active_cameras:
+                    await websocket.send_json({
+                        "error": f"Camera {camera_index} is already in use "
+                                 f"by {self._active_cameras[camera_index]}"
+                    })
+                    await websocket.close()
+                    return
+
                 detector = CompatibleCharucoDetector(
                     squares_x=CHARUCO_SQUARES_X, squares_y=CHARUCO_SQUARES_Y,
                     square_length=CHARUCO_SQUARE_LENGTH, marker_length=CHARUCO_MARKER_LENGTH,
                 )
 
-                cap = cv2.VideoCapture(camera_index)
-                if not cap.isOpened():
+                cap = await asyncio.to_thread(open_camera, camera_index, 3840, 2160)
+                if cap is None:
                     await websocket.send_json({"error": f"Cannot open camera {camera_index}"})
                     await websocket.close()
                     return
 
-                # Capture at max resolution for calibration accuracy
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 3840)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160)
-                # Read actual resolution the camera settled on
-                actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                logger.info(f"Distortion feed camera resolution: {actual_w}x{actual_h}")
+                self._active_cameras[camera_index] = "distortion-feed"
 
-                STREAM_WIDTH = 960  # downscale for streaming display
+                # Read actual resolution after first frame (accurate for rpicam-vid)
+                ret, first_frame = await asyncio.to_thread(cap.read)
+                if ret and first_frame is not None:
+                    actual_h, actual_w = first_frame.shape[:2]
+                    logger.info(f"Distortion feed camera resolution: {actual_w}x{actual_h}")
+                else:
+                    actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                    actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-                try:
-                    while True:
-                        ret, frame = cap.read()
+                STREAM_WIDTH = 960
+
+                frame = first_frame
+                while True:
+                    if frame is None:
+                        ret, frame = await asyncio.to_thread(cap.read)
                         if not ret:
                             await asyncio.sleep(0.1)
+                            frame = None
                             continue
 
-                        # Publish full-res RAW frame for calibration
-                        self.calibration_manager.set_shared_frame(camera_index, frame.copy())
+                    self.calibration_manager.set_shared_frame(camera_index, frame.copy())
 
-                        # Downscale for display and detection overlay
-                        scale = STREAM_WIDTH / frame.shape[1]
-                        display = cv2.resize(frame, (STREAM_WIDTH, int(frame.shape[0] * scale)))
+                    scale = STREAM_WIDTH / frame.shape[1]
+                    display = cv2.resize(frame, (STREAM_WIDTH, int(frame.shape[0] * scale)))
 
-                        gray = cv2.cvtColor(display, cv2.COLOR_BGR2GRAY)
-                        corners, ids, marker_corners, marker_ids = detector.detect_charuco_corners(gray)
+                    gray = cv2.cvtColor(display, cv2.COLOR_BGR2GRAY)
+                    corners, ids, marker_corners, marker_ids = detector.detect_charuco_corners(gray)
 
-                        if marker_corners and len(marker_corners) > 0:
-                            cv2.aruco.drawDetectedMarkers(display, marker_corners, marker_ids)
-                        if corners is not None and len(corners) > 0:
-                            cv2.aruco.drawDetectedCornersCharuco(display, corners, ids)
-                            quality = detector.assess_image_quality(gray, corners)
-                            label = f"Corners: {quality['num_corners']}  Blur: {quality['blur_score']:.0f}"
-                            color = (0, 255, 0) if quality["is_good"] else (0, 128, 255)
-                            cv2.putText(display, label, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-                        else:
-                            cv2.putText(display, "No board detected", (10, 25),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                    if marker_corners and len(marker_corners) > 0:
+                        cv2.aruco.drawDetectedMarkers(display, marker_corners, marker_ids)
+                    if corners is not None and len(corners) > 0:
+                        cv2.aruco.drawDetectedCornersCharuco(display, corners, ids)
+                        quality = detector.assess_image_quality(gray, corners)
+                        label = f"Corners: {quality['num_corners']}  Blur: {quality['blur_score']:.0f}"
+                        color = (0, 255, 0) if quality["is_good"] else (0, 128, 255)
+                        cv2.putText(display, label, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                    else:
+                        cv2.putText(display, "No board detected", (10, 25),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
-                        # Draw coverage grid overlay (single blend pass)
-                        status = self.calibration_manager.calibration_status.get(camera, {})
-                        cov = status.get("coverage")
-                        if cov and cov.get("grid"):
-                            dh, dw = display.shape[:2]
-                            grid = cov["grid"]
-                            rows, cols = len(grid), len(grid[0])
-                            if any(grid[r][c] > 0 for r in range(rows) for c in range(cols)):
-                                overlay = display.copy()
-                                for r in range(rows):
-                                    for c in range(cols):
-                                        if grid[r][c] > 0:
-                                            x1 = int(c * dw / cols)
-                                            y1 = int(r * dh / rows)
-                                            x2 = int((c + 1) * dw / cols)
-                                            y2 = int((r + 1) * dh / rows)
-                                            cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 180, 0), -1)
-                                cv2.addWeighted(overlay, 0.15, display, 0.85, 0, display)
+                    # Draw coverage grid overlay (single blend pass)
+                    status = self.calibration_manager.calibration_status.get(camera, {})
+                    cov = status.get("coverage")
+                    if cov and cov.get("grid"):
+                        dh, dw = display.shape[:2]
+                        grid = cov["grid"]
+                        rows, cols = len(grid), len(grid[0])
+                        if any(grid[r][c] > 0 for r in range(rows) for c in range(cols)):
+                            overlay = display.copy()
+                            for r in range(rows):
+                                for c in range(cols):
+                                    if grid[r][c] > 0:
+                                        x1 = int(c * dw / cols)
+                                        y1 = int(r * dh / rows)
+                                        x2 = int((c + 1) * dw / cols)
+                                        y2 = int((r + 1) * dh / rows)
+                                        cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 180, 0), -1)
+                            cv2.addWeighted(overlay, 0.15, display, 0.85, 0, display)
 
-                        _, jpg = cv2.imencode(".jpg", display, [cv2.IMWRITE_JPEG_QUALITY, 70])
-                        await websocket.send_bytes(jpg.tobytes())
-                        await asyncio.sleep(0.066)  # ~15 fps
-                finally:
-                    cap.release()
-                    self.calibration_manager.clear_shared_frame(camera_index)
+                    _, jpg = cv2.imencode(".jpg", display, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                    await websocket.send_bytes(jpg.tobytes())
+                    await asyncio.sleep(0.066)  # ~15 fps
+                    frame = None  # read next frame on next iteration
 
             except WebSocketDisconnect:
                 logger.debug("Distortion feed WebSocket disconnected")
@@ -578,10 +712,19 @@ class PiTracServer:
                     await websocket.close()
                 except Exception:
                     pass
+            finally:
+                if cap is not None:
+                    await asyncio.to_thread(cap.release)
+                if camera_index is not None:
+                    self._active_cameras.pop(camera_index, None)
+                    self.calibration_manager.clear_shared_frame(camera_index)
 
         @self.app.websocket("/ws/undistort-preview")
         async def undistort_preview_feed(websocket: WebSocket) -> None:
             await websocket.accept()
+            cap = None
+            camera_index = None
+            listener = None
             try:
                 import cv2
                 import numpy as np
@@ -605,17 +748,24 @@ class PiTracServer:
                 camera_matrix = np.array(matrix_data, dtype=np.float64)
                 dist_coeffs = np.array(dist_data, dtype=np.float64)
 
-                cap = cv2.VideoCapture(camera_index)
-                if not cap.isOpened():
+                if camera_index in self._active_cameras:
+                    await websocket.send_json({
+                        "error": f"Camera {camera_index} is already in use "
+                                 f"by {self._active_cameras[camera_index]}"
+                    })
+                    await websocket.close()
+                    return
+
+                cap = await asyncio.to_thread(open_camera, camera_index, 1280, 720)
+                if cap is None:
                     await websocket.send_json({"error": f"Cannot open camera {camera_index}"})
                     await websocket.close()
                     return
 
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+                self._active_cameras[camera_index] = "undistort-preview"
 
                 # Read actual resolution and precompute undistort maps
-                ret, first_frame = cap.read()
+                ret, first_frame = await asyncio.to_thread(cap.read)
                 if not ret:
                     await websocket.send_json({"error": "Could not read from camera"})
                     await websocket.close()
@@ -645,41 +795,37 @@ class PiTracServer:
 
                 listener = asyncio.create_task(listen_for_mode())
 
-                try:
-                    while True:
-                        ret, frame = cap.read()
-                        if not ret:
-                            await asyncio.sleep(0.1)
-                            continue
+                while True:
+                    ret, frame = await asyncio.to_thread(cap.read)
+                    if not ret:
+                        await asyncio.sleep(0.1)
+                        continue
 
-                        mode = mode_holder["mode"]
+                    mode = mode_holder["mode"]
 
-                        if mode == "raw":
-                            cv2.putText(frame, "RAW", (10, 30),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-                            output = frame
-                        elif mode == "undistorted":
-                            output = cv2.remap(frame, map1, map2, cv2.INTER_LINEAR)
-                            cv2.putText(output, "UNDISTORTED", (10, 30),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-                        else:
-                            undistorted = cv2.remap(frame, map1, map2, cv2.INTER_LINEAR)
-                            # Scale both to half width for side-by-side
-                            half_w = w // 2
-                            left = cv2.resize(frame, (half_w, h))
-                            right = cv2.resize(undistorted, (half_w, h))
-                            cv2.putText(left, "RAW", (10, 30),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-                            cv2.putText(right, "UNDISTORTED", (10, 30),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                            output = np.hstack([left, right])
+                    if mode == "raw":
+                        cv2.putText(frame, "RAW", (10, 30),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                        output = frame
+                    elif mode == "undistorted":
+                        output = cv2.remap(frame, map1, map2, cv2.INTER_LINEAR)
+                        cv2.putText(output, "UNDISTORTED", (10, 30),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                    else:
+                        undistorted = cv2.remap(frame, map1, map2, cv2.INTER_LINEAR)
+                        # Scale both to half width for side-by-side
+                        half_w = w // 2
+                        left = cv2.resize(frame, (half_w, h))
+                        right = cv2.resize(undistorted, (half_w, h))
+                        cv2.putText(left, "RAW", (10, 30),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                        cv2.putText(right, "UNDISTORTED", (10, 30),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        output = np.hstack([left, right])
 
-                        _, jpg = cv2.imencode(".jpg", output, [cv2.IMWRITE_JPEG_QUALITY, 75])
-                        await websocket.send_bytes(jpg.tobytes())
-                        await asyncio.sleep(0.066)  # ~15 fps
-                finally:
-                    listener.cancel()
-                    cap.release()
+                    _, jpg = cv2.imencode(".jpg", output, [cv2.IMWRITE_JPEG_QUALITY, 75])
+                    await websocket.send_bytes(jpg.tobytes())
+                    await asyncio.sleep(0.066)  # ~15 fps
 
             except WebSocketDisconnect:
                 logger.debug("Undistort preview WebSocket disconnected")
@@ -689,6 +835,13 @@ class PiTracServer:
                     await websocket.close()
                 except Exception:
                     pass
+            finally:
+                if listener is not None:
+                    listener.cancel()
+                if cap is not None:
+                    await asyncio.to_thread(cap.release)
+                if camera_index is not None:
+                    self._active_cameras.pop(camera_index, None)
 
         @self.app.post("/api/calibration/distortion/{camera}")
         async def run_distortion_calibration(camera: str, request: Request) -> Dict[str, Any]:
