@@ -124,7 +124,7 @@ class TestConfigurationAPI:
         server_instance.config_manager = mock_config_manager
 
         response = client.put("/api/config/cameras.camera1_gain", json={"value": "20.0"})
-        assert response.status_code == 200
+        assert response.status_code == 400
 
         data = response.json()
         assert "error" in data
@@ -149,11 +149,11 @@ class TestConfigurationAPI:
         server_instance.config_manager = mock_config_manager
 
         response = client.post("/api/config/reset")
-        assert response.status_code == 200
+        assert response.status_code == 500
 
         data = response.json()
-        assert data["success"] is False
-        assert data["message"] == "Reset failed"
+        assert "error" in data
+        assert data["error"] == "Reset failed"
 
     def test_reload_config(self, client, server_instance, mock_config_manager):
         """Test reloading configuration from disk"""
@@ -200,11 +200,11 @@ class TestConfigurationAPI:
         server_instance.config_manager = mock_config_manager
 
         response = client.post("/api/config/import", json={"invalid": "data"})
-        assert response.status_code == 200
+        assert response.status_code == 400
 
         data = response.json()
-        assert data["success"] is False
-        assert data["message"] == "Invalid configuration format"
+        assert "error" in data
+        assert data["error"] == "Invalid configuration format"
 
     def test_config_cors_headers(self, client):
         """Test CORS headers on config endpoints"""

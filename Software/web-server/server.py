@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from fastapi import FastAPI, File, Request, UploadFile, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -200,11 +200,14 @@ class PiTracServer:
             return self.templates.TemplateResponse("config.html", {"request": request})
 
         @self.app.get("/api/config")
-        async def get_config(key: Optional[str] = None) -> Dict[str, Any]:
+        async def get_config(key: Optional[str] = None):
             """Get merged configuration or specific key"""
             config = self.config_manager.get_config(key)
             if config is None and key:
-                return {"error": f"Configuration key '{key}' not found"}
+                return JSONResponse(
+                    status_code=404,
+                    content={"error": f"Configuration key '{key}' not found"},
+                )
             return {"data": config}
 
         @self.app.get("/api/config/defaults")
@@ -213,7 +216,10 @@ class PiTracServer:
             if key:
                 config = self.config_manager.get_default(key)
                 if config is None:
-                    return {"error": f"Configuration key '{key}' not found"}
+                    return JSONResponse(
+                        status_code=404,
+                        content={"error": f"Configuration key '{key}' not found"}
+                    )
                 return {"data": config}
             else:
                 config = self.config_manager.get_all_defaults_with_metadata()
@@ -241,27 +247,34 @@ class PiTracServer:
             return {"data": self.config_manager.get_diff()}
 
         @self.app.put("/api/config/{key:path}")
-        async def update_config(key: str, request: Request) -> Dict[str, Any]:
+        async def update_config(key: str, request: Request):
             """Update a configuration value"""
             try:
                 body = await request.json()
                 value = body.get("value")
 
+                # Check that the key exists in metadata
+                metadata = self.config_manager.load_configurations_metadata()
+                settings_metadata = metadata.get("settings", {})
+                if key not in settings_metadata:
+                    return JSONResponse(
+                        status_code=400,
+                        content={"error": "Unknown configuration key"},
+                    )
+
                 # Validate the value
                 is_valid, error_msg = self.config_manager.validate_config(key, value)
                 if not is_valid:
-                    return {"error": error_msg}
+                    return JSONResponse(status_code=400, content={"error": error_msg})
 
                 # Set the value
                 success, message, requires_restart = self.config_manager.set_config(key, value)
 
-                # Rebuild the generated .json file in case the thing that was changed is
-                # in the calibration.json or user_settings.json file and needs to be merged.
-
-                generated_config_path = self.config_manager.generate_golf_sim_config()
-                logger.info(f"Generated config file at: {generated_config_path}")
-
                 if success:
+                    # Rebuild the generated config so the C++ process picks up changes
+                    generated_config_path = self.config_manager.generate_golf_sim_config()
+                    logger.info(f"Generated config file at: {generated_config_path}")
+
                     # Broadcast update to WebSocket clients
                     await self.connection_manager.broadcast(
                         {
@@ -278,27 +291,34 @@ class PiTracServer:
                         "requires_restart": requires_restart,
                     }
                 else:
-                    return {"error": message}
+                    return JSONResponse(status_code=500, content={"error": message})
 
             except Exception as e:
                 logger.error(f"Failed to update config: {e}")
-                return {"error": str(e)}
+                return JSONResponse(status_code=500, content={"error": str(e)})
 
         @self.app.post("/api/config/reset")
-        async def reset_config() -> Dict[str, Any]:
+        async def reset_config():
             """Reset all user settings to defaults"""
             success, message = self.config_manager.reset_all()
 
             if success:
+                self.config_manager.generate_golf_sim_config()
                 await self.connection_manager.broadcast({"type": "config_reset"})
+                return {"success": True, "message": message}
 
-            return {"success": success, "message": message}
+            return JSONResponse(status_code=500, content={"error": message})
 
         @self.app.post("/api/config/reload")
-        async def reload_config() -> Dict[str, str]:
+        async def reload_config():
             """Reload configuration from disk"""
-            self.config_manager.reload()
-            return {"status": "Configuration reloaded"}
+            try:
+                self.config_manager.reload()
+                self.config_manager.generate_golf_sim_config()
+                return {"status": "Configuration reloaded"}
+            except Exception as e:
+                logger.error(f"Failed to reload config: {e}")
+                return JSONResponse(status_code=500, content={"error": str(e)})
 
         @self.app.get("/api/config/export")
         async def export_config() -> Dict[str, Any]:
@@ -306,19 +326,21 @@ class PiTracServer:
             return self.config_manager.export_config()
 
         @self.app.post("/api/config/import")
-        async def import_config(request: Request) -> Dict[str, Any]:
+        async def import_config(request: Request):
             """Import configuration from exported data"""
             try:
                 config_data = await request.json()
                 success, message = self.config_manager.import_config(config_data)
 
                 if success:
+                    self.config_manager.generate_golf_sim_config()
                     await self.connection_manager.broadcast({"type": "config_import"})
+                    return {"success": True, "message": message}
 
-                return {"success": success, "message": message}
+                return JSONResponse(status_code=400, content={"error": message})
             except Exception as e:
                 logger.error(f"Failed to import config: {e}")
-                return {"error": str(e)}
+                return JSONResponse(status_code=500, content={"error": str(e)})
 
         # PiTrac process management endpoints
         @self.app.post("/api/pitrac/start")
