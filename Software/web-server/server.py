@@ -673,12 +673,19 @@ class PiTracServer:
                     if corners is not None and len(corners) > 0:
                         cv2.aruco.drawDetectedCornersCharuco(display, corners, ids)
                         quality = detector.assess_image_quality(gray, corners)
-                        label = f"Corners: {quality['num_corners']}  Blur: {quality['blur_score']:.0f}"
-                        color = (0, 255, 0) if quality["is_good"] else (0, 128, 255)
-                        cv2.putText(display, label, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                        await websocket.send_json({
+                            "type": "metrics",
+                            "corners": int(quality["num_corners"]),
+                            "blur": int(round(float(quality["blur_score"]))),
+                            "is_good": bool(quality["is_good"]),
+                        })
                     else:
-                        cv2.putText(display, "No board detected", (10, 25),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                        await websocket.send_json({
+                            "type": "metrics",
+                            "corners": 0,
+                            "blur": 0,
+                            "is_good": False,
+                        })
 
                     # Draw coverage grid overlay (single blend pass)
                     status = self.calibration_manager.calibration_status.get(camera, {})

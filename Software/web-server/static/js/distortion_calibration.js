@@ -329,16 +329,24 @@ const distortionCalibration = {
             };
 
             ws.onmessage = (event) => {
-                // Text messages are JSON errors from the server
                 if (typeof event.data === 'string') {
-                    clearTimeout(timeout);
-                    try {
-                        const msg = JSON.parse(event.data);
-                        const errorText = msg.error || 'Camera error';
-                        document.getElementById('distortion-feed-placeholder').textContent = errorText;
-                        document.getElementById('distortion-feed-placeholder').style.display = 'block';
-                    } catch (_) {}
-                    reject(new Error('Camera could not be opened'));
+                    let msg;
+                    try { msg = JSON.parse(event.data); }
+                    catch (e) { console.warn('Bad JSON from feed:', e); return; }
+
+                    if (msg.error) {
+                        clearTimeout(timeout);
+                        const ph = document.getElementById('distortion-feed-placeholder');
+                        if (ph) {
+                            ph.textContent = msg.error;
+                            ph.style.display = 'block';
+                        }
+                        reject(new Error(msg.error));
+                        return;
+                    }
+                    if (msg.type === 'metrics') {
+                        this._updateFeedOverlay(msg);
+                    }
                     return;
                 }
                 if (firstFrame) {
@@ -360,6 +368,8 @@ const distortionCalibration = {
 
             ws.onclose = () => {
                 this.feedSocket = null;
+                const overlay = document.getElementById('distortion-feed-overlay');
+                if (overlay) overlay.style.display = 'none';
             };
 
             this.feedSocket = ws;
@@ -375,6 +385,20 @@ const distortionCalibration = {
         if (oldSrc && oldSrc.startsWith('blob:')) URL.revokeObjectURL(oldSrc);
     },
 
+    _updateFeedOverlay(metrics) {
+        const el = document.getElementById('distortion-feed-overlay');
+        if (!el) return;
+        if (metrics.corners > 0) {
+            el.style.display = 'block';
+            el.style.color = metrics.is_good ? '#00ff00' : '#ff8800';
+            el.textContent = `Corners: ${metrics.corners}  Blur: ${metrics.blur}`;
+        } else {
+            el.style.display = 'block';
+            el.style.color = '#ff4444';
+            el.textContent = 'No board detected';
+        }
+    },
+
     _stopFeed() {
         if (this.feedSocket) {
             this.feedSocket.close();
@@ -385,6 +409,8 @@ const distortionCalibration = {
             URL.revokeObjectURL(img.src);
             img.src = '';
         }
+        const overlay = document.getElementById('distortion-feed-overlay');
+        if (overlay) overlay.style.display = 'none';
     },
 
     async printBoard() {

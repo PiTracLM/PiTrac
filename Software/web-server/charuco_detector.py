@@ -164,6 +164,11 @@ class CompatibleCharucoDetector:
             "reasons": []
         }
 
+        h, w = gray_image.shape[:2]
+        if h < 2 or w < 2:
+            metrics["reasons"].append(f"Invalid image dimensions ({w}x{h})")
+            return metrics
+
         num_found = 0 if charuco_corners is None else len(charuco_corners)
         metrics["num_corners"] = num_found
 
@@ -172,8 +177,15 @@ class CompatibleCharucoDetector:
                 f"Insufficient corners detected ({num_found} < 4)")
             return metrics
 
-        # 1. Blur detection (Laplacian variance)
-        laplacian = cv2.Laplacian(gray_image, cv2.CV_64F)
+        # Normalize to 960px before computing Laplacian so the score
+        # doesn't swing wildly between preview and full-res capture.
+        BLUR_REF_WIDTH = 960
+        if gray_image.shape[1] != BLUR_REF_WIDTH:
+            s = BLUR_REF_WIDTH / gray_image.shape[1]
+            blur_img = cv2.resize(gray_image, (BLUR_REF_WIDTH, int(gray_image.shape[0] * s)))
+        else:
+            blur_img = gray_image
+        laplacian = cv2.Laplacian(blur_img, cv2.CV_64F)
         metrics["blur_score"] = laplacian.var()
 
         blur_threshold = 50
