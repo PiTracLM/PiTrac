@@ -1,10 +1,10 @@
-fastapi==0.120.4
-uvicorn[standard]==0.38.0
-python-multipart==0.0.20
+fastapi==0.135.3
+uvicorn[standard]==0.44.0
+python-multipart==0.0.26
 jinja2==3.1.6
-pillow==11.3.0
+pillow==12.2.0
 pyyaml==6.0.3
 aiofiles==25.1.0
-websockets==15.0.1
+websockets==16.0
 spidev>=3.6
 gpiozero>=2.0
