@@ -1,119 +1,109 @@
+{% from "_macros.html" import pitrac_btn, nav_item %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}PiTrac Launch Monitor{% endblock %}</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-    <link rel="stylesheet" href="/static/css/common.css">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="/static/css/pitrac.css">
     {% block extra_css %}{% endblock %}
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div class="status-indicators-vertical">
-                <div class="status-indicator">
+<body class="bg-base-100 text-base-content min-h-screen p-2 sm:p-4">
+    <div class="max-w-[1400px] mx-auto animate-fade-in">
+
+        <div class="navbar bg-base-200 rounded-box shadow-md border border-base-300 mb-4 px-3 min-h-0 py-2 gap-2">
+            <!-- Status dots -->
+            <div class="flex flex-col gap-1 pr-3 border-r border-base-300">
+                <div class="flex items-center gap-1.5">
                     <div class="status-dot" id="ws-status-dot" title="WebSocket"></div>
-                    <span class="status-label">WS</span>
+                    <span class="text-[0.6rem] font-semibold opacity-40 uppercase tracking-wide">WS</span>
                 </div>
-                <div class="status-indicator">
+                <div class="flex items-center gap-1.5">
                     <div class="status-dot" id="pitrac-status-dot" title="PiTrac"></div>
-                    <span class="status-label">LM</span>
+                    <span class="text-[0.6rem] font-semibold opacity-40 uppercase tracking-wide">LM</span>
                 </div>
             </div>
-            <div class="header-content">
+
+            <!-- Logo -->
+            <div class="flex-1 flex justify-center">
                 <a href="/" title="Dashboard">
-                    <img src="/static/logos/PiTrac.svg" alt="PiTrac Logo" class="header-logo">
+                    <img src="/static/logos/PiTrac.svg" alt="PiTrac Logo" class="h-10 header-logo">
                 </a>
             </div>
-            <div class="pitrac-controls desktop-only">
-                <button id="pitrac-start-btn-desktop" class="control-btn start-btn" onclick="controlPiTrac('start')" title="Start PiTrac">
-                    <i data-lucide="play" class="icon-sm"></i>
-                    <span class="btn-text">Start</span>
-                </button>
-                <button id="pitrac-stop-btn-desktop" class="control-btn stop-btn" onclick="controlPiTrac('stop')" title="Stop PiTrac">
-                    <i data-lucide="square" class="icon-sm"></i>
-                    <span class="btn-text">Stop</span>
-                </button>
-                <button id="pitrac-restart-btn-desktop" class="control-btn restart-btn" onclick="controlPiTrac('restart')" title="Restart PiTrac">
-                    <i data-lucide="rotate-cw" class="icon-sm"></i>
-                    <span class="btn-text">Restart</span>
-                </button>
+
+            <!-- Desktop controls -->
+            <div class="hidden md:flex gap-2 mr-2 pitrac-controls">
+                {{ pitrac_btn("start", "play", "Start", "desktop", "btn-success") }}
+                {{ pitrac_btn("stop", "square", "Stop", "desktop", "btn-error") }}
+                {{ pitrac_btn("restart", "rotate-cw", "Restart", "desktop", "btn-warning") }}
             </div>
-            <div class="header-right">
-                <div id="timestamp" style="display:none;"></div>
-                <div class="dropdown">
-                    <button class="dropdown-toggle" aria-label="Menu">
-                        <i data-lucide="more-vertical" class="icon-md"></i>
-                    </button>
-                    <div class="dropdown-menu">
-                        <div class="pitrac-controls-mobile mobile-only">
-                            <span class="dropdown-label">PiTrac Controls</span>
-                            <div class="mobile-control-buttons">
-                                <button id="pitrac-start-btn-mobile" class="control-btn start-btn" onclick="controlPiTrac('start')" title="Start PiTrac">
-                                    <i data-lucide="play" class="icon-sm"></i>
-                                    Start
-                                </button>
-                                <button id="pitrac-stop-btn-mobile" class="control-btn stop-btn" onclick="controlPiTrac('stop')" title="Stop PiTrac">
-                                    <i data-lucide="square" class="icon-sm"></i>
-                                    Stop
-                                </button>
-                                <button id="pitrac-restart-btn-mobile" class="control-btn restart-btn" onclick="controlPiTrac('restart')" title="Restart PiTrac">
-                                    <i data-lucide="rotate-cw" class="icon-sm"></i>
-                                    Restart
-                                </button>
-                            </div>
+
+            <!-- Menu -->
+            <details class="dropdown dropdown-end" id="nav-dropdown">
+                <summary class="btn btn-ghost btn-square btn-sm">
+                    <i data-lucide="more-vertical" class="icon-md"></i>
+                </summary>
+                <ul class="menu dropdown-content bg-base-200 rounded-box z-50 w-56 p-2 shadow-xl border border-base-300 mt-2">
+                    <li class="menu-title md:hidden">PiTrac Controls</li>
+                    <li class="md:hidden">
+                        <div class="flex flex-col gap-1.5 p-1">
+                            {{ pitrac_btn("start", "play", "Start", "mobile", "btn-success w-full") }}
+                            {{ pitrac_btn("stop", "square", "Stop", "mobile", "btn-error w-full") }}
+                            {{ pitrac_btn("restart", "rotate-cw", "Restart", "mobile", "btn-warning w-full") }}
                         </div>
-                        <div class="dropdown-divider mobile-only"></div>
-                        <a href="/" class="dropdown-item">
-                            <i data-lucide="home" class="icon-menu"></i>
-                            Dashboard
-                        </a>
-                        <a href="/calibration" class="dropdown-item">
-                            <i data-lucide="crosshair" class="icon-menu"></i>
-                            Calibration
-                        </a>
-                        <a href="/config" class="dropdown-item">
-                            <i data-lucide="settings" class="icon-menu"></i>
-                            Configuration
-                        </a>
-                        <a href="/logs" class="dropdown-item">
-                            <i data-lucide="file-text" class="icon-menu"></i>
-                            Logs
-                        </a>
-                        <a href="/testing" class="dropdown-item">
-                            <i data-lucide="flask-conical" class="icon-menu"></i>
-                            Testing Tools
-                        </a>
-                        <a href="/update" class="dropdown-item">
-                            <i data-lucide="refresh-cw" class="icon-menu"></i>
-                            System Update
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        <div class="theme-selector">
-                            <span class="dropdown-label">Theme</span>
-                            <div class="theme-options">
-                                <button class="theme-btn" data-theme="light" title="Light mode" onclick="setTheme('light')">
-                                    <i data-lucide="sun"></i>
-                                </button>
-                                <button class="theme-btn" data-theme="dark" title="Dark mode" onclick="setTheme('dark')">
-                                    <i data-lucide="moon"></i>
-                                </button>
-                                <button class="theme-btn" data-theme="system" title="System theme" onclick="setTheme('system')">
-                                    <i data-lucide="monitor"></i>
-                                </button>
-                            </div>
+                    </li>
+                    <div class="divider my-0 md:hidden"></div>
+                    {{ nav_item("/", "home", "Dashboard") }}
+                    {{ nav_item("/calibration", "crosshair", "Calibration") }}
+                    {{ nav_item("/config", "settings", "Configuration") }}
+                    {{ nav_item("/logs", "file-text", "Logs") }}
+                    {{ nav_item("/testing", "flask-conical", "Testing Tools") }}
+                    {{ nav_item("/update", "refresh-cw", "System Update") }}
+                    <div class="divider my-0"></div>
+                    <li class="menu-title">Theme</li>
+                    <li>
+                        <div class="flex gap-2 p-1">
+                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-theme="light" title="Light" onclick="setTheme('light')">
+                                <i data-lucide="sun"></i>
+                            </button>
+                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-theme="dark" title="Dark" onclick="setTheme('dark')">
+                                <i data-lucide="moon"></i>
+                            </button>
+                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-theme="system" title="System" onclick="setTheme('system')">
+                                <i data-lucide="monitor"></i>
+                            </button>
                         </div>
-                    </div>
-                </div>
-            </div>
+                    </li>
+                </ul>
+            </details>
         </div>
 
         {% block content %}{% endblock %}
     </div>
+
+    <!-- Strobe safety modal (hidden, shown by JS) -->
+    <dialog id="strobe-safety-modal" class="modal">
+        <div class="modal-box">
+            <div class="text-center mb-4 text-error">
+                <i data-lucide="triangle-alert" class="icon-lg"></i>
+            </div>
+            <h3 class="text-lg font-bold text-center">Strobe Calibration Required</h3>
+            <p class="py-4 text-center opacity-60" id="strobe-safety-msg">
+                V3 board requires strobe calibration before use.
+            </p>
+            <div class="modal-action justify-center">
+                <a href="/calibration" class="btn btn-primary">Go to Calibration</a>
+                <form method="dialog"><button class="btn btn-ghost">Dismiss</button></form>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
 
     <script src="/static/js/lucide.min.js"></script>
     <script src="/static/js/common.js"></script>
