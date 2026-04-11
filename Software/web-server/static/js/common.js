@@ -1,39 +1,29 @@
 // Common functionality for all PiTrac pages
 
-// Initialize Lucide icons
 if (typeof lucide !== 'undefined') {
   lucide.createIcons();
 }
 
-// Theme management
+// -- Theme --
+
 let currentTheme = "system";
 
 function getSystemTheme() {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 function applyTheme(theme) {
   const root = document.documentElement;
-
-  root.removeAttribute("data-theme");
-
-  document.querySelectorAll(".theme-btn").forEach((btn) => {
-    btn.classList.remove("active");
-  });
+  document.querySelectorAll(".theme-btn").forEach(b => b.classList.remove("active"));
 
   if (theme === "system") {
-    const systemTheme = getSystemTheme();
-    root.setAttribute("data-theme", systemTheme);
-    const systemBtn = document.querySelector('.theme-btn[data-theme="system"]');
-    if (systemBtn) systemBtn.classList.add("active");
+    root.setAttribute("data-theme", getSystemTheme());
+    const btn = document.querySelector('.theme-btn[data-theme="system"]');
+    if (btn) btn.classList.add("active");
   } else {
     root.setAttribute("data-theme", theme);
-    const themeBtn = document.querySelector(
-      `.theme-btn[data-theme="${theme}"]`,
-    );
-    if (themeBtn) themeBtn.classList.add("active");
+    const btn = document.querySelector(`.theme-btn[data-theme="${theme}"]`);
+    if (btn) btn.classList.add("active");
   }
 }
 
@@ -44,292 +34,131 @@ function setTheme(theme) {
 }
 
 function initTheme() {
-  const savedTheme = localStorage.getItem("pitrac-theme") || "system";
-  currentTheme = savedTheme;
-  applyTheme(savedTheme);
+  applyTheme(localStorage.getItem("pitrac-theme") || "system");
 }
 
-// Listen for system theme changes
-window
-  .matchMedia("(prefers-color-scheme: dark)")
-  .addEventListener("change", (e) => {
-    if (currentTheme === "system") {
-      applyTheme("system");
-    }
-  });
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (currentTheme === "system") applyTheme("system");
+});
 
-function initDropdown() {
-  const dropdown = document.querySelector(".dropdown");
-  const toggle = document.querySelector(".dropdown-toggle");
+// -- PiTrac Controls --
 
-  if (toggle && dropdown) {
-    toggle.addEventListener("click", (e) => {
-      e.stopPropagation();
-      dropdown.classList.toggle("active");
-    });
-
-    document.addEventListener("click", () => {
-      dropdown.classList.remove("active");
-    });
-
-    const dropdownMenu = document.querySelector(".dropdown-menu");
-    if (dropdownMenu) {
-      dropdownMenu.addEventListener("click", (e) => {
-        e.stopPropagation();
-      });
-    }
-  }
+function getButtons(action) {
+  return ["desktop", "mobile"]
+    .map(s => document.getElementById(`pitrac-${action}-btn-${s}`))
+    .filter(Boolean);
 }
 
 async function controlPiTrac(action) {
-  if (
-    (action === "start" || action === "restart") &&
-    !(await requireStrobeSafe())
-  )
+  if ((action === "start" || action === "restart") && !(await requireStrobeSafe()))
     return;
 
-  const buttonMap = {
-    start: ["pitrac-start-btn-desktop", "pitrac-start-btn-mobile"],
-    stop: ["pitrac-stop-btn-desktop", "pitrac-stop-btn-mobile"],
-    restart: ["pitrac-restart-btn-desktop", "pitrac-restart-btn-mobile"],
-  };
-
-  const buttons = buttonMap[action]
-    .map((id) => document.getElementById(id))
-    .filter((btn) => btn);
-
-  document.querySelectorAll(".control-btn").forEach((btn) => {
-    btn.disabled = true;
-  });
-
-  buttons.forEach((btn) => {
-    if (btn) {
-      btn.classList.add("loading");
-    }
-  });
+  document.querySelectorAll(".control-btn").forEach(b => { b.disabled = true; });
+  getButtons(action).forEach(b => b.classList.add("loading"));
 
   try {
-    const response = await fetch(`/api/pitrac/${action}`, {
+    const res = await fetch(`/api/pitrac/${action}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
     });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `Failed to ${action} PiTrac`);
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || `Failed to ${action} PiTrac`);
     }
-
-    const data = await response.json();
-
-    if (typeof showStatusMessage === "function") {
-      showStatusMessage(data.message, "success");
-    }
-
-    setTimeout(() => {
-      if (typeof checkSystemStatus === "function") {
-        checkSystemStatus();
-      }
-    }, 2000);
-  } catch (error) {
-    console.error(`Error ${action}ing PiTrac:`, error);
-    if (typeof showStatusMessage === "function") {
-      showStatusMessage(error.message || `Failed to ${action} PiTrac`, "error");
-    }
+    const data = await res.json();
+    if (typeof showStatusMessage === "function") showStatusMessage(data.message, "success");
+    setTimeout(() => { if (typeof checkSystemStatus === "function") checkSystemStatus(); }, 2000);
+  } catch (err) {
+    console.error(`Error ${action}ing PiTrac:`, err);
+    if (typeof showStatusMessage === "function") showStatusMessage(err.message, "error");
   } finally {
-    buttons.forEach((btn) => {
-      if (btn) {
-        btn.classList.remove("loading");
-      }
-    });
-
+    getButtons(action).forEach(b => b.classList.remove("loading"));
     setTimeout(() => {
       if (typeof checkPiTracStatus === "function") {
         checkPiTracStatus();
       } else {
-        document.querySelectorAll(".control-btn").forEach((btn) => {
-          btn.disabled = false;
-        });
+        document.querySelectorAll(".control-btn").forEach(b => { b.disabled = false; });
       }
     }, 1000);
   }
 }
 
 function updatePiTracButtons(isRunning) {
-  const startBtns = ["pitrac-start-btn-desktop", "pitrac-start-btn-mobile"]
-    .map((id) => document.getElementById(id))
-    .filter((btn) => btn);
-
-  const stopBtns = ["pitrac-stop-btn-desktop", "pitrac-stop-btn-mobile"]
-    .map((id) => document.getElementById(id))
-    .filter((btn) => btn);
-
-  const restartBtns = [
-    "pitrac-restart-btn-desktop",
-    "pitrac-restart-btn-mobile",
-  ]
-    .map((id) => document.getElementById(id))
-    .filter((btn) => btn);
+  const show = (btns) => btns.forEach(b => { b.style.display = ""; b.disabled = false; });
+  const hide = (btns) => btns.forEach(b => { b.style.display = "none"; });
 
   if (isRunning) {
-    startBtns.forEach((btn) => {
-      btn.style.display = "none";
-    });
-    stopBtns.forEach((btn) => {
-      btn.style.display = "";
-      btn.disabled = false;
-      btn.title = "Stop PiTrac";
-    });
-    restartBtns.forEach((btn) => {
-      btn.style.display = "";
-      btn.disabled = false;
-      btn.title = "Restart PiTrac";
-    });
+    hide(getButtons("start"));
+    show(getButtons("stop"));
+    show(getButtons("restart"));
   } else {
-    startBtns.forEach((btn) => {
-      btn.style.display = "";
-      btn.disabled = false;
-      btn.title = "Start PiTrac";
-    });
-    stopBtns.forEach((btn) => {
-      btn.style.display = "none";
-    });
-    restartBtns.forEach((btn) => {
-      btn.style.display = "none";
-    });
+    show(getButtons("start"));
+    hide(getButtons("stop"));
+    hide(getButtons("restart"));
   }
 }
 
+// -- Status Polling --
+
 async function checkSystemStatus() {
-    try {
-        const response = await fetch('/health');
-        if (response.ok) {
-            return await response.json();
-        }
-    } catch (error) {
-        console.error('Error checking system status:', error);
-    }
-    return null;
+  try {
+    const res = await fetch("/health");
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.error("Error checking system status:", e);
+  }
+  return null;
 }
 
 async function checkPiTracStatus() {
-    try {
-        const response = await fetch('/api/pitrac/status');
-        const status = await response.json();
-        updatePiTracButtons(status.is_running);
+  try {
+    const res = await fetch("/api/pitrac/status");
+    const status = await res.json();
+    updatePiTracButtons(status.is_running);
 
-        const statusDot = document.getElementById('pitrac-status-dot');
-        if (statusDot) {
-            if (status.pid) {
-                statusDot.classList.add('connected');
-                statusDot.classList.remove('disconnected');
-                statusDot.title = `PiTrac Running (PID: ${status.pid})`;
-            } else {
-                statusDot.classList.remove('connected');
-                statusDot.classList.add('disconnected');
-                statusDot.title = 'PiTrac Stopped';
-            }
-        }
-
-        return status.is_running;
-    } catch (error) {
-        console.error('Failed to check PiTrac status:', error);
-        return false;
+    const dot = document.getElementById("pitrac-status-dot");
+    if (dot) {
+      dot.classList.toggle("connected", !!status.pid);
+      dot.classList.toggle("disconnected", !status.pid);
+      dot.title = status.pid ? `PiTrac Running (PID: ${status.pid})` : "PiTrac Stopped";
     }
+    return status.is_running;
+  } catch (e) {
+    console.error("Failed to check PiTrac status:", e);
+    return false;
+  }
 }
 
-let strobeUnsafeReason = "";
+// -- Strobe Safety --
 
 async function requireStrobeSafe() {
   try {
-    const response = await fetch("/api/strobe-safety");
-    const data = await response.json();
+    const res = await fetch("/api/strobe-safety");
+    const data = await res.json();
     if (data.safe) return true;
-    strobeUnsafeReason = data.reason || "";
-    showStrobeSafetyModal();
+    showStrobeSafetyModal(data.reason || "");
     return false;
-  } catch (error) {
-    strobeUnsafeReason =
-      "Could not verify strobe safety — check server connection.";
-    showStrobeSafetyModal();
+  } catch (_) {
+    showStrobeSafetyModal("Could not verify strobe safety — check server connection.");
     return false;
   }
 }
 
-function showStrobeSafetyModal() {
-  const existing = document.getElementById("strobe-safety-modal");
-  if (existing) {
-    existing.style.display = "flex";
-    return;
-  }
-
-  const overlay = document.createElement("div");
-  overlay.id = "strobe-safety-modal";
-  overlay.style.cssText =
-    "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;justify-content:center;align-items:center;z-index:1000;";
-
-  const card = document.createElement("div");
-  card.style.cssText =
-    "background:var(--bg-card);border-radius:0.75rem;padding:2rem;max-width:420px;width:90%;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.3);border:1px solid var(--border-color);";
-
-  const icon = document.createElement("div");
-  icon.style.cssText = "text-align:center;margin-bottom:1rem;color:#e53e3e;";
-  icon.innerHTML = '<i data-lucide="triangle-alert" class="icon-lg"></i>';
-
-  const title = document.createElement("h3");
-  title.style.cssText =
-    "color:var(--text-primary);margin:0 0 0.75rem;text-align:center;font-size:1.1rem;";
-  title.textContent = "Strobe Calibration Required";
-
-  const msg = document.createElement("p");
-  msg.style.cssText =
-    "color:var(--text-secondary);margin:0 0 1.5rem;text-align:center;font-size:0.9rem;line-height:1.5;";
-  msg.textContent =
-    strobeUnsafeReason ||
-    "V3 board requires strobe calibration before use.";
-
-  const btnRow = document.createElement("div");
-  btnRow.style.cssText =
-    "display:flex;gap:0.75rem;justify-content:center;";
-
-  const calBtn = document.createElement("a");
-  calBtn.href = "/calibration";
-  calBtn.style.cssText =
-    "background:var(--accent-gradient);color:white;border:none;padding:0.6rem 1.25rem;border-radius:0.5rem;font-size:0.9rem;font-weight:500;cursor:pointer;text-decoration:none;display:inline-block;";
-  calBtn.textContent = "Go to Calibration";
-
-  const dismissBtn = document.createElement("button");
-  dismissBtn.style.cssText =
-    "background:transparent;color:var(--text-secondary);border:1px solid var(--border-color);padding:0.6rem 1.25rem;border-radius:0.5rem;font-size:0.9rem;cursor:pointer;";
-  dismissBtn.textContent = "Dismiss";
-  dismissBtn.onclick = () => {
-    overlay.style.display = "none";
-  };
-
-  btnRow.appendChild(calBtn);
-  btnRow.appendChild(dismissBtn);
-  card.appendChild(icon);
-  card.appendChild(title);
-  card.appendChild(msg);
-  card.appendChild(btnRow);
-  overlay.appendChild(card);
-
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) overlay.style.display = "none";
-  });
-
-  document.body.appendChild(overlay);
-  if (typeof lucide !== 'undefined') lucide.createIcons();
+function showStrobeSafetyModal(reason) {
+  const modal = document.getElementById("strobe-safety-modal");
+  if (!modal) return;
+  const msg = document.getElementById("strobe-safety-msg");
+  if (msg) msg.textContent = reason || "V3 board requires strobe calibration before use.";
+  modal.showModal();
+  if (typeof lucide !== "undefined") lucide.createIcons();
 }
+
+// -- Init --
 
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
-  initDropdown();
-
   checkSystemStatus();
   checkPiTracStatus();
-
   setInterval(checkSystemStatus, 5000);
   setInterval(checkPiTracStatus, 5000);
 });
