@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import result_item, status_row %}
 
 {% block title %}PiTrac Calibration{% endblock %}
 
@@ -7,374 +8,385 @@
 {% endblock %}
 
 {% block content %}
-<div class="main-content">
-    <div class="status-bar">
-        <div class="status-item">
-            <span class="status-label">System Mode:</span>
-            <span id="system-mode" class="status-value">Loading...</span>
-        </div>
-        <div class="status-item">
-            <span class="status-label">PiTrac Status:</span>
-            <span id="pitrac-status" class="status-value">Checking...</span>
+<div class="flex flex-col gap-4">
+
+    {# -- Status bar -- #}
+    <div class="card bg-base-200 border border-base-300 shadow-sm">
+        <div class="card-body p-3 flex-row gap-4">
+            <div class="flex items-center gap-2">
+                <span class="text-sm opacity-60">System Mode:</span>
+                <span id="system-mode" class="text-sm font-semibold">Loading...</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-sm opacity-60">PiTrac Status:</span>
+                <span id="pitrac-status" class="text-sm font-semibold">Checking...</span>
+            </div>
         </div>
     </div>
 
-    <div class="calibration-wizard">
-        <div class="wizard-steps">
-            <div class="step active" data-step="1">
-                <div class="step-number">1</div>
-                <div class="step-label">Setup</div>
-            </div>
-            <div class="step" data-step="2">
-                <div class="step-number">2</div>
-                <div class="step-label">Verify</div>
-            </div>
-            <div class="step" data-step="3">
-                <div class="step-number">3</div>
-                <div class="step-label">Calibrate</div>
-            </div>
-            <div class="step" data-step="4">
-                <div class="step-number">4</div>
-                <div class="step-label">Complete</div>
-            </div>
-        </div>
+    {# ================================================================ #}
+    {# Ball-based Calibration Wizard                                     #}
+    {# ================================================================ #}
+    <div class="card bg-base-200 border border-base-300 shadow-sm">
+        <div class="card-body p-4 sm:p-6">
 
-        <div class="wizard-content" id="step1">
-            <h2>Calibration Setup</h2>
-            
-            <div class="setup-instructions">
-                <h3>Before You Begin:</h3>
-                <ol>
-                    <li>Ensure both cameras are properly connected</li>
-                    <li>Place a golf ball at the tee position</li>
-                    <li>Make sure the hitting area is well-lit</li>
-                    <li>Remove any obstructions from camera view</li>
-                </ol>
-            </div>
-
-            <div class="camera-selection">
-                <h3>Select Camera to Calibrate:</h3>
-                <div class="camera-options">
-                    <label class="camera-option">
-                        <input type="radio" name="camera" value="camera1" checked>
-                        <span class="camera-card">
-                            <span class="camera-name">Camera 1</span>
-                            <span class="camera-desc">Tee Camera (Top/Angled or Straight)</span>
-                        </span>
-                    </label>
-                    <label class="camera-option">
-                        <input type="radio" name="camera" value="camera2">
-                        <span class="camera-card">
-                            <span class="camera-name">Camera 2</span>
-                            <span class="camera-desc">Flight Camera (Bottom/Straight)</span>
-                        </span>
-                    </label>
-                    <label class="camera-option">
-                        <input type="radio" name="camera" value="both">
-                        <span class="camera-card">
-                            <span class="camera-name">Both Cameras</span>
-                            <span class="camera-desc">Full System Calibration</span>
-                        </span>
-                    </label>
+            {# -- Wizard step indicators -- #}
+            <div class="wizard-steps flex items-center justify-between w-full mb-6 relative">
+                <div class="wizard-line"></div>
+                <div class="step active" data-step="1">
+                    <div class="step-circle">1</div>
+                    <div class="step-label">Setup</div>
+                </div>
+                <div class="step" data-step="2">
+                    <div class="step-circle">2</div>
+                    <div class="step-label">Verify</div>
+                </div>
+                <div class="step" data-step="3">
+                    <div class="step-circle">3</div>
+                    <div class="step-label">Calibrate</div>
+                </div>
+                <div class="step" data-step="4">
+                    <div class="step-circle">4</div>
+                    <div class="step-label">Complete</div>
                 </div>
             </div>
 
-            <div class="wizard-actions">
-                <button class="btn btn-primary" onclick="calibration.nextStep()">
-                    Next: Verify Ball Placement
-                </button>
-            </div>
-        </div>
+            {# ---- Step 1: Setup ---- #}
+            <div class="wizard-content" id="step1">
+                <h2 class="text-xl font-semibold mb-4 text-primary">Calibration Setup</h2>
 
-        <div class="wizard-content" id="step2" style="display: none;">
-            <h2>Verify Ball Placement</h2>
-            
-            <div class="verification-panel">
-                <div class="camera-views">
-                    <div class="camera-view" id="camera1-view">
-                        <h3>Camera 1 - Tee Camera (Top/Angled or Straight)</h3>
-                        <div class="camera-preview">
-                            <img id="camera1-image" src="" alt="Camera 1 preview" style="display: none;">
-                            <div class="camera-placeholder">
-                                <p>Click "Calibrate Camera 1" to verify setup</p>
+                <div class="bg-base-300 rounded-lg p-4 mb-6 border border-base-300">
+                    <h3 class="font-semibold mb-3 text-primary">Before You Begin:</h3>
+                    <ol class="list-decimal list-inside space-y-1 opacity-60">
+                        <li>Ensure both cameras are properly connected</li>
+                        <li>Place a golf ball at the tee position</li>
+                        <li>Make sure the hitting area is well-lit</li>
+                        <li>Remove any obstructions from camera view</li>
+                    </ol>
+                </div>
+
+                <div class="mb-6">
+                    <h3 class="font-semibold mb-3 text-primary">Select Camera to Calibrate:</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <label class="camera-option cursor-pointer">
+                            <input type="radio" name="camera" value="camera1" class="hidden peer" checked>
+                            <div class="card bg-base-300 border-2 border-base-300 peer-checked:border-primary hover:-translate-y-0.5 transition-all">
+                                <div class="card-body items-center p-4">
+                                    <span class="font-semibold">Camera 1</span>
+                                    <span class="text-xs opacity-60">Tee Camera (Top/Angled or Straight)</span>
+                                </div>
                             </div>
-                        </div>
-                        <div class="camera-controls">
-                            <button class="btn btn-primary" onclick="calibration.runAutoCalibration('camera1', event)">
-                                Calibrate Camera 1
-                            </button>
-                            <button class="btn btn-secondary" onclick="calibration.checkBallLocation('camera1', event)">
-                                Check Ball Location
-                            </button>
-                        </div>
-                        <div class="ball-status" id="camera1-ball-status"></div>
-                    </div>
-
-                    <div class="camera-view" id="camera2-view">
-                        <h3>Camera 2 - Flight Camera (Bottom/Straight)</h3>
-                        <div class="camera-preview">
-                            <img id="camera2-image" src="" alt="Camera 2 preview" style="display: none;">
-                            <div class="camera-placeholder">
-                                <p>Click "Calibrate Camera 2" to verify setup</p>
+                        </label>
+                        <label class="camera-option cursor-pointer">
+                            <input type="radio" name="camera" value="camera2" class="hidden peer">
+                            <div class="card bg-base-300 border-2 border-base-300 peer-checked:border-primary hover:-translate-y-0.5 transition-all">
+                                <div class="card-body items-center p-4">
+                                    <span class="font-semibold">Camera 2</span>
+                                    <span class="text-xs opacity-60">Flight Camera (Bottom/Straight)</span>
+                                </div>
                             </div>
-                        </div>
-                        <div class="camera-controls">
-                            <button class="btn btn-primary" onclick="calibration.runAutoCalibration('camera2', event)">
-                                Calibrate Camera 2
-                            </button>
-                            <button class="btn btn-secondary" onclick="calibration.checkBallLocation('camera2', event)">
-                                Check Ball Location
-                            </button>
-                        </div>
-                        <div class="ball-status" id="camera2-ball-status"></div>
+                        </label>
+                        <label class="camera-option cursor-pointer">
+                            <input type="radio" name="camera" value="both" class="hidden peer">
+                            <div class="card bg-base-300 border-2 border-base-300 peer-checked:border-primary hover:-translate-y-0.5 transition-all">
+                                <div class="card-body items-center p-4">
+                                    <span class="font-semibold">Both Cameras</span>
+                                    <span class="text-xs opacity-60">Full System Calibration</span>
+                                </div>
+                            </div>
+                        </label>
                     </div>
                 </div>
 
-                <div class="verification-status">
-                    <div id="verification-message" class="alert alert-info">
-                        Capture images and verify ball is properly positioned for calibration.
-                    </div>
-                </div>
-            </div>
-
-            <div class="wizard-actions">
-                <button class="btn btn-secondary" onclick="calibration.prevStep()">
-                    Back
-                </button>
-                <button class="btn btn-primary" onclick="calibration.nextStep()" id="verify-next" disabled>
-                    Next: Start Calibration
-                </button>
-            </div>
-        </div>
-
-        <div class="wizard-content" id="step3" style="display: none;">
-            <h2>Calibration Process</h2>
-            
-            <div class="calibration-options">
-                <h3>Select Calibration Method:</h3>
-                <div class="method-cards">
-                    <div class="method-card" onclick="calibration.selectMethod('auto')">
-                        <h4>Automatic Calibration</h4>
-                        <p>Recommended for most users. Automatically detects and calibrates camera parameters.</p>
-                        <button class="btn btn-primary">Use Auto Calibration</button>
-                    </div>
-                    <div class="method-card" onclick="calibration.selectMethod('manual')">
-                        <h4>Manual Calibration</h4>
-                        <p>Advanced users only. Manually adjust camera parameters with real-time feedback.</p>
-                        <button class="btn btn-secondary">Use Manual Calibration</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="calibration-progress" id="calibration-progress" style="display: none;">
-                <h3>Calibration in Progress...</h3>
-                
-                <div class="progress-cameras">
-                    <div class="progress-camera" id="progress-camera1">
-                        <h4>Camera 1</h4>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="camera1-progress"></div>
-                        </div>
-                        <div class="progress-status" id="camera1-status">Waiting...</div>
-                        <div class="completion-details" id="camera1-details"></div>
-                    </div>
-
-                    <div class="progress-camera" id="progress-camera2">
-                        <h4>Camera 2</h4>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="camera2-progress"></div>
-                        </div>
-                        <div class="progress-status" id="camera2-status">Waiting...</div>
-                        <div class="completion-details" id="camera2-details"></div>
-                    </div>
-                </div>
-
-                <div class="calibration-log">
-                    <h4>Process Log:</h4>
-                    <div id="calibration-log-content" class="log-content"></div>
-                </div>
-
-                <div class="calibration-controls">
-                    <button class="btn btn-danger" onclick="calibration.stopCalibration()">
-                        Stop Calibration
+                <div class="flex justify-end pt-4 border-t border-base-300">
+                    <button class="btn btn-primary" onclick="calibration.nextStep()">
+                        Next: Verify Ball Placement
                     </button>
                 </div>
             </div>
 
-            <div class="wizard-actions">
-                <button class="btn btn-secondary" onclick="calibration.prevStep()">
-                    Back
-                </button>
-            </div>
-        </div>
+            {# ---- Step 2: Verify ---- #}
+            <div class="wizard-content" id="step2" style="display: none;">
+                <h2 class="text-xl font-semibold mb-4 text-primary">Verify Ball Placement</h2>
 
-        <div class="wizard-content" id="step4" style="display: none;">
-            <h2>Calibration Complete</h2>
-            
-            <div class="calibration-results">
-                <div class="success-icon">🎉</div>
-                
-                <div class="results-summary">
-                    <h3>Calibration Results:</h3>
-                    
-                    <div class="result-cards">
-                        <div class="result-card" id="camera1-result-card">
-                            <h4>Camera 1 - Tee Camera</h4>
-                            <div class="result-data" id="camera1-results">
-                                <div class="result-item">
-                                    <span class="result-label">Status:</span>
-                                    <span class="result-value" id="camera1-result-status">--</span>
-                                </div>
-                                <div class="result-item">
-                                    <span class="result-label">Completion Method:</span>
-                                    <span class="result-value" id="camera1-completion-method">--</span>
-                                </div>
-                                <div class="result-item">
-                                    <span class="result-label">Focal Length:</span>
-                                    <span class="result-value" id="camera1-focal">--</span>
-                                </div>
-                                <div class="result-item">
-                                    <span class="result-label">Camera Angles:</span>
-                                    <span class="result-value" id="camera1-angles">--</span>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+
+                    {# Camera 1 #}
+                    <div class="card bg-base-300 border border-base-300" id="camera1-view">
+                        <div class="card-body p-4">
+                            <h4 class="card-title text-base">Camera 1 - Tee Camera (Top/Angled or Straight)</h4>
+                            <div class="camera-preview">
+                                <img id="camera1-image" src="" alt="Camera 1 preview" style="display: none;">
+                                <div class="camera-placeholder">
+                                    <p>Click "Calibrate Camera 1" to verify setup</p>
                                 </div>
                             </div>
+                            <div class="flex gap-2">
+                                <button class="btn btn-primary btn-sm" onclick="calibration.runAutoCalibration('camera1', event)">
+                                    Calibrate Camera 1
+                                </button>
+                                <button class="btn btn-ghost btn-sm" onclick="calibration.checkBallLocation('camera1', event)">
+                                    Check Ball Location
+                                </button>
+                            </div>
+                            <div class="ball-status" id="camera1-ball-status"></div>
                         </div>
+                    </div>
 
-                        <div class="result-card" id="camera2-result-card">
-                            <h4>Camera 2 - Flight Camera</h4>
-                            <div class="result-data" id="camera2-results">
-                                <div class="result-item">
-                                    <span class="result-label">Status:</span>
-                                    <span class="result-value" id="camera2-result-status">--</span>
-                                </div>
-                                <div class="result-item">
-                                    <span class="result-label">Completion Method:</span>
-                                    <span class="result-value" id="camera2-completion-method">--</span>
-                                </div>
-                                <div class="result-item">
-                                    <span class="result-label">Focal Length:</span>
-                                    <span class="result-value" id="camera2-focal">--</span>
-                                </div>
-                                <div class="result-item">
-                                    <span class="result-label">Camera Angles:</span>
-                                    <span class="result-value" id="camera2-angles">--</span>
+                    {# Camera 2 #}
+                    <div class="card bg-base-300 border border-base-300" id="camera2-view">
+                        <div class="card-body p-4">
+                            <h4 class="card-title text-base">Camera 2 - Flight Camera (Bottom/Straight)</h4>
+                            <div class="camera-preview">
+                                <img id="camera2-image" src="" alt="Camera 2 preview" style="display: none;">
+                                <div class="camera-placeholder">
+                                    <p>Click "Calibrate Camera 2" to verify setup</p>
                                 </div>
                             </div>
+                            <div class="flex gap-2">
+                                <button class="btn btn-primary btn-sm" onclick="calibration.runAutoCalibration('camera2', event)">
+                                    Calibrate Camera 2
+                                </button>
+                                <button class="btn btn-ghost btn-sm" onclick="calibration.checkBallLocation('camera2', event)">
+                                    Check Ball Location
+                                </button>
+                            </div>
+                            <div class="ball-status" id="camera2-ball-status"></div>
                         </div>
                     </div>
                 </div>
 
-                <div class="next-steps">
-                    <h3>Next Steps:</h3>
-                    <ol>
-                        <li>Test the calibration by hitting a few shots</li>
-                        <li>Verify ball detection is working correctly</li>
-                        <li>Fine-tune settings if needed in Configuration</li>
-                    </ol>
+                <div id="verification-message" class="alert alert-info mb-4">
+                    <span>Capture images and verify ball is properly positioned for calibration.</span>
+                </div>
+
+                <div class="flex justify-between pt-4 border-t border-base-300">
+                    <button class="btn btn-ghost" onclick="calibration.prevStep()">Back</button>
+                    <button class="btn btn-primary" onclick="calibration.nextStep()" id="verify-next" disabled>
+                        Next: Start Calibration
+                    </button>
                 </div>
             </div>
 
-            <div class="wizard-actions">
-                <button class="btn btn-secondary" onclick="calibration.restart()">
-                    Calibrate Again
-                </button>
-                <button class="btn btn-primary" onclick="window.location.href='/'">
-                    Return to Dashboard
-                </button>
+            {# ---- Step 3: Calibrate ---- #}
+            <div class="wizard-content" id="step3" style="display: none;">
+                <h2 class="text-xl font-semibold mb-4 text-primary">Calibration Process</h2>
+
+                <div class="calibration-options">
+                    <h3 class="font-semibold mb-3 text-primary">Select Calibration Method:</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="method-card card bg-base-300 border-2 border-base-300 hover:border-primary hover:-translate-y-1 transition-all cursor-pointer"
+                             onclick="calibration.selectMethod('auto')">
+                            <div class="card-body items-center text-center">
+                                <h4 class="card-title text-base">Automatic Calibration</h4>
+                                <p class="text-sm opacity-60 mb-2">Recommended for most users. Automatically detects and calibrates camera parameters.</p>
+                                <button class="btn btn-primary btn-sm">Use Auto Calibration</button>
+                            </div>
+                        </div>
+                        <div class="method-card card bg-base-300 border-2 border-base-300 hover:border-primary hover:-translate-y-1 transition-all cursor-pointer"
+                             onclick="calibration.selectMethod('manual')">
+                            <div class="card-body items-center text-center">
+                                <h4 class="card-title text-base">Manual Calibration</h4>
+                                <p class="text-sm opacity-60 mb-2">Advanced users only. Manually adjust camera parameters with real-time feedback.</p>
+                                <button class="btn btn-ghost btn-sm">Use Manual Calibration</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {# Progress panel (hidden until method selected) #}
+                <div class="bg-base-300 rounded-lg p-4 mt-4 border border-base-300" id="calibration-progress" style="display: none;">
+                    <h3 class="font-semibold mb-3 text-primary">Calibration in Progress...</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div id="progress-camera1">
+                            <h4 class="text-sm font-semibold mb-2">Camera 1</h4>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="camera1-progress"></div>
+                            </div>
+                            <div class="text-xs opacity-60 mt-1" id="camera1-status">Waiting...</div>
+                            <div class="completion-details text-xs mt-1" id="camera1-details"></div>
+                        </div>
+                        <div id="progress-camera2">
+                            <h4 class="text-sm font-semibold mb-2">Camera 2</h4>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="camera2-progress"></div>
+                            </div>
+                            <div class="text-xs opacity-60 mt-1" id="camera2-status">Waiting...</div>
+                            <div class="completion-details text-xs mt-1" id="camera2-details"></div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <h4 class="text-sm font-semibold mb-2">Process Log:</h4>
+                        <div id="calibration-log-content" class="log-content"></div>
+                    </div>
+
+                    <div class="flex justify-center mt-4">
+                        <button class="btn btn-error" onclick="calibration.stopCalibration()">
+                            Stop Calibration
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex justify-between pt-4 border-t border-base-300 mt-4">
+                    <button class="btn btn-ghost" onclick="calibration.prevStep()">Back</button>
+                </div>
+            </div>
+
+            {# ---- Step 4: Complete ---- #}
+            <div class="wizard-content" id="step4" style="display: none;">
+                <h2 class="text-xl font-semibold mb-4 text-primary">Calibration Complete</h2>
+
+                <div class="text-center">
+                    <div class="text-5xl mb-4">&#127881;</div>
+
+                    <h3 class="font-semibold mb-3 text-primary">Calibration Results:</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-left">
+                        {# Camera 1 results #}
+                        <div class="card bg-base-300 border border-base-300" id="camera1-result-card">
+                            <div class="card-body p-4">
+                                <h4 class="card-title text-primary text-base mb-2">Camera 1 - Tee Camera</h4>
+                                <div id="camera1-results">
+                                    {{ result_item("Status", "camera1-result-status") }}
+                                    {{ result_item("Completion Method", "camera1-completion-method") }}
+                                    {{ result_item("Focal Length", "camera1-focal") }}
+                                    {{ result_item("Camera Angles", "camera1-angles") }}
+                                </div>
+                            </div>
+                        </div>
+
+                        {# Camera 2 results #}
+                        <div class="card bg-base-300 border border-base-300" id="camera2-result-card">
+                            <div class="card-body p-4">
+                                <h4 class="card-title text-primary text-base mb-2">Camera 2 - Flight Camera</h4>
+                                <div id="camera2-results">
+                                    {{ result_item("Status", "camera2-result-status") }}
+                                    {{ result_item("Completion Method", "camera2-completion-method") }}
+                                    {{ result_item("Focal Length", "camera2-focal") }}
+                                    {{ result_item("Camera Angles", "camera2-angles") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-base-300 rounded-lg p-4 mb-6 text-left border border-base-300">
+                        <h3 class="font-semibold mb-3 text-primary">Next Steps:</h3>
+                        <ol class="list-decimal list-inside space-y-1 opacity-60">
+                            <li>Test the calibration by hitting a few shots</li>
+                            <li>Verify ball detection is working correctly</li>
+                            <li>Fine-tune settings if needed in Configuration</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="flex justify-between pt-4 border-t border-base-300">
+                    <button class="btn btn-ghost" onclick="calibration.restart()">Calibrate Again</button>
+                    <button class="btn btn-primary" onclick="window.location.href='/'">Return to Dashboard</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    {# ================================================================ #}
+    {# Strobe Calibration                                                #}
+    {# ================================================================ #}
+    <div class="card bg-base-200 border border-base-300 shadow-sm">
+        <div class="card-body p-4 sm:p-6">
+            <h3 class="text-lg font-semibold text-primary mb-3">Strobe Calibration</h3>
+
+            {# Strobe status row #}
+            <div class="flex flex-wrap gap-x-6 gap-y-1 bg-base-300 rounded-lg px-3 py-2 mb-4 border border-base-300 text-sm">
+                <div class="flex items-center gap-2">
+                    <span class="opacity-60">Board:</span>
+                    <span id="strobe-board-version" class="font-semibold">Loading...</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="opacity-60">Saved DAC:</span>
+                    <span id="strobe-saved-dac" class="font-semibold">Loading...</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="opacity-60">State:</span>
+                    <span id="strobe-state" class="font-semibold">Idle</span>
+                </div>
+            </div>
+
+            {# V3 board warning #}
+            <div id="strobe-board-warning" class="alert alert-error mb-4" style="display: none;">
+                <span>
+                    Strobe calibration requires a V3 Connector Board.
+                    <a href="/config" class="underline">Set your board version</a>
+                    in Configuration &gt; System &gt; Connection Board Version.
+                </span>
+            </div>
+
+            {# Controls #}
+            <div id="strobe-controls" class="mb-4 space-y-3">
+                <div class="flex items-center gap-3">
+                    <label for="strobe-led-type" class="text-sm font-semibold opacity-60 min-w-[80px]">LED Type:</label>
+                    <select id="strobe-led-type" class="select select-bordered select-sm">
+                        <option value="v3" selected>V3 LED Board (10A)</option>
+                        <option value="legacy">Legacy 100W LED (9A)</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button id="strobe-calibrate-btn" class="btn btn-primary btn-sm" onclick="calibration.startStrobeCalibration()">
+                        Calibrate
+                    </button>
+                    <button id="strobe-cancel-btn" class="btn btn-error btn-sm" onclick="calibration.cancelStrobeCalibration()" style="display: none;">
+                        Cancel
+                    </button>
+                </div>
+                <!-- Re-enable once safe LDO voltage threshold is determined -->
+                <div class="flex items-center gap-3" style="display: none;">
+                    <button id="strobe-diagnostics-btn" class="btn btn-ghost btn-sm" onclick="calibration.readStrobeDiagnostics()">
+                        Read Diagnostics
+                    </button>
+                </div>
+            </div>
+
+            {# Progress #}
+            <div id="strobe-progress-area" style="display: none;" class="mb-4">
+                <h4 class="text-sm font-semibold mb-2">Calibration Progress</h4>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="strobe-progress-fill"></div>
+                </div>
+                <div class="text-xs opacity-60 mt-1" id="strobe-progress-message">Starting...</div>
+            </div>
+
+            {# Results #}
+            <div id="strobe-result-area" style="display: none;">
+                <div class="card bg-base-300 border-2 border-base-300 transition-colors" id="strobe-result-card">
+                    <div class="card-body p-4">
+                        <h4 class="card-title text-sm text-primary" id="strobe-result-title">Calibration Result</h4>
+                        {{ result_item("DAC Setting", "strobe-result-dac") }}
+                        {{ result_item("LED Current", "strobe-result-current") }}
+                        {{ result_item("LDO Voltage", "strobe-result-ldo") }}
+                    </div>
+                </div>
+            </div>
+
+            {# Diagnostics #}
+            <div id="strobe-diagnostics-area" style="display: none;" class="mt-4">
+                <h4 class="text-sm font-semibold mb-2">Hardware Diagnostics</h4>
+                <div class="calibration-data-grid" id="strobe-diagnostics-grid"></div>
+                <div id="strobe-diagnostics-warning" class="alert alert-error mt-3" style="display: none;"></div>
             </div>
         </div>
     </div>
 
-    <div class="strobe-calibration">
-        <div class="strobe-header">
-            <h3>Strobe Calibration</h3>
-            <div class="strobe-status-bar">
-                <div class="status-item">
-                    <span class="status-label">Board:</span>
-                    <span id="strobe-board-version" class="status-value">Loading...</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Saved DAC:</span>
-                    <span id="strobe-saved-dac" class="status-value">Loading...</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">State:</span>
-                    <span id="strobe-state" class="status-value">Idle</span>
-                </div>
-            </div>
-        </div>
-
-        <div id="strobe-board-warning" class="alert alert-error" style="display: none;">
-            Strobe calibration requires a V3 Connector Board.
-            <a href="/config" style="color: inherit; text-decoration: underline;">Set your board version</a>
-            in Configuration &gt; System &gt; Connection Board Version.
-        </div>
-
-        <div class="strobe-controls" id="strobe-controls">
-            <div class="strobe-control-row">
-                <label for="strobe-led-type" class="strobe-label">LED Type:</label>
-                <select id="strobe-led-type" class="strobe-select">
-                    <option value="v3" selected>V3 LED Board (10A)</option>
-                    <option value="legacy">Legacy 100W LED (9A)</option>
-                </select>
-            </div>
-            <div class="strobe-control-row">
-                <button id="strobe-calibrate-btn" class="btn btn-primary" onclick="calibration.startStrobeCalibration()">
-                    Calibrate
-                </button>
-                <button id="strobe-cancel-btn" class="btn btn-danger" onclick="calibration.cancelStrobeCalibration()" style="display: none;">
-                    Cancel
-                </button>
-            </div>
-            <!-- TODO: Re-enable once safe LDO voltage threshold is determined -->
-            <div class="strobe-control-row" style="display: none;">
-                <button id="strobe-diagnostics-btn" class="btn btn-secondary" onclick="calibration.readStrobeDiagnostics()">
-                    Read Diagnostics
-                </button>
-            </div>
-        </div>
-
-        <div id="strobe-progress-area" style="display: none;">
-            <h4>Calibration Progress</h4>
-            <div class="progress-bar">
-                <div class="progress-fill" id="strobe-progress-fill"></div>
-            </div>
-            <div class="progress-status" id="strobe-progress-message">Starting...</div>
-        </div>
-
-        <div id="strobe-result-area" style="display: none;">
-            <div class="result-card" id="strobe-result-card">
-                <h4 id="strobe-result-title">Calibration Result</h4>
-                <div class="result-data">
-                    <div class="result-item">
-                        <span class="result-label">DAC Setting:</span>
-                        <span class="result-value" id="strobe-result-dac">--</span>
-                    </div>
-                    <div class="result-item">
-                        <span class="result-label">LED Current:</span>
-                        <span class="result-value" id="strobe-result-current">--</span>
-                    </div>
-                    <div class="result-item">
-                        <span class="result-label">LDO Voltage:</span>
-                        <span class="result-value" id="strobe-result-ldo">--</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="strobe-diagnostics-area" style="display: none;">
-            <h4>Hardware Diagnostics</h4>
-            <div class="calibration-data-grid" id="strobe-diagnostics-grid">
-            </div>
-            <div id="strobe-diagnostics-warning" class="alert alert-error" style="display: none;"></div>
+    {# ================================================================ #}
+    {# Current Calibration Data                                          #}
+    {# ================================================================ #}
+    <div class="card bg-base-200 border border-base-300 shadow-sm">
+        <div class="card-body p-4 sm:p-6">
+            <h3 class="text-lg font-semibold text-primary mb-3">Current Calibration Data</h3>
+            <div id="current-calibration-data" class="calibration-data-grid"></div>
         </div>
     </div>
 
-    <div class="current-calibration">
-        <h3>Current Calibration Data</h3>
-        <div id="current-calibration-data" class="calibration-data-grid">
-        </div>
-    </div>
 </div>
 {% endblock %}
 

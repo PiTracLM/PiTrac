@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import result_item, status_row %}
 
 {% block title %}PiTrac Launch Monitor{% endblock %}
 
@@ -7,54 +8,84 @@
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-layout">
+<div class="grid grid-cols-1 lg:grid-cols-[minmax(320px,1fr)_minmax(400px,1.2fr)] gap-4">
 
     <!-- Status Strip -->
-    <div class="status-strip" id="status-strip">
-        <div class="status-strip-icon">
-            <div class="ball-icon"></div>
+    <div class="status-strip col-span-full flex items-center gap-3 px-4 py-2.5 rounded-box bg-base-200 border border-base-300 shadow-sm"
+         id="status-strip">
+        <div class="shrink-0 flex items-center justify-center w-9 h-9">
+            <div class="ball-icon w-full h-full"></div>
         </div>
-        <div class="status-strip-content">
-            <span class="status-strip-title" id="status-strip-title">System Status</span>
-            <span class="status-strip-separator">&mdash;</span>
+        <div class="flex-1 min-w-0 flex items-baseline gap-2 flex-wrap">
+            <span class="font-bold text-base whitespace-nowrap" id="status-strip-title">System Status</span>
+            <span class="status-strip-separator text-base-content/40 text-sm select-none">&mdash;</span>
             <span class="status-strip-message" id="status-strip-message">Initializing...</span>
         </div>
-        <div class="status-strip-actions">
-            <button class="btn-reset" id="btn-reset" onclick="resetShot()" style="display: none;">Reset</button>
+        <div class="shrink-0 flex items-center gap-2">
+            <button class="btn btn-ghost btn-xs uppercase tracking-wide font-semibold border border-base-300"
+                    id="btn-reset" onclick="resetShot()" style="display: none;">Reset</button>
         </div>
     </div>
 
-    <!-- Left Column: Metrics Panel -->
-    <div class="metrics-panel" id="metrics-panel">
-        <!-- Hero Card: Ball Speed -->
-        <div class="metric-card hero">
-            <div class="metric-label">Ball Speed</div>
-            <div class="metric-number" id="speed">{{ shot.speed }}<span class="metric-unit">mph</span></div>
+    <!-- Left Column: Metrics -->
+    <div class="flex flex-col gap-3" id="metrics-panel">
+
+        <!-- Hero: Ball Speed -->
+        <div class="card bg-base-200 border border-base-300 shadow-sm
+                    metric-card hero hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+            <div class="card-body p-6">
+                <div class="stat p-0">
+                    <div class="stat-title text-sm uppercase tracking-widest opacity-60">Ball Speed</div>
+                    <div class="stat-value metric-number" id="speed"
+                         style="font-size: clamp(3.25rem, 7vw, 4.5rem);">{{ shot.speed }}<span class="metric-unit text-base-content/40 font-normal ml-1"
+                             style="font-size: clamp(1rem, 1.8vw, 1.25rem);">mph</span></div>
+                </div>
+            </div>
         </div>
 
         <!-- 2x2 Sub-Grid -->
-        <div class="metrics-sub-grid">
-            <div class="metric-card">
-                <div class="metric-label">Launch Angle</div>
-                <div class="metric-number" id="launch_angle">{{ shot.launch_angle }}<span class="metric-unit">&deg;</span></div>
+        <div class="grid grid-cols-2 gap-3">
+            <div class="card bg-base-200 border border-base-300 shadow-sm                        metric-card hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+                <div class="card-body p-4">
+                    <div class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Launch Angle</div>
+                    <div class="metric-number text-base-content font-bold leading-tight tabular-nums"
+                         id="launch_angle"
+                         style="font-size: clamp(2.5rem, 5vw, 3.25rem);">{{ shot.launch_angle }}<span class="metric-unit text-base-content/40 font-normal ml-1"
+                             style="font-size: clamp(1rem, 1.8vw, 1.25rem);">&deg;</span></div>
+                </div>
             </div>
-            <div class="metric-card">
-                <div class="metric-label">Side Angle</div>
-                <div class="metric-number" id="side_angle">{{ shot.side_angle }}<span class="metric-unit">&deg;</span></div>
+            <div class="card bg-base-200 border border-base-300 shadow-sm                        metric-card hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+                <div class="card-body p-4">
+                    <div class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Side Angle</div>
+                    <div class="metric-number text-base-content font-bold leading-tight tabular-nums"
+                         id="side_angle"
+                         style="font-size: clamp(2.5rem, 5vw, 3.25rem);">{{ shot.side_angle }}<span class="metric-unit text-base-content/40 font-normal ml-1"
+                             style="font-size: clamp(1rem, 1.8vw, 1.25rem);">&deg;</span></div>
+                </div>
             </div>
-            <div class="metric-card">
-                <div class="metric-label">Back Spin</div>
-                <div class="metric-number" id="back_spin">{{ shot.back_spin }}<span class="metric-unit">rpm</span></div>
+            <div class="card bg-base-200 border border-base-300 shadow-sm                        metric-card hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+                <div class="card-body p-4">
+                    <div class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Back Spin</div>
+                    <div class="metric-number text-base-content font-bold leading-tight tabular-nums"
+                         id="back_spin"
+                         style="font-size: clamp(2.5rem, 5vw, 3.25rem);">{{ shot.back_spin }}<span class="metric-unit text-base-content/40 font-normal ml-1"
+                             style="font-size: clamp(1rem, 1.8vw, 1.25rem);">rpm</span></div>
+                </div>
             </div>
-            <div class="metric-card">
-                <div class="metric-label">Side Spin</div>
-                <div class="metric-number" id="side_spin">{{ shot.side_spin }}<span class="metric-unit">rpm</span></div>
+            <div class="card bg-base-200 border border-base-300 shadow-sm                        metric-card hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+                <div class="card-body p-4">
+                    <div class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Side Spin</div>
+                    <div class="metric-number text-base-content font-bold leading-tight tabular-nums"
+                         id="side_spin"
+                         style="font-size: clamp(2.5rem, 5vw, 3.25rem);">{{ shot.side_spin }}<span class="metric-unit text-base-content/40 font-normal ml-1"
+                             style="font-size: clamp(1rem, 1.8vw, 1.25rem);">rpm</span></div>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Right Column: Image Panel -->
-    <div class="image-panel">
+    <div class="card bg-base-200 border border-base-300 shadow-sm overflow-hidden">
         <div class="image-panel-inner" id="image-panel-inner">
             <div class="image-empty-state">
                 <div class="empty-icon"></div>

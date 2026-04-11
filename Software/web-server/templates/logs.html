@@ -7,59 +7,71 @@
 {% endblock %}
 
 {% block content %}
-<div class="logs-container">
-    <div class="logs-header">
-        <div class="logs-controls-row">
-            <div class="service-selector">
-                <label for="serviceSelect">Service:</label>
-                <select id="serviceSelect" onchange="changeService()">
+<div class="logs-container flex flex-col gap-4" style="height: calc(100vh - 90px);">
+
+    <!-- Header / controls -->
+    <div class="card bg-base-200 border border-base-300 shadow-sm p-4 mx-2 sm:mx-4">
+        <div class="flex flex-wrap items-center gap-4 md:gap-6">
+
+            <!-- Service picker -->
+            <div class="flex items-center gap-3 min-w-[220px] max-md:w-full max-md:flex-col max-md:items-stretch">
+                <label for="serviceSelect" class="font-semibold whitespace-nowrap">Service:</label>
+                <select id="serviceSelect" class="select select-sm select-bordered flex-1" onchange="changeService()">
                     <option value="">Loading services...</option>
                 </select>
             </div>
 
-            <div class="service-info">
+            <!-- Service status + log stream connection -->
+            <div class="flex items-center gap-4 flex-1">
                 <span id="serviceStatus" class="service-status" style="display: none;"></span>
-                <div class="connection-status">
+
+                <div class="flex items-center gap-2 text-sm">
                     <span class="status-indicator disconnected" id="connectionIndicator"></span>
+                    <span class="opacity-60 text-xs uppercase tracking-wide">Log Stream:</span>
                     <span id="connectionText">Disconnected</span>
                 </div>
             </div>
 
-            <div class="logs-actions">
-                <button id="pauseButton" class="action-btn" onclick="togglePause()">
+            <!-- Action buttons -->
+            <div class="flex gap-2 max-md:w-full max-md:mt-2">
+                <button id="pauseButton" class="btn btn-sm btn-ghost max-md:flex-1" onclick="togglePause()">
                     <i data-lucide="pause" class="icon-sm" id="pauseIcon"></i>
-                    <span class="btn-text">Pause</span>
+                    <span class="btn-text max-md:hidden">Pause</span>
                 </button>
-                <button id="clearButton" class="action-btn danger" onclick="clearLogs()">
+                <button id="clearButton" class="btn btn-sm btn-ghost text-error max-md:flex-1" onclick="clearLogs()">
                     <i data-lucide="trash-2" class="icon-sm"></i>
-                    <span class="btn-text">Clear</span>
+                    <span class="btn-text max-md:hidden">Clear</span>
                 </button>
-                <button class="action-btn" onclick="downloadLogs()">
+                <button class="btn btn-sm btn-ghost max-md:flex-1" onclick="downloadLogs()">
                     <i data-lucide="download" class="icon-sm"></i>
-                    <span class="btn-text">Download</span>
+                    <span class="btn-text max-md:hidden">Download</span>
                 </button>
             </div>
         </div>
     </div>
 
-    <div class="log-viewer-wrapper">
+    <!-- Log viewer + stats -->
+    <div class="card bg-base-200 border border-base-300 shadow-sm flex-1 mx-2 sm:mx-4 mb-4 p-4 flex flex-col overflow-hidden">
         <div class="log-viewer empty" id="logViewer"></div>
 
-        <div class="log-stats">
-            <div class="stat-item">
-                <span class="stat-label">Lines:</span>
-                <span class="stat-value" id="lineCount">0</span>
+        <div class="divider my-1"></div>
+
+        <div class="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+            <div class="stat-item flex items-center gap-2">
+                <span class="font-semibold opacity-60">Lines:</span>
+                <span class="font-mono" id="lineCount">0</span>
             </div>
-            <div class="stat-item">
-                <span class="stat-label">Errors:</span>
-                <span class="stat-value" id="errorCount">0</span>
+            <div class="stat-item flex items-center gap-2">
+                <span class="font-semibold opacity-60">Errors:</span>
+                <span class="font-mono" id="errorCount">0</span>
             </div>
-            <div class="stat-item">
-                <span class="stat-label">Warnings:</span>
-                <span class="stat-value" id="warningCount">0</span>
+            <div class="stat-item flex items-center gap-2">
+                <span class="font-semibold opacity-60">Warnings:</span>
+                <span class="font-mono" id="warningCount">0</span>
             </div>
         </div>
     </div>
+
 </div>
 {% endblock %}
 
