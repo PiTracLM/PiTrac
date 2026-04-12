@@ -821,10 +821,11 @@ class PiTracServer:
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
                     else:
                         undistorted = cv2.remap(frame, map1, map2, cv2.INTER_LINEAR)
-                        # Scale both to half width for side-by-side
+                        # Scale both to half size for side-by-side (preserve aspect ratio)
                         half_w = w // 2
-                        left = cv2.resize(frame, (half_w, h))
-                        right = cv2.resize(undistorted, (half_w, h))
+                        half_h = h // 2
+                        left = cv2.resize(frame, (half_w, half_h))
+                        right = cv2.resize(undistorted, (half_w, half_h))
                         cv2.putText(left, "RAW", (10, 30),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                         cv2.putText(right, "UNDISTORTED", (10, 30),
