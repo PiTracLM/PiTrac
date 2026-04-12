@@ -1,5 +1,11 @@
 /* Calibration page */
 
+/* ---- Camera selection cards ---- */
+.camera-option input:checked + .card {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 12px oklch(59% 0.17 270 / 0.3);
+}
+
 /* ---- Wizard steps ---- */
 .wizard-steps {
     position: relative;
