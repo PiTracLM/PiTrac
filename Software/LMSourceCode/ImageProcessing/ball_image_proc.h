@@ -200,7 +200,6 @@ public:
     static int kModelInputWidth;
     static int kModelInputHeight;
     static int kInferenceThreads;
-    static bool kUseModelCLAHEPreprocessing;
 
     // This determines which potential 3D angles will be searched for spin processing
     struct RotationSearchSpace {

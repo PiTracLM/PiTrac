@@ -218,8 +218,6 @@ namespace golf_sim {
     int BallImageProc::kModelInputWidth = 736;
     int BallImageProc::kModelInputHeight = 544;
     int BallImageProc::kInferenceThreads = 4;
-    bool BallImageProc::kUseModelCLAHEPreprocessing = false;
-
     // NCNN detector
     std::unique_ptr<NCNNDetector> BallImageProc::ncnn_detector_;
     std::atomic<bool> BallImageProc::ncnn_detector_initialized_{false};
@@ -4257,16 +4255,6 @@ namespace golf_sim {
                 input_image = preprocessed_img;
             }
 
-            if (kUseModelCLAHEPreprocessing && kCLAHEClipLimit >= 1 && kCLAHETilesGridSize >= 1) {
-                cv::Mat gray, clahe_result;
-                cv::cvtColor(input_image, gray, cv::COLOR_BGR2GRAY);
-                cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
-                clahe->setClipLimit(kCLAHEClipLimit);
-                clahe->setTilesGridSize(cv::Size(kCLAHETilesGridSize, kCLAHETilesGridSize));
-                clahe->apply(gray, clahe_result);
-                cv::cvtColor(clahe_result, input_image, cv::COLOR_GRAY2BGR);
-            }
-
             auto detections = ncnn_detector_->Detect(input_image);
 
             detected_circles.clear();
@@ -4400,7 +4388,6 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelInputWidth", kModelInputWidth);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelInputHeight", kModelInputHeight);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kInferenceThreads", kInferenceThreads);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kUseModelCLAHEPreprocessing", kUseModelCLAHEPreprocessing);
         GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kSpinDetectionMethod", kSpinDetectionMethod);
         if (kSpinDetectionMethod != "ml" && kSpinDetectionMethod != "legacy") {
             GS_LOG_MSG(error, "Unrecognized kSpinDetectionMethod: '" + kSpinDetectionMethod + "' - defaulting to 'ml'");

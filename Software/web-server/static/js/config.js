@@ -1071,8 +1071,11 @@ async function showDiff() {
                     </table>
                 </div>
                 <div class="diff-footer">
-                    <button class="btn btn-primary" onclick="closeModal()">Close</button>
-                    <button class="btn btn-danger" onclick="resetAllFromDiff()">Reset All to Defaults</button>
+                    <button class="btn btn-error btn-sm" onclick="resetAllFromDiff()">Reset All to Defaults</button>
+                    <div class="flex gap-2">
+                        <button class="btn btn-ghost btn-sm" onclick="closeModal()">Close</button>
+                        <button class="btn btn-primary btn-sm" onclick="closeModal(); saveChanges();" ${modifiedSettings.size === 0 ? 'disabled' : ''}>Save Changes</button>
+                    </div>
                 </div>
             </div>
         `;

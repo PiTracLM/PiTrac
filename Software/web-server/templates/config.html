@@ -65,7 +65,7 @@
 
 <!-- Confirm/diff modal (JS toggles .active class on #confirmModal) -->
 <div id="confirmModal">
-    <div class="modal-content bg-base-200 rounded-box shadow-xl border border-base-300 w-[90%] max-w-lg max-h-[80vh] overflow-auto">
+    <div class="modal-content bg-base-200 rounded-box shadow-xl border border-base-300 w-[95%] max-w-4xl max-h-[85vh] overflow-auto">
         <div class="modal-header flex justify-between items-center p-5 border-b border-base-300">
             <h2 id="modalTitle" class="text-lg font-bold text-primary">Confirm</h2>
             <button class="modal-close btn btn-ghost btn-sm btn-square" onclick="closeModal()">&times;</button>
@@ -73,7 +73,6 @@
         <div class="modal-body p-5" id="modalBody">
         </div>
         <div class="modal-footer flex justify-end gap-3 p-5 border-t border-base-300">
-            <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
             <button class="btn btn-primary btn-sm" id="modalConfirmBtn">Confirm</button>
         </div>
     </div>
