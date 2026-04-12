@@ -146,6 +146,8 @@ class CompatibleCharucoDetector:
                           max(self.squares_x - 1, self.squares_y - 1))
 
         ratio_diff = abs(observed_ratio - expected_ratio)
+        # Scale so that meaningful tilts (15-45 degrees) produce scores
+        # in the 0.20-0.80 range
         return min(1.0, ratio_diff * 3)
 
     def assess_image_quality(

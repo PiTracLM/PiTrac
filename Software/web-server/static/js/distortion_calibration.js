@@ -33,7 +33,7 @@ const distortionCalibration = {
             const response = await fetch(`/api/calibration/distortion/${camera}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ target_images: 20 })
+                body: JSON.stringify({ target_images: 30 })
             });
 
             if (!response.ok) {
@@ -110,13 +110,13 @@ const distortionCalibration = {
         }
 
         if (status.images_captured !== undefined) {
-            const target = status.target_images || 20;
+            const target = status.target_images || 30;
             detailsText.textContent =
                 `${status.images_captured} of ${target} good images captured`;
         }
 
         if (status.images_captured !== undefined) {
-            const target = status.target_images || 20;
+            const target = status.target_images || 30;
             const imagesOk = status.images_captured >= target;
             const reqImages = document.getElementById('req-images');
             if (reqImages) {
@@ -125,7 +125,7 @@ const distortionCalibration = {
             }
         }
         if (status.coverage && status.coverage.fraction !== undefined) {
-            const coverageOk = status.coverage.fraction >= 0.67;
+            const coverageOk = status.coverage.fraction >= 1.0;
             const cellsCovered = Math.round(status.coverage.fraction * 9);
             const reqCoverage = document.getElementById('req-coverage');
             if (reqCoverage) {
@@ -134,7 +134,7 @@ const distortionCalibration = {
             }
         }
         if (status.tilt_fraction !== undefined) {
-            const tiltOk = status.tilt_fraction >= 0.30;
+            const tiltOk = status.tilt_fraction >= 0.40;
             const reqTilt = document.getElementById('req-tilt');
             if (reqTilt) {
                 reqTilt.style.color = tiltOk ? '#4CAF50' : '#888';

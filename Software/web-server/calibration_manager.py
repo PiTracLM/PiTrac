@@ -26,7 +26,7 @@ CAMERA1_CALIBRATION_TIMEOUT = 40.0  # Camera1 has faster hardware detection
 CAMERA2_CALIBRATION_TIMEOUT = 140.0  # Camera2 needs background process initialization
 CAMERA2_BACKGROUND_INIT_WAIT = 4.0  # Time to wait for background process to initialize
 
-DISTORTION_DEFAULT_TARGET_IMAGES = 20
+DISTORTION_DEFAULT_TARGET_IMAGES = 30
 DISTORTION_MAX_ATTEMPTS_MULTIPLIER = 5  # max_attempts = target * this
 DISTORTION_CAPTURE_INTERVAL = 2.0  # seconds between captures
 DISTORTION_CAPTURE_TIMEOUT = 10.0  # timeout for rpicam-still
@@ -969,7 +969,7 @@ class CalibrationManager:
 
         Args:
             camera: "camera1" or "camera2"
-            target_images: Number of good images to collect (default 20)
+            target_images: Number of good images to collect (default 30)
 
         Returns:
             Dict with calibration results or error
@@ -989,8 +989,8 @@ class CalibrationManager:
             return {"status": "error", "message": f"Missing dependency: {e}"}
 
         detector = CompatibleCharucoDetector(
-            squares_x=7, squares_y=10,
-            square_length=0.025, marker_length=0.020
+            squares_x=8, squares_y=11,
+            square_length=0.023, marker_length=0.017
         )
 
         image_dir = Path.home() / "LM_Shares" / "Images" / "distortion_calibration"
@@ -1048,8 +1048,8 @@ class CalibrationManager:
 
         log_msg(f"Target: {target_images} images, camera index: {camera_index}")
 
-        min_coverage_fraction = 0.67  # At least 6/9 grid cells
-        min_tilt_fraction = 0.30  # At least 30% of images must be tilted
+        min_coverage_fraction = 1.0  # All 9 grid cells must be covered
+        min_tilt_fraction = 0.40  # At least 40% of images must be tilted
 
         try:
             for attempt in range(max_attempts):
@@ -1127,7 +1127,7 @@ class CalibrationManager:
                     await asyncio.sleep(DISTORTION_CAPTURE_INTERVAL)
                     continue
 
-                if quality["tilt_score"] > 0.15:
+                if quality["tilt_score"] > 0.20:
                     tilted_count += 1
 
                 all_corners.append(corners)
@@ -1140,7 +1140,7 @@ class CalibrationManager:
                 self.calibration_status[camera]["images_captured"] = good_count
                 self.calibration_status[camera]["images_rejected"] = rejected_count
 
-                tilt_label = "tilted" if quality["tilt_score"] > 0.15 else "flat"
+                tilt_label = "tilted" if quality["tilt_score"] > 0.20 else "flat"
                 log_msg(
                     f"Image {good_count}/{target_images} accepted "
                     f"(sharpness: {quality['blur_score']:.0f}, "

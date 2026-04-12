@@ -127,13 +127,13 @@ class TestCompatibleCharucoDetector:
     @pytest.fixture
     def detector(self):
         return CompatibleCharucoDetector(
-            squares_x=7, squares_y=10,
-            square_length=0.025, marker_length=0.020
+            squares_x=8, squares_y=11,
+            square_length=0.023, marker_length=0.017
         )
 
     def test_init(self, detector):
-        assert detector.squares_x == 7
-        assert detector.squares_y == 10
+        assert detector.squares_x == 8
+        assert detector.squares_y == 11
         assert detector.board is not None
         assert detector.charuco_detector is not None
 
@@ -170,7 +170,7 @@ class TestCompatibleCharucoDetector:
         board_img = detector.board.generateImage((700, 1000))
         corners, ids, _, _ = detector.detect_charuco_corners(board_img)
         score = detector.compute_tilt_score(corners)
-        assert score < 0.15  # flat board should have low tilt
+        assert score < 0.20  # flat board should have low tilt
 
     def test_compute_tilt_score_zero_rect(self, detector):
         corners = np.array([[[5, 5]] for _ in range(10)], dtype=np.float32)
@@ -228,8 +228,8 @@ class TestCalibrateWithOutlierRejection:
     @pytest.fixture
     def detector(self):
         return CompatibleCharucoDetector(
-            squares_x=7, squares_y=10,
-            square_length=0.025, marker_length=0.020
+            squares_x=8, squares_y=11,
+            square_length=0.023, marker_length=0.017
         )
 
     def _generate_views(self, detector, n=8):

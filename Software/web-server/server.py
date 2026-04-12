@@ -30,10 +30,10 @@ from update_manager import UpdateManager
 
 logger = logging.getLogger(__name__)
 
-CHARUCO_SQUARES_X = 7
-CHARUCO_SQUARES_Y = 10
-CHARUCO_SQUARE_LENGTH = 0.025
-CHARUCO_MARKER_LENGTH = 0.020
+CHARUCO_SQUARES_X = 8
+CHARUCO_SQUARES_Y = 11
+CHARUCO_SQUARE_LENGTH = 0.023
+CHARUCO_MARKER_LENGTH = 0.017
 
 
 class RpicamVideoStream:
@@ -603,7 +603,7 @@ class PiTracServer:
             return Response(
                 content=png_bytes.tobytes(),
                 media_type="image/png",
-                headers={"Content-Disposition": "inline; filename=charuco_board_7x10.png"},
+                headers={"Content-Disposition": "inline; filename=charuco_board_8x11.png"},
             )
 
         @self.app.websocket("/ws/distortion-feed")
@@ -859,10 +859,10 @@ class PiTracServer:
             if self.calibration_manager.loop is None:
                 return {"status": "error", "message": "Server still starting up, please retry in a moment"}
 
-            target_images = 20
+            target_images = 30
             try:
                 body = await request.json()
-                target_images = body.get("target_images", 20)
+                target_images = body.get("target_images", 30)
             except Exception:
                 pass  # No body or invalid JSON is fine, use default
 

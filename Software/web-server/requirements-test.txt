@@ -6,3 +6,4 @@ pytest-xdist==3.5.0
 httpx==0.25.2
 websocket-client==1.6.4
 faker==20.1.0
+opencv-python-headless>=4.7.0

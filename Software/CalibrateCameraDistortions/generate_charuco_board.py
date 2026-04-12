@@ -17,11 +17,11 @@ def is_new_api():
 
 
 def generate_charuco_board(
-    squares_x=7,
-    squares_y=10,
-    square_length=0.025,  # 25mm squares
-    marker_length=0.020,  # 20mm markers
-    output_path="charuco_board_7x10.png",
+    squares_x=8,
+    squares_y=11,
+    square_length=0.023,  # 23mm squares
+    marker_length=0.017,  # 17mm markers
+    output_path="charuco_board_8x11.png",
     dict_type=cv2.aruco.DICT_4X4_50
 ):
     """Generate ChArUco calibration board with OpenCV version compatibility."""
@@ -91,16 +91,16 @@ def generate_charuco_board(
 if __name__ == "__main__":
     # Generate default ChArUco board for PiTrac
     board = generate_charuco_board(
-        squares_x=7,
-        squares_y=10,
-        square_length=0.025,  # 25mm
-        marker_length=0.020,  # 20mm
-        output_path="charuco_board_7x10.png"
+        squares_x=8,
+        squares_y=11,
+        square_length=0.023,  # 23mm
+        marker_length=0.017,  # 17mm
+        output_path="charuco_board_8x11.png"
     )
 
     print("\nBoard generation complete!")
     print("Next steps:")
-    print("   1. Print charuco_board_7x10.png")
+    print("   1. Print charuco_board_8x11.png")
     print("   2. Mount on cardboard for rigidity")
     print("   3. Use in PiTrac web UI: Calibration > Lens Distortion Calibration")
-    print("   4. System will auto-capture 20 images with quality validation")
+    print("   4. System will auto-capture 30 images with quality validation")
