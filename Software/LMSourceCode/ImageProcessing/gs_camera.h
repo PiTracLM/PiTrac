@@ -381,6 +381,10 @@ namespace golf_sim {
 
         int CountSetBits(int n);
 
+	std::vector<float> GetPulseIntervalsNoTrailingZero();
+
+	void ComputePulseIntervalRatiosFromIntervals(const std::vector<float>& input_pulse_intervals, std::vector<double>& output_pulse_ratios); 
+
         void SetPulseVector(int bit_value, std::vector<bool>& combinations_vector);
 
         int FindClosestRatioPatternMatchOffset(const std::vector<double> distance_ratios,
@@ -393,11 +397,10 @@ namespace golf_sim {
                                                             std::vector<float>& pulse_intervals,
                                                             std::vector<double>& pulse_ratios);
 
-        bool GetPulseIntervalsAndRatios(const std::vector<float>& initial_pulse_intervals_ms, 
-                                        std::vector<float>& pulse_pause_intervals,
-                                        std::vector<double>& pulse_pause_ratios,                                        
-                                        const int number_pulses_to_collapse = -1,
-                                        const int collapse_offset = -1);
+        bool GetPulseIntervalsAndRatiosUsingMissingBallsVector(const std::vector<bool>& missing_ball_image_vector,
+            const std::vector<float>& initial_pulse_intervals_ms,
+            std::vector<float>& pulse_intervals,
+            std::vector<double>& pulse_ratios);
 
         double GetPerpendicularDistanceFromLine(double x, double y, double x1, double y1, double x2, double y2);
 

@@ -2688,601 +2688,6 @@ namespace golf_sim {
         }
 
 
-        int GolfSimCamera::FindClosestRatioPatternMatchOffset(const std::vector<double> distance_ratios,
-                                                              const std::vector<double> pulse_ratios,
-                                                              double& delta_to_closest_ratio,
-                                                              bool try_different_offsets) {
-
-            // The current offset within the pulse interval ratios at which the pattern
-            // of distance ratios is most closely correlated.
-            delta_to_closest_ratio = 99999.0;
-            int closest_timing_interval_offset = -1;
-
-            if (pulse_ratios.size() < distance_ratios.size()) {
-                return -1;
-            }
-
-            for (int distance_pattern_offset = 0; distance_pattern_offset < (int)(pulse_ratios.size() - distance_ratios.size()); distance_pattern_offset++) {
-
-                double difference_in_ratios = ComputeRatioDistance(distance_ratios, pulse_ratios, distance_pattern_offset);
-
-                GS_LOG_TRACE_MSG(trace, "difference_in_ratios for offset " + std::to_string(distance_pattern_offset) + " is: " + std::to_string(difference_in_ratios));
-
-                // If the current offset of the distance ratios within the pulse ratio pattern
-                // results in the lowest error (distance), then assume it's the best for now.
-                if (difference_in_ratios < delta_to_closest_ratio) {
-
-                    // This is the smallest difference we've seen so far, so keep it!
-                    // Also, figure out if the interval is to the left or to the right of the 
-                    // middle ball (depending on which ball we chose as ball 2).
-                    delta_to_closest_ratio = difference_in_ratios;
-                    closest_timing_interval_offset = distance_pattern_offset;
-
-                }
-
-                // If we are, for example, enumerating all possible strobe vector patterns,
-                // we will only be interested in a match without any offset.
-                if (!try_different_offsets) {
-                    break;
-                }
-            }
-
-            return closest_timing_interval_offset;
-        }
-
-
-        // Returns a score of the closeness of the vector of distance_ratios within the pulse_ratios at an offset
-        // of the distance_ratios from the beginning of the pulse_ratios
-        double GolfSimCamera::ComputeRatioDistance(const std::vector<double> distance_ratios,
-            const std::vector<double> pulse_ratios,
-            int& distance_pattern_offset) {
-
-            // TBD - Do some error checking on the inputs
-
-            double kMaxRatioDistance = 1000.0;
-
-            double difference_in_ratios = 0;
-
-            // Compute the differences between each distance ratio in the pattern of distances as compared
-            // to each possible offset of those ratios to the pulse interval ratios.
-            for (size_t distance_ratio_index = 0; distance_ratio_index < distance_ratios.size(); distance_ratio_index++) {
-
-                // If we got more ball distance ratios than we have collapsed (and thus down-sized) pulse
-                // ratios, then just stop and return a big error number to drop this comparison from the
-                // best-of list.
-
-                if ((distance_ratio_index + distance_pattern_offset) >= pulse_ratios.size()) {
-                    LoggingTools::Warning("GolfSimCamera::ComputeRatioDistance received a distance_ratio_index higher than the number of pulse ratios.");
-                    return kMaxRatioDistance;
-                }
-                // Compute the difference as a percent of the distance ratio so that each element
-                // of the pattern of ratios can contribute a meaningful amount of error/difference
-                // even if the distance is small.
-                double distance_ratio = distance_ratios[distance_ratio_index];
-                double pulse_ratio = pulse_ratios[distance_ratio_index + distance_pattern_offset];
-
-                // Get a difference that is >= 0 so that squaring it will not decrease the number
-                // double single_ratio_difference = 100. * std::abs(distance_ratio - pulse_ratio) / std::min(distance_ratio, pulse_ratio);
-                double single_ratio_difference = 100. * std::abs(distance_ratio - pulse_ratio);
-
-
-                // If we get a crazy number, cap it so that we don't go out of bounds of our variable
-                if (single_ratio_difference > kMaxRatioDistance) {
-                    GS_LOG_TRACE_MSG(trace, "single_ratio_difference > kMaxRatioDistance!");
-                    single_ratio_difference = kMaxRatioDistance;
-                }
-
-                // Square to highlight/emphasize larger errors
-                single_ratio_difference = pow(single_ratio_difference, 2);
-                // Removed excessive per-element logging
-
-                difference_in_ratios += single_ratio_difference;
-            }
-
-            return difference_in_ratios;
-        }
-
-        // Set the element of the vector to true when there is a 1 bit (a flag to remove the corresponding strobe pulse) in the vector
-        void GolfSimCamera::SetPulseVector(int bit_value, std::vector<bool>& combinations_vector) {
-
-            int vector_size = (int)combinations_vector.size();
-
-            if (vector_size > 512) {
-                GS_LOG_TRACE_MSG(error, "GolfSimCamera::SetPulseVector - vector was too long."); 
-                return;
-            }
-
-            // Create a bitset value that we can more easily work with
-            std::bitset<512> bit_array(bit_value);
-
-            // The bitset is indexed (visually) right to left, but we will setup the 
-            // boolean vector to go from left to right
-            for (auto i = 0; i < vector_size; ++i) {
-                combinations_vector[vector_size - i - 1] = (bit_array[i] == 1);
-            }
-
-        }
-
-        void GolfSimCamera::PrintPulseVector(const std::vector<bool> &combinations_vector) {
-            std::string v;
-
-            for (int i = 0; i < (int)combinations_vector.size(); ++i) {
-                v += (combinations_vector[i] ? "1" : "0");
-            }
-
-            GS_LOG_TRACE_MSG(trace, "Combinations_vector: " + v);
-        }
-
-        // Count the number of bits that are true
-        int GolfSimCamera::CountSetBits(int n) {
-            int count = 0;
-            while (n > 0) {
-                n &= (n - 1); // Brian Kernighan's algorithm
-                count++;
-            }
-            return count;
-        }
-
-        // Determine the ratios of the exposure distances and compare to the
-        // ratios of the strobe pulses to find a correlation.  
-        // The best correlation will determine the 
-        // likely correspondence between the strobe intervals and the ball intervals.
-        // time_between_ball_images_ms is the time between 
-        bool GolfSimCamera::DetermineStrobeIntervals(std::vector<GolfBall>& input_balls, 
-                                                    int most_centered_ball_index, 
-                                                    int second_ball_index, 
-                                                    long & time_between_ball_images_uS,
-                                                    GsBallsAndTimingVector& return_balls_and_timing) {
-
-            GS_LOG_TRACE_MSG(trace, "GolfSimCamera::DetermineStrobeInterval");
-
-            LoggingTools::Trace( "   Return_balls: ", input_balls);
-
-            std::vector<double> distances;
-            std::vector<double> distance_ratios;
-
-            // Distance ratios will be adjusted to account for ball slow down 
-            if (!GetBallDistancesAndRatios(input_balls, distances, distance_ratios)) {
-                LoggingTools::Warning("GetBallDistancesAndRatios failed.");
-                return false;
-            }
-
-            if (distances.empty()) {
-                LoggingTools::Warning("GetBallDistancesAndRatios returned no data.  Has the strobe vector been established?");
-                return false;
-            }
-
-            LoggingTools::Trace( "Return_balls distances: ", distances);
-            LoggingTools::Trace( "--------------------Return_balls distance ratios (adjusted for slow-down): ", distance_ratios);
-
-            // We will get the full set of pulse ratios to see if we can confirm that there are fewer 
-            // distances than pulses.  TBD - Not sure useful?
-            // We also need the original, actual intervals to figure out how many we want to collapse
-            // further down in this function.
-            std::vector<double>test_pulse_ratios;
-            std::vector<float>test_pulse_intervals;
-            
-            std::vector<float> pulse_intervals_from_strobe = PulseStrobe::GetPulseIntervals();
-            GS_LOG_TRACE_MSG(trace, "About to call GetPulseIntervalsAndRatios with " + std::to_string(pulse_intervals_from_strobe.size()) + " pulse intervals");
-
-            bool result = GetPulseIntervalsAndRatios(pulse_intervals_from_strobe, test_pulse_intervals, test_pulse_ratios);
-
-            GS_LOG_TRACE_MSG(trace, "GetPulseIntervalsAndRatios returned: " + std::to_string(result));
-            LoggingTools::Trace( "The pulse_interval ratios were: ", test_pulse_ratios);
-
-            // Look at each pulse interval ratio that we have and see which is closest to the ratio(s) that 
-            // exist for distance deltas.
-            // NOTE - Assumes near-constant ball speed such that the ratios of strobe intervals is directly
-            // proportional to the distances covered during those intervals.
-
-            // Provide some sensible default for the interval time.  Will calculate in code below.
-            time_between_ball_images_uS = 0;
-
-
-            // Ensure we have at least one distance ratio, which means at least 2 distances and 3 balls
-            // If not, fall back to a simpler estimate
-            if (distance_ratios.size() > 0) {
-
-                // Each interval ratio we have will involve three balls (left/right/middle), and should be 
-                // roughly equal to the ratio of the distance between the middle and next ball divided 
-                // by the distance between the ball before the middle and the middle
-
-                // Compute the correlation (closeness) of the ball distance ratio pattern to the pulse ratio
-                // pattern.  The distance ratios will always be <= the number of pulse intervals, due to the
-                // possibility of losing some highly-overlapped images early in the pattern.
-
-                // There shouldn't be too many missed pulses, but they could occur anywhere, so make sure
-                // that we consider possible collapsed pulses all the way to the end
-
-                std::vector<float>best_pulse_intervals;
-                double best_ratio_distance = 999999.;
-                int best_final_offset_of_distance_ratios = -1;
-                int best_pulses_to_collapse = -1;
-                int best_collapse_offset = -1;
-
-                // We will now generate all combinations of fitting the <x> 'missing' balls into the <y> possible
-                // positions that exist in the pulse vector.  We had originally been assuming there would just be one 
-                // contiguous group of missing balls, but that turned out not to be true.  So, now go through all combinations
-
-                int number_ball_exposures = (int)input_balls.size();
-                int number_of_strobes = (int)test_pulse_intervals.size();
-
-                if (number_ball_exposures > number_of_strobes) {
-                    LoggingTools::Warning("GetBallDistancesAndRatios had more exposures than strobes.  It is possible the image being analyzed was generated with a different strobing configuration.");
-                    return false;
-                }
-
-                // There might be 0 missing exposures, in which case, we won't have to do any
-                // interval collapsing
-                int number_of_missing_exposures = number_of_strobes - number_ball_exposures;
-
-                std::vector<bool> combinations_vector;
-                std::vector<std::vector<bool>> candidate_intervals_to_collapse_patterns_vector;
-
-                // Start with an all-false vector
-                // The - 1 is because there are 1 fewer intervals than strobes
-                for (int i = 0 ; i < (int)number_of_strobes - 1; i++) {
-                    combinations_vector.push_back(false);
-                }
-
-                // Because we're unlikely to have more than 8 or so possible strobes, we will just use a 
-                // brute-force method to figure out all combinations of exposures in the strobe vector.  
-                // This code iterates though all possible numbers of an n-bit number and whenever the number
-                // has the correct number of bits, we use that pattern as a possible candidate for how the
-                // exposures correllate to the strobes.
-
-                int number_missed_exposures = number_of_strobes - number_ball_exposures;
-
-                for (int i = 0; i < (1 << number_of_strobes) - 1; ++i) {
-                    if (CountSetBits(i) == number_missed_exposures) {
-
-                        SetPulseVector(i, combinations_vector);
-
-                        candidate_intervals_to_collapse_patterns_vector.push_back(combinations_vector);
-                        // Too detailed to keep in production system - PrintPulseVector(combinations_vector);
-                    }
-                }
-
-                // Each  of the resulting candidate vectors will contain a 'true'
-                int best_intervals_pattern_index = -1;
-
-                for (int i = 0; i < (int)candidate_intervals_to_collapse_patterns_vector.size(); i++) {
-
-                    std::vector<bool> intervals_to_collapse_vector = candidate_intervals_to_collapse_patterns_vector[i];
-
-                    PrintPulseVector(intervals_to_collapse_vector);
-
-                    // Just a breakpoint trigger for debugging
-                    /** /
-                    if (intervals_to_collapse_vector[0] == true &&
-                        intervals_to_collapse_vector[1] == true &&
-                        intervals_to_collapse_vector[2] == true &&
-                        intervals_to_collapse_vector[3] == false &&
-                        intervals_to_collapse_vector[4] == false &&
-                        intervals_to_collapse_vector[5] == false) {
-                        GS_LOG_TRACE_MSG(trace, "----------> - Reached the vector of interest.");
-                    }
-                    **/
-
-                    // Formulate a new set of pulses that correspond to the exposures that we found
-                    // with the pulses corresponding to the 'missing' exposures collapsed/removed.
-
-                    std::vector<double>pulse_ratios;
-                    std::vector<float>pulse_intervals;
-                    std::vector<float> current_pulse_intervals_ms = PulseStrobe::GetPulseIntervals();
-
-
-                    if (!GetPulseIntervalsAndRatiosFromIntervalVector(intervals_to_collapse_vector, current_pulse_intervals_ms, pulse_intervals, pulse_ratios)) {
-                        GS_LOG_TRACE_MSG(error, "Failed to GetPulseIntervalsAndRatiosFromIntervalVector");
-                        return false;
-                    }
-
-
-                    // Too chatty- LoggingTools::Trace("The (potentially collapsed) pulse_intervals were (ignore last '0' interval): ", pulse_intervals);
-                    // LoggingTools::Trace("The (potentially collapsed) pulse_ratios were : ", pulse_ratios);
-
-
-                    double delta_to_closest_ratio;
-
-                    int best_local_offset_of_distance_ratios = FindClosestRatioPatternMatchOffset(distance_ratios, pulse_ratios, delta_to_closest_ratio, true /* Try any offset */);
-
-                    // If this is the closest match seen so far, save the information
-                    if (best_local_offset_of_distance_ratios >= 0 && delta_to_closest_ratio <= best_ratio_distance) {
-
-                        best_ratio_distance = delta_to_closest_ratio;
-                        best_final_offset_of_distance_ratios = best_local_offset_of_distance_ratios;
-                        best_intervals_pattern_index = i;
-
-                        GS_LOG_TRACE_MSG(trace, "------------> Found best (so far) pulse ratio pattern match.  best_ratio_distance= " + std::to_string(best_ratio_distance)
-                            + " best_final_offset_of_distance_ratios= " + std::to_string(best_ratio_distance)
-                            + " best_intervals_pattern_index= " + std::to_string(best_intervals_pattern_index) + ".  Vector was : ");
-                        PrintPulseVector(candidate_intervals_to_collapse_patterns_vector[best_intervals_pattern_index]);
-                    }
-                }
-
-                // In the unlikely event we didn't find ANY best interval, just default it to the first interval
-                if (best_intervals_pattern_index < 0) {
-                    best_intervals_pattern_index = 0;
-                }
-
-                GS_LOG_TRACE_MSG(trace, "------------> Best-fitting pulse vector was number: " + std::to_string(best_intervals_pattern_index) + ".  With score of: " + 
-                            std::to_string(best_ratio_distance) + ".  Vector was : ");
-                PrintPulseVector(candidate_intervals_to_collapse_patterns_vector[best_intervals_pattern_index]);
-
-
-
-                // If we found a best correllation, re-create the corresponding set of ratios and intervals
-                std::vector<double>pulse_ratios;
-                std::vector<float>pulse_intervals;
-
-                // We will retrieve the actual pulse interval (in uS) from the list of such intervals.
-                // Just need to figure out WHICH interval corresponds to the two balls of interest.
-                if (!GetPulseIntervalsAndRatiosFromIntervalVector(candidate_intervals_to_collapse_patterns_vector[best_intervals_pattern_index],
-                                                                    PulseStrobe::GetPulseIntervals(), 
-                                                                    pulse_intervals, 
-                                                                    pulse_ratios)) {
-                        GS_LOG_TRACE_MSG(error, "Failed to GetPulseIntervalsAndRatiosFromIntervalVector");
-                        return false;
-                }
-
-
-                LoggingTools::Trace( "The best set of pulse_intervals was (ignore last '0' interval): ", pulse_intervals);
-
-                // Transfer the pulse intervals to the array of balls and associated timing
-                // The first ball doesn't get a prior interval
-                // Input_balls area assumed to be sorted based on the handedness of the shot,
-                // so, right-to-left by X position for left-handed shots
-                for (size_t i = 0; i < input_balls.size(); i++) {
-                    GolfBall& b = input_balls[i];
-                    GsBallAndTimingElement be;
-                    be.ball = b;
-                    if (i > 0) {
-                        size_t interval_index = best_final_offset_of_distance_ratios + i - 1;
-                        if (interval_index < pulse_intervals.size()) {
-                            be.time_interval_before_ball_us = 1000 * pulse_intervals[interval_index];
-                        } else {
-                            GS_LOG_MSG(warning, "Pulse interval index " + std::to_string(interval_index) +
-                                     " out of bounds (size: " + std::to_string(pulse_intervals.size()) + ")");
-                            be.time_interval_before_ball_us = 0;
-                        }
-                    }
-                    return_balls_and_timing.push_back(be);
-                }
-                // Sort the ball and timing vector by ball.x position, left to right
-                // Note that we do this same sort for both left and right-handed shots
-                std::sort(return_balls_and_timing.begin(), return_balls_and_timing.end(), [](const GsBallAndTimingElement& a, const GsBallAndTimingElement& b)
-                    { return (a.ball.x() < b.ball.x()); });
-
-
-                if (second_ball_index > most_centered_ball_index) {
-                    // The correct interval is the right one, as ball2 is to the right
-                    // of the middle ball.  Because of the sort we just did, this will also
-                    // be correct for left-handed playing, where the
-                    size_t interval_index = most_centered_ball_index + best_final_offset_of_distance_ratios;
-                    if (interval_index < pulse_intervals.size()) {
-                        time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[interval_index]);
-                    } else {
-                        GS_LOG_MSG(warning, "Time interval index " + std::to_string(interval_index) +
-                                 " out of bounds (size: " + std::to_string(pulse_intervals.size()) + ")");
-                        time_between_ball_images_uS = 0;
-                    }
-                }
-                else {
-                    // Ball2 is to the left of the middle ball.
-                    size_t interval_index = most_centered_ball_index + best_final_offset_of_distance_ratios - 1;
-                    if (interval_index < pulse_intervals.size()) {
-                        time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[interval_index]);
-                    } else {
-                        GS_LOG_MSG(warning, "Time interval index " + std::to_string(interval_index) +
-                                 " out of bounds (size: " + std::to_string(pulse_intervals.size()) + ")");
-                        time_between_ball_images_uS = 0;
-                    }
-                }
-
-            }
-            else {
-                if (GolfSimClubs::GetCurrentClubType() == GolfSimClubs::kPutter) {
-
-                    GS_LOG_MSG(warning, "DetermineStrobeInterval received only two recognized balls - will make a guess that this was the last two exposures.");
-
-                    // We only have two valid ball images
-                    // Special cases where we only have 2 balls initially, or if we ultimately only end up with two.  
-                    // Having only two balls might occur when the ball was hit really fast, and we only got
-                    // two strobes before the ball went out of the FoV.  In this case, we (MAYBE) can assume that the first interval 
-                    // must be the first strobe delay.
-                    //    We could do:   time_between_ball_images_uS = pulse_intervals[0];
-                    // OR...
-                    // Maybe we trust that we actually managed to identify EACH of the strobes (even though we threw some out earlier)
-                    // In that case, just count the number of images up to the two balls of interest and pick that pulse length:
-
-                    // Keep track of how many balls we got considered heavily overlapped
-
-                    std::vector<double>pulse_ratios;
-                    std::vector<float>pulse_intervals;
-
-                    // We will retrieve the actual pulse interval (in uS) from the list of such intervals.
-                    // Just need to figure out WHICH interval coresponds to the two balls of interest.
-                    if (!GetPulseIntervalsAndRatios(PulseStrobe::GetPulseIntervals(), pulse_intervals, pulse_ratios)) {
-                        GS_LOG_MSG(error, "GetPulseIntervalsAndRatios failed.");
-                        return false;
-                    }
-
-                    if (input_balls.size() == 2) {
-                        // We didn't see ANYTHING except two balls
-                        int last_ball_index = (int)input_balls.size() - 1;
-                        time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[pulse_intervals.size() - 2]);
-
-                        GsBallAndTimingElement be1;
-                        be1.ball = input_balls[last_ball_index-1];
-                        GsBallAndTimingElement be2;
-                        be2.ball = input_balls[last_ball_index];
-                        be2.time_interval_before_ball_us = time_between_ball_images_uS;
-
-                        return_balls_and_timing.push_back(be1);
-                        return_balls_and_timing.push_back(be2);
-                    }
-                    else {
-                        GS_LOG_MSG(error, "GetPulseIntervalsAndRatios failed - Input balls < 3 and not 2 (?.");
-                        return false;
-                    }
-                }
-                else {
-                        GS_LOG_MSG(warning, "DetermineStrobeInterval received only two recognized balls - will make a guess that this was the first two exposures.");
-
-                        // We only have two valid ball images
-                        // Special cases where we only have 2 balls initially, or if we ultimately only end up with two.  
-                        // Having only two balls might occur when the ball was hit really fast, and we only got
-                        // two strobes before the ball went out of the FoV.  In this case, we (MAYBE) can assume that the first interval 
-                        // must be the first strobe delay.
-                        //    We could do:   time_between_ball_images_uS = pulse_intervals[0];
-                        // OR...
-                        // Maybe we trust that we actually managed to identify EACH of the strobes (even though we threw some out earlier)
-                        // In that case, just count the number of images up to the two balls of interest and pick that pulse length:
-
-                        // Keep track of how many balls we got considered heavily overlapped
-
-                        std::vector<double>pulse_ratios;
-                        std::vector<float>pulse_intervals;
-
-                        // We will retrieve the actual pulse interval (in uS) from the list of such intervals.
-                        // Just need to figure out WHICH interval corresponds to the two balls of interest.
-                        if (!GetPulseIntervalsAndRatios(PulseStrobe::GetPulseIntervals(), pulse_intervals, pulse_ratios)) {
-                            GS_LOG_MSG(error, "GetPulseIntervalsAndRatios failed.");
-                            return false;
-                        }
-
-                        if (input_balls.size() == 2) {
-                            // We didn't see ANYTHING except two balls
-                            time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[0]);
-
-                            GsBallAndTimingElement be1;
-                            be1.ball = input_balls[0];
-                            GsBallAndTimingElement be2;
-                            be2.ball = input_balls[1];
-                            be2.time_interval_before_ball_us = time_between_ball_images_uS;
-
-                            return_balls_and_timing.push_back(be1);
-                            return_balls_and_timing.push_back(be2);
-                        }
-                        else {
-                            GS_LOG_MSG(error, "GetPulseIntervalsAndRatios failed - Input balls < 3 and not 2 (?.");
-                            return false;
-                        }
-                }
-            }
-
-            // Sort the ball and timing vector by ball.x position, left to right
-            std::sort(return_balls_and_timing.begin(), return_balls_and_timing.end(), [](const GsBallAndTimingElement& a, const GsBallAndTimingElement& b)
-                { return (a.ball.x() < b.ball.x()); });
-
-            return true;
-        }
-
-
-
-
-
-        bool GolfSimCamera::GetPulseIntervalsAndRatiosFromIntervalVector(   const std::vector<bool>& intervals_to_collapse_vector,
-                                                                            const std::vector<float>& initial_pulse_intervals_ms,
-                                                                            std::vector<float>& pulse_intervals,
-                                                                            std::vector<double>& pulse_ratios) {
-
-            std::vector<float> current_pulse_intervals_ms = PulseStrobe::GetPulseIntervals();
-
-            int number_collapsed_intervals_so_far = 0;
-
-            // Build the pulse interval list to match the (typically shorter) vector
-            // We collapse from the left-most of two pairs of intervals, so we do not
-            // have to deal with the very last bit of the vector
-            for (int v = 0; v < (int)intervals_to_collapse_vector.size() - 1; v++) {
-
-                if (intervals_to_collapse_vector[v]) {
-                    // Ignore the current pulse_ratios for right now as we are building the complete pulse_interval set
-                    // At the end of this loop, ths pulse_ratios should hold the final ratio set corresponding to the
-                    // current_pulse_intervals_ms
-
-                    bool result = GetPulseIntervalsAndRatios(current_pulse_intervals_ms, pulse_intervals, pulse_ratios, 1, v - number_collapsed_intervals_so_far);
-
-                    number_collapsed_intervals_so_far++;
-                    // We are going to continue to work on the result vector, and potentially collapse 
-                    // more intervals
-                    current_pulse_intervals_ms = pulse_intervals;
-                }
-            }
-
-            return true;
-        }
-
-        bool GolfSimCamera::GetPulseIntervalsAndRatios(const std::vector<float>& initial_pulse_intervals_ms,
-                                                       std::vector<float>& pulse_pause_intervals,
-                                                       std::vector<double>& pulse_pause_ratios,                                                       
-                                                       const int number_pulses_to_collapse,
-                                                       const int collapse_offset ) {
-
-            GS_LOG_TRACE_MSG(trace, "GolfSimCamera::GetPulseIntervalsAndRatios: number_pulses_to_collapse: " + std::to_string(number_pulses_to_collapse) + 
-                                                    ", collapse_offset: " + std::to_string(collapse_offset));
-
-            if (initial_pulse_intervals_ms.size() < 3) {
-                GS_LOG_MSG(error, "Strobe pulse sequence is too short to compute ratios.");
-
-                return false;
-            }
-
-            std::vector<float> working_pulse_intervals = initial_pulse_intervals_ms;
-
-            // "Collapsing" a pulse ratio means taking two pulses and treating them as one.  Which is 
-            // how the rest of the code would see the world if two strobed ball images could not be
-            // separately resolved.  In that scenario, it's as if a ball was lost, so the way to correct
-            // for it is to treat things as if that strobe pulse never happened, and that the prior strobe
-            // consumed the time of the lost pulse as well as the prior pulse.
-
-            if (collapse_offset >= 0 && number_pulses_to_collapse > 0) {
-
-                if (collapse_offset > (int)working_pulse_intervals.size() - 1 - number_pulses_to_collapse) {
-                    GS_LOG_MSG(error, "GolfSimCamera::GetPulseRatios - collapse_offset of " + std::to_string(collapse_offset) + " was too large.");
-                    return false;
-                }
-
-                // Collapse
-                for (int i = 0; i < number_pulses_to_collapse; i++) {
-                    // After each erase(), the vector shrinks, so we must recheck bounds
-                    if (collapse_offset + 1 >= (int)working_pulse_intervals.size()) {
-                        GS_LOG_MSG(warning, "GetPulseIntervalsAndRatios: Cannot collapse more intervals - " +
-                                 std::to_string(i) + " of " + std::to_string(number_pulses_to_collapse) +
-                                 " completed, vector size now " + std::to_string(working_pulse_intervals.size()));
-                        break;
-                    }
-
-                    working_pulse_intervals[collapse_offset] += working_pulse_intervals[collapse_offset + 1];
-
-                    // The erase() will both remove the collapsed element and also move the remaining element(s)
-                    // over to the left by one to fill in the gap.
-                    working_pulse_intervals.erase(working_pulse_intervals.begin() + collapse_offset + 1);
-                }
-            }
-
-            // Collapsed pulse vector logging removed - was too verbose even for trace level
-
-            pulse_pause_intervals = working_pulse_intervals;
-
-
-            // Now, calculate the resulting ratios
-            //
-            // The "- 2" deals with having a 0 at the end of the sequence.
-            pulse_pause_ratios.clear();
-
-            for (size_t i = 0; i < pulse_pause_intervals.size() - 1; i++) {
-
-                double ratio = ((double)(pulse_pause_intervals[i + 1])) /
-                    ((double)(pulse_pause_intervals[i]));
-
-                pulse_pause_ratios.push_back(ratio);
-            }
-
-            return true;
-        }
-
-
         // Returns all of the result information in the result ball
         // TBD - How about we use a result instead of a ball for this purpose??
         bool GolfSimCamera::ProcessReceivedCam2Image(const cv::Mat& ball1_mat,
@@ -4310,6 +3715,647 @@ namespace golf_sim {
             return true;
         }
 
+
+
+
+        // TBD - Considering putting the following code in a separate pulsed - image analysis class ?
+
+        void GolfSimCamera::PrintPulseVector(const std::vector<bool>& missing_balls_vector) {
+            std::string v;
+
+            for (int i = 0; i < (int)missing_balls_vector.size(); ++i) {
+                v += (missing_balls_vector[i] ? "1" : "0");
+            }
+
+            GS_LOG_TRACE_MSG(trace, "Combinations_vector: " + v);
+        }
+
+
+        std::vector<float> GolfSimCamera::GetPulseIntervalsNoTrailingZero() {
+            std::vector<float> pulse_intervals_from_strobe = PulseStrobe::GetPulseIntervals();
+
+            // The last pulse interval value is a 0 which is an artifact of the strobing system needing that last 0.
+            // To simplify things here, we're going to just get rid of that last strobe.
+            pulse_intervals_from_strobe.pop_back();
+
+            return pulse_intervals_from_strobe;
+        }
+
+
+        // Count the number of bits that are true
+        int GolfSimCamera::CountSetBits(int n) {
+            int count = 0;
+            while (n > 0) {
+                n &= (n - 1); // Brian Kernighan's algorithm
+                count++;
+            }
+            return count;
+        }
+
+
+
+        /*
+
+         Determine the ratios of the exposure distances and compare to the
+         ratios of the strobe pulse intervals to find a correlation.
+
+         The best correlation will determine the most likely correspondence between
+         the strobe intervals and the ball intervals in the image.
+
+         The resulting output parameter, time_between_ball_images_ms, is the time between
+         the most-centered ball and the second most-centered ball, which are the the most
+         likely balls to be accurate and non-overlapped, and is also usually the
+         most relevant for spin analysis.
+
+         The return_balls_and_timing contain a vector of balls and their corresponding timing
+         intervals that are associated with the strobe intervals The timing intervals in this vector
+         are the time intervals before each ball image, which means they correspond to the
+         strobe interval that occurred before that ball image.
+
+         See U.S. Patent No. US 1,2401,909 for additional information.
+
+        */
+        bool GolfSimCamera::DetermineStrobeIntervals(std::vector<GolfBall>& input_balls,
+            int most_centered_ball_index,
+            int second_ball_index,
+            long& time_between_ball_images_uS,
+            GsBallsAndTimingVector& return_balls_and_timing) {
+
+            GS_LOG_TRACE_MSG(trace, "GolfSimCamera::DetermineStrobeInterval");
+            LoggingTools::Trace("   Return_balls: ", input_balls);
+
+            // These are the distances (in pixels) and ratios for the strobed ball images
+            std::vector<double> distances;
+            std::vector<double> distance_ratios;
+
+            // Distance ratios will be adjusted to account for ball slow down in this call,
+            // but (TBD), the slow down is so small that we may just want to ignore it
+            if (!GetBallDistancesAndRatios(input_balls, distances, distance_ratios)) {
+                LoggingTools::Warning("GetBallDistancesAndRatios failed.");
+                return false;
+            }
+
+            if (distances.empty()) {
+                LoggingTools::Warning("GetBallDistancesAndRatios returned no data.  Has the strobe vector been established?");
+                return false;
+            }
+
+            LoggingTools::Trace("Return_balls distances: ", distances);
+            LoggingTools::Trace("--------------------Return_balls distance ratios (adjusted for slow-down): ", distance_ratios);
+
+            // We will get the full set of pulse ratios to see if we ended up with fewer strobed images 
+            // than pulses. 
+            // We  need the original, actual intervals to compare to the distances figure out how many we want to collapse
+            // further down in this function.
+            std::vector<double>test_pulse_ratios;
+            std::vector<float>test_pulse_intervals;
+
+            std::vector<float> pulse_intervals_from_strobe = GetPulseIntervalsNoTrailingZero();
+
+            GS_LOG_TRACE_MSG(trace, "About to call GetPulseIntervalsAndRatios with " + std::to_string(pulse_intervals_from_strobe.size()) + " pulse intervals");
+
+            bool result = GetPulseIntervalsAndRatiosUsingMissingBallsVector(std::vector<bool>(), pulse_intervals_from_strobe, test_pulse_intervals, test_pulse_ratios);
+
+            GS_LOG_TRACE_MSG(trace, "GetPulseIntervalsAndRatios returned: " + std::to_string(result));
+            LoggingTools::Trace("The full set of pulse_interval ratios (if all ball images were present) is: ", test_pulse_ratios);
+
+            // Look at each pulse interval ratio that we have and see which is closest to the ratio(s) that 
+            // exist for distance deltas.
+            // NOTE - Assumes near-constant ball speed such that the ratios of strobe intervals is directly
+            // proportional to the distances covered during those intervals.
+
+            // Provide some sensible default for the interval time.  Will calculate in code below.
+            time_between_ball_images_uS = 0;
+
+
+            // Ensure we have at least one distance ratio, which means at least 2 distances and 3 balls
+            // If not, fall back to a simpler estimate
+            if (distance_ratios.size() > 0) {
+
+                // Each interval ratio we have will involve three balls (left/right/middle), and should be 
+                // roughly equal to the ratio of the distance between the middle and next ball divided 
+                // by the distance between the ball before the middle and the middle
+
+                // Compute the correlation (closeness) of the ball distance ratio pattern to the pulse ratio
+                // pattern.  The distance ratios will always be <= the number of pulse intervals, due to the
+                // possibility of losing some highly-overlapped images early in the pattern.
+
+                // There shouldn't be too many missed pulses, but they could occur anywhere, so make sure
+                // that we consider possible collapsed pulses all the way to the end
+
+                std::vector<float>best_pulse_intervals;
+                double best_ratio_distance = 999999.;
+                int best_final_offset_of_distance_ratios = -1;
+                int best_pulses_to_collapse = -1;
+                int best_collapse_offset = -1;
+
+                // We effectively generate all combinations of ways of fitting the <x> 'missing' balls into the <y> possible
+                // positions that exist in the pulse vector.  We had originally been assuming there would just be one 
+                // contiguous group of missing balls, but that turned out not to be true.  So, now go through all combinations
+                // Balls images can go missing anywhere in the pattern for all sorts of reasons.
+
+                int number_ball_exposures = (int)input_balls.size();
+
+                // Add 1 to account for the initial strobe (before the first strobe interval) that is not included in the pulse intervals vector
+                int number_of_strobes = (int)test_pulse_intervals.size() + 1;
+
+                if (number_ball_exposures > number_of_strobes) {
+                    LoggingTools::Warning("GetBallDistancesAndRatios had more exposures than strobes.  It is possible the image being analyzed was generated with a different strobing configuration.");
+                    return false;
+                }
+
+                // We will create a binary bit-vector where a "1" in a position represents a 
+                // pulsed image (and a corresponding pulse) that we are going to pretend is not there.
+                // This vector will then be used to create a set of hypothetical sets of pulses (defined
+                // by pulse intervals) that might have resulted in the same set of images that we
+                // were able to identify as balls in the overall strobed image.  
+                // One of these bit vectors will hopefully match up well with the distance ratios that 
+                // we see in the image, which will then allow us to determine which pulses correspond 
+                // to which intervals between the balls in the image.
+
+                // Each of the resulting candidate vectors will contain zero or more 'true' bits where we will assume we missed
+                // the strobed image at that same (0-based) index of that true bit.  So, 0000011 indicates a scenario in which
+                // the last two pulses were missing from the photo (perhaps because they went off the view port and so
+                // could not be captured by the camera, or maybe the ball-ID just failed for some reason).
+
+                // Note - there might be 0 missing exposures, in which case, we won't have to do any
+                // interval collapsing, and only one pattern will correspond
+                // The one pattern will be 00....00 (as many zeros as there are strobes) which means 
+                // that we assume all strobed images were captured in the photo and so we don't collapse any intervals.
+
+                int number_of_missing_exposures = number_of_strobes - number_ball_exposures;
+
+                // Start with an all-false vector template into which we will
+                // subsequently set patterns of on-bits that match the number of 
+                // strobes that may be missing missing
+
+                std::vector<bool> missing_balls_vector(number_of_strobes, false);
+                std::vector<std::vector<bool>> candidate_intervals_to_collapse_patterns_vector;
+
+                // Because we're unlikely to have more than 8 or so possible strobes, we will just use a 
+                // brute-force method to figure out all combinations of exposures in the strobe vector.  
+                // This code iterates though all possible numbers of an n-bit number and whenever the number
+                // has the correct number of on-bits (representing strobed ball images that are missing), 
+                // we use that pattern as a possible candidate for how the exposures correllate to the strobes.
+
+                // Note that in many cases, the right-most <n> balls will be missing from the image because
+                // the ball was too fast and went out of view before those strobes were flashed.
+                // This situation is covered by the case in which the last <n-1> intervals are missing. 
+
+                for (int i = 0; i < (1 << number_of_strobes) - 1; ++i) {
+
+                    if (CountSetBits(i) == number_of_missing_exposures) {
+
+                        // This combination of bits has the right number of on-bits, s
+                        // so we will use it as a candidate pattern of missing exposures
+                        SetPulseVector(i, missing_balls_vector);
+
+                        candidate_intervals_to_collapse_patterns_vector.push_back(missing_balls_vector);
+                        // For debugging, but too detailed to keep in production system - PrintPulseVector(missing_balls_vector);
+                    }
+                }
+
+                int best_intervals_pattern_index = -1;
+
+                for (int i = 0; i < (int)candidate_intervals_to_collapse_patterns_vector.size(); i++) {
+
+                    std::vector<bool> missing_ball_image_vector = candidate_intervals_to_collapse_patterns_vector[i];
+
+                    PrintPulseVector(missing_ball_image_vector);
+
+                    // Just a breakpoint trigger for debugging.  Keep this in the code for now
+                    /*
+                    if (missing_ball_image_vector[0] == true &&
+                        missing_ball_image_vector[1] == true &&
+                        missing_ball_image_vector[2] == false &&
+                        missing_ball_image_vector[3] == false &&
+                        missing_ball_image_vector[4] == false &&
+                        missing_ball_image_vector[5] == false &&
+                        missing_ball_image_vector[6] == false &&
+                        missing_ball_image_vector[7] == false) {
+                        GS_LOG_TRACE_MSG(trace, "----------> - Reached the vector of interest.");
+                    }
+                    */
+
+                    // Formulate a new set of pulses intervals that correspond to the current bit vector pattern
+                    // with the pulses corresponding to the 'missing' exposures collapsed/removed.
+
+                    // These next two vectors will hold the hypothetical results of any collapsing of the pulse vector
+                    std::vector<double>pulse_ratios;
+                    std::vector<float>pulse_intervals;
+
+                    std::vector<float> current_pulse_intervals_ms = GetPulseIntervalsNoTrailingZero();
+
+                    if (!GetPulseIntervalsAndRatiosUsingMissingBallsVector(missing_ball_image_vector, current_pulse_intervals_ms, pulse_intervals, pulse_ratios)) {
+                        GS_LOG_TRACE_MSG(error, "Failed to GetPulseIntervalsAndRatiosUsingMissingBallsVector");
+                        return false;
+                    }
+
+                    // Too chatty - turn off - TBD
+                    /*
+                    LoggingTools::Trace("The (potentially collapsed) pulse_intervals were (ignore last '0' interval): ", pulse_intervals);
+                    LoggingTools::Trace("The (potentially collapsed) pulse_ratios were : ", pulse_ratios);
+                    */
+
+                    double delta_to_closest_ratio;
+
+                    // If our set of strobes includes less than the total number strobed balls that we know should have existed, then 
+                    // we need to figure out where this set of <n> strobed images and intervals best fits within the <total> set of pulse intervals.  
+                    // This is because we don't necessarily know which images were the ones that were missed, so we need to try all 
+                    // combinations of missing images and see which one best fits the pattern of distances between the balls that we did find.
+
+                    int best_local_offset_of_distance_ratios = FindClosestRatioPatternMatchOffset(distance_ratios, pulse_ratios, delta_to_closest_ratio, true /* Try any offset */);
+
+                    // If this is the closest match seen so far, save the information
+                    if (best_local_offset_of_distance_ratios >= 0 && delta_to_closest_ratio <= best_ratio_distance) {
+
+                        best_ratio_distance = delta_to_closest_ratio;
+                        best_final_offset_of_distance_ratios = best_local_offset_of_distance_ratios;
+                        best_intervals_pattern_index = i;
+
+                        GS_LOG_TRACE_MSG(trace, "------------> Found best (so far) pulse ratio pattern match.  best_ratio_distance= " + std::to_string(best_ratio_distance)
+                            + " best_final_offset_of_distance_ratios= " + std::to_string(best_ratio_distance)
+                            + " best_intervals_pattern_index= " + std::to_string(best_intervals_pattern_index) + ".  Vector was : ");
+                        PrintPulseVector(candidate_intervals_to_collapse_patterns_vector[best_intervals_pattern_index]);
+                    }
+                }
+
+                // In the unlikely event we didn't find ANY best interval, just default it to the first interval (index 0)
+                best_intervals_pattern_index = std::max(0, best_intervals_pattern_index);
+
+                GS_LOG_TRACE_MSG(trace, "------------> Best-fitting pulse vector was number: " + std::to_string(best_intervals_pattern_index) + ".  With score of: " +
+                    std::to_string(best_ratio_distance) + ".  Vector was : ");
+                PrintPulseVector(candidate_intervals_to_collapse_patterns_vector[best_intervals_pattern_index]);
+
+
+                // If we found a best correllation, re-create the corresponding set of ratios and intervals
+                std::vector<double>pulse_ratios;
+                std::vector<float>pulse_intervals;
+
+                // We will retrieve the actual pulse interval (in uS) from the list of such intervals.
+                // Just need to figure out WHICH interval corresponds to the two balls of interest.
+                if (!GetPulseIntervalsAndRatiosUsingMissingBallsVector(candidate_intervals_to_collapse_patterns_vector[best_intervals_pattern_index],
+                    PulseStrobe::GetPulseIntervals(),
+                    pulse_intervals,
+                    pulse_ratios)) {
+                    GS_LOG_TRACE_MSG(error, "Failed to GetPulseIntervalsAndRatiosUsingMissingBallsVector");
+                    return false;
+                }
+
+
+                LoggingTools::Trace("The best set of pulse_intervals was (ignore last '0' interval): ", pulse_intervals);
+
+                // Almost done now.  Transfer the pulse intervals to the array of balls and associated timing
+                // The first ball doesn't get a prior interval
+                // Input_balls area assumed to be sorted based on the handedness of the shot,
+                // so, right-to-left by X position for left-handed shots
+
+                for (size_t i = 0; i < input_balls.size(); i++) {
+
+                    GolfBall& b = input_balls[i];
+                    GsBallAndTimingElement be;
+                    be.ball = b;
+
+                    if (i > 0) {
+                        size_t interval_index = best_final_offset_of_distance_ratios + i - 1;
+                        if (interval_index < pulse_intervals.size()) {
+                            be.time_interval_before_ball_us = 1000 * pulse_intervals[interval_index];
+                        }
+                        else {
+                            GS_LOG_MSG(warning, "Pulse interval index " + std::to_string(interval_index) +
+                                " out of bounds (size: " + std::to_string(pulse_intervals.size()) + ")");
+                            be.time_interval_before_ball_us = 0;
+                        }
+                    }
+
+                    return_balls_and_timing.push_back(be);
+                }
+
+                // Sort the ball and timing vector by ball.x position, left to right
+                // Note that we do this same sort for both left and right-handed shots
+
+                std::sort(return_balls_and_timing.begin(), return_balls_and_timing.end(), [](const GsBallAndTimingElement& a, const GsBallAndTimingElement& b)
+                    { return (a.ball.x() < b.ball.x()); });
+
+
+                if (second_ball_index > most_centered_ball_index) {
+                    // The correct interval is the right one, as ball2 is to the right
+                    // of the middle ball.  Because of the sort we just did, this will also
+                    // be correct for left-handed playing, where the balls have been sorted the same way
+                    size_t interval_index = most_centered_ball_index + best_final_offset_of_distance_ratios;
+                    if (interval_index < pulse_intervals.size()) {
+                        time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[interval_index]);
+                    }
+                    else {
+                        GS_LOG_MSG(warning, "Time interval index " + std::to_string(interval_index) +
+                            " out of bounds (size: " + std::to_string(pulse_intervals.size()) + ")");
+                        time_between_ball_images_uS = 0;
+                    }
+                }
+                else {
+                    // Ball2 is to the left of the middle ball.
+                    size_t interval_index = most_centered_ball_index + best_final_offset_of_distance_ratios - 1;
+                    if (interval_index < pulse_intervals.size()) {
+                        time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[interval_index]);
+                    }
+                    else {
+                        GS_LOG_MSG(warning, "Time interval index " + std::to_string(interval_index) +
+                            " out of bounds (size: " + std::to_string(pulse_intervals.size()) + ")");
+                        time_between_ball_images_uS = 0;
+                    }
+                }
+
+            }
+            else {
+                // We only found two balls, which means we only have one distance and no distance ratios, 
+                // so we can't do any fancy pattern matching.
+
+                // In this case, we will just make a guess based on whether we think the two balls we 
+                // found are the FIRST two exposures (which would be more likely for a fast driver shot 
+                // where the ball is moving quickly and so we only got a couple of exposures before it 
+                // went out of the FoV) or if they are the LAST two exposures (which would be more likely
+                // for a putter  shot where the ball is moving slowly and so we only got a couple of exposures 
+                // by the time the ball made it into the FoV).
+
+                if (GolfSimClubs::GetCurrentClubType() == GolfSimClubs::kPutter) {
+
+                    GS_LOG_MSG(warning, "DetermineStrobeInterval received only two recognized balls - will make a guess that this was the last two exposures.");
+
+                    std::vector<double>pulse_ratios;
+                    std::vector<float>pulse_intervals;
+
+                    // We will retrieve the actual pulse interval (in uS) from the list of such intervals.
+                    // Just need to figure out WHICH interval coresponds to the two balls of interest.
+                    if (!GetPulseIntervalsAndRatiosUsingMissingBallsVector(std::vector<bool>(), GetPulseIntervalsNoTrailingZero(), pulse_intervals, pulse_ratios)) {
+                        GS_LOG_MSG(error, "GetPulseIntervalsAndRatiosUsingMissingBallsVector failed.");
+                        return false;
+                    }
+
+                    if (input_balls.size() == 2) {
+                        // We didn't see ANYTHING except two balls
+                        int last_ball_index = (int)input_balls.size() - 1;
+                        time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[pulse_intervals.size() - 2]);
+
+                        GsBallAndTimingElement be1;
+                        be1.ball = input_balls[last_ball_index - 1];
+                        GsBallAndTimingElement be2;
+                        be2.ball = input_balls[last_ball_index];
+                        be2.time_interval_before_ball_us = time_between_ball_images_uS;
+
+                        return_balls_and_timing.push_back(be1);
+                        return_balls_and_timing.push_back(be2);
+                    }
+                    else {
+                        GS_LOG_MSG(error, "GetPulseIntervalsAndRatiosUsingMissingBallsVector failed - Input balls < 3 and not 2 (?.");
+                        return false;
+                    }
+                }
+                else {
+                    GS_LOG_MSG(warning, "DetermineStrobeInterval received only two recognized balls - will make a guess that this was the first two exposures.");
+
+                    // We only have two valid ball images
+                    // Special cases where we only have 2 balls initially, or if we ultimately only end up with two.  
+                    // Having only two balls might occur when the ball was hit really fast, and we only got
+                    // two strobes before the ball went out of the FoV.  In this case, we (MAYBE) can assume that the first interval 
+                    // must be the first strobe delay.
+                    //    We could do:   time_between_ball_images_uS = pulse_intervals[0];
+                    // OR...
+                    // Maybe we trust that we actually managed to identify EACH of the strobes (even though we threw some out earlier)
+                    // In that case, just count the number of images up to the two balls of interest and pick that pulse length:
+
+                    // Keep track of how many balls we got considered heavily overlapped
+
+                    std::vector<double>pulse_ratios;
+                    std::vector<float>pulse_intervals;
+
+                    // We will retrieve the actual pulse interval (in uS) from the list of such intervals.
+                    // Just need to figure out WHICH interval corresponds to the two balls of interest.
+                    if (!GetPulseIntervalsAndRatiosUsingMissingBallsVector(std::vector<bool>(), GetPulseIntervalsNoTrailingZero(), pulse_intervals, pulse_ratios)) {
+                        GS_LOG_MSG(error, "GetPulseIntervalsAndRatios failed.");
+                        return false;
+                    }
+
+                    if (input_balls.size() == 2) {
+                        // We didn't see ANYTHING except two balls
+                        time_between_ball_images_uS = (long)std::round(1000 * pulse_intervals[0]);
+
+                        GsBallAndTimingElement be1;
+                        be1.ball = input_balls[0];
+                        GsBallAndTimingElement be2;
+                        be2.ball = input_balls[1];
+                        be2.time_interval_before_ball_us = time_between_ball_images_uS;
+
+                        return_balls_and_timing.push_back(be1);
+                        return_balls_and_timing.push_back(be2);
+                    }
+                    else {
+                        GS_LOG_MSG(error, "GetPulseIntervalsAndRatiosUsingMissingBallsVector failed - Input balls < 3 and not 2 (?.");
+                        return false;
+                    }
+                }
+            }
+
+            // Sort the ball and timing vector by ball.x position, left to right
+            std::sort(return_balls_and_timing.begin(), return_balls_and_timing.end(), [](const GsBallAndTimingElement& a, const GsBallAndTimingElement& b)
+                { return (a.ball.x() < b.ball.x()); });
+
+            return true;
+        }
+
+
+        // Build a set of pulse intervals and ratios that correspond to a hypothetical pattern of missing ball images. 
+
+        bool GolfSimCamera::GetPulseIntervalsAndRatiosUsingMissingBallsVector(const std::vector<bool>& missing_ball_image_vector,
+            const std::vector<float>& initial_pulse_intervals_ms,
+            std::vector<float>& output_pulse_intervals,
+            std::vector<double>& output_pulse_ratios) {
+
+            // Note the distinction between the balls (which include a first ball from a first strobe pulse)
+            // and the pulse intervals, which are the intervals between the pulses.  So, if we have 3 balls, we will have 2 pulse intervals.
+            // Note also that the ball-pulse-vector is basically a set of intervals that define the length of time between each strobe pulse.
+
+            // All indices are 0-based
+
+            // "Collapsing" a pulse ratio or intervals means taking two pulses and treating them as one.  Which is 
+            // how the rest of the code would see the world if two strobed ball images could not be
+            // separately resolved.  In that scenario, it's as if a ball was lost, so the way to correct
+            // for it is to treat things as if that strobe pulse never happened, and that the prior strobe
+            // consumed the time of the lost pulse as well as the prior pulse.
+
+            output_pulse_intervals = GetPulseIntervalsNoTrailingZero();
+
+            int initial_pulse_vector_length = (int)missing_ball_image_vector.size();
+
+            // Build the pulse interval list to match the (typically shorter) collapsed vector
+            // 
+            // We collapse from right-to-left so that we don't have to take into account the
+            // previously-erased pulses as much.
+            for (int v = initial_pulse_vector_length - 1; v >= 0; v--) {
+
+                if (missing_ball_image_vector[v]) {
+                    // We are removing a ball from this hypothetical pattern
+
+                    if (v == 0) {
+                        // If we are losing the FIRST ball, then lose the first interval entirely and perforn no collapsing, because there is no prior interval to collapse into.
+                        output_pulse_intervals.erase(output_pulse_intervals.begin());
+                        continue;
+                    }
+                    else if (v == (int)output_pulse_intervals.size()) {
+                        // If the pulse we are removing is the LAST one, then we just remove it and we don't have to do any collapsing
+                        output_pulse_intervals.pop_back();
+                        continue;
+                    }
+                    else {
+                        // Otherwise, for the [nth] ball, we will remove the [nth - 1] interval and add that interval's time 
+                        // to the new [nth - 1] interval
+                        float prior_interval = output_pulse_intervals[v - 1];
+
+                        output_pulse_intervals.erase(output_pulse_intervals.begin() + (v - 1));
+
+                        // We erased the original [v-th] element, so no need to move one back
+                        output_pulse_intervals[v - 1] += prior_interval;
+                    }
+                }
+            }
+
+            // Now that we have the final set of pulse intervals, we can calculate the ratios for that final set of intervals.  
+            // We will later use those ratios to compare to the distance ratios to find the best match.
+
+            ComputePulseIntervalRatiosFromIntervals(output_pulse_intervals, output_pulse_ratios);
+
+            return true;
+        }
+
+        void GolfSimCamera::ComputePulseIntervalRatiosFromIntervals(const std::vector<float>& input_pulse_intervals,
+            std::vector<double>& output_pulse_ratios) {
+            output_pulse_ratios.clear();
+
+            for (size_t i = 0; i <= input_pulse_intervals.size() - 2; i++) {
+
+                double ratio = ((double)(input_pulse_intervals[i + 1])) /
+                    ((double)(input_pulse_intervals[i]));
+
+                output_pulse_ratios.push_back(ratio);
+            }
+        }
+
+        int GolfSimCamera::FindClosestRatioPatternMatchOffset(const std::vector<double> distance_ratios,
+            const std::vector<double> pulse_ratios,
+            double& delta_to_closest_ratio,
+            bool try_different_offsets) {
+
+            // The current offset within the pulse interval ratios at which the pattern
+            // of distance ratios is most closely correlated.
+            delta_to_closest_ratio = 99999.0;
+
+            // Default offset is zero, such that if the two patterns to compare are the same size,
+            // then there can be only a 0 offset.
+            int closest_timing_interval_offset = 0;
+
+            if (pulse_ratios.size() < distance_ratios.size()) {
+                return -1;
+            }
+
+            for (int distance_pattern_offset = 0; distance_pattern_offset <= (int)(pulse_ratios.size() - distance_ratios.size()); distance_pattern_offset++) {
+
+                double difference_in_ratios = ComputeRatioDistance(distance_ratios, pulse_ratios, distance_pattern_offset);
+
+                GS_LOG_TRACE_MSG(trace, "difference_in_ratios for offset " + std::to_string(distance_pattern_offset) + " is: " + std::to_string(difference_in_ratios));
+
+                // If the current offset of the distance ratios within the pulse ratio pattern
+                // results in the lowest error (distance), then assume it's the best for now.
+                if (difference_in_ratios < delta_to_closest_ratio) {
+
+                    // This is the smallest difference we've seen so far, so keep it!
+                    // Also, figure out if the interval is to the left or to the right of the 
+                    // middle ball (depending on which ball we chose as ball 2).
+                    delta_to_closest_ratio = difference_in_ratios;
+                    closest_timing_interval_offset = distance_pattern_offset;
+
+                }
+
+                // If we are, for example, enumerating all possible strobe vector patterns,
+                // we will only be interested in a match without any offset.
+                if (!try_different_offsets) {
+                    break;
+                }
+            }
+
+            return closest_timing_interval_offset;
+        }
+
+
+        // Returns a score of the closeness of the vector of distance_ratios within the pulse_ratios at an offset
+        // of the distance_ratios from the beginning of the pulse_ratios
+        double GolfSimCamera::ComputeRatioDistance(const std::vector<double> distance_ratios,
+            const std::vector<double> pulse_ratios,
+            int& distance_pattern_offset) {
+
+            // TBD - Do some error checking on the inputs
+
+            double kMaxRatioDistance = 1000.0;
+
+            double difference_in_ratios = 0;
+
+            // Compute the differences between each distance ratio in the pattern of distances as compared
+            // to each possible offset of those ratios to the pulse interval ratios.
+            for (size_t distance_ratio_index = 0; distance_ratio_index < distance_ratios.size(); distance_ratio_index++) {
+
+                // If we got more ball distance ratios than we have collapsed (and thus down-sized) pulse
+                // ratios, then just stop and return a big error number to drop this comparison from the
+                // best-of list.
+
+                if ((distance_ratio_index + distance_pattern_offset) >= pulse_ratios.size()) {
+                    LoggingTools::Warning("GolfSimCamera::ComputeRatioDistance received a distance_ratio_index higher than the number of pulse ratios.");
+                    return kMaxRatioDistance;
+                }
+                // Compute the difference as a percent of the distance ratio so that each element
+                // of the pattern of ratios can contribute a meaningful amount of error/difference
+                // even if the distance is small.
+                double distance_ratio = distance_ratios[distance_ratio_index];
+                double pulse_ratio = pulse_ratios[distance_ratio_index + distance_pattern_offset];
+
+                // Get a difference that is >= 0 so that squaring it will not decrease the number
+                // double single_ratio_difference = 100. * std::abs(distance_ratio - pulse_ratio) / std::min(distance_ratio, pulse_ratio);
+                double single_ratio_difference = 100. * std::abs(distance_ratio - pulse_ratio);
+
+
+                // If we get a crazy number, cap it so that we don't go out of bounds of our variable
+                if (single_ratio_difference > kMaxRatioDistance) {
+                    GS_LOG_TRACE_MSG(trace, "single_ratio_difference > kMaxRatioDistance!");
+                    single_ratio_difference = kMaxRatioDistance;
+                }
+
+                // Square to highlight/emphasize larger errors
+                single_ratio_difference = pow(single_ratio_difference, 2);
+                // Removed excessive per-element logging
+
+                difference_in_ratios += single_ratio_difference;
+            }
+
+            return difference_in_ratios;
+        }
+
+        // Set the element of the vector to true when there is a 1 bit (a flag to remove the corresponding strobe pulse) in the vector
+        void GolfSimCamera::SetPulseVector(int bit_value, std::vector<bool>& missing_balls_vector) {
+
+            int vector_size = (int)missing_balls_vector.size();
+
+            if (vector_size > 512) {
+                GS_LOG_TRACE_MSG(error, "GolfSimCamera::SetPulseVector - vector was too long.");
+                return;
+            }
+
+            // Create a bitset value that we can more easily work with
+            std::bitset<512> bit_array(bit_value);
+
+            // The bitset is indexed (visually) right to left, but we will setup the 
+            // boolean vector to go from left to right
+            for (auto i = 0; i < vector_size; ++i) {
+                missing_balls_vector[vector_size - i - 1] = (bit_array[i] == 1);
+            }
+
+        }
 
 }
 
