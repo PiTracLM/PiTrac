@@ -5,6 +5,7 @@ Requires OpenCV >= 4.7.0 (objdetect-based aruco API).
 
 import cv2
 import logging
+import math
 import numpy as np
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -39,11 +40,12 @@ class CoverageTracker:
         self.cell_width = image_width / grid_cols
         self.cell_height = image_height / grid_rows
         self.coverage = [[0] * grid_cols for _ in range(grid_rows)]
+        self._frame_corners: List[np.ndarray] = []
 
     def update(self, corners: np.ndarray) -> None:
-        """Update coverage grid based on the center of detected corners."""
         if corners is None or len(corners) == 0:
             return
+        self._frame_corners.append(corners)
         x_coords = corners[:, 0, 0]
         y_coords = corners[:, 0, 1]
         cx = (x_coords.min() + x_coords.max()) / 2
@@ -53,9 +55,36 @@ class CoverageTracker:
         self.coverage[row][col] += 1
 
     def get_coverage_fraction(self) -> float:
-        """Return fraction of grid cells with at least one image."""
         covered = sum(1 for row in self.coverage for cell in row if cell > 0)
         return covered / (self.grid_rows * self.grid_cols)
+
+    def estimate_coverage_quality(
+        self, active_indices: Optional[List[int]] = None,
+        exclude_index: int = -1
+    ) -> float:
+        """Coverage uniformity over a 10x10 grid.
+
+        Returns mean / (stddev + eps) of per-cell point counts.
+        Higher values indicate more uniform spatial distribution.
+        """
+        grid_size = 10
+        x_step = self.image_width / grid_size
+        y_step = self.image_height / grid_size
+        cells = np.zeros((grid_size, grid_size), dtype=np.float64)
+
+        indices = active_indices if active_indices is not None else range(len(self._frame_corners))
+        for i in indices:
+            if i == exclude_index or i >= len(self._frame_corners):
+                continue
+            for pt in self._frame_corners[i][:, 0, :]:
+                c = min(int(pt[0] / x_step), grid_size - 1)
+                r = min(int(pt[1] / y_step), grid_size - 1)
+                cells[r][c] += 1
+
+        flat = cells.flatten()
+        mean_val = flat.mean()
+        std_val = flat.std()
+        return mean_val / (std_val + 1e-7)
 
     def get_suggested_region(self) -> str:
         """Suggest which region needs more coverage."""
@@ -235,6 +264,165 @@ class CompatibleCharucoDetector:
         )
 
         return metrics
+
+    def compute_image_params(
+        self, charuco_corners: np.ndarray, image_size: Tuple[int, int]
+    ) -> Optional[List[float]]:
+        """4D diversity descriptor [X, Y, Size, Skew] normalized to [0, 1].
+
+        X and Y are board center positions with an inset so large boards
+        aren't penalized for limited position range. Size is the square
+        root of the area fraction. Skew is the tilt score.
+        """
+        if charuco_corners is None or len(charuco_corners) < 4:
+            return None
+
+        w, h = image_size
+        pts = charuco_corners[:, 0, :]
+        x_min, x_max = float(pts[:, 0].min()), float(pts[:, 0].max())
+        y_min, y_max = float(pts[:, 1].min()), float(pts[:, 1].max())
+        area = (x_max - x_min) * (y_max - y_min)
+        border = math.sqrt(area)
+
+        cx = (x_min + x_max) / 2
+        cy = (y_min + y_max) / 2
+        p_x = max(0.0, min(1.0, (cx - border / 2) / max(w - border, 1)))
+        p_y = max(0.0, min(1.0, (cy - border / 2) / max(h - border, 1)))
+        p_size = math.sqrt(area / (w * h))
+        p_skew = self.compute_tilt_score(charuco_corners)
+        return [p_x, p_y, p_size, p_skew]
+
+    @staticmethod
+    def is_good_sample(
+        params: List[float],
+        existing_params: List[List[float]],
+        min_distance: float = 0.2
+    ) -> bool:
+        """True if the sample is sufficiently different from all existing ones.
+
+        Uses L1 distance in the 4D parameter space with a threshold of 0.2.
+        """
+        if not existing_params:
+            return True
+        for p in existing_params:
+            if sum(abs(a - b) for a, b in zip(params, p)) <= min_distance:
+                return False
+        return True
+
+    def calibrate_with_filtering(
+        self,
+        all_charuco_corners: List[np.ndarray],
+        all_charuco_ids: List[np.ndarray],
+        image_size: Tuple[int, int],
+        coverage_tracker: Optional['CoverageTracker'] = None,
+        fix_k3: bool = False,
+    ) -> Tuple[float, np.ndarray, np.ndarray, List[int]]:
+        """Calibrate with bicriterial frame filtering.
+
+        Iteratively removes the worst frame using a combined loss:
+          loss(i) = alpha * error(i) + (1-alpha) * coverage_delta(i)
+        with alpha=0.1 (90% weight on coverage uniformity, 10% on error).
+        """
+        corners = list(all_charuco_corners)
+        ids = list(all_charuco_ids)
+        original_indices = list(range(len(corners)))
+        rejected_indices: List[int] = []
+
+        flags = 0
+        if fix_k3:
+            flags |= cv2.CALIB_FIX_K3
+
+        def _run_calibration(c_list, id_list):
+            obj_all, img_all = [], []
+            for c, d in zip(c_list, id_list):
+                obj_pts, img_pts = self.board.matchImagePoints(c, d)
+                if len(obj_pts) == 0:
+                    continue
+                obj_all.append(obj_pts)
+                img_all.append(img_pts)
+            return cv2.calibrateCamera(
+                obj_all, img_all, image_size, None, None, flags=flags)
+
+        rms, camera_matrix, dist_coeffs, rvecs, tvecs = _run_calibration(corners, ids)
+        logger.info(f"Initial calibration: RMS={rms:.4f}, images={len(corners)}")
+
+        # -- Bicriterial frame filtering --
+        filter_alpha = 0.1
+        max_rounds = len(corners) // 3
+
+        for round_num in range(max_rounds):
+            if len(corners) <= 8:
+                break
+
+            per_image_errors = []
+            for i in range(len(corners)):
+                obj_pts, img_pts = self.board.matchImagePoints(corners[i], ids[i])
+                if len(obj_pts) == 0:
+                    per_image_errors.append(0.0)
+                    continue
+                ok, rvec, tvec = cv2.solvePnP(
+                    obj_pts, img_pts, camera_matrix, dist_coeffs)
+                if not ok:
+                    per_image_errors.append(0.0)
+                    continue
+                projected, _ = cv2.projectPoints(
+                    obj_pts, rvec, tvec, camera_matrix, dist_coeffs)
+                per_image_errors.append(
+                    cv2.norm(img_pts, projected, cv2.NORM_L2) / len(projected))
+
+            max_err = max(per_image_errors) if per_image_errors else 1.0
+            if max_err == 0:
+                break
+            norm_errors = [e / max_err for e in per_image_errors]
+
+            if coverage_tracker:
+                baseline_q = coverage_tracker.estimate_coverage_quality(original_indices)
+            else:
+                baseline_q = 0.0
+
+            worst_score = -float('inf')
+            worst_idx = -1
+            for i in range(len(corners)):
+                if coverage_tracker:
+                    q_without = coverage_tracker.estimate_coverage_quality(
+                        original_indices, exclude_index=original_indices[i])
+                    cov_delta = q_without - baseline_q
+                else:
+                    cov_delta = 0.0
+                score = filter_alpha * norm_errors[i] + (1 - filter_alpha) * cov_delta
+                if score > worst_score:
+                    worst_score = score
+                    worst_idx = i
+
+            if worst_idx < 0:
+                break
+
+            test_corners = [c for j, c in enumerate(corners) if j != worst_idx]
+            test_ids = [d for j, d in enumerate(ids) if j != worst_idx]
+            try:
+                test_rms, test_mat, test_dist, test_rv, test_tv = \
+                    _run_calibration(test_corners, test_ids)
+            except Exception:
+                break
+
+            if test_rms >= rms:
+                break
+
+            logger.info(
+                f"Filter round {round_num + 1}: removing frame {original_indices[worst_idx]} "
+                f"(RMS {rms:.4f} -> {test_rms:.4f})")
+
+            rejected_indices.append(original_indices[worst_idx])
+            corners = test_corners
+            ids = test_ids
+            original_indices = [
+                idx for j, idx in enumerate(original_indices) if j != worst_idx]
+            rms, camera_matrix, dist_coeffs = test_rms, test_mat, test_dist
+            rvecs, tvecs = test_rv, test_tv
+
+        logger.info(
+            f"Final: RMS={rms:.4f}, images={len(corners)}, rejected={len(rejected_indices)}")
+        return rms, camera_matrix, dist_coeffs, rejected_indices
 
     def calibrate_with_outlier_rejection(
         self,
