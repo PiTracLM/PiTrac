@@ -125,6 +125,8 @@ class TestCoverageTracker:
         assert "grid" in d
         assert "fraction" in d
         assert "suggested_region" in d
+        assert "cell_target" in d
+        assert "pixel_coverage" in d
         assert len(d["grid"]) == 3
         assert len(d["grid"][0]) == 3
 
@@ -133,6 +135,38 @@ class TestCoverageTracker:
         corners = np.array([[[899, 899]]], dtype=np.float32)
         tracker.update(corners)
         assert tracker.coverage[2][2] == 1
+
+    def test_pixel_coverage_empty(self):
+        tracker = CoverageTracker(1000, 1000)
+        assert tracker.get_pixel_coverage_fraction() == 0.0
+
+    def test_pixel_coverage_single_corner(self):
+        tracker = CoverageTracker(1000, 1000)
+        tracker.update(np.array([[[55, 55]]], dtype=np.float32))
+        # 1 cell out of 100 in default 10x10 grid
+        assert tracker.get_pixel_coverage_fraction() == pytest.approx(0.01)
+
+    def test_pixel_coverage_spans_multiple_cells(self):
+        tracker = CoverageTracker(1000, 1000)
+        # Each corner lands in a different 10x10 cell at 100-px intervals
+        corners = np.array([[[c * 100 + 50, c * 100 + 50]] for c in range(10)],
+                           dtype=np.float32)
+        tracker.update(corners)
+        # Diagonal hits 10 distinct cells
+        assert tracker.get_pixel_coverage_fraction() == pytest.approx(0.10)
+
+    def test_pixel_coverage_custom_grid_size(self):
+        tracker = CoverageTracker(1000, 1000)
+        # Grid 2x2 has cells of 500x500. (100,100) is in (0,0); (700,100) is in (0,1).
+        tracker.update(np.array([[[100, 100]], [[700, 100]]], dtype=np.float32))
+        assert tracker.get_pixel_coverage_fraction(grid_size=2) == pytest.approx(0.50)
+
+    def test_pixel_coverage_aggregates_across_frames(self):
+        tracker = CoverageTracker(1000, 1000)
+        tracker.update(np.array([[[55, 55]]], dtype=np.float32))
+        tracker.update(np.array([[[955, 955]]], dtype=np.float32))
+        # Two distinct corners across two frames -> 2/100 cells
+        assert tracker.get_pixel_coverage_fraction() == pytest.approx(0.02)
 
 
 class TestCompatibleCharucoDetector:
@@ -282,3 +316,42 @@ class TestCalibrateWithOutlierRejection:
         rms, matrix, dist, rejected = detector.calibrate_with_outlier_rejection(
             corners, ids, image_size)
         assert len(rejected) == 0
+
+    def test_calibrate_with_filtering_returns_diagnostics(self, detector):
+        corners, ids, image_size = self._generate_views(detector, n=10)
+        rms, matrix, dist, rejected, diagnostics = detector.calibrate_with_filtering(
+            corners, ids, image_size)
+        assert rms > 0
+        assert matrix.shape == (3, 3)
+        assert dist.shape[1] == 5
+        assert isinstance(rejected, list)
+        for k in ("std_fx", "std_fy", "std_cx", "std_cy",
+                  "per_view_errors", "per_view_median", "per_view_max",
+                  "retained_original_indices"):
+            assert k in diagnostics, f"missing diagnostic key: {k}"
+        assert isinstance(diagnostics["per_view_errors"], list)
+        assert len(diagnostics["per_view_errors"]) == len(corners) - len(rejected)
+        assert diagnostics["per_view_max"] >= diagnostics["per_view_median"]
+
+    def test_calibrate_with_filtering_min_retained_floor(self, detector):
+        # With very few frames, filtering should refuse to drop below the floor.
+        corners, ids, image_size = self._generate_views(detector, n=8)
+        _, _, _, rejected, _ = detector.calibrate_with_filtering(
+            corners, ids, image_size)
+        assert len(corners) - len(rejected) >= min(15, len(corners))
+
+    def test_calibrate_with_filtering_runs_filter_loop(self, detector):
+        # n>15 lets the filter loop actually iterate (otherwise capped by floor).
+        from charuco_detector import CoverageTracker
+        corners, ids, image_size = self._generate_views(detector, n=20)
+        if len(corners) < 16:
+            pytest.skip("synthetic detector did not yield enough usable views")
+        coverage = CoverageTracker(image_size[0], image_size[1])
+        for c in corners:
+            coverage.update(c)
+        rms, K, dist, rejected, diagnostics = detector.calibrate_with_filtering(
+            corners, ids, image_size, coverage_tracker=coverage)
+        retained = len(corners) - len(rejected)
+        assert retained >= 15
+        assert diagnostics["std_fx"] > 0  # extended path produced parameter uncertainty
+        assert len(diagnostics["per_view_errors"]) == retained

@@ -985,3 +985,130 @@ class TestConfigurationHandling:
                 mock_config_manager.reload.assert_called_once()
 
             asyncio.run(run_test())
+
+
+class TestSaveDistortionResults:
+    """Tests for _save_distortion_results: shape assertions + atomic write."""
+
+    @pytest.fixture
+    def manager(self):
+        cfg = Mock()
+        cfg.get_cli_parameters = Mock(return_value=[])
+        cfg.register_callback = Mock()
+        cfg.set_calibration_batch = Mock(return_value=(True, "ok"))
+        return CalibrationManager(cfg)
+
+    def test_saves_via_atomic_batch(self, manager):
+        import numpy as np
+        K = np.array([[1833.0, 0.0, 728.0], [0.0, 1833.0, 544.0], [0.0, 0.0, 1.0]])
+        d = np.array([-0.51, 0.34, -0.002, 0.002, -0.13])
+        manager._save_distortion_results("camera1", K, d, rms_error=0.42)
+        manager.config_manager.set_calibration_batch.assert_called_once()
+        updates = manager.config_manager.set_calibration_batch.call_args[0][0]
+        assert "gs_config.cameras.kCamera1CalibrationMatrix" in updates
+        assert "gs_config.cameras.kCamera1DistortionVector" in updates
+        assert updates["gs_config.cameras.kCamera1DistortionVector"] == d.tolist()
+
+    def test_routes_to_correct_camera_keys(self, manager):
+        import numpy as np
+        K = np.eye(3)
+        d = np.zeros(5)
+        manager._save_distortion_results("camera2", K, d, rms_error=0.1)
+        updates = manager.config_manager.set_calibration_batch.call_args[0][0]
+        assert "gs_config.cameras.kCamera2CalibrationMatrix" in updates
+        assert "gs_config.cameras.kCamera2DistortionVector" in updates
+
+    def test_rejects_non_3x3_matrix(self, manager):
+        import numpy as np
+        bad_K = np.eye(4)  # 4x4 instead of 3x3
+        d = np.zeros(5)
+        with pytest.raises(RuntimeError, match="3.3"):
+            manager._save_distortion_results("camera1", bad_K, d, rms_error=0.1)
+        manager.config_manager.set_calibration_batch.assert_not_called()
+
+    def test_rejects_wrong_distortion_length(self, manager):
+        import numpy as np
+        K = np.eye(3)
+        bad_d = np.zeros(8)  # rational model would be 8 — would corrupt C++ consumer
+        with pytest.raises(RuntimeError, match="5"):
+            manager._save_distortion_results("camera1", K, bad_d, rms_error=0.1)
+        manager.config_manager.set_calibration_batch.assert_not_called()
+
+    def test_propagates_save_failure(self, manager):
+        import numpy as np
+        manager.config_manager.set_calibration_batch.return_value = (False, "disk full")
+        with pytest.raises(RuntimeError, match="disk full"):
+            manager._save_distortion_results("camera1", np.eye(3), np.zeros(5), 0.1)
+
+
+class TestSharedFrameAndCaptureBackend:
+    """Tests for the shared frame buffer + capture backend selector."""
+
+    @pytest.fixture
+    def manager(self):
+        cfg = Mock()
+        cfg.get_cli_parameters = Mock(return_value=[])
+        cfg.register_callback = Mock()
+        return CalibrationManager(cfg)
+
+    def test_shared_frame_set_get_clear(self, manager):
+        import numpy as np
+        frame = np.zeros((100, 100, 3), dtype=np.uint8)
+        manager.set_shared_frame(0, frame)
+        assert manager._shared_frames[0] is frame
+        manager.clear_shared_frame(0)
+        assert 0 not in manager._shared_frames
+
+    def test_clear_shared_frame_missing_is_safe(self, manager):
+        manager.clear_shared_frame(99)  # should not raise
+
+    def test_capture_backend_detected_at_init(self, manager):
+        assert manager._capture_backend in ("rpicam", "webcam")
+
+    def test_capture_image_uses_shared_frame_when_available(self, manager, tmp_path):
+        import numpy as np
+        frame = np.full((10, 10, 3), 128, dtype=np.uint8)
+        manager.set_shared_frame(0, frame)
+        out = tmp_path / "shot.png"
+
+        async def go():
+            return await manager._capture_image(0, out, gain=1.0)
+
+        result = asyncio.run(go())
+        assert result is not None
+        assert out.exists()  # cv2.imwrite was called via shared-frame path
+
+
+class TestStopDistortionCalibrationFlag:
+    """Stop signal for the distortion capture loop."""
+
+    @pytest.fixture
+    def manager(self):
+        cfg = Mock()
+        cfg.get_cli_parameters = Mock(return_value=[])
+        cfg.register_callback = Mock()
+        return CalibrationManager(cfg)
+
+    def test_stop_signals_distortion_camera(self, manager):
+        manager.calibration_status["camera1"]["status"] = "distortion_calibrating"
+
+        async def go():
+            return await manager.stop_calibration(camera="camera1")
+
+        result = asyncio.run(go())
+        assert manager.calibration_status["camera1"]["status"] == "stopping"
+        assert result["status"] == "stopping"
+        assert "camera1" in result["cameras"]
+
+    def test_stop_all_signals_both_distortion_cameras(self, manager):
+        manager.calibration_status["camera1"]["status"] = "distortion_calibrating"
+        manager.calibration_status["camera2"]["status"] = "distortion_calibrating"
+
+        async def go():
+            return await manager.stop_calibration()
+
+        result = asyncio.run(go())
+        assert manager.calibration_status["camera1"]["status"] == "stopping"
+        assert manager.calibration_status["camera2"]["status"] == "stopping"
+        assert result["status"] == "stopping"
+        assert set(result["cameras"]) == {"camera1", "camera2"}

@@ -347,7 +347,6 @@ class TestArrayHandling:
         assert not is_valid
         assert "array" in error.lower()
 
-        config_manager.load_configurations_metadata = original_load
 
     def test_validate_array_rejects_plain_string(self, config_manager):
         """Test that plain strings are rejected for array types"""
@@ -577,3 +576,75 @@ class TestArrayHandling:
         assert success, f"set_config failed: {message}"
 
         config_manager.load_configurations_metadata = original_load
+
+
+class TestSetCalibrationBatch:
+    """Atomic multi-key calibration writes used by distortion calibration save."""
+
+    @pytest.fixture
+    def temp_config_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    @pytest.fixture
+    def config_manager(self, temp_config_dir):
+        manager = ConfigManager()
+        manager.user_settings_path = temp_config_dir / "user_settings.json"
+        manager.calibration_data_path = temp_config_dir / "calibration_data.json"
+        manager.calibration_data = {}
+        manager.user_settings = {}
+        manager._rebuild_merged_config()
+        return manager
+
+    def test_empty_updates_returns_success(self, config_manager):
+        ok, msg = config_manager.set_calibration_batch({})
+        assert ok
+        assert "no updates" in msg.lower()
+
+    def test_writes_both_keys_atomically(self, config_manager):
+        matrix = [[1833.0, 0.0, 728.0], [0.0, 1833.0, 544.0], [0.0, 0.0, 1.0]]
+        dist = [-0.51, 0.34, -0.002, 0.002, -0.13]
+        ok, _ = config_manager.set_calibration_batch({
+            "gs_config.cameras.kCamera1CalibrationMatrix": matrix,
+            "gs_config.cameras.kCamera1DistortionVector": dist,
+        })
+        assert ok
+        cams = config_manager.calibration_data["gs_config"]["cameras"]
+        assert cams["kCamera1CalibrationMatrix"] == matrix
+        assert cams["kCamera1DistortionVector"] == dist
+
+    def test_persists_to_calibration_data_file(self, config_manager):
+        config_manager.set_calibration_batch({
+            "gs_config.cameras.kCamera1CalibrationMatrix": [[1.0]],
+        })
+        with open(config_manager.calibration_data_path) as f:
+            saved = json.load(f)
+        assert saved["gs_config"]["cameras"]["kCamera1CalibrationMatrix"] == [[1.0]]
+
+    def test_rejects_non_calibration_key(self, config_manager):
+        ok, msg = config_manager.set_calibration_batch({
+            "gs_config.cameras.kCamera1Gain": 2.5,
+        })
+        assert not ok
+        assert "not a calibration field" in msg
+
+    def test_rejects_mixed_when_any_non_calibration(self, config_manager):
+        ok, _ = config_manager.set_calibration_batch({
+            "gs_config.cameras.kCamera1CalibrationMatrix": [[1.0]],
+            "gs_config.cameras.kCamera1Gain": 2.5,
+        })
+        assert not ok
+        # Reject before writing — calibration_data must remain untouched.
+        assert config_manager.calibration_data == {}
+
+    def test_callbacks_fire_for_each_key(self, config_manager):
+        seen = []
+        config_manager.register_callback(
+            "gs_config.cameras.kCamera1CalibrationMatrix",
+            lambda k, v: seen.append((k, v)),
+        )
+        config_manager.set_calibration_batch({
+            "gs_config.cameras.kCamera1CalibrationMatrix": [[1.0]],
+            "gs_config.cameras.kCamera1DistortionVector": [0.0] * 5,
+        })
+        assert any(k == "gs_config.cameras.kCamera1CalibrationMatrix" for k, _ in seen)
