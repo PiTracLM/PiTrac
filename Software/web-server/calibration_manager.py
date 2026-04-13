@@ -1039,6 +1039,7 @@ class CalibrationManager:
 
         all_corners = []
         all_ids = []
+        sample_params = []
         good_count = 0
         rejected_count = 0
         tilted_count = 0
@@ -1127,11 +1128,28 @@ class CalibrationManager:
                     await asyncio.sleep(DISTORTION_CAPTURE_INTERVAL)
                     continue
 
+                params = detector.compute_image_params(corners, image_size)
+                if params is None:
+                    rejected_count += 1
+                    log_msg(f"Attempt {attempt + 1}: Could not compute image parameters")
+                    await asyncio.sleep(DISTORTION_CAPTURE_INTERVAL)
+                    continue
+                if not detector.is_good_sample(params, sample_params):
+                    rejected_count += 1
+                    log_msg(f"Attempt {attempt + 1}: Too similar to existing sample")
+                    self.calibration_status[camera]["message"] = (
+                        "Skipped: board position too similar -- move it to a new area"
+                    )
+                    self.calibration_status[camera]["images_rejected"] = rejected_count
+                    await asyncio.sleep(DISTORTION_CAPTURE_INTERVAL)
+                    continue
+
                 if quality["tilt_score"] > 0.20:
                     tilted_count += 1
 
                 all_corners.append(corners)
                 all_ids.append(ids)
+                sample_params.append(params)
                 good_count += 1
 
                 coverage_tracker.update(corners)
@@ -1182,18 +1200,29 @@ class CalibrationManager:
 
             fix_k3 = good_count < 10
             rms, camera_matrix, dist_coeffs, rejected_indices = \
-                detector.calibrate_with_outlier_rejection(
-                    all_corners, all_ids, image_size, fix_k3=fix_k3)
+                detector.calibrate_with_filtering(
+                    all_corners, all_ids, image_size,
+                    coverage_tracker=coverage_tracker,
+                    fix_k3=fix_k3)
 
             if rejected_indices:
-                log_msg(f"Outlier rejection removed {len(rejected_indices)} image(s)")
+                log_msg(f"Filtering removed {len(rejected_indices)} frame(s)")
 
             log_msg(f"Calibration RMS error: {rms:.4f} pixels")
 
             if rms > 1.0:
                 log_msg(f"Warning: RMS error ({rms:.4f}) is high. Consider recalibrating.")
 
-            # Save results
+            if rms > 2.0:
+                msg = (f"Calibration quality too low (RMS {rms:.2f}px). "
+                       "Try again with the board in more varied positions and angles.")
+                log_msg(f"REJECTED: {msg}")
+                self.calibration_status[camera]["status"] = "failed"
+                self.calibration_status[camera]["message"] = msg
+                self._write_distortion_log(log_file, log_lines)
+                return {"status": "failed", "message": msg, "rms_error": float(rms),
+                        "log_file": str(log_file)}
+
             self.calibration_status[camera]["message"] = "Saving calibration results..."
             self.calibration_status[camera]["progress"] = 95
 
