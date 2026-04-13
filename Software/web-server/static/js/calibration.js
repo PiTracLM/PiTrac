@@ -670,16 +670,22 @@ class CalibrationManager {
             boardEl.textContent = boardVersion ? 'V' + boardVersion : 'Not set';
 
             const isV3 = boardVersion !== null && parseInt(boardVersion) === 3;
+            const tabInput = document.getElementById('strobe-tab-input');
+            const tabContent = document.getElementById('strobe-tab-content');
             if (!isV3) {
                 calBtn.disabled = true;
                 diagBtn.disabled = true;
                 controls.style.opacity = '0.5';
                 warning.style.display = 'block';
+                if (tabInput) tabInput.classList.add('hidden');
+                if (tabContent) tabContent.classList.add('hidden');
             } else {
                 calBtn.disabled = false;
                 diagBtn.disabled = false;
                 controls.style.opacity = '1';
                 warning.style.display = 'none';
+                if (tabInput) tabInput.classList.remove('hidden');
+                if (tabContent) tabContent.classList.remove('hidden');
             }
 
             if (settingsRes.ok) {

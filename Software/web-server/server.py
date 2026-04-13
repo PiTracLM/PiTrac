@@ -340,7 +340,7 @@ class PiTracServer:
         @self.app.get("/config", response_class=HTMLResponse)
         async def config_page(request: Request) -> Response:
             """Serve configuration UI page"""
-            return self.templates.TemplateResponse(request, "config.html")
+            return self.templates.TemplateResponse("config.html", {"request": request})
 
         @self.app.get("/api/config")
         async def get_config(key: Optional[str] = None):
@@ -521,7 +521,7 @@ class PiTracServer:
         @self.app.get("/calibration", response_class=HTMLResponse)
         async def calibration_page(request: Request) -> Response:
             """Serve calibration UI page"""
-            return self.templates.TemplateResponse(request, "calibration.html")
+            return self.templates.TemplateResponse("calibration.html", {"request": request})
 
         @self.app.get("/api/calibration/status")
         async def calibration_status() -> Dict[str, Any]:
@@ -902,7 +902,7 @@ class PiTracServer:
         @self.app.get("/testing", response_class=HTMLResponse)
         async def testing_page(request: Request) -> Response:
             """Serve testing tools UI page"""
-            return self.templates.TemplateResponse(request, "testing.html")
+            return self.templates.TemplateResponse("testing.html", {"request": request})
 
         @self.app.get("/api/testing/tools")
         async def get_testing_tools() -> Dict[str, Any]:
@@ -1133,7 +1133,7 @@ class PiTracServer:
         @self.app.get("/logs", response_class=HTMLResponse)
         async def logs_page(request: Request) -> Response:
             """Serve logs viewer page"""
-            return self.templates.TemplateResponse(request, "logs.html")
+            return self.templates.TemplateResponse("logs.html", {"request": request})
 
         @self.app.websocket("/ws/logs")
         async def websocket_logs(websocket: WebSocket) -> None:

@@ -17,7 +17,9 @@ const distortionCalibration = {
         document.getElementById('distortion-results').style.display = 'none';
 
         document.getElementById('distortion-progress-bar').style.width = '0%';
-        document.getElementById('distortion-status').textContent = 'Starting calibration...';
+        const statusEl = document.getElementById('distortion-status');
+        statusEl.textContent = 'Starting calibration...';
+        statusEl.classList.remove('text-error', 'text-success');
         document.getElementById('distortion-details').textContent = '';
         document.getElementById('distortion-log-content').innerHTML = '';
 
@@ -51,16 +53,16 @@ const distortionCalibration = {
         } catch (error) {
             console.error('Error starting distortion calibration:', error);
             this._stopFeed();
-            const statusEl = document.getElementById('distortion-status');
             statusEl.textContent = 'Could not connect to camera';
-            statusEl.style.color = '#f44336';
+            statusEl.classList.add('text-error');
+            const safe = this._escapeHtml(error.message || 'Check that the camera is connected and not in use by another program.');
             document.getElementById('distortion-details').innerHTML = `
-                <div style="margin-top: 0.5rem; color: var(--text-secondary, #aaa);">
-                    <p>${this._escapeHtml(error.message || 'Check that the camera is connected and not in use by another program.')}</p>
-                    <button class="btn btn-secondary" onclick="distortionCalibration.reset()" style="margin-top: 0.5rem;">
-                        Back
-                    </button>
+                <div class="alert alert-error mt-2">
+                    <span>${safe}</span>
                 </div>
+                <button class="btn btn-ghost btn-sm mt-2" onclick="distortionCalibration.reset()">
+                    Back
+                </button>
             `;
         }
     },
@@ -113,37 +115,37 @@ const distortionCalibration = {
             const target = status.target_images || 40;
             detailsText.textContent =
                 `${status.images_captured} of ${target} good images captured`;
-        }
 
-        if (status.images_captured !== undefined) {
-            const target = status.target_images || 40;
             const imagesOk = status.images_captured >= target;
-            const reqImages = document.getElementById('req-images');
-            if (reqImages) {
-                reqImages.style.color = imagesOk ? '#4CAF50' : '#888';
-                reqImages.innerHTML = `<span style="margin-right: 0.25rem;">${imagesOk ? '&#9745;' : '&#9744;'}</span> ${status.images_captured}/${target} images captured`;
-            }
+            this._setRequirement('req-images', imagesOk,
+                `${status.images_captured}/${target} images captured`);
         }
         if (status.coverage && status.coverage.fraction !== undefined) {
             const coverageOk = status.coverage.fraction >= 1.0;
             const cellsCovered = Math.round(status.coverage.fraction * 9);
-            const reqCoverage = document.getElementById('req-coverage');
-            if (reqCoverage) {
-                reqCoverage.style.color = coverageOk ? '#4CAF50' : '#888';
-                reqCoverage.innerHTML = `<span style="margin-right: 0.25rem;">${coverageOk ? '&#9745;' : '&#9744;'}</span> ${cellsCovered}/9 areas covered`;
-            }
+            this._setRequirement('req-coverage', coverageOk,
+                `${cellsCovered}/9 areas covered`);
         }
         if (status.tilt_fraction !== undefined) {
             const tiltOk = status.tilt_fraction >= 0.40;
-            const reqTilt = document.getElementById('req-tilt');
-            if (reqTilt) {
-                reqTilt.style.color = tiltOk ? '#4CAF50' : '#888';
-                reqTilt.innerHTML = `<span style="margin-right: 0.25rem;">${tiltOk ? '&#9745;' : '&#9744;'}</span> ${tiltOk ? 'Tilted angles used' : 'Need more tilted angles'}`;
-            }
+            this._setRequirement('req-tilt', tiltOk,
+                tiltOk ? 'Tilted angles used' : 'Need more tilted angles');
         }
 
         if (status.coverage && status.coverage.grid) {
             this._updateCoverageGrid(status.coverage);
+        }
+    },
+
+    _setRequirement(id, satisfied, label) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.toggle('text-success', satisfied);
+        el.classList.toggle('opacity-60', !satisfied);
+        const icon = satisfied ? 'check-square' : 'square';
+        el.innerHTML = `<i data-lucide="${icon}" class="icon-sm"></i><span>${this._escapeHtml(label)}</span>`;
+        if (window.lucide && window.lucide.createIcons) {
+            window.lucide.createIcons({ nodes: [el] });
         }
     },
 
@@ -152,8 +154,8 @@ const distortionCalibration = {
         grid.innerHTML = '';
         for (let i = 0; i < 9; i++) {
             const cell = document.createElement('div');
-            cell.style.cssText =
-                'background: #333; border-radius: 2px; transition: background 0.3s;';
+            cell.className = 'coverage-cell';
+            cell.dataset.count = '0';
             cell.dataset.index = i;
             grid.appendChild(cell);
         }
@@ -171,15 +173,8 @@ const distortionCalibration = {
                 const mirroredCol = 2 - c;
                 const count = coverage.grid[r][mirroredCol];
                 if (cells[idx]) {
-                    if (count === 0) {
-                        cells[idx].style.background = '#333';
-                    } else if (count === 1) {
-                        cells[idx].style.background = '#2d5a1e';
-                    } else if (count === 2) {
-                        cells[idx].style.background = '#3a7a25';
-                    } else {
-                        cells[idx].style.background = '#4CAF50';
-                    }
+                    // Clamp to 0..3 for styling bucket
+                    cells[idx].dataset.count = String(Math.min(count, 3));
                 }
             }
         }
@@ -200,40 +195,38 @@ const distortionCalibration = {
         this.log('Calibration completed successfully!');
 
         try {
-            const response = await fetch('/api/calibration/data');
-            const calibData = await response.json();
-
-            const cameraData = this.currentCamera === 'camera1' ?
-                calibData.camera1 : calibData.camera2;
-
             document.getElementById('distortion-progress').style.display = 'none';
             document.getElementById('distortion-results').style.display = 'block';
 
             const cameraLabel = this.currentCamera === 'camera1' ? 'Camera 1' : 'Camera 2';
-            const rmsText = status.message || '';
+            const rmsText = this._escapeHtml(status.message || '');
 
             const resultsDiv = document.getElementById('distortion-results-data');
             resultsDiv.innerHTML = `
-                <div style="padding: 1rem; background: var(--bg-tertiary, #252535); border-radius: 6px;">
-                    <h3 style="margin-top: 0; color: #4CAF50;">${cameraLabel} -- Calibration Complete</h3>
-                    <p style="color: var(--text-secondary, #aaa);">${rmsText}</p>
-                    <p style="color: var(--text-secondary, #aaa); font-size: 0.9rem;">
-                        Calibration data has been saved automatically.
-                    </p>
-                    <div style="background: #1a3a1a; padding: 0.75rem; border-radius: 4px; border: 1px solid #2a5a2a;">
-                        <strong>What's next?</strong>
-                        <ul style="margin: 0.5rem 0 0 0; padding-left: 1.2rem;">
-                            <li>Use "Show Undistort Preview" below to visually verify straight lines look straight</li>
-                            <li>This calibration is saved -- you only need to redo it if you change the lens</li>
-                            <li>Proceed to ball-based calibration below when ready</li>
-                        </ul>
+                <div class="alert alert-success mb-3">
+                    <i data-lucide="check-circle-2"></i>
+                    <div>
+                        <div class="font-semibold">${cameraLabel} &mdash; Calibration Complete</div>
+                        <div class="text-sm opacity-80">${rmsText}</div>
+                        <div class="text-sm opacity-60 mt-1">Calibration data has been saved automatically.</div>
                     </div>
                 </div>
+                <div class="bg-base-300 rounded-lg p-4 border border-base-300">
+                    <div class="font-semibold mb-2">What's next?</div>
+                    <ul class="list-disc list-inside space-y-1 text-sm opacity-80">
+                        <li>Use "Show Undistort Preview" below to visually verify straight lines look straight</li>
+                        <li>This calibration is saved &mdash; you only need to redo it if you change the lens</li>
+                        <li>Switch to the Ball Calibration tab when ready</li>
+                    </ul>
+                </div>
             `;
+            if (window.lucide && window.lucide.createIcons) {
+                window.lucide.createIcons({ nodes: [resultsDiv] });
+            }
 
         } catch (error) {
-            console.error('Error fetching calibration data:', error);
-            this.log('Calibration completed but could not fetch results: ' + error.message);
+            console.error('Error rendering calibration results:', error);
+            this.log('Calibration completed but could not render results: ' + error.message);
         }
     },
 
@@ -251,24 +244,31 @@ const distortionCalibration = {
         this.log('Calibration failed: ' + message);
 
         const safeMessage = this._escapeHtml(message);
-        document.getElementById('distortion-status').textContent = 'Calibration Failed';
-        document.getElementById('distortion-status').style.color = '#f44336';
-        document.getElementById('distortion-details').innerHTML = `
-            <div style="background: #3a1a1a; padding: 1rem; border-radius: 6px; border: 1px solid #5a2a2a; margin-top: 0.5rem;">
-                <strong>Error:</strong> ${safeMessage}
-                <br><br>
-                <strong>Troubleshooting:</strong>
-                <ul style="padding-left: 1.2rem; margin-bottom: 0.5rem;">
+        const statusEl = document.getElementById('distortion-status');
+        statusEl.textContent = 'Calibration Failed';
+        statusEl.classList.remove('text-success');
+        statusEl.classList.add('text-error');
+        const details = document.getElementById('distortion-details');
+        details.innerHTML = `
+            <div class="alert alert-error mt-2">
+                <div>
+                    <div class="font-semibold">Error</div>
+                    <div class="text-sm">${safeMessage}</div>
+                </div>
+            </div>
+            <div class="bg-base-300 rounded-lg p-3 border border-base-300 mt-2 text-sm">
+                <div class="font-semibold mb-1">Troubleshooting:</div>
+                <ul class="list-disc list-inside space-y-0.5 opacity-80">
                     <li>Ensure the ChArUco board is printed at 100% scale</li>
                     <li>Check camera is focused properly</li>
                     <li>Ensure good, even lighting</li>
                     <li>Keep the entire board visible in the frame</li>
                     <li>Hold the board steady during capture</li>
                 </ul>
-                <button class="btn btn-secondary" onclick="distortionCalibration.reset()">
-                    Try Again
-                </button>
             </div>
+            <button class="btn btn-ghost btn-sm mt-2" onclick="distortionCalibration.reset()">
+                Try Again
+            </button>
         `;
     },
 
@@ -297,9 +297,8 @@ const distortionCalibration = {
         document.getElementById('distortion-progress').style.display = 'none';
         document.getElementById('distortion-results').style.display = 'none';
 
-        // Reset status text color
         const statusEl = document.getElementById('distortion-status');
-        if (statusEl) statusEl.style.color = '';
+        if (statusEl) statusEl.classList.remove('text-error', 'text-success');
 
         document.getElementById('distortion-log-content').innerHTML = '';
         this.checkExistingCalibrations();
@@ -360,9 +359,9 @@ const distortionCalibration = {
 
             ws.onerror = () => {
                 clearTimeout(timeout);
-                document.getElementById('distortion-feed-placeholder').textContent =
-                    'Camera feed unavailable';
-                document.getElementById('distortion-feed-placeholder').style.display = 'block';
+                const ph = document.getElementById('distortion-feed-placeholder');
+                ph.textContent = 'Camera feed unavailable';
+                ph.style.display = 'block';
                 reject(new Error('Camera feed connection failed'));
             };
 
@@ -388,13 +387,13 @@ const distortionCalibration = {
     _updateFeedOverlay(metrics) {
         const el = document.getElementById('distortion-feed-overlay');
         if (!el) return;
+        el.style.display = 'block';
+        el.classList.remove('text-success', 'text-warning', 'text-error');
         if (metrics.corners > 0) {
-            el.style.display = 'block';
-            el.style.color = metrics.is_good ? '#00ff00' : '#ff8800';
+            el.classList.add(metrics.is_good ? 'text-success' : 'text-warning');
             el.textContent = `Corners: ${metrics.corners}  Blur: ${metrics.blur}`;
         } else {
-            el.style.display = 'block';
-            el.style.color = '#ff4444';
+            el.classList.add('text-error');
             el.textContent = 'No board detected';
         }
     },
@@ -442,11 +441,14 @@ const distortionCalibration = {
         if (this.undistortSocket) {
             this._stopUndistortPreview();
             section.style.display = 'none';
-            btn.textContent = 'Show Undistort Preview';
+            btn.innerHTML = '<i data-lucide="eye" class="icon-sm"></i> Show Undistort Preview';
         } else {
             section.style.display = 'block';
-            btn.textContent = 'Hide Undistort Preview';
+            btn.innerHTML = '<i data-lucide="eye-off" class="icon-sm"></i> Hide Undistort Preview';
             this._startUndistortPreview();
+        }
+        if (window.lucide && window.lucide.createIcons) {
+            window.lucide.createIcons({ nodes: [btn] });
         }
     },
 
@@ -454,7 +456,7 @@ const distortionCalibration = {
         this.undistortMode = mode;
         for (const m of ['side_by_side', 'raw', 'undistorted']) {
             const el = document.getElementById('mode-' + m);
-            if (el) el.style.fontWeight = m === mode ? 'bold' : 'normal';
+            if (el) el.classList.toggle('btn-active', m === mode);
         }
         if (this.undistortSocket && this.undistortSocket.readyState === WebSocket.OPEN) {
             this.undistortSocket.send(JSON.stringify({ mode }));
@@ -525,11 +527,15 @@ const distortionCalibration = {
             const data = await resp.json();
             for (const cam of ['camera1', 'camera2']) {
                 const el = document.getElementById(cam + '-cal-status');
-                if (el && data[cam] && data[cam].calibration_matrix) {
+                if (!el) continue;
+                if (data[cam] && data[cam].calibration_matrix) {
                     el.textContent = 'Calibrated';
-                    el.style.color = '#4CAF50';
-                } else if (el) {
+                    el.classList.add('text-success');
+                    el.classList.remove('opacity-70');
+                } else {
                     el.textContent = '';
+                    el.classList.remove('text-success');
+                    el.classList.add('opacity-70');
                 }
             }
         } catch (e) { /* ignore */ }

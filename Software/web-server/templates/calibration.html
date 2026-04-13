@@ -25,10 +25,162 @@
     </div>
 
     {# ================================================================ #}
-    {# Ball-based Calibration Wizard                                     #}
+    {# Calibration tabs: Distortion / Ball / Strobe                      #}
     {# ================================================================ #}
-    <div class="card bg-base-200 border border-base-300 shadow-sm">
-        <div class="card-body p-4 sm:p-6">
+    <div class="card bg-base-200 border border-base-300 shadow-sm overflow-hidden">
+        <div class="tabs tabs-border">
+
+        {# ================================================================ #}
+        {# Tab 1: Lens Distortion Calibration                                #}
+        {# ================================================================ #}
+        <input type="radio" name="cal_tabs" class="tab" aria-label="Lens Distortion" checked />
+        <div class="tab-content bg-base-200 border-base-300 p-4 sm:p-6">
+
+            <h2 class="text-xl font-semibold text-primary mb-2">Lens Distortion Calibration</h2>
+            <p class="text-sm opacity-60 mb-4">
+                One-time setup per lens using a ChArUco calibration board. Run this before ball-based calibration.
+                Not needed after camera repositioning &mdash; only when the lens changes.
+            </p>
+
+            {# ---- Camera selection / initial state ---- #}
+            <div id="distortion-camera-selection">
+                <div class="flex flex-wrap gap-2 items-center mb-4">
+                    <button class="btn btn-primary btn-sm gap-1" onclick="distortionCalibration.startCalibration('camera1')">
+                        <i data-lucide="camera" class="icon-sm"></i>
+                        Calibrate Camera 1
+                    </button>
+                    <span id="camera1-cal-status" class="text-xs opacity-70"></span>
+                    <div class="divider divider-horizontal mx-0"></div>
+                    <button class="btn btn-primary btn-sm gap-1" onclick="distortionCalibration.startCalibration('camera2')">
+                        <i data-lucide="camera" class="icon-sm"></i>
+                        Calibrate Camera 2
+                    </button>
+                    <span id="camera2-cal-status" class="text-xs opacity-70"></span>
+                    <div class="divider divider-horizontal mx-0"></div>
+                    <button class="btn btn-ghost btn-sm gap-1" onclick="distortionCalibration.printBoard()">
+                        <i data-lucide="printer" class="icon-sm"></i>
+                        Print Calibration Pattern
+                    </button>
+                </div>
+
+                <div class="bg-base-300 rounded-lg p-4 border border-base-300">
+                    <h3 class="font-semibold mb-3 text-primary">Instructions:</h3>
+                    <ol class="list-decimal list-inside space-y-1 opacity-60 text-sm">
+                        <li>Click "Print Calibration Pattern" and print at 100% scale (no "fit to page") on A4/Letter paper</li>
+                        <li><strong>Important:</strong> Mount the printed pattern on stiff cardboard or foam board &mdash; it must stay perfectly flat</li>
+                        <li>Click the button for the camera to calibrate</li>
+                        <li>Hold the board in front of the camera &mdash; the system auto-captures when quality is good</li>
+                        <li>Move the board to different positions and angles between captures</li>
+                        <li>The system collects ~40 images and finishes automatically when it has enough variety</li>
+                    </ol>
+                </div>
+            </div>
+
+            {# ---- Progress state ---- #}
+            <div id="distortion-progress" style="display: none;">
+                <h3 id="distortion-camera-title" class="text-lg font-semibold mb-3 text-primary"></h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-4 mb-4">
+
+                    {# Live camera feed #}
+                    <div>
+                        <h4 class="text-sm font-semibold mb-2">Live Feed</h4>
+                        <div class="camera-preview relative">
+                            <img id="distortion-feed" alt="Camera feed" style="display: block;">
+                            <div id="distortion-feed-overlay"
+                                 class="absolute top-2 left-2 mono text-sm font-bold pointer-events-none"
+                                 style="display: none; text-shadow: 0 1px 3px rgba(0,0,0,0.9);"></div>
+                            <div id="distortion-feed-placeholder" class="camera-placeholder">
+                                <p>Connecting to camera...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {# Progress + coverage sidebar #}
+                    <div class="flex flex-col gap-3">
+                        <div>
+                            <div class="progress-bar relative">
+                                <div class="progress-fill" id="distortion-progress-bar"></div>
+                                <span id="distortion-progress-pct"
+                                      class="absolute inset-0 flex items-center justify-center text-[0.7rem] font-bold text-base-content pointer-events-none">0%</span>
+                            </div>
+                            <div id="distortion-status" class="text-sm font-semibold mt-1">Starting...</div>
+                            <div id="distortion-details" class="text-xs opacity-60"></div>
+                            <div id="distortion-hint" class="text-xs text-warning min-h-[1.25rem] mt-1"></div>
+                        </div>
+
+                        <div id="distortion-coverage-section">
+                            <h4 class="text-sm font-semibold mb-1">Board Positions</h4>
+                            <p class="text-xs opacity-60 mb-2">
+                                Each square lights up when the board has been held in that part of the frame.
+                            </p>
+                            <div id="distortion-coverage-grid" class="coverage-grid"></div>
+                            <div id="distortion-coverage-text" class="text-xs opacity-60 mt-1"></div>
+                        </div>
+
+                        <div class="text-sm">
+                            <div class="font-semibold mb-1">Requirements:</div>
+                            <div id="req-images" class="flex items-center gap-1.5 text-xs opacity-60">
+                                <i data-lucide="square" class="icon-sm"></i>
+                                <span>0/40 images captured</span>
+                            </div>
+                            <div id="req-coverage" class="flex items-center gap-1.5 text-xs opacity-60">
+                                <i data-lucide="square" class="icon-sm"></i>
+                                <span>0/9 areas covered</span>
+                            </div>
+                            <div id="req-tilt" class="flex items-center gap-1.5 text-xs opacity-60">
+                                <i data-lucide="square" class="icon-sm"></i>
+                                <span>Need some tilted angles</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <details class="collapse collapse-arrow bg-base-300 border border-base-300 mb-4">
+                    <summary class="collapse-title text-sm font-semibold">Show detailed log</summary>
+                    <div class="collapse-content">
+                        <div id="distortion-log-content" class="log-content"></div>
+                    </div>
+                </details>
+
+                <button class="btn btn-error btn-sm" onclick="distortionCalibration.stopCalibration()">
+                    Stop Calibration
+                </button>
+            </div>
+
+            {# ---- Results state ---- #}
+            <div id="distortion-results" style="display: none;">
+                <div id="distortion-results-data"></div>
+
+                <div class="flex flex-wrap gap-2 mt-4">
+                    <button class="btn btn-ghost btn-sm gap-1" onclick="distortionCalibration.reset()">
+                        <i data-lucide="arrow-left" class="icon-sm"></i>
+                        Back to Camera Selection
+                    </button>
+                    <button class="btn btn-primary btn-sm gap-1" id="undistort-preview-btn" onclick="distortionCalibration.toggleUndistortPreview()">
+                        <i data-lucide="eye" class="icon-sm"></i>
+                        Show Undistort Preview
+                    </button>
+                </div>
+
+                <div id="undistort-preview-section" class="mt-4" style="display: none;">
+                    <div class="join mb-2">
+                        <button class="btn btn-sm join-item btn-active" onclick="distortionCalibration.setPreviewMode('side_by_side')" id="mode-side_by_side">Side by Side</button>
+                        <button class="btn btn-sm join-item" onclick="distortionCalibration.setPreviewMode('raw')" id="mode-raw">Raw</button>
+                        <button class="btn btn-sm join-item" onclick="distortionCalibration.setPreviewMode('undistorted')" id="mode-undistorted">Undistorted</button>
+                    </div>
+                    <div class="camera-preview">
+                        <img id="undistort-feed" alt="Undistort preview" style="display: block;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# ================================================================ #}
+        {# Tab 2: Ball-based Calibration                                     #}
+        {# ================================================================ #}
+        <input type="radio" name="cal_tabs" class="tab" aria-label="Ball Calibration" />
+        <div class="tab-content bg-base-200 border-base-300 p-4 sm:p-6">
 
             {# -- Wizard step indicators -- #}
             <div class="wizard-steps flex items-center justify-between w-full mb-6 relative">
@@ -286,16 +438,15 @@
                     <button class="btn btn-primary" onclick="window.location.href='/'">Return to Dashboard</button>
                 </div>
             </div>
-
         </div>
-    </div>
 
-    {# ================================================================ #}
-    {# Strobe Calibration                                                #}
-    {# ================================================================ #}
-    <div class="card bg-base-200 border border-base-300 shadow-sm">
-        <div class="card-body p-4 sm:p-6">
-            <h3 class="text-lg font-semibold text-primary mb-3">Strobe Calibration</h3>
+        {# ================================================================ #}
+        {# Tab 3: Strobe Calibration (V3 board only)                         #}
+        {# ================================================================ #}
+        <input type="radio" name="cal_tabs" class="tab" aria-label="Strobe" id="strobe-tab-input" />
+        <div class="tab-content bg-base-200 border-base-300 p-4 sm:p-6" id="strobe-tab-content">
+
+            <h2 class="text-xl font-semibold text-primary mb-3">Strobe Calibration</h2>
 
             {# Strobe status row #}
             <div class="flex flex-wrap gap-x-6 gap-y-1 bg-base-300 rounded-lg px-3 py-2 mb-4 border border-base-300 text-sm">
@@ -313,7 +464,6 @@
                 </div>
             </div>
 
-            {# V3 board warning #}
             <div id="strobe-board-warning" class="alert alert-error mb-4" style="display: none;">
                 <span>
                     Strobe calibration requires a V3 Connector Board.
@@ -375,10 +525,11 @@
                 <div id="strobe-diagnostics-warning" class="alert alert-error mt-3" style="display: none;"></div>
             </div>
         </div>
+        </div>
     </div>
 
     {# ================================================================ #}
-    {# Current Calibration Data                                          #}
+    {# Current Calibration Data (always visible, below tabs)             #}
     {# ================================================================ #}
     <div class="card bg-base-200 border border-base-300 shadow-sm">
         <div class="card-body p-4 sm:p-6">
@@ -391,5 +542,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="/static/js/distortion_calibration.js"></script>
 <script src="/static/js/calibration.js"></script>
 {% endblock %}

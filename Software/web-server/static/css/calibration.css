@@ -189,6 +189,34 @@ div.progress-bar > .progress-fill {
     font-family: ui-monospace, monospace;
 }
 
+/* ---- Distortion coverage grid (ChArUco) ---- */
+.coverage-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 3px;
+    width: 180px;
+    height: 120px;
+}
+
+.coverage-cell {
+    background: var(--color-base-300);
+    border-radius: 2px;
+    transition: background 0.3s;
+}
+
+.coverage-cell[data-count="1"] {
+    background: color-mix(in oklch, var(--color-success) 35%, var(--color-base-300));
+}
+
+.coverage-cell[data-count="2"] {
+    background: color-mix(in oklch, var(--color-success) 65%, var(--color-base-300));
+}
+
+.coverage-cell[data-count="3"] {
+    background: var(--color-success);
+}
+
 /* ---- Light theme ---- */
 [data-theme="light"] .calibration-data-item {
     background: var(--color-base-200);
