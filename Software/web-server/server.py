@@ -63,7 +63,7 @@ class RpicamVideoStream:
                 "rpicam-vid", "--camera", str(camera_index),
                 "--width", str(width), "--height", str(height),
                 "--framerate", "15",
-                "--codec", "mjpeg", "--output", "-",
+                "--codec", "mjpeg", "--quality", "100", "--output", "-",
                 "--timeout", "0", "--nopreview",
                 "--shutter", str(RPICAM_CAL_SHUTTER_US),
                 "--gain", str(RPICAM_CAL_GAIN),
@@ -652,7 +652,7 @@ class PiTracServer:
                     square_length=CHARUCO_SQUARE_LENGTH, marker_length=CHARUCO_MARKER_LENGTH,
                 )
 
-                cap = await asyncio.to_thread(open_camera, camera_index, 3840, 2160)
+                cap = await asyncio.to_thread(open_camera, camera_index, 1456, 1088)
                 if cap is None:
                     await websocket.send_json({"error": f"Cannot open camera {camera_index}"})
                     await websocket.close()
@@ -783,7 +783,7 @@ class PiTracServer:
                     await websocket.close()
                     return
 
-                cap = await asyncio.to_thread(open_camera, camera_index, 1280, 720)
+                cap = await asyncio.to_thread(open_camera, camera_index, 1456, 1088)
                 if cap is None:
                     await websocket.send_json({"error": f"Cannot open camera {camera_index}"})
                     await websocket.close()
