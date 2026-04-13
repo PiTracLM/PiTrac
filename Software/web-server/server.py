@@ -586,11 +586,18 @@ class PiTracServer:
                 CHARUCO_SQUARE_LENGTH, CHARUCO_MARKER_LENGTH, aruco_dict,
             )
 
-            # A4 at 300 DPI = 2480x3508; leave margins for printer
-            margin = 100  # px
-            board_img = board.generateImage((2480 - 2 * margin, 3508 - 2 * margin))
-            page = np.full((3508, 2480), 255, dtype=np.uint8)
-            page[margin:margin + board_img.shape[0], margin:margin + board_img.shape[1]] = board_img
+            DPI = 300
+            px_per_mm = DPI / 25.4
+            square_px = round(CHARUCO_SQUARE_LENGTH * 1000 * px_per_mm)
+            board_w = CHARUCO_SQUARES_X * square_px
+            board_h = CHARUCO_SQUARES_Y * square_px
+            board_img = board.generateImage((board_w, board_h), marginSize=0)
+
+            a4_w, a4_h = round(210 * px_per_mm), round(297 * px_per_mm)
+            page = np.full((a4_h, a4_w), 255, dtype=np.uint8)
+            x_off = (a4_w - board_w) // 2
+            y_off = (a4_h - board_h) // 2
+            page[y_off:y_off + board_h, x_off:x_off + board_w] = board_img
 
             success, png_bytes = cv2.imencode(".png", page)
             if not success:
