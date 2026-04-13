@@ -26,10 +26,13 @@ CAMERA1_CALIBRATION_TIMEOUT = 40.0  # Camera1 has faster hardware detection
 CAMERA2_CALIBRATION_TIMEOUT = 140.0  # Camera2 needs background process initialization
 CAMERA2_BACKGROUND_INIT_WAIT = 4.0  # Time to wait for background process to initialize
 
-DISTORTION_DEFAULT_TARGET_IMAGES = 30
+DISTORTION_DEFAULT_TARGET_IMAGES = 40  # Hagemann 2021: 40+ images for sub-0.2% std_fx/fx
 DISTORTION_MAX_ATTEMPTS_MULTIPLIER = 5  # max_attempts = target * this
 DISTORTION_CAPTURE_INTERVAL = 2.0  # seconds between captures
 DISTORTION_CAPTURE_TIMEOUT = 10.0  # timeout for rpicam-still
+
+RPICAM_TUNING_FILE = "/usr/share/libcamera/ipa/rpi/pisp/imx296_noir.json"
+RPICAM_CAL_SHUTTER_US = 11000
 
 
 class CalibrationManager:
@@ -969,7 +972,7 @@ class CalibrationManager:
 
         Args:
             camera: "camera1" or "camera2"
-            target_images: Number of good images to collect (default 30)
+            target_images: Number of good images to collect (default 40)
 
         Returns:
             Dict with calibration results or error
@@ -1049,15 +1052,30 @@ class CalibrationManager:
 
         log_msg(f"Target: {target_images} images, camera index: {camera_index}")
 
-        min_coverage_fraction = 1.0  # All 9 grid cells must be covered
-        min_tilt_fraction = 0.40  # At least 40% of images must be tilted
+        min_pixel_coverage = 0.80   # 10×10 pixel grid; reachable in ~40 frames per coupon-collector
+        min_tilt_fraction = 0.40
+        size_bin_min_samples = 3
+        size_bin_edges = (0.10, 0.16)  # standard ball-tracking distance gives ~0.12 = medium
+        size_bins = {"small": 0, "medium": 0, "large": 0}
+
+        def bin_for(size: float) -> str:
+            if size < size_bin_edges[0]:
+                return "small"
+            if size < size_bin_edges[1]:
+                return "medium"
+            return "large"
 
         try:
             for attempt in range(max_attempts):
-                # Require image count AND coverage AND tilt diversity
-                coverage_ok = coverage_tracker and coverage_tracker.get_coverage_fraction() >= min_coverage_fraction
+                pixel_cov = (
+                    coverage_tracker.get_pixel_coverage_fraction()
+                    if coverage_tracker else 0.0
+                )
+                coverage_ok = pixel_cov >= min_pixel_coverage
                 tilt_ok = good_count > 0 and (tilted_count / good_count) >= min_tilt_fraction
-                if good_count >= target_images and coverage_ok and tilt_ok:
+                size_ok = all(n >= size_bin_min_samples for n in size_bins.values())
+
+                if good_count >= target_images and coverage_ok and tilt_ok and size_ok:
                     break
 
                 # Check if calibration was stopped
@@ -1065,32 +1083,40 @@ class CalibrationManager:
                     log_msg("Calibration stopped by user")
                     return {"status": "stopped", "message": "Calibration stopped"}
 
-                # Coaching hint: prioritize the most important action
                 hint = ""
-                if good_count >= target_images and not tilt_ok:
-                    hint = "Tilt the board at an angle for the next few shots."
-                elif good_count >= target_images and not coverage_ok:
-                    suggested = coverage_tracker.get_suggested_region() if coverage_tracker else "edges"
-                    hint = f"Move the board toward the {suggested} of the frame."
-                elif not tilt_ok and good_count > 0 and good_count >= target_images // 2:
-                    hint = "Try tilting the board at different angles."
-                elif not coverage_ok and coverage_tracker:
+                short_bin = next((b for b, n in size_bins.items() if n < size_bin_min_samples), None)
+                if not coverage_ok and coverage_tracker:
                     suggested = coverage_tracker.get_suggested_region()
-                    hint = f"Try the {suggested} area next."
+                    hint = f"Move the board toward the {suggested} of the frame."
+                elif short_bin == "small":
+                    hint = "Hold the board farther from the camera for a few shots."
+                elif short_bin == "large":
+                    hint = "Bring the board closer to the camera for a few shots."
+                elif short_bin == "medium":
+                    hint = "Try the board at mid-range distance."
+                elif not tilt_ok:
+                    hint = "Tilt the board at an angle for the next few shots."
                 else:
                     hint = "Hold the board steady and visible."
 
-                # Progress bar reflects all three requirements
                 image_progress = min(good_count / target_images, 1.0)
-                cov_progress = min(coverage_tracker.get_coverage_fraction() / min_coverage_fraction, 1.0) if coverage_tracker else 0
+                cov_progress = min(pixel_cov / min_pixel_coverage, 1.0)
                 tilt_prog = min((tilted_count / good_count) / min_tilt_fraction, 1.0) if good_count > 0 else 0
-                progress = int((image_progress * 0.5 + cov_progress * 0.3 + tilt_prog * 0.2) * 80)
+                size_prog = min(
+                    sum(min(n, size_bin_min_samples) for n in size_bins.values()) /
+                    (size_bin_min_samples * 3), 1.0
+                )
+                progress = int(
+                    (image_progress * 0.35 + cov_progress * 0.35 + tilt_prog * 0.15 + size_prog * 0.15) * 80
+                )
 
                 self.calibration_status[camera]["progress"] = progress
                 self.calibration_status[camera]["hint"] = hint
                 self.calibration_status[camera]["tilt_fraction"] = tilted_count / good_count if good_count > 0 else 0
+                self.calibration_status[camera]["pixel_coverage"] = pixel_cov
+                self.calibration_status[camera]["size_bins"] = dict(size_bins)
 
-                if good_count >= target_images and not (coverage_ok and tilt_ok):
+                if good_count >= target_images and not (coverage_ok and tilt_ok and size_ok):
                     self.calibration_status[camera]["message"] = (
                         f"All {target_images} images captured -- collecting a few more for better accuracy."
                     )
@@ -1147,6 +1173,9 @@ class CalibrationManager:
                 if quality["tilt_score"] > 0.20:
                     tilted_count += 1
 
+                size_bucket = bin_for(quality["coverage"])
+                size_bins[size_bucket] += 1
+
                 all_corners.append(corners)
                 all_ids.append(ids)
                 sample_params.append(params)
@@ -1157,13 +1186,15 @@ class CalibrationManager:
                 self.calibration_status[camera]["coverage"] = coverage_data
                 self.calibration_status[camera]["images_captured"] = good_count
                 self.calibration_status[camera]["images_rejected"] = rejected_count
+                self.calibration_status[camera]["size_bins"] = dict(size_bins)
 
                 tilt_label = "tilted" if quality["tilt_score"] > 0.20 else "flat"
                 log_msg(
                     f"Image {good_count}/{target_images} accepted "
                     f"(sharpness: {quality['blur_score']:.0f}, "
                     f"tilt: {tilt_label}, "
-                    f"total coverage: {coverage_data['fraction']:.0%})"
+                    f"size: {size_bucket} ({quality['coverage']:.0%}), "
+                    f"pixel coverage: {coverage_data['pixel_coverage']:.0%})"
                 )
 
                 # Positive feedback with coaching hint
@@ -1198,22 +1229,36 @@ class CalibrationManager:
             self.calibration_status[camera]["progress"] = 85
             log_msg(f"Running calibration on {good_count} images...")
 
-            fix_k3 = good_count < 10
-            rms, camera_matrix, dist_coeffs, rejected_indices = \
+            # k3 is non-trivial on this lens (~-0.13); fixing it biases k1/k2.
+            rms, camera_matrix, dist_coeffs, rejected_indices, diagnostics = \
                 detector.calibrate_with_filtering(
                     all_corners, all_ids, image_size,
                     coverage_tracker=coverage_tracker,
-                    fix_k3=fix_k3)
+                    fix_k3=False)
 
             if rejected_indices:
                 log_msg(f"Filtering removed {len(rejected_indices)} frame(s)")
 
             log_msg(f"Calibration RMS error: {rms:.4f} pixels")
+            log_msg(
+                f"Per-view error: median {diagnostics['per_view_median']:.4f}px, "
+                f"max {diagnostics['per_view_max']:.4f}px")
+            log_msg(
+                f"Parameter uncertainty: fx=±{diagnostics['std_fx']:.2f}px, "
+                f"fy=±{diagnostics['std_fy']:.2f}px, "
+                f"cx=±{diagnostics['std_cx']:.2f}px, "
+                f"cy=±{diagnostics['std_cy']:.2f}px")
+            # >5 px std on fx/fy means the pose set didn't constrain intrinsics.
+            if max(diagnostics['std_fx'], diagnostics['std_fy']) > 5.0:
+                log_msg(
+                    "Warning: high focal-length uncertainty — capture more poses "
+                    "with varied board distance and tilt.")
 
-            if rms > 1.0:
-                log_msg(f"Warning: RMS error ({rms:.4f}) is high. Consider recalibrating.")
+            if rms > 0.7:
+                log_msg(f"Warning: RMS error ({rms:.4f}) is above target (0.7). "
+                        "Consider recalibrating with more diverse board positions.")
 
-            if rms > 2.0:
+            if rms > 1.2:
                 msg = (f"Calibration quality too low (RMS {rms:.2f}px). "
                        "Try again with the board in more varied positions and angles.")
                 log_msg(f"REJECTED: {msg}")
@@ -1229,7 +1274,12 @@ class CalibrationManager:
             self._save_distortion_results(camera, camera_matrix, dist_coeffs, rms)
             log_msg("Calibration results saved to configuration")
 
-            quality_label = "Excellent" if rms < 0.5 else "Good" if rms < 0.75 else "Acceptable" if rms <= 1.0 else "Poor"
+            quality_label = (
+                "Excellent" if rms < 0.4 else
+                "Good" if rms < 0.6 else
+                "Acceptable" if rms <= 0.9 else
+                "Poor"
+            )
             self.calibration_status[camera]["status"] = "completed"
             self.calibration_status[camera]["message"] = (
                 f"Calibration complete -- accuracy: {quality_label} (error: {rms:.2f}px)"
@@ -1344,10 +1394,14 @@ class CalibrationManager:
             "rpicam-still",
             "--camera", str(camera_index),
             "-o", str(output_path),
-            f"--gain", str(gain),
+            "--gain", str(gain),
             "--timeout", "1",
             "--nopreview",
             "--encoding", "png",
+            "--shutter", str(RPICAM_CAL_SHUTTER_US),
+            "--awbgains", "1.0,1.0",
+            "--denoise", "cdn_off",
+            "--tuning-file", RPICAM_TUNING_FILE,
         ]
 
         try:
@@ -1386,11 +1440,7 @@ class CalibrationManager:
     def _save_distortion_results(
         self, camera: str, camera_matrix, dist_coeffs, rms_error: float
     ) -> None:
-        """Save distortion calibration results to configuration.
-
-        Saves the camera matrix and distortion coefficients using the
-        existing config system (kCameraNCalibrationMatrix, kCameraNDistortionVector).
-        """
+        """Atomically save camera matrix + distortion vector. C++ hardcodes 3×3 / 5-element."""
         camera_num = "1" if camera == "camera1" else "2"
         matrix_key = f"gs_config.cameras.kCamera{camera_num}CalibrationMatrix"
         distortion_key = f"gs_config.cameras.kCamera{camera_num}DistortionVector"
@@ -1398,13 +1448,23 @@ class CalibrationManager:
         matrix_list = camera_matrix.tolist()
         dist_list = dist_coeffs.flatten().tolist()
 
-        success, message, _ = self.config_manager.set_config(matrix_key, matrix_list)
-        if not success:
-            raise RuntimeError(f"Failed to save calibration matrix: {message}")
+        if len(matrix_list) != 3 or any(len(row) != 3 for row in matrix_list):
+            raise RuntimeError(
+                f"Refusing to save: camera matrix shape is not 3×3 "
+                f"(got {len(matrix_list)} rows). C++ consumer expects 3×3."
+            )
+        if len(dist_list) != 5:
+            raise RuntimeError(
+                f"Refusing to save: distortion vector has {len(dist_list)} "
+                "elements, C++ consumer expects exactly 5."
+            )
 
-        success, message, _ = self.config_manager.set_config(distortion_key, dist_list)
+        success, message = self.config_manager.set_calibration_batch({
+            matrix_key: matrix_list,
+            distortion_key: dist_list,
+        })
         if not success:
-            raise RuntimeError(f"Failed to save distortion vector: {message}")
+            raise RuntimeError(f"Failed to save calibration: {message}")
 
         logger.info(f"Distortion calibration saved for {camera} (RMS={rms_error:.4f})")
 

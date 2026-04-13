@@ -28,17 +28,25 @@ def _check_opencv_version() -> None:
 _check_opencv_version()
 
 
+BLUR_THRESHOLD = 100        # Laplacian variance on 960-px-normalized image
+MIN_COVERAGE = 0.08         # corner bbox area / image area; standard tee distance is ~0.12
+EDGE_MARGIN_PX = 10         # below this, cornerSubPix's 11×11 window biases corners inward
+CELL_TARGET_SAMPLES = 3
+
+
 class CoverageTracker:
     """Tracks spatial coverage of calibration images across a grid."""
 
     def __init__(self, image_width: int, image_height: int,
-                 grid_rows: int = 3, grid_cols: int = 3):
+                 grid_rows: int = 3, grid_cols: int = 3,
+                 cell_target: int = CELL_TARGET_SAMPLES):
         self.grid_rows = grid_rows
         self.grid_cols = grid_cols
         self.image_width = image_width
         self.image_height = image_height
         self.cell_width = image_width / grid_cols
         self.cell_height = image_height / grid_rows
+        self.cell_target = cell_target
         self.coverage = [[0] * grid_cols for _ in range(grid_rows)]
         self._frame_corners: List[np.ndarray] = []
 
@@ -55,8 +63,27 @@ class CoverageTracker:
         self.coverage[row][col] += 1
 
     def get_coverage_fraction(self) -> float:
-        covered = sum(1 for row in self.coverage for cell in row if cell > 0)
+        """Fraction of 3×3 cells with >= cell_target samples (UX coaching signal)."""
+        covered = sum(
+            1 for row in self.coverage for cell in row if cell >= self.cell_target
+        )
         return covered / (self.grid_rows * self.grid_cols)
+
+    def _pixel_cell_counts(self, grid_size: int = 10) -> np.ndarray:
+        x_step = self.image_width / grid_size
+        y_step = self.image_height / grid_size
+        cells = np.zeros((grid_size, grid_size), dtype=np.int32)
+        for frame_corners in self._frame_corners:
+            for pt in frame_corners[:, 0, :]:
+                c = min(int(pt[0] / x_step), grid_size - 1)
+                r = min(int(pt[1] / y_step), grid_size - 1)
+                cells[r][c] += 1
+        return cells
+
+    def get_pixel_coverage_fraction(self, grid_size: int = 10) -> float:
+        """Fraction of fine-grid cells with >=1 detected corner across all frames."""
+        cells = self._pixel_cell_counts(grid_size)
+        return float(np.count_nonzero(cells)) / (grid_size * grid_size)
 
     def estimate_coverage_quality(
         self, active_indices: Optional[List[int]] = None,
@@ -112,6 +139,8 @@ class CoverageTracker:
             "grid": self.coverage,
             "fraction": self.get_coverage_fraction(),
             "suggested_region": self.get_suggested_region(),
+            "cell_target": self.cell_target,
+            "pixel_coverage": self.get_pixel_coverage_fraction(),
         }
 
 
@@ -219,7 +248,7 @@ class CompatibleCharucoDetector:
         laplacian = cv2.Laplacian(blur_img, cv2.CV_64F)
         metrics["blur_score"] = laplacian.var()
 
-        blur_threshold = 50
+        blur_threshold = BLUR_THRESHOLD
         if metrics["blur_score"] < blur_threshold:
             metrics["reasons"].append(
                 f"Image too blurry (score {metrics['blur_score']:.2f} < {blur_threshold})")
@@ -233,13 +262,13 @@ class CompatibleCharucoDetector:
         image_area = gray_image.shape[0] * gray_image.shape[1]
         metrics["coverage"] = bbox_area / image_area
 
-        min_coverage = 0.10
+        min_coverage = MIN_COVERAGE
         if metrics["coverage"] < min_coverage:
             metrics["reasons"].append(
                 f"Board too small (coverage {metrics['coverage']:.1%} < {min_coverage:.0%})")
 
         # 3. Edge margin check (board not cut off)
-        margin_threshold = 20
+        margin_threshold = EDGE_MARGIN_PX
         h, w = gray_image.shape[:2]
 
         metrics["edge_margin"] = min(
@@ -316,13 +345,8 @@ class CompatibleCharucoDetector:
         image_size: Tuple[int, int],
         coverage_tracker: Optional['CoverageTracker'] = None,
         fix_k3: bool = False,
-    ) -> Tuple[float, np.ndarray, np.ndarray, List[int]]:
-        """Calibrate with bicriterial frame filtering.
-
-        Iteratively removes the worst frame using a combined loss:
-          loss(i) = alpha * error(i) + (1-alpha) * coverage_delta(i)
-        with alpha=0.1 (90% weight on coverage uniformity, 10% on error).
-        """
+    ) -> Tuple[float, np.ndarray, np.ndarray, List[int], Dict[str, Any]]:
+        """Bicriterial filter (alpha=0.1: 90% coverage, 10% per-frame error). Returns (rms, K, dist, rejected, diagnostics)."""
         corners = list(all_charuco_corners)
         ids = list(all_charuco_ids)
         original_indices = list(range(len(corners)))
@@ -340,18 +364,27 @@ class CompatibleCharucoDetector:
                     continue
                 obj_all.append(obj_pts)
                 img_all.append(img_pts)
-            return cv2.calibrateCamera(
+            return cv2.calibrateCameraExtended(
                 obj_all, img_all, image_size, None, None, flags=flags)
 
-        rms, camera_matrix, dist_coeffs, rvecs, tvecs = _run_calibration(corners, ids)
+        (rms, camera_matrix, dist_coeffs, rvecs, tvecs,
+         std_intrinsics, std_extrinsics, per_view_errors) = _run_calibration(corners, ids)
         logger.info(f"Initial calibration: RMS={rms:.4f}, images={len(corners)}")
 
-        # -- Bicriterial frame filtering --
         filter_alpha = 0.1
         max_rounds = len(corners) // 3
 
+        def _intrinsic_uncertainty(std_intr):
+            if std_intr is None:
+                return float("inf")
+            f = std_intr.flatten()
+            if len(f) < 2:
+                return float("inf")
+            return max(float(f[0]), float(f[1]))
+
+        # Min retained: below 15 frames, std_fx/fy diverges for a 5-coef Brown model.
         for round_num in range(max_rounds):
-            if len(corners) <= 8:
+            if len(corners) <= 15:
                 break
 
             per_image_errors = []
@@ -400,17 +433,23 @@ class CompatibleCharucoDetector:
             test_corners = [c for j, c in enumerate(corners) if j != worst_idx]
             test_ids = [d for j, d in enumerate(ids) if j != worst_idx]
             try:
-                test_rms, test_mat, test_dist, test_rv, test_tv = \
+                (test_rms, test_mat, test_dist, test_rv, test_tv,
+                 test_std_int, test_std_ext, test_per_view) = \
                     _run_calibration(test_corners, test_ids)
             except Exception:
                 break
 
-            if test_rms >= rms:
+            # Stop only if removal worsens BOTH parameter uncertainty AND RMS by >5%.
+            # Protects edge frames whose removal lowers RMS but raises intrinsic stdDev.
+            current_unc = _intrinsic_uncertainty(std_intrinsics)
+            test_unc = _intrinsic_uncertainty(test_std_int)
+            if test_unc >= current_unc and test_rms >= rms * 1.05:
                 break
 
             logger.info(
                 f"Filter round {round_num + 1}: removing frame {original_indices[worst_idx]} "
-                f"(RMS {rms:.4f} -> {test_rms:.4f})")
+                f"(RMS {rms:.4f} -> {test_rms:.4f}, "
+                f"std_max {current_unc:.2f} -> {test_unc:.2f})")
 
             rejected_indices.append(original_indices[worst_idx])
             corners = test_corners
@@ -419,10 +458,29 @@ class CompatibleCharucoDetector:
                 idx for j, idx in enumerate(original_indices) if j != worst_idx]
             rms, camera_matrix, dist_coeffs = test_rms, test_mat, test_dist
             rvecs, tvecs = test_rv, test_tv
+            std_intrinsics, std_extrinsics, per_view_errors = \
+                test_std_int, test_std_ext, test_per_view
+
+        # OpenCV stdDeviationsIntrinsics order: fx, fy, cx, cy, k1, k2, p1, p2, k3
+
+        std_flat = std_intrinsics.flatten() if std_intrinsics is not None else np.zeros(4)
+        per_view_flat = per_view_errors.flatten() if per_view_errors is not None else np.array([])
+        diagnostics = {
+            "std_fx": float(std_flat[0]) if len(std_flat) > 0 else 0.0,
+            "std_fy": float(std_flat[1]) if len(std_flat) > 1 else 0.0,
+            "std_cx": float(std_flat[2]) if len(std_flat) > 2 else 0.0,
+            "std_cy": float(std_flat[3]) if len(std_flat) > 3 else 0.0,
+            "per_view_errors": per_view_flat.tolist(),
+            "per_view_median": float(np.median(per_view_flat)) if len(per_view_flat) else 0.0,
+            "per_view_max": float(np.max(per_view_flat)) if len(per_view_flat) else 0.0,
+            "retained_original_indices": list(original_indices),
+        }
 
         logger.info(
-            f"Final: RMS={rms:.4f}, images={len(corners)}, rejected={len(rejected_indices)}")
-        return rms, camera_matrix, dist_coeffs, rejected_indices
+            f"Final: RMS={rms:.4f}, images={len(corners)}, rejected={len(rejected_indices)}, "
+            f"stdDev(fx,fy)=({diagnostics['std_fx']:.2f}, {diagnostics['std_fy']:.2f}), "
+            f"per-view median={diagnostics['per_view_median']:.4f} max={diagnostics['per_view_max']:.4f}")
+        return rms, camera_matrix, dist_coeffs, rejected_indices, diagnostics
 
     def calibrate_with_outlier_rejection(
         self,

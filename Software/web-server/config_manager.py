@@ -378,6 +378,32 @@ class ConfigurationManager:
 
         return result
 
+    def set_calibration_batch(self, updates: Dict[str, Any]) -> Tuple[bool, str]:
+        """Atomic multi-key write to calibration data. All keys must be calibration fields."""
+        if not updates:
+            return True, "No updates"
+
+        with self._lock:
+            for key in updates:
+                if not self._is_calibration_field(key):
+                    return False, f"Key {key} is not a calibration field"
+
+            calibration_copy = copy.deepcopy(self.calibration_data)
+            for key, value in updates.items():
+                if not self._set_in_dict(calibration_copy, key, value):
+                    return False, f"Failed to set {key}"
+
+            if not self._save_json(self.calibration_data_path, calibration_copy):
+                return False, "Failed to save calibration data"
+
+            self.calibration_data = calibration_copy
+            self._rebuild_merged_config()
+
+            for key, value in updates.items():
+                self._notify_callbacks(key, value)
+
+        return True, f"Saved {len(updates)} calibration values"
+
     def _set_in_dict(self, d: Dict[str, Any], key: str, value: Any) -> bool:
         """Set value in nested dictionary using dot notation"""
         parts = key.split(".")

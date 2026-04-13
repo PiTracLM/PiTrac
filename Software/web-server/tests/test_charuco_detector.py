@@ -36,7 +36,7 @@ class TestCoverageTracker:
         assert all(cell == 0 for row in tracker.coverage for cell in row)
 
     def test_update_center(self):
-        tracker = CoverageTracker(900, 900, grid_rows=3, grid_cols=3)
+        tracker = CoverageTracker(900, 900, grid_rows=3, grid_cols=3, cell_target=1)
         corners = np.array([[[450, 450]]], dtype=np.float32)
         tracker.update(corners)
         assert tracker.coverage[1][1] == 1
@@ -65,15 +65,27 @@ class TestCoverageTracker:
         assert tracker.get_coverage_fraction() == 0.0
 
     def test_multiple_updates_same_cell(self):
-        tracker = CoverageTracker(900, 900)
+        tracker = CoverageTracker(900, 900, cell_target=1)
         corners = np.array([[[50, 50]]], dtype=np.float32)
         tracker.update(corners)
         tracker.update(corners)
         assert tracker.coverage[0][0] == 2
         assert tracker.get_coverage_fraction() == pytest.approx(1 / 9)
 
+    def test_cell_target_gates_coverage(self):
+        """A cell must reach cell_target samples before it counts as covered."""
+        tracker = CoverageTracker(900, 900, cell_target=3)
+        corners = np.array([[[50, 50]]], dtype=np.float32)
+        tracker.update(corners)
+        tracker.update(corners)
+        assert tracker.coverage[0][0] == 2
+        assert tracker.get_coverage_fraction() == 0.0  # 2 < cell_target=3
+        tracker.update(corners)
+        assert tracker.coverage[0][0] == 3
+        assert tracker.get_coverage_fraction() == pytest.approx(1 / 9)
+
     def test_full_coverage(self):
-        tracker = CoverageTracker(900, 900)
+        tracker = CoverageTracker(900, 900, cell_target=1)
         for r in range(3):
             for c in range(3):
                 cx = c * 300 + 150

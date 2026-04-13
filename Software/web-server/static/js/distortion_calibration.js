@@ -33,7 +33,7 @@ const distortionCalibration = {
             const response = await fetch(`/api/calibration/distortion/${camera}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ target_images: 30 })
+                body: JSON.stringify({ target_images: 40 })
             });
 
             if (!response.ok) {
@@ -110,13 +110,13 @@ const distortionCalibration = {
         }
 
         if (status.images_captured !== undefined) {
-            const target = status.target_images || 30;
+            const target = status.target_images || 40;
             detailsText.textContent =
                 `${status.images_captured} of ${target} good images captured`;
         }
 
         if (status.images_captured !== undefined) {
-            const target = status.target_images || 30;
+            const target = status.target_images || 40;
             const imagesOk = status.images_captured >= target;
             const reqImages = document.getElementById('req-images');
             if (reqImages) {

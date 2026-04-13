@@ -35,6 +35,13 @@ CHARUCO_SQUARES_Y = 11
 CHARUCO_SQUARE_LENGTH = 0.023
 CHARUCO_MARKER_LENGTH = 0.017
 
+# Locked to defeat AE/AWB/tuning drift across calibration frames (sub-pixel
+# corner bias). Tuning file matches production rcPi5GS.sh; shutter is shorter
+# than production (11 vs 20 ms) to limit hand-tremor blur.
+RPICAM_TUNING_FILE = "/usr/share/libcamera/ipa/rpi/pisp/imx296_noir.json"
+RPICAM_CAL_SHUTTER_US = 11000
+RPICAM_CAL_GAIN = 1.3
+
 
 class RpicamVideoStream:
     """cv2.VideoCapture-compatible wrapper around rpicam-vid for Pi CSI cameras."""
@@ -58,6 +65,11 @@ class RpicamVideoStream:
                 "--framerate", "15",
                 "--codec", "mjpeg", "--output", "-",
                 "--timeout", "0", "--nopreview",
+                "--shutter", str(RPICAM_CAL_SHUTTER_US),
+                "--gain", str(RPICAM_CAL_GAIN),
+                "--awbgains", "1.0,1.0",
+                "--denoise", "cdn_off",
+                "--tuning-file", RPICAM_TUNING_FILE,
             ],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
@@ -867,10 +879,10 @@ class PiTracServer:
             if self.calibration_manager.loop is None:
                 return {"status": "error", "message": "Server still starting up, please retry in a moment"}
 
-            target_images = 30
+            target_images = 40
             try:
                 body = await request.json()
-                target_images = body.get("target_images", 30)
+                target_images = body.get("target_images", 40)
             except Exception:
                 pass  # No body or invalid JSON is fine, use default
 
