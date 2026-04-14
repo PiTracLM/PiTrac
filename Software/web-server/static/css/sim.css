@@ -1,0 +1,241 @@
+#sim-app {
+  position: fixed;
+  top: 80px;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0b1018;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+#sim-view {
+  position: absolute;
+  inset: 0;
+}
+
+#sim-overlay {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  padding: 16px 20px;
+  background: rgba(18, 26, 39, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  min-width: 240px;
+  color: #e6ecf3;
+  font: 13px/1.3 -apple-system, "SF Pro Text", Inter, system-ui, sans-serif;
+}
+
+#sim-overlay h1 {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #7c8aa0;
+  margin: 0 0 10px;
+}
+
+.sim-tabs {
+  display: flex;
+  margin: 0 0 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sim-tab {
+  flex: 1;
+  padding: 7px 0;
+  font: 600 10px/1 inherit;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7c8aa0;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.sim-tab:hover { color: #e6ecf3; }
+.sim-tab.active { color: #7fdbff; border-bottom-color: #7fdbff; }
+
+.sim-panel { display: none; }
+.sim-panel.active { display: block; }
+
+.sim-metric {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.sim-metric:last-child { border-bottom: 0; }
+
+.sim-metric .label {
+  font-size: 10px;
+  color: #7c8aa0;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.sim-metric .value {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-metric .unit {
+  font-size: 10px;
+  color: #7c8aa0;
+  margin-left: 4px;
+}
+
+#sim-images-panel {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 220px;
+  background: rgba(18, 26, 39, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 12px;
+  display: none;
+  color: #e6ecf3;
+  font: 13px/1.3 -apple-system, system-ui, sans-serif;
+}
+
+#sim-images-panel.visible { display: block; }
+
+#sim-images-panel h2 {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #7c8aa0;
+  margin: 0 0 8px;
+}
+
+.sim-img-thumb {
+  width: 100%;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0a1218;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+
+.sim-img-thumb:hover { border-color: #7fdbff; }
+
+.sim-img-caption {
+  font-size: 10px;
+  color: #7c8aa0;
+  margin-bottom: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#sim-status {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background: rgba(18, 26, 39, 0.9);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  font: 500 11px/1 -apple-system, system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  color: #e6ecf3;
+  white-space: nowrap;
+  max-width: calc(100% - 520px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#sim-status.hidden { display: none; }
+
+.sim-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #56627a;
+  flex-shrink: 0;
+}
+
+.sim-status-sep { color: #7c8aa0; opacity: 0.6; }
+#sim-status-title { font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; }
+#sim-status-msg   { color: #b4beca; font-weight: 400; }
+
+#sim-status.initializing .sim-status-dot,
+#sim-status.waiting      .sim-status-dot { background: #b9a15c; animation: sim-pulse 1.6s infinite; }
+#sim-status.stabilizing  .sim-status-dot { background: #7fdbff; animation: sim-pulse 1.0s infinite; }
+#sim-status.ready        .sim-status-dot { background: #4adf6f; animation: sim-pulse 1.2s infinite; }
+#sim-status.hit          .sim-status-dot { background: #4adf6f; }
+#sim-status.error        .sim-status-dot { background: #ff6b6b; }
+
+#sim-status.initializing { border-color: rgba(185, 161, 92, 0.4); }
+#sim-status.waiting      { border-color: rgba(185, 161, 92, 0.4); }
+#sim-status.stabilizing  { border-color: rgba(127, 219, 255, 0.45); }
+#sim-status.ready        { border-color: rgba(74, 223, 111, 0.45); }
+#sim-status.hit          { border-color: rgba(74, 223, 111, 0.45); }
+#sim-status.error        { border-color: rgba(255, 107, 107, 0.45); }
+
+@keyframes sim-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(127, 219, 255, 0.45); }
+  70%  { box-shadow: 0 0 0 8px rgba(127, 219, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(127, 219, 255, 0); }
+}
+
+#sim-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #7c8aa0;
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+#sim-empty.hidden { display: none; }
+
+#sim-controls {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 8px 14px;
+  background: rgba(18, 26, 39, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+
+#sim-speed {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: #7c8aa0;
+}
+
+#sim-speed label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+#sim-speed input { accent-color: #7fdbff; }

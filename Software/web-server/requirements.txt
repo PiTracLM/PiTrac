@@ -3,6 +3,7 @@ uvicorn[standard]==0.44.0
 python-multipart==0.0.26
 jinja2==3.1.6
 pillow==12.2.0
+numpy>=1.24,<3
 pyyaml==6.0.3
 aiofiles==25.1.0
 websockets==16.0

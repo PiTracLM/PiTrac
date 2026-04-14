@@ -23,6 +23,7 @@ from constants import (
 from managers import ConnectionManager, ShotDataStore
 from models import ShotData
 from parsers import ShotDataParser
+from physics import ShotPredictor
 from pitrac_manager import PiTracProcessManager
 from strobe_calibration_manager import StrobeCalibrationManager
 from testing_tools_manager import TestingToolsManager
@@ -179,6 +180,7 @@ class PiTracServer:
         self.connection_manager = ConnectionManager()
         self.shot_store = ShotDataStore()
         self.parser = ShotDataParser()
+        self.shot_predictor = ShotPredictor()
         self.config_manager = ConfigurationManager()
         self.pitrac_manager = PiTracProcessManager(self.config_manager)
         self.calibration_manager = CalibrationManager(self.config_manager)
@@ -213,6 +215,10 @@ class PiTracServer:
                 "dashboard.html",
                 context={"shot": self.shot_store.get().to_dict()},
             )
+
+        @self.app.get("/sim", response_class=HTMLResponse)
+        async def sim(request: Request) -> Response:
+            return self.templates.TemplateResponse(request, "sim.html")
 
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket) -> None:
@@ -295,6 +301,31 @@ class PiTracServer:
 
             self.shot_store.update(shot_data)
             await self.connection_manager.broadcast(shot_data.to_dict())
+
+            if not (is_status or is_fake_hit) and shot_data.speed > 0:
+                try:
+                    trajectory = self.shot_predictor.predict(
+                        ball_speed_mph=shot_data.speed,
+                        launch_angle_deg=shot_data.launch_angle,
+                        back_spin_rpm=shot_data.back_spin,
+                        side_spin_rpm=shot_data.side_spin,
+                        launch_direction_deg=shot_data.side_angle,
+                    )
+                    await self.connection_manager.broadcast({
+                        "type": "shot_trajectory",
+                        "timestamp": shot_data.timestamp,
+                        "inputs": {
+                            "ball_speed_mph": shot_data.speed,
+                            "launch_angle_deg": shot_data.launch_angle,
+                            "launch_direction_deg": shot_data.side_angle,
+                            "back_spin_rpm": shot_data.back_spin,
+                            "side_spin_rpm": shot_data.side_spin,
+                        },
+                        **trajectory,
+                    })
+                except Exception as e:
+                    logger.warning(f"shot trajectory prediction failed: {e}")
+
             return {"status": "ok"}
 
         @self.app.post("/api/internal/image-ready")

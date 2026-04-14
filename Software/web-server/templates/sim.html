@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}PiTrac - Shot Sim{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/sim.css?v={{ range(1, 1000000) | random }}">
+{% endblock %}
+
+{% block content %}
+<div id="sim-app">
+  <div id="sim-view"></div>
+
+  <div id="sim-status" class="hidden">
+    <span class="sim-status-dot"></span>
+    <span id="sim-status-title">Waiting</span>
+    <span class="sim-status-sep">—</span>
+    <span id="sim-status-msg">…</span>
+  </div>
+
+  <div id="sim-overlay">
+    <h1>Shot Summary</h1>
+    <div class="sim-tabs" role="tablist">
+      <button class="sim-tab active" data-tab="lm">LM Data</button>
+      <button class="sim-tab" data-tab="physics">Physics</button>
+    </div>
+    <div class="sim-panel active" id="sim-tab-lm">
+      <div class="sim-metric"><span class="label">Ball Speed</span><span><span class="value" id="sm-bs">—</span><span class="unit">mph</span></span></div>
+      <div class="sim-metric"><span class="label">Launch Angle</span><span><span class="value" id="sm-la">—</span><span class="unit">°</span></span></div>
+      <div class="sim-metric"><span class="label">Launch Dir.</span><span><span class="value" id="sm-ld">—</span><span class="unit">°</span></span></div>
+      <div class="sim-metric"><span class="label">Back Spin</span><span><span class="value" id="sm-bs-spin">—</span><span class="unit">rpm</span></span></div>
+      <div class="sim-metric"><span class="label">Side Spin</span><span><span class="value" id="sm-ss-spin">—</span><span class="unit">rpm</span></span></div>
+    </div>
+    <div class="sim-panel" id="sim-tab-physics">
+      <div class="sim-metric"><span class="label">Carry</span><span><span class="value" id="sm-carry">—</span><span class="unit">yd</span></span></div>
+      <div class="sim-metric"><span class="label">Apex</span><span><span class="value" id="sm-apex">—</span><span class="unit">ft</span></span></div>
+      <div class="sim-metric"><span class="label">Landing Angle</span><span><span class="value" id="sm-land-a">—</span><span class="unit">°</span></span></div>
+      <div class="sim-metric"><span class="label">Landing Speed</span><span><span class="value" id="sm-land-s">—</span><span class="unit">mph</span></span></div>
+      <div class="sim-metric"><span class="label">Flight Time</span><span><span class="value" id="sm-flight-t">—</span><span class="unit">s</span></span></div>
+      <div class="sim-metric"><span class="label">Roll</span><span><span class="value" id="sm-roll">—</span><span class="unit">yd</span></span></div>
+      <div class="sim-metric"><span class="label">Total</span><span><span class="value" id="sm-total">—</span><span class="unit">yd</span></span></div>
+      <div class="sim-metric"><span class="label">Side</span><span><span class="value" id="sm-side">—</span><span class="unit">yd</span></span></div>
+    </div>
+  </div>
+
+  <div id="sim-images-panel">
+    <h2>Shot Images</h2>
+    <div id="sim-images-list"></div>
+  </div>
+
+  <div id="sim-empty">Waiting for a shot…</div>
+
+  <div id="sim-controls">
+    <div id="sim-speed">
+      <label><input type="radio" name="sim-speed" value="1" checked> 1×</label>
+      <label><input type="radio" name="sim-speed" value="1.5"> 1.5×</label>
+      <label><input type="radio" name="sim-speed" value="2"> 2×</label>
+    </div>
+    <button id="sim-replay" class="btn btn-sm btn-primary" disabled>Replay</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="/static/js/sim.js?v={{ range(1, 1000000) | random }}"></script>
+{% endblock %}
