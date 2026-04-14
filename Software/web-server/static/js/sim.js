@@ -11,22 +11,31 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b1018);
 scene.fog = new THREE.Fog(0x0b1018, 200, 600);
 
+const CAMERA_HOME = new THREE.Vector3(0, 30, -55);
+const CAMERA_TARGET = new THREE.Vector3(0, 0, 100);
+
 const camera = new THREE.PerspectiveCamera(42, 1, 0.5, 2000);
-camera.position.set(-10, 30, -55);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 container.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 0, 100);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 8;
 controls.maxDistance = 800;
 controls.maxPolarAngle = Math.PI / 2 - 0.05;
-camera.lookAt(0, 0, 100);
-controls.update();
+
+function resetCamera() {
+  camera.position.copy(CAMERA_HOME);
+  camera.up.set(0, 1, 0);
+  controls.target.copy(CAMERA_TARGET);
+  camera.lookAt(CAMERA_TARGET);
+  controls.update();
+}
+resetCamera();
+window.addEventListener("pageshow", resetCamera);
 
 scene.add(new THREE.AmbientLight(0x99aabb, 0.5));
 const sun = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -369,25 +378,34 @@ function setStatus(state, title, msg) {
   statusMsg.textContent = msg;
 }
 
-function updateStatusFromShot(resultType, message) {
-  if (!resultType) return;
+function updateBallStatus(resultType, message, isPiTracRunning) {
+  if (isPiTracRunning === false) {
+    setStatus("error", "System Stopped", "PiTrac is not running — click Start to begin");
+    return;
+  }
+  if (!resultType) {
+    setStatus(null, "System Status", message || "—");
+    return;
+  }
   const t = resultType.toLowerCase();
   if (t.includes("initializing")) {
-    setStatus("initializing", "Initializing", message || "Starting up PiTrac…");
+    setStatus("initializing", "System Initializing", message || "Starting up PiTrac…");
   } else if (t.includes("waiting for ball")) {
-    setStatus("waiting", "Waiting for Ball", message || "Place ball on tee");
+    setStatus("waiting", "Waiting for Ball", message || "Please place ball on tee");
   } else if (t.includes("waiting for simulator")) {
-    setStatus("waiting", "Waiting for Simulator", message || "Waiting on simulator…");
+    setStatus("waiting", "Waiting for Simulator", message || "Waiting for simulator to be ready");
   } else if (t.includes("pausing") || t.includes("stabilization")) {
     setStatus("stabilizing", "Ball Detected", message || "Waiting for ball to stabilize…");
   } else if (t.includes("ball ready") || t.includes("ready")) {
     setStatus("ready", "Ready to Hit!", message || "Ball is ready, take your shot");
   } else if (t.includes("hit")) {
     setStatus("hit", "Ball Hit!", message || "Processing shot data…");
-  } else if (t.includes("error")) {
-    setStatus("error", "Error", message || "Something went wrong");
   } else if (t.includes("multiple balls")) {
-    setStatus("error", "Multiple Balls", message || "Remove extra balls");
+    setStatus("error", "Multiple Balls Detected", message || "Please remove extra balls");
+  } else if (t.includes("error")) {
+    setStatus("error", "Error", message || "An error occurred");
+  } else {
+    setStatus(null, "System Status", message || resultType);
   }
 }
 
@@ -404,13 +422,26 @@ function connectWs() {
     } else if (data.type === "image_ready" && data.filename) {
       const ts = Date.now();
       addShotImage(`/images/${data.filename}?t=${ts}`, data.caption || null);
-    } else if (data.result_type) {
-      updateStatusFromShot(data.result_type, data.message);
+    } else if (data.result_type !== undefined || data.pitrac_running !== undefined) {
+      updateBallStatus(data.result_type, data.message, data.pitrac_running);
     }
   };
   ws.onclose = () => setTimeout(connectWs, 2000);
 }
 connectWs();
+
+updateBallStatus(null, null, false);
+
+(function wrapPiTracStatusPoll() {
+  if (typeof window === "undefined") return;
+  if (typeof window.checkPiTracStatus !== "function") return;
+  const original = window.checkPiTracStatus;
+  window.checkPiTracStatus = async function () {
+    const isRunning = await original();
+    if (!isRunning) updateBallStatus(null, null, false);
+    return isRunning;
+  };
+})();
 
 window.addEventListener("resize", resize);
 resize();
