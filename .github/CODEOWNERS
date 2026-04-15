@@ -11,16 +11,8 @@
 # Python Web Server
 /Software/web-server/ @connorgallopo 
 
-# Yolo Model + Tooling
-/Software/GroundTruthAnnotator/ @connorgallopo
+# Image Processing
 /Software/LMSourceCode/ImageProcessing/ @jamespilgrim @connorgallopo
-
-# Documentation files
-/docs/ @jeshernandez @connorgallopo
-/docs/hardware/ @markjonharman
-
-# Installation Scripts
-/Dev/ @jeshernandez @connorgallopo
 
 # Hardware
 /Hardware/ @markjonharman
