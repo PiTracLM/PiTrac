@@ -19,8 +19,7 @@ using ip::tcp;
 namespace golf_sim {
 
     class GsSimSocketInterface : public GsSimInterface {
-
-    public:
+       public:
         GsSimSocketInterface();
         virtual ~GsSimSocketInterface();
 
@@ -37,23 +36,20 @@ namespace golf_sim {
 
         virtual void ReceiveSocketData();
 
-    public:
-
+       public:
         std::string socket_connect_address_;
         std::string socket_connect_port_;
 
-    protected:
-
+       protected:
         virtual std::string GenerateResultsDataToSend(const GsResults& results);
-        
+
         virtual bool ProcessReceivedData(const std::string received_data);
 
-        // Default behavior here is just to send the message to the socket and 
+        // Default behavior here is just to send the message to the socket and
         // return the number of bytes written
         virtual int SendSimMessage(const std::string& message);
 
-    protected:
-
+       protected:
         tcp::socket* socket_ = nullptr;
         boost::asio::io_context* io_context_ = nullptr;
 
@@ -66,4 +62,4 @@ namespace golf_sim {
         boost::mutex sim_socket_send_mutex_;
     };
 
-}
+}  // namespace golf_sim

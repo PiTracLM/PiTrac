@@ -13,21 +13,20 @@
 
 #ifdef __unix__  // Ignore in Windows environment
 
+    #include <boost/lockfree/queue.hpp>
+    #include <boost/thread/thread.hpp>
 
-#include <boost/thread/thread.hpp>
-#include <boost/lockfree/queue.hpp>
+    #include "blocking_queue.h"
 
-#include "blocking_queue.h"
+    #include <opencv2/core.hpp>
 
-#include <opencv2/core.hpp>
-
-#include "golf_ball.h"
-#include "gs_control_msg.h"
+    #include "golf_ball.h"
+    #include "gs_control_msg.h"
 
 namespace golf_sim {
 
     class GolfSimEventBase {
-    public:
+       public:
         GolfSimEventBase() {};
         virtual ~GolfSimEventBase() {};
 
@@ -36,36 +35,32 @@ namespace golf_sim {
 
     namespace GolfSimEvent {
 
-        class EventLoopTick : public GolfSimEventBase
-        {
-        public:
+        class EventLoopTick : public GolfSimEventBase {
+           public:
             EventLoopTick() {};
             ~EventLoopTick() {};
 
             virtual std::string Format() override { return "EventLoopTick"; };
         };
 
-        class BeginWatchingForBallHit : public GolfSimEventBase
-        {
-        public:
+        class BeginWatchingForBallHit : public GolfSimEventBase {
+           public:
             BeginWatchingForBallHit() {};
             ~BeginWatchingForBallHit() {};
 
             virtual std::string Format() override { return "BeginWatchingForBallHit"; };
         };
 
-        class BeginWaitingForBallPlaced : public GolfSimEventBase
-        {
-        public:
+        class BeginWaitingForBallPlaced : public GolfSimEventBase {
+           public:
             BeginWaitingForBallPlaced() {};
             ~BeginWaitingForBallPlaced() {};
 
             virtual std::string Format() override { return "BeginWaitingForBallPlaced"; };
         };
 
-        class CheckForBallStable : public GolfSimEventBase
-        {
-        public:
+        class CheckForBallStable : public GolfSimEventBase {
+           public:
             CheckForBallStable() {};
             ~CheckForBallStable() {};
 
@@ -73,9 +68,8 @@ namespace golf_sim {
         };
 
         // The previously-located ball will be held in the stabilizing state class
-        class BallStabilized : public GolfSimEventBase
-        {
-        public:
+        class BallStabilized : public GolfSimEventBase {
+           public:
             BallStabilized(GolfBall& ball) { ball_ = ball; };
             ~BallStabilized() {};
 
@@ -84,49 +78,53 @@ namespace golf_sim {
             GolfBall ball_;
         };
 
-        class BallHit : public GolfSimEventBase
-        {
-        public:
-            BallHit(GolfBall& ball, cv::Mat& ball_hit_image) { ball_ = ball; ball_hit_image_ = ball_hit_image; };
+        class BallHit : public GolfSimEventBase {
+           public:
+            BallHit(GolfBall& ball, cv::Mat& ball_hit_image) {
+                ball_ = ball;
+                ball_hit_image_ = ball_hit_image;
+            };
             ~BallHit() {};
 
             virtual std::string Format() override { return "BallHit"; };
 
-            GolfBall ball_; cv::Mat ball_hit_image_;
+            GolfBall ball_;
+            cv::Mat ball_hit_image_;
         };
 
-        class ControlMessage : public GolfSimEventBase
-        {
-        public:
-            ControlMessage(const GsIPCControlMsgType& message_type) { message_type_ = message_type; };
+        class ControlMessage : public GolfSimEventBase {
+           public:
+            ControlMessage(const GsIPCControlMsgType& message_type) {
+                message_type_ = message_type;
+            };
             ~ControlMessage() {};
 
-            virtual std::string Format() override { return "ControlMessage - " + GsIPCControlMsg::FormatControlMessageType(message_type_); };
+            virtual std::string Format() override {
+                return "ControlMessage - " +
+                       GsIPCControlMsg::FormatControlMessageType(message_type_);
+            };
 
             GsIPCControlMsgType message_type_;
         };
 
-        class BeginWaitingForSimulatorArmed : public GolfSimEventBase
-        {
-        public:
+        class BeginWaitingForSimulatorArmed : public GolfSimEventBase {
+           public:
             BeginWaitingForSimulatorArmed() {};
             ~BeginWaitingForSimulatorArmed() {};
 
             virtual std::string Format() override { return "BeginWaitingForSimulatorArmed"; };
         };
 
-        class SimulatorIsArmed : public GolfSimEventBase
-        {
-        public:
+        class SimulatorIsArmed : public GolfSimEventBase {
+           public:
             SimulatorIsArmed() {};
             ~SimulatorIsArmed() {};
 
             virtual std::string Format() override { return "SimulatorIsArmed"; };
         };
 
-        class CheckForCam2ImageReceived : public GolfSimEventBase
-        {
-        public:
+        class CheckForCam2ImageReceived : public GolfSimEventBase {
+           public:
             CheckForCam2ImageReceived() {};
             ~CheckForCam2ImageReceived() {};
 
@@ -134,9 +132,8 @@ namespace golf_sim {
         };
 
         // TBD - this error event isn't really handled properly yet
-        class FoundMultipleBalls : public GolfSimEventBase
-        {
-        public:
+        class FoundMultipleBalls : public GolfSimEventBase {
+           public:
             FoundMultipleBalls() {};
             ~FoundMultipleBalls() {};
 
@@ -145,59 +142,49 @@ namespace golf_sim {
             unsigned int numberBallsFound = 0;
         };
 
-        class Camera2ImageReceived : public GolfSimEventBase
-        {
-        public:
-            Camera2ImageReceived(const cv::Mat& ball_hit_image) { ball_flight_image_ = ball_hit_image; };
+        class Camera2ImageReceived : public GolfSimEventBase {
+           public:
+            Camera2ImageReceived(const cv::Mat& ball_hit_image) {
+                ball_flight_image_ = ball_hit_image;
+            };
             ~Camera2ImageReceived() {};
 
             virtual std::string Format() override { return "Camera2ImageReceived"; };
 
             const cv::Mat& GetBallFlightImage() const { return ball_flight_image_; };
 
-        private:
+           private:
             cv::Mat ball_flight_image_;
         };
 
         // Reset the FSM to the initializing state
-        class Restart : public GolfSimEventBase
-        { 
-        public:
+        class Restart : public GolfSimEventBase {
+           public:
             Restart() {};
             ~Restart() {};
 
             virtual std::string Format() override { return "Restart"; };
-
         };
 
-        class Exit : public GolfSimEventBase
-        {
-        public:
+        class Exit : public GolfSimEventBase {
+           public:
             Exit() {};
             ~Exit() {};
 
             virtual std::string Format() override { return "Exit"; };
-
         };
 
-    }
+    }  // namespace GolfSimEvent
 
-    using PossibleEvent = std::variant< GolfSimEvent::EventLoopTick, 
-                                        GolfSimEvent::BeginWaitingForSimulatorArmed,
-                                        GolfSimEvent::SimulatorIsArmed,
-                                        GolfSimEvent::BeginWaitingForBallPlaced,
-                                        GolfSimEvent::CheckForBallStable, 
-                                        GolfSimEvent::BallStabilized, 
-                                        GolfSimEvent::BallHit,
-                                        GolfSimEvent::ControlMessage,
-                                        GolfSimEvent::BeginWatchingForBallHit,
-                                        GolfSimEvent::FoundMultipleBalls,
-                                        GolfSimEvent::CheckForCam2ImageReceived,
-                                        GolfSimEvent::Camera2ImageReceived,
-                                        GolfSimEvent::Exit,
-                                        GolfSimEvent::Restart>;
+    using PossibleEvent =
+        std::variant<GolfSimEvent::EventLoopTick, GolfSimEvent::BeginWaitingForSimulatorArmed,
+                     GolfSimEvent::SimulatorIsArmed, GolfSimEvent::BeginWaitingForBallPlaced,
+                     GolfSimEvent::CheckForBallStable, GolfSimEvent::BallStabilized,
+                     GolfSimEvent::BallHit, GolfSimEvent::ControlMessage,
+                     GolfSimEvent::BeginWatchingForBallHit, GolfSimEvent::FoundMultipleBalls,
+                     GolfSimEvent::CheckForCam2ImageReceived, GolfSimEvent::Camera2ImageReceived,
+                     GolfSimEvent::Exit, GolfSimEvent::Restart>;
 
-    
     struct GolfSimEventElement {
         /*
         GolfSimEventElement(const GolfSimEventElement& rhs) { e_ = rhs.e_; };
@@ -209,7 +196,8 @@ namespace golf_sim {
         ~GolfSimEventElement();
         */
 
-        // TBD - Do we need a std::move constructor and assignment here?  Will that work with a variant?
+        // TBD - Do we need a std::move constructor and assignment here?  Will that work with a
+        // variant?
 
         GolfSimEventBase* e_;
 
@@ -217,8 +205,7 @@ namespace golf_sim {
     };
 
     class GolfSimEventQueue {
-
-    public:
+       public:
         static const int kMaxQueueSize = 20;
 
         static bool QueueEvent(GolfSimEventElement& event);
@@ -237,11 +224,12 @@ namespace golf_sim {
         // Not thread safe
         static int GetQueueLength();
 
-        // static boost::lockfree::queue<GolfSimEventElement, boost::lockfree::capacity<kMaxQueueSize>> queue_;
+        // static boost::lockfree::queue<GolfSimEventElement,
+        // boost::lockfree::capacity<kMaxQueueSize>> queue_;
         static queue<GolfSimEventElement> queue_;
 
         static int queue_size_;
     };
-}
+}  // namespace golf_sim
 
-#endif // #ifdef __unix__  // Ignore in Windows environment
+#endif  // #ifdef __unix__  // Ignore in Windows environment

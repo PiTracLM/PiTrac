@@ -4,52 +4,52 @@
  */
 
 // "TruGolf Simulators" and other marks such as E6 may be trademarked by TruGolf, Inc.
-// The PiTrac project is not endorsed, sponsored by or associated with TrueGolf products or services.
-
+// The PiTrac project is not endorsed, sponsored by or associated with TrueGolf products or
+// services.
 
 #include <iostream>
 
 #ifdef __unix__  // Ignore in Windows environment
 
-#include <pthread.h>
-#include <boost/asio.hpp>
-#include <boost/bind/bind.hpp>
-#include <boost/enable_shared_from_this.hpp>
+    #include <pthread.h>
+    #include <boost/asio.hpp>
+    #include <boost/bind/bind.hpp>
+    #include <boost/enable_shared_from_this.hpp>
 
-#include "logging_tools.h"
-#include "gs_options.h"
-#include "gs_config.h"
-#include "gs_events.h"
-#include "gs_control_msg.h"
+    #include "gs_config.h"
+    #include "gs_control_msg.h"
+    #include "gs_events.h"
+    #include "gs_options.h"
+    #include "logging_tools.h"
 
-#include "gs_e6_interface.h"
-#include "gs_e6_results.h"
-#include "gs_e6_response.h"
+    #include "gs_e6_interface.h"
+    #include "gs_e6_response.h"
+    #include "gs_e6_results.h"
 
 using namespace boost::asio;
 using ip::tcp;
-
 
 namespace golf_sim {
 
     long GsE6Interface::kE6InterMessageDelayMs = 50;
 
     GsE6Interface::GsE6Interface() {
-
         if (!GolfSimOptions::GetCommandLineOptions().e6_host_address_.empty()) {
             socket_connect_address_ = GolfSimOptions::GetCommandLineOptions().e6_host_address_;
-        }
-        else {
-            GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress", socket_connect_address_);
+        } else {
+            GolfSimConfiguration::SetConstant(
+                "gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress",
+                socket_connect_address_);
         }
 
-        GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6ConnectPort", socket_connect_port_);
-        GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6InterMessageDelayMs", kE6InterMessageDelayMs);
+        GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6ConnectPort",
+                                          socket_connect_port_);
+        GolfSimConfiguration::SetConstant(
+            "gs_config.golf_simulator_interfaces.E6.kE6InterMessageDelayMs",
+            kE6InterMessageDelayMs);
     }
 
-    GsE6Interface::~GsE6Interface() {
-
-    }
+    GsE6Interface::~GsE6Interface() {}
 
     bool GsE6Interface::InterfaceIsPresent() {
         // TBD - For now, just see if the JSON file has E6 information.
@@ -58,16 +58,16 @@ namespace golf_sim {
         std::string test_socket_connect_address;
         if (!GolfSimOptions::GetCommandLineOptions().e6_host_address_.empty()) {
             test_socket_connect_address = GolfSimOptions::GetCommandLineOptions().e6_host_address_;
-            GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress", test_socket_connect_address);
+            GolfSimConfiguration::SetConstant(
+                "gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress",
+                test_socket_connect_address);
             return true;
-        }
-        else {
+        } else {
             GS_LOG_TRACE_MSG(trace, "GsE6Interface::InterfaceIsPresent - Not Present.");
             return false;
         }
         return (test_socket_connect_address != "");
     }
-
 
     bool GsE6Interface::Initialize() {
         // Setup the socket connect here first so
@@ -75,15 +75,17 @@ namespace golf_sim {
         // setup a keep-alive ping to the E6 system.
         GS_LOG_TRACE_MSG(trace, "GsE6Interface Initialize called.");
 
-	// Get the connection address from the command line if possible
+        // Get the connection address from the command line if possible
         if (!GolfSimOptions::GetCommandLineOptions().e6_host_address_.empty()) {
             socket_connect_address_ = GolfSimOptions::GetCommandLineOptions().e6_host_address_;
-        }
-        else {
-            GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress", socket_connect_address_);
+        } else {
+            GolfSimConfiguration::SetConstant(
+                "gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress",
+                socket_connect_address_);
         }
 
-        GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6ConnectPort", socket_connect_port_);
+        GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.E6.kE6ConnectPort",
+                                          socket_connect_port_);
 
         if (!GsSimSocketInterface::Initialize()) {
             GS_LOG_MSG(error, "GsE6Interface could not Initialize.");
@@ -104,9 +106,7 @@ namespace golf_sim {
         return true;
     }
 
-
     void GsE6Interface::DeInitialize() {
-
         // Send disconnect message to TruGolf before we finish up
         std::string results_msg = "{\"Type\":\"Disconnect\"}";
 
@@ -114,7 +114,6 @@ namespace golf_sim {
 
         GsSimSocketInterface::DeInitialize();
     }
-
 
     void GsE6Interface::SetSimSystemArmed(const bool is_armed) {
         boost::lock_guard<boost::mutex> lock(sim_arming_mutex_);
@@ -130,30 +129,33 @@ namespace golf_sim {
         return sim_system_is_armed_;
     }
 
-
     bool GsE6Interface::SendResults(const GsResults& input_results) {
-
         GS_LOG_TRACE_MSG(trace, "GsE6Interface::SendResults called.");
 
         if (!initialized_) {
-            GS_LOG_MSG(error, "GsE6Interface::SendResults called before the interface was intialized.");
+            GS_LOG_MSG(error,
+                       "GsE6Interface::SendResults called before the interface was intialized.");
             return false;
         }
 
         if (!GetSimSystemArmed()) {
-            GS_LOG_MSG(warning, "GsE6Interface::SendResults called before the E6 system was armed.");
+            GS_LOG_MSG(warning,
+                       "GsE6Interface::SendResults called before the E6 system was armed.");
             return false;
         }
 
         if (receive_thread_exited_) {
             // If we ended the recieve thread, try re-initializing the connection
 
-            GS_LOG_MSG(error, "GsGSProInterface::SendResults called before the interface was intialized.");
+            GS_LOG_MSG(error,
+                       "GsGSProInterface::SendResults called before the interface was intialized.");
 
             DeInitialize();
             if (!Initialize()) {
-                GS_LOG_MSG(error, "GsE6Interface::SendResults called before the interface was intialized.");
-            return false;
+                GS_LOG_MSG(
+                    error,
+                    "GsE6Interface::SendResults called before the interface was intialized.");
+                return false;
             }
         }
 
@@ -183,10 +185,12 @@ namespace golf_sim {
 
         // Create a dummy club data - we really don't have this information
         // Head speed is feet per second
-        club_data_child.put("ClubHeadSpeed", GsResults::FormatDoubleAsString(0.0)); // (results.speed_mph_ / 3600.) * 5280.));
+        club_data_child.put("ClubHeadSpeed", GsResults::FormatDoubleAsString(
+                                                 0.0));  // (results.speed_mph_ / 3600.) * 5280.));
         club_data_child.put("ClubAngleFace", GsResults::FormatDoubleAsString(0.0));
         club_data_child.put("ClubAnglePath", GsResults::FormatDoubleAsString(0.0));
-        club_data_child.put("ClubHeadSpeedMPH", GsResults::FormatDoubleAsString(0.0));  // results.speed_mph_));
+        club_data_child.put("ClubHeadSpeedMPH",
+                            GsResults::FormatDoubleAsString(0.0));  // results.speed_mph_));
 
         root.add_child("ClubData", club_data_child);
 
@@ -223,40 +227,43 @@ namespace golf_sim {
         return true;
     }
 
-
     std::string GsE6Interface::GenerateResultsDataToSend(const GsResults& input_results) {
-
         GsE6Results e6_results(input_results);
 
         std::string results_string = e6_results.Format();
 
-        GS_LOG_TRACE_MSG(trace, "GsE6Interface::GenerateResultsDataToSend) returning:\n" + results_string);
+        GS_LOG_TRACE_MSG(trace,
+                         "GsE6Interface::GenerateResultsDataToSend) returning:\n" + results_string);
 
         return results_string;
     }
 
-
     bool GsE6Interface::ProcessReceivedData(const std::string received_data) {
-
         GsE6Response e6_response;
         std::string e6_response_string;
 
         if (!e6_response.ProcessJson(received_data, e6_response_string)) {
-            GS_LOG_MSG(error, "Failed GsE6Interface::ProcessReceivedData - Could not process json: " + received_data);
+            GS_LOG_MSG(error,
+                       "Failed GsE6Interface::ProcessReceivedData - Could not process json: " +
+                           received_data);
             return false;
         }
 
         if (e6_response_string == "") {
-            // GS_LOG_TRACE_MSG(trace, "GsE6Interface::ProcessReceivedData had no response string to return to E6");
+            // GS_LOG_TRACE_MSG(trace, "GsE6Interface::ProcessReceivedData had no response string to
+            // return to E6");
             return true;
-        }
-        else {
-            GS_LOG_TRACE_MSG(trace, "GsE6Interface::ProcessReceivedData about to send response of: " + e6_response_string);
+        } else {
+            GS_LOG_TRACE_MSG(trace,
+                             "GsE6Interface::ProcessReceivedData about to send response of: " +
+                                 e6_response_string);
 
             size_t write_length = SendSimMessage(e6_response_string);
 
             if (write_length <= 0) {
-                GS_LOG_MSG(error, "GsE6Interface::ProcessReceivedData failed to send date message: " + e6_response_string);
+                GS_LOG_MSG(error,
+                           "GsE6Interface::ProcessReceivedData failed to send date message: " +
+                               e6_response_string);
                 return false;
             }
         }
@@ -264,8 +271,5 @@ namespace golf_sim {
         return true;
     }
 
-
-
-
-}
+}  // namespace golf_sim
 #endif

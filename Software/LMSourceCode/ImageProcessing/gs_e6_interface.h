@@ -3,13 +3,13 @@
  * Copyright (C) 2022-2025, Verdant Consultants, LLC.
  */
 
- // "TruGolf Simulators" and other marks such as E6 may be trademarked by TruGolf, Inc.
- // The PiTrac project is not endorsed, sponsored by or associated with TrueGolf products or services.
-
+// "TruGolf Simulators" and other marks such as E6 may be trademarked by TruGolf, Inc.
+// The PiTrac project is not endorsed, sponsored by or associated with TrueGolf products or
+// services.
 
 #pragma once
 
- // Base class for representing and transferring Golf Sim results to the E6 golf simulator
+// Base class for representing and transferring Golf Sim results to the E6 golf simulator
 
 #include <boost/asio.hpp>
 
@@ -22,8 +22,7 @@ using ip::tcp;
 namespace golf_sim {
 
     class GsE6Interface : public GsSimSocketInterface {
-
-    public:
+       public:
         GsE6Interface();
         virtual ~GsE6Interface();
 
@@ -41,14 +40,13 @@ namespace golf_sim {
         virtual void SetSimSystemArmed(const bool is_armed);
         virtual bool GetSimSystemArmed();
 
-    protected:
-
+       protected:
         virtual std::string GenerateResultsDataToSend(const GsResults& results);
 
         virtual bool ProcessReceivedData(const std::string received_data);
 
-    protected:
+       protected:
         static long kE6InterMessageDelayMs;
     };
 
-}
+}  // namespace golf_sim

@@ -7,19 +7,17 @@
 
 #pragma once
 
-#include <string>
-#include <iostream>
 #include <boost/asio.hpp>
 #include <boost/bind/bind.hpp>
+#include <iostream>
+#include <string>
 
 using boost::asio::ip::tcp;
 
-
 namespace golf_sim {
 
-    class GsGSProConnection : public std::enable_shared_from_this<GsGSProConnection>
-    {
-    public:
+    class GsGSProConnection : public std::enable_shared_from_this<GsGSProConnection> {
+       public:
         typedef std::shared_ptr<GsGSProConnection> pointer;
 
         static pointer Create(boost::asio::io_context& io_context, int port_number);
@@ -30,7 +28,7 @@ namespace golf_sim {
 
         void Start();
 
-    private:
+       private:
         GsGSProConnection(boost::asio::io_context& io_context, int port_number);
 
         void HandleWrite(const boost::system::error_code& error, size_t bytes_transferred);
@@ -39,20 +37,19 @@ namespace golf_sim {
         std::string message_;
     };
 
-    class GsGSProTestServer
-    {
-    public:
+    class GsGSProTestServer {
+       public:
         GsGSProTestServer(boost::asio::io_context& io_context, int port_number);
 
-    private:
+       private:
         void StartAccept();
 
         void HandleAccept(GsGSProConnection::pointer new_connection,
-            const boost::system::error_code& error);
-            
+                          const boost::system::error_code& error);
+
         boost::asio::io_context& io_context_;
         int port_number_ = 0;
         tcp::acceptor acceptor_;
     };
 
-}
+}  // namespace golf_sim

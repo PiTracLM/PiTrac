@@ -15,56 +15,50 @@
 
 namespace golf_sim {
 
-	enum SystemMode {
-		kTest = 0,
-		kCamera1 = 1,		// Normal shot-detection mode. Camera2 runs as internal thread.
-		kCamera1TestStandalone = 3,
-		kCamera1Calibrate = 5,
-		kCamera2Calibrate = 6,
-		kTestSpin = 7,
-		kCamera1BallLocation = 8,
-		kCamera2BallLocation = 9,
-		kTestExternalSimMessage = 10,
-		kTestGSProServer = 11,
-		kAutomatedTesting = 12,
-		kCamera1AutoCalibrate = 13,
-		kCamera2AutoCalibrate = 14,
-	};
+    enum SystemMode {
+        kTest = 0,
+        kCamera1 = 1,  // Normal shot-detection mode. Camera2 runs as internal thread.
+        kCamera1TestStandalone = 3,
+        kCamera1Calibrate = 5,
+        kCamera2Calibrate = 6,
+        kTestSpin = 7,
+        kCamera1BallLocation = 8,
+        kCamera2BallLocation = 9,
+        kTestExternalSimMessage = 10,
+        kTestGSProServer = 11,
+        kAutomatedTesting = 12,
+        kCamera1AutoCalibrate = 13,
+        kCamera2AutoCalibrate = 14,
+    };
 
-	enum LoggingLevel {
-		kTrace = 0,      // Just run unit tests
-		kDebug = 1,
-		kInfo = 2,
-		kWarn = 3,
-		kError = 4,
-		kNone = 5
-	};
+    enum LoggingLevel {
+        kTrace = 0,  // Just run unit tests
+        kDebug = 1,
+        kInfo = 2,
+        kWarn = 3,
+        kError = 4,
+        kNone = 5
+    };
 
-	enum ArtifactSaveLevel {
-		kNoArtifacts = 0,
-		kFinalResultsOnly = 1,	// produces images, but only at a few higher-level points in the processing
-		kAll = 2				// May slow the system to a crawl, with over a dozen large intermediate files being written
-	};
+    enum ArtifactSaveLevel {
+        kNoArtifacts = 0,
+        kFinalResultsOnly =
+            1,    // produces images, but only at a few higher-level points in the processing
+        kAll = 2  // May slow the system to a crawl, with over a dozen large intermediate files
+                  // being written
+    };
 
-	// TBD - More of a place-holder.  Not implemented yet.
-	enum GolferOrientation {
-		kRightHanded = 0,
-		kLeftHanded = 1
-	};
+    // TBD - More of a place-holder.  Not implemented yet.
+    enum GolferOrientation { kRightHanded = 0, kLeftHanded = 1 };
 
-	// TBD - Some question as to whether this should be defined here instead in GolfSimCamera class?
-	// Note that the cameras are given enumerated values to match the name (e.g., 1, 2, etc.)
-	enum GsCameraNumber {
-		kGsCamera1 = 1,
-		kGsCamera2 = 2
-	};
+    // TBD - Some question as to whether this should be defined here instead in GolfSimCamera class?
+    // Note that the cameras are given enumerated values to match the name (e.g., 1, 2, etc.)
+    enum GsCameraNumber { kGsCamera1 = 1, kGsCamera2 = 2 };
 
-	struct GolfSimOptions
-	{
-		GolfSimOptions()
-		{
-			using namespace boost::program_options;
-			// clang-format off
+    struct GolfSimOptions {
+        GolfSimOptions() {
+            using namespace boost::program_options;
+            // clang-format off
 			options_.add_options()
 				("help,h", value<bool>(&help_)->default_value(false)->implicit_value(true),
 					"Print this help message")
@@ -128,55 +122,56 @@ namespace golf_sim {
 					"Note that the config file must only contain the long form options.")
 
 				;
-			// clang-format on
-		}
+            // clang-format on
+        }
 
-		virtual ~GolfSimOptions() {}
+        virtual ~GolfSimOptions() {}
 
-		static GolfSimOptions& GetCommandLineOptions();
+        static GolfSimOptions& GetCommandLineOptions();
 
-		// Returns 1 for camera-1-based modes and 2 for 2-based modes
-		GsCameraNumber GetCameraNumber();
+        // Returns 1 for camera-1-based modes and 2 for 2-based modes
+        GsCameraNumber GetCameraNumber();
 
-		bool help_;
-		bool version_;
-		bool shutdown_;
-		bool camera_still_mode_;
-		bool lm_comparison_mode_;
-		bool send_test_results_;
-		bool skip_wait_armed_;
-		bool practice_ball_;
-		bool perform_pulse_test_;
-		bool use_non_IR_camera_;
-		bool simulate_found_ball_;
-		std::string output_filename_;
-		std::string system_mode_string_;
-		std::string artifact_save_level_string_;
-		std::string logging_level_string_;
-		std::string command_line_file_;
-		std::string msg_broker_address_;
-		std::string base_image_logging_dir_;
-		std::string web_server_share_dir_;
-		std::string e6_host_address_;
-		std::string gspro_host_address_;
-		std::string config_file_;
-		std::string golfer_orientation_string_;
-		SystemMode system_mode_ = kTest;
-		LoggingLevel logging_level_ = kInfo;
-		ArtifactSaveLevel artifact_save_level_ = kNoArtifacts;
-		GolferOrientation golfer_orientation_ = kRightHanded;
-		bool wait_for_key_on_images_;
-		bool run_single_pi_ = true;  // Always true — dual-Pi support removed
-		bool show_images_;
-		unsigned int search_center_x_ = 0;
-		unsigned int search_center_y_ = 0;
-		double camera_gain_ = 0.0;   // 1.0 might seem more appropriate, but we want to be able to see if this is set or not
+        bool help_;
+        bool version_;
+        bool shutdown_;
+        bool camera_still_mode_;
+        bool lm_comparison_mode_;
+        bool send_test_results_;
+        bool skip_wait_armed_;
+        bool practice_ball_;
+        bool perform_pulse_test_;
+        bool use_non_IR_camera_;
+        bool simulate_found_ball_;
+        std::string output_filename_;
+        std::string system_mode_string_;
+        std::string artifact_save_level_string_;
+        std::string logging_level_string_;
+        std::string command_line_file_;
+        std::string msg_broker_address_;
+        std::string base_image_logging_dir_;
+        std::string web_server_share_dir_;
+        std::string e6_host_address_;
+        std::string gspro_host_address_;
+        std::string config_file_;
+        std::string golfer_orientation_string_;
+        SystemMode system_mode_ = kTest;
+        LoggingLevel logging_level_ = kInfo;
+        ArtifactSaveLevel artifact_save_level_ = kNoArtifacts;
+        GolferOrientation golfer_orientation_ = kRightHanded;
+        bool wait_for_key_on_images_;
+        bool run_single_pi_ = true;  // Always true — dual-Pi support removed
+        bool show_images_;
+        unsigned int search_center_x_ = 0;
+        unsigned int search_center_y_ = 0;
+        double camera_gain_ = 0.0;  // 1.0 might seem more appropriate, but we want to be able to
+                                    // see if this is set or not
 
-		virtual bool Parse(int argc, char* argv[]);
-		virtual void Print() const;
+        virtual bool Parse(int argc, char* argv[]);
+        virtual void Print() const;
 
-	protected:
-		boost::program_options::options_description options_;
-		static GolfSimOptions the_command_line_options_;
-	};
-}
+       protected:
+        boost::program_options::options_description options_;
+        static GolfSimOptions the_command_line_options_;
+    };
+}  // namespace golf_sim

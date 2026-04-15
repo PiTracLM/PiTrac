@@ -6,20 +6,18 @@
 // Representation of the results of processing a golf shot
 
 #include <regex>
-#include "gs_format_lib.h"
-#include "math.h"
-#include "logging_tools.h"
 #include "cv_utils.h"
+#include "gs_format_lib.h"
+#include "logging_tools.h"
+#include "math.h"
 
 #include "gs_results.h"
 
 namespace golf_sim {
 
-    GsResults::GsResults() {
-    }
+    GsResults::GsResults() {}
 
-    GsResults::~GsResults() {
-    }
+    GsResults::~GsResults() {}
 
     GsResults::GsResults(const GolfBall& ball) {
         shot_number_ = 0;
@@ -43,13 +41,14 @@ namespace golf_sim {
         if (std::abs(side_spin_rpm_) <= 0.0001) {
             return 0.0;
         }
-        float spin_axis = (float)atan((float)side_spin_rpm_ / (float)back_spin_rpm_ + 0.00001) * (180.F / (float)kPi);
+        float spin_axis = (float)atan((float)side_spin_rpm_ / (float)back_spin_rpm_ + 0.00001) *
+                          (180.F / (float)kPi);
         return spin_axis;
     }
 
     std::string GsResults::Format() const {
         std::string s;
-        s =  "Shot No.:         " + std::to_string(shot_number_) + "\n";
+        s = "Shot No.:         " + std::to_string(shot_number_) + "\n";
         s += "Speed (mph):      " + std::to_string(speed_mph_) + "\n";
         s += "Launch Angle:     " + std::to_string(vla_deg_) + "\n";
         s += "Side Angle:       " + std::to_string(hla_deg_) + "\n";
@@ -64,7 +63,6 @@ namespace golf_sim {
     }
 
     std::string GsResults::FormatDoubleAsString(const double original_value) {
-
         double value = std::round(original_value * 10.0) / 10.0;
 
         auto s = GS_FORMATLIB_FORMAT("{: <1.1f}", value);
@@ -74,8 +72,7 @@ namespace golf_sim {
         // If we don't quote 0.0, it ends up as 0, and some systems don't like that
         if (s == "0.0") {
             result = "0.0";
-        }
-        else {
+        } else {
             result = s;
         }
 
@@ -83,7 +80,6 @@ namespace golf_sim {
     }
 
     std::string GsResults::GenerateStringFromJsonTree(const boost::property_tree::ptree& root) {
-
         // Write the property tree to a JSON string
         std::stringstream ss;
         boost::property_tree::write_json(ss, root);
@@ -113,4 +109,4 @@ namespace golf_sim {
         return result;
     }
 
-}
+}  // namespace golf_sim

@@ -3,8 +3,8 @@
  * Copyright (C) 2022-2025, Verdant Consultants, LLC.
  */
 
-#include "logging_tools.h"
 #include "gs_shot_parameters.h"
+#include "logging_tools.h"
 
 namespace golf_sim {
 
@@ -14,11 +14,9 @@ namespace golf_sim {
         VLA_is_set_ = false;
     }
 
-    GsShotParameters::~GsShotParameters() {
-    }
+    GsShotParameters::~GsShotParameters() {}
 
     void GsShotParameters::SetInternalParameter(const ShotParameter& parameter, bool is_present) {
-
         switch (parameter) {
             case kShotParameterNone:
                 velocity_is_set_ = !is_present;
@@ -46,17 +44,17 @@ namespace golf_sim {
                 VLA_is_set_ = is_present;
                 break;
             default:
-                GS_LOG_TRACE_MSG(warning, "GsShotParameters::SetInternalParameter--Invalid parameter: " + std::to_string( static_cast<int>(parameter) ) );
-		}
+                GS_LOG_TRACE_MSG(warning,
+                                 "GsShotParameters::SetInternalParameter--Invalid parameter: " +
+                                     std::to_string(static_cast<int>(parameter)));
+        }
     }
 
     void GsShotParameters::SetParameter(const ShotParameter& parameter, bool is_present) {
-
         SetInternalParameter(parameter, is_present);
     }
 
     bool GsShotParameters::ParameterIsPresent(const ShotParameter& parameter) const {
-
         switch (parameter) {
             case kShotParameterNone:
                 return !velocity_is_set_ && !HLA_is_set_ && !VLA_is_set_;
@@ -69,7 +67,9 @@ namespace golf_sim {
             case kShotParameterAll:
                 return velocity_is_set_ && HLA_is_set_ && VLA_is_set_;
             default:
-                GS_LOG_TRACE_MSG(warning, "GsShotParameters::SetInternalParameter--Invalid parameter: " + std::to_string(static_cast<int>(parameter)));
+                GS_LOG_TRACE_MSG(warning,
+                                 "GsShotParameters::SetInternalParameter--Invalid parameter: " +
+                                     std::to_string(static_cast<int>(parameter)));
                 return false;
         }
     }
@@ -92,4 +92,4 @@ namespace golf_sim {
 
         return s;
     }
-}
+}  // namespace golf_sim

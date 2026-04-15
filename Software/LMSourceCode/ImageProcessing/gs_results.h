@@ -3,24 +3,22 @@
  * Copyright (C) 2022-2025, Verdant Consultants, LLC.
  */
 
- // Representation of the results of processing a golf shot
-
+// Representation of the results of processing a golf shot
 
 #pragma once
 
 #include <boost/property_tree/json_parser.hpp>
 
-#include "logging_tools.h"
 #include "golf_ball.h"
 #include "gs_clubs.h"
+#include "logging_tools.h"
 
 // Base class for representing and transferring Golf Sim results
 
 namespace golf_sim {
 
     class GsResults {
-
-    public:
+       public:
         GsResults();
         GsResults(const GolfBall& ball);
         virtual ~GsResults();
@@ -35,26 +33,24 @@ namespace golf_sim {
 
         // Deals with problem where Boost will put double-quotes around double values
         static std::string FormatDoubleAsString(const double value);
-        
+
         // Helper that converts a boost JSON tree into a string.  Includes processing that
         // will remove extraneous quotes.
         static std::string GenerateStringFromJsonTree(const boost::property_tree::ptree& root);
 
-
-    public:
+       public:
         long shot_number_ = 0;
         float speed_mph_ = 0;
         float hla_deg_ = 0.;
         float vla_deg_ = 0.;
         int back_spin_rpm_ = 0;
-        int side_spin_rpm_ = 0;     // Negative is left (counter-clockwise from above ball)
+        int side_spin_rpm_ = 0;  // Negative is left (counter-clockwise from above ball)
         GolfSimClubs::GsClubType club_type_ = GolfSimClubs::GsClubType::kNotSelected;
 
         // Some systems need a keep-alive
         bool result_message_is_keepalive_ = false;
         bool heartbeat_launch_monitor_ready_ = true;
         bool heartbeat_ball_detected_ = false;
-
     };
 
-}
+}  // namespace golf_sim

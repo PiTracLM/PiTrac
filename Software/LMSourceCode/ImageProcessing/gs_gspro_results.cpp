@@ -3,10 +3,10 @@
  * Copyright (C) 2022-2025, Verdant Consultants, LLC.
  */
 
-#include <regex>
-#include "gs_format_lib.h"
 #include <boost/program_options.hpp>
 #include <boost/property_tree/json_parser.hpp>
+#include <regex>
+#include "gs_format_lib.h"
 
 #include "logging_tools.h"
 
@@ -14,21 +14,14 @@
 
 namespace golf_sim {
 
-    GsGSProResults::GsGSProResults() {
-    }
+    GsGSProResults::GsGSProResults() {}
 
-    GsGSProResults::GsGSProResults(const GolfBall& ball) : GsResults(ball) {
-    }
+    GsGSProResults::GsGSProResults(const GolfBall& ball) : GsResults(ball) {}
 
     // TBD - Copy constructor?
-    GsGSProResults::GsGSProResults(const GsResults& results) : GsResults(results) {
-    }
-    
+    GsGSProResults::GsGSProResults(const GsResults& results) : GsResults(results) {}
 
-    GsGSProResults::~GsGSProResults() {
-
-    }
-
+    GsGSProResults::~GsGSProResults() {}
 
     std::string GsGSProResults::Format() const {
         // Create a JSON object based on https://gsprogolf.com/GSProConnectV1.html
@@ -69,7 +62,7 @@ namespace golf_sim {
         club_data_child.put("VerticalFaceImpact", "0.0");
         club_data_child.put("HorizontalFaceImpact", "0.0");
         club_data_child.put("ClosureRate", "0.0");
-        
+
         if (!result_message_is_keepalive_) {
             // Only the ball data is valid
             shot_data_options_child.put("ContainsBallData", true);
@@ -78,8 +71,7 @@ namespace golf_sim {
             shot_data_options_child.put("LaunchMonitorIsReady", true);
             shot_data_options_child.put("LaunchMonitorBallDetected", heartbeat_ball_detected_);
             shot_data_options_child.put("IsHeartBeat", false);
-        }
-        else {
+        } else {
             shot_data_options_child.put("ContainsBallData", false);
             shot_data_options_child.put("ContainsClubData", false);
             shot_data_options_child.put("LaunchMonitorIsReady", true);
@@ -100,4 +92,4 @@ namespace golf_sim {
         return result;
     }
 
-}
+}  // namespace golf_sim

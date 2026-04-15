@@ -4,12 +4,12 @@
  */
 
 // "TruGolf Simulators" and other marks such as E6 may be trademarked by TruGolf, Inc.
-// The PiTrac project is not endorsed, sponsored by or associated with TrueGolf products or services.
+// The PiTrac project is not endorsed, sponsored by or associated with TrueGolf products or
+// services.
 
-
-#include <regex>
 #include <boost/program_options.hpp>
 #include <boost/property_tree/json_parser.hpp>
+#include <regex>
 
 #include "logging_tools.h"
 
@@ -17,21 +17,14 @@
 
 namespace golf_sim {
 
-    GsE6Results::GsE6Results() {
-    }
+    GsE6Results::GsE6Results() {}
 
-    GsE6Results::GsE6Results(const GolfBall& ball) : GsResults(ball) {
-    }
+    GsE6Results::GsE6Results(const GolfBall& ball) : GsResults(ball) {}
 
     // TBD - Copy constructor?
-    GsE6Results::GsE6Results(const GsResults& results) : GsResults(results) {
-    }
-    
+    GsE6Results::GsE6Results(const GsResults& results) : GsResults(results) {}
 
-    GsE6Results::~GsE6Results() {
-
-    }
-
+    GsE6Results::~GsE6Results() {}
 
     std::string GsE6Results::Format() const {
         // Create a JSON object based on https://e6golf.com/E6ConnectV1.html
@@ -56,7 +49,6 @@ namespace golf_sim {
         int side_spin_rpm = std::min(side_spin_rpm_, 5999);
         side_spin_rpm = std::max(side_spin_rpm_, -5999);
 
-
         // Ball data - some of the values such as tilt are not required and we don't include them
         ball_data_child.put("BackSpin", FormatDoubleAsString(back_spin_rpm_));
         ball_data_child.put("BallSpeed", FormatDoubleAsString(speed_mph_));
@@ -75,4 +67,4 @@ namespace golf_sim {
         return result;
     }
 
-}
+}  // namespace golf_sim

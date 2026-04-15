@@ -4,7 +4,7 @@
  */
 
 // This structure is setup by the libcamera loop with the (usually) rapidly-taken
-// images from the camera.  
+// images from the camera.
 
 #pragma once
 
@@ -15,18 +15,18 @@
 
 namespace golf_sim {
 
-	//  We also need to be able to reach these variables from within the libcamera namespace.
+    //  We also need to be able to reach these variables from within the libcamera namespace.
 
-	struct RecentFrameInfo {
-		cv::Mat mat;
-		// Holds the sequence number from the completed request from whence the mat came
-		unsigned int requestSequence;
-		// True if this was the frame where motion (the ball hit) was first detected
-		bool isballHitFrame = false;
-		float frameRate = 0.0;
-	};
+    struct RecentFrameInfo {
+        cv::Mat mat;
+        // Holds the sequence number from the completed request from whence the mat came
+        unsigned int requestSequence;
+        // True if this was the frame where motion (the ball hit) was first detected
+        bool isballHitFrame = false;
+        float frameRate = 0.0;
+    };
 
-	// Global queue to hold the last <n> frames before motion is detected in the frame
-	extern boost::circular_buffer<RecentFrameInfo> RecentFrames;
+    // Global queue to hold the last <n> frames before motion is detected in the frame
+    extern boost::circular_buffer<RecentFrameInfo> RecentFrames;
 
-}
+}  // namespace golf_sim

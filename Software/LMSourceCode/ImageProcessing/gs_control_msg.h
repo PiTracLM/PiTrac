@@ -10,26 +10,24 @@
 
 #ifdef __unix__  // Ignore in Windows environment
 
+    #include <msgpack.hpp>
 
-#include <msgpack.hpp>
+    #include <opencv2/core.hpp>
+    #include <opencv2/dnn.hpp>
+    #include <opencv2/dnn/all_layers.hpp>
+    #include <opencv2/imgcodecs.hpp>
+    #include <opencv2/imgproc.hpp>
+    #include <opencv2/opencv.hpp>
 
-#include <opencv2/core.hpp>
-#include <opencv2/dnn.hpp>
-#include <opencv2/dnn/all_layers.hpp>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/opencv.hpp>
-
-#include "logging_tools.h"
-
+    #include "logging_tools.h"
 
 // The primary object for control-type communications from the Golf Sim user interface
 
 namespace golf_sim {
 
     // TBD - Add a change-player type?
-    enum class GsIPCControlMsgType { 
-        kUnknown = 0, 
+    enum class GsIPCControlMsgType {
+        kUnknown = 0,
         kClubChangeToPutter = 1,
         kClubChangeToDriver = 2,
     };
@@ -37,9 +35,7 @@ namespace golf_sim {
     // This class is mostly designed to compartmentalize the details of (De)serializing
     // these IPC messages.
     class GsIPCControlMsg {
-
-    public:
-
+       public:
         GsIPCControlMsg();
         virtual ~GsIPCControlMsg();
 
@@ -48,16 +44,14 @@ namespace golf_sim {
 
         static std::string FormatControlMessageType(const GsIPCControlMsgType t);
 
-    public:
+       public:
         GsIPCControlMsgType control_type_ = GsIPCControlMsgType::kUnknown;
 
-        MSGPACK_DEFINE( control_type_ );
-
+        MSGPACK_DEFINE(control_type_);
     };
 
-}
+}  // namespace golf_sim
 // This needs to be placed outside the namespace
 MSGPACK_ADD_ENUM(golf_sim::GsIPCControlMsgType);
 
-
-#endif // #ifdef __unix__  // Ignore in Windows environment
+#endif  // #ifdef __unix__  // Ignore in Windows environment

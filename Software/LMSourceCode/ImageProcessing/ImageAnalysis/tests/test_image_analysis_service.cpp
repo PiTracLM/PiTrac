@@ -6,15 +6,15 @@
 /**
  * @file test_image_analysis_service.cpp
  * @brief Unit tests for ImageAnalysisService input validation
- * 
+ *
  * Tests input validation functions that will be added to the service.
  * Focuses on validation logic rather than full service implementation.
  */
 
 #define BOOST_TEST_MODULE ImageAnalysisServiceValidationTests
 #include <boost/test/unit_test.hpp>
-#include "../application/image_analysis_service.hpp"
 #include <stdexcept>
+#include "../application/image_analysis_service.hpp"
 
 using namespace golf_sim::image_analysis::application;
 
@@ -24,60 +24,51 @@ using namespace golf_sim::image_analysis::application;
 
 namespace {
     // These validation functions will be added to ImageAnalysisService
-    
+
     void ValidateConfidenceThreshold(double threshold) {
         if (threshold < 0.0 || threshold > 1.0) {
-            throw std::invalid_argument(
-                "Confidence threshold must be between 0.0 and 1.0, got: " + 
-                std::to_string(threshold)
-            );
+            throw std::invalid_argument("Confidence threshold must be between 0.0 and 1.0, got: " +
+                                        std::to_string(threshold));
         }
     }
-    
+
     void ValidateAnalyzerConfig(const AnalyzerConfig& config) {
         if (config.type.empty()) {
             throw std::invalid_argument("Analyzer type cannot be empty");
         }
-        
+
         ValidateConfidenceThreshold(config.confidence_threshold);
-        
+
         if (config.nms_threshold < 0.0 || config.nms_threshold > 1.0) {
-            throw std::invalid_argument(
-                "NMS threshold must be between 0.0 and 1.0, got: " + 
-                std::to_string(config.nms_threshold)
-            );
+            throw std::invalid_argument("NMS threshold must be between 0.0 and 1.0, got: " +
+                                        std::to_string(config.nms_threshold));
         }
-        
+
         if (config.input_width <= 0) {
-            throw std::invalid_argument(
-                "Input width must be positive, got: " + 
-                std::to_string(config.input_width)
-            );
+            throw std::invalid_argument("Input width must be positive, got: " +
+                                        std::to_string(config.input_width));
         }
-        
+
         if (config.input_height <= 0) {
-            throw std::invalid_argument(
-                "Input height must be positive, got: " + 
-                std::to_string(config.input_height)
-            );
+            throw std::invalid_argument("Input height must be positive, got: " +
+                                        std::to_string(config.input_height));
         }
     }
-    
+
     void ValidateAnalyzerType(const std::string& analyzer_type) {
         if (analyzer_type.empty()) {
             throw std::invalid_argument("Analyzer type cannot be empty");
         }
-        
+
         // This would check against available analyzers in real implementation
-        static const std::vector<std::string> valid_types = {
-            "opencv", "yolo", "tensorflow_lite", "hybrid"
-        };
-        
+        static const std::vector<std::string> valid_types = {"opencv", "yolo", "tensorflow_lite",
+                                                             "hybrid"};
+
         if (std::find(valid_types.begin(), valid_types.end(), analyzer_type) == valid_types.end()) {
             throw std::invalid_argument("Unknown analyzer type: " + analyzer_type);
         }
     }
-}
+}  // namespace
 
 BOOST_AUTO_TEST_SUITE(ImageAnalysisServiceValidationTests)
 
@@ -115,14 +106,14 @@ BOOST_AUTO_TEST_CASE(test_validate_analyzer_config_valid) {
     config.nms_threshold = 0.4;
     config.input_width = 640;
     config.input_height = 480;
-    
+
     BOOST_CHECK_NO_THROW(ValidateAnalyzerConfig(config));
 }
 
 BOOST_AUTO_TEST_CASE(test_validate_analyzer_config_empty_type) {
     AnalyzerConfig config;
     config.type = "";  // Invalid
-    
+
     BOOST_CHECK_THROW(ValidateAnalyzerConfig(config), std::invalid_argument);
 }
 
@@ -130,10 +121,10 @@ BOOST_AUTO_TEST_CASE(test_validate_analyzer_config_invalid_confidence) {
     AnalyzerConfig config;
     config.type = "opencv";
     config.confidence_threshold = -0.1;  // Invalid
-    
+
     BOOST_CHECK_THROW(ValidateAnalyzerConfig(config), std::invalid_argument);
-    
-    config.confidence_threshold = 1.5;   // Invalid
+
+    config.confidence_threshold = 1.5;  // Invalid
     BOOST_CHECK_THROW(ValidateAnalyzerConfig(config), std::invalid_argument);
 }
 
@@ -141,27 +132,27 @@ BOOST_AUTO_TEST_CASE(test_validate_analyzer_config_invalid_nms_threshold) {
     AnalyzerConfig config;
     config.type = "opencv";
     config.nms_threshold = -0.1;  // Invalid
-    
+
     BOOST_CHECK_THROW(ValidateAnalyzerConfig(config), std::invalid_argument);
-    
-    config.nms_threshold = 1.5;   // Invalid
+
+    config.nms_threshold = 1.5;  // Invalid
     BOOST_CHECK_THROW(ValidateAnalyzerConfig(config), std::invalid_argument);
 }
 
 BOOST_AUTO_TEST_CASE(test_validate_analyzer_config_invalid_dimensions) {
     AnalyzerConfig config;
     config.type = "opencv";
-    
+
     config.input_width = 0;  // Invalid
     BOOST_CHECK_THROW(ValidateAnalyzerConfig(config), std::invalid_argument);
-    
+
     config.input_width = -1;  // Invalid
     BOOST_CHECK_THROW(ValidateAnalyzerConfig(config), std::invalid_argument);
-    
+
     config.input_width = 640;
     config.input_height = 0;  // Invalid
     BOOST_CHECK_THROW(ValidateAnalyzerConfig(config), std::invalid_argument);
-    
+
     config.input_height = -1;  // Invalid
     BOOST_CHECK_THROW(ValidateAnalyzerConfig(config), std::invalid_argument);
 }
@@ -197,7 +188,7 @@ BOOST_AUTO_TEST_CASE(test_error_messages_contain_actual_values) {
         BOOST_CHECK(error_msg.find("-0.5") != std::string::npos);
         BOOST_CHECK(error_msg.find("between 0.0 and 1.0") != std::string::npos);
     }
-    
+
     try {
         ValidateAnalyzerType("bad_type");
         BOOST_FAIL("Expected exception was not thrown");
@@ -216,7 +207,7 @@ BOOST_AUTO_TEST_CASE(test_boundary_conditions) {
     // Test exact boundary values
     BOOST_CHECK_NO_THROW(ValidateConfidenceThreshold(0.0));
     BOOST_CHECK_NO_THROW(ValidateConfidenceThreshold(1.0));
-    
+
     // Test just outside boundaries
     BOOST_CHECK_THROW(ValidateConfidenceThreshold(-0.000001), std::invalid_argument);
     BOOST_CHECK_THROW(ValidateConfidenceThreshold(1.000001), std::invalid_argument);
@@ -227,9 +218,9 @@ BOOST_AUTO_TEST_CASE(test_configuration_with_minimal_valid_values) {
     config.type = "opencv";
     config.confidence_threshold = 0.0;
     config.nms_threshold = 0.0;
-    config.input_width = 1;     // Minimal valid
-    config.input_height = 1;    // Minimal valid
-    
+    config.input_width = 1;   // Minimal valid
+    config.input_height = 1;  // Minimal valid
+
     BOOST_CHECK_NO_THROW(ValidateAnalyzerConfig(config));
 }
 
@@ -240,7 +231,7 @@ BOOST_AUTO_TEST_CASE(test_configuration_with_maximal_valid_values) {
     config.nms_threshold = 1.0;
     config.input_width = 4096;   // Large but reasonable
     config.input_height = 4096;  // Large but reasonable
-    
+
     BOOST_CHECK_NO_THROW(ValidateAnalyzerConfig(config));
 }
 

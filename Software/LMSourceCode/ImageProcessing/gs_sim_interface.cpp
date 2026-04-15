@@ -3,14 +3,14 @@
  * Copyright (C) 2022-2025, Verdant Consultants, LLC.
  */
 
-#include "logging_tools.h"
 #include "cv_utils.h"
-#include "gs_options.h"
 #include "gs_config.h"
+#include "gs_options.h"
+#include "logging_tools.h"
 
-#include "gs_sim_interface.h"
-#include "gs_gspro_interface.h"
 #include "gs_e6_interface.h"
+#include "gs_gspro_interface.h"
+#include "gs_sim_interface.h"
 
 namespace golf_sim {
 
@@ -27,16 +27,15 @@ namespace golf_sim {
     // the system will increment the counter first before storing information
     long GsSimInterface::shot_counter_ = 0;
 
-
     GsSimInterface::GsSimInterface() {
-        GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.kLaunchMonitorIdString", launch_monitor_id_string_);
+        GolfSimConfiguration::SetConstant(
+            "gs_config.golf_simulator_interfaces.kLaunchMonitorIdString",
+            launch_monitor_id_string_);
     }
 
-    GsSimInterface::~GsSimInterface() {
-    }
+    GsSimInterface::~GsSimInterface() {}
 
     bool GsSimInterface::InitializeSims() {
-
         GS_LOG_TRACE_MSG(trace, "GsSimInterface::InitializeSims()");
 
         // Create and add an interface to the global vector of interfaces
@@ -92,9 +91,7 @@ namespace golf_sim {
         return true;
     }
 
-
     bool GsSimInterface::SimIsConnected() {
-
         GS_LOG_TRACE_MSG(trace, "GsSimInterface::SimIsConnected()");
 
         if (!sims_initialized_) {
@@ -117,7 +114,6 @@ namespace golf_sim {
     }
 
     void GsSimInterface::DeInitializeSims() {
-
         GS_LOG_TRACE_MSG(trace, "GsSimInterface::DeInitializeSims()");
 
 #ifdef __unix__  // Ignore in Windows environment
@@ -135,7 +131,6 @@ namespace golf_sim {
         sims_initialized_ = false;
     }
 
-
     void GsSimInterface::SetSimSystemArmed(const bool is_armed) {
         boost::lock_guard<boost::mutex> lock(sim_arming_mutex_);
 
@@ -144,7 +139,7 @@ namespace golf_sim {
         GS_LOG_TRACE_MSG(trace, "GsSimInterface::SetSimSystemArmed called.");
 
         sim_system_is_armed_ = is_armed;
-    }    
+    }
 
     bool GsSimInterface::GetSimSystemArmed() {
         boost::lock_guard<boost::mutex> lock(sim_arming_mutex_);
@@ -157,15 +152,12 @@ namespace golf_sim {
         return sim_system_is_armed_;
     }
 
-
     int GsSimInterface::SendSimMessage(const std::string& message) {
         GS_LOG_MSG(warning, "GsSimInterface::SendSimMessage - message was:\n" + message);
         return 0;
     }
 
-
     bool GsSimInterface::SendResultsToGolfSims(const GsResults& input_results) {
-
         // The shot number should already have been set when the ball was teed up
 
         // Make a local copy of the results so that we can set the shot_counter
@@ -173,7 +165,9 @@ namespace golf_sim {
         results.shot_number_ = shot_counter_;
 
         if (results.speed_mph_ > 200.0) {
-            GS_LOG_MSG(warning, "GsSimInterface::SendResultsToGolfSim got out of bounds speed_mph.  Settting to 200.");
+            GS_LOG_MSG(warning,
+                       "GsSimInterface::SendResultsToGolfSim got out of bounds speed_mph.  "
+                       "Settting to 200.");
             results.speed_mph_ = 200.0;
         }
 
@@ -214,9 +208,7 @@ namespace golf_sim {
         return all_systems_armed;
     }
 
-
     GsSimInterface* GsSimInterface::GetSimInterfaceByType(GolfSimulatorType sim_type) {
-
         // Loop through any interfaces that we are configured for and send the results
         for (auto interface : interfaces_) {
             if (interface == nullptr) {
@@ -231,7 +223,6 @@ namespace golf_sim {
 
         return nullptr;
     }
-
 
     void GsSimInterface::IncrementShotCounter() {
         shot_counter_++;
@@ -273,7 +264,10 @@ namespace golf_sim {
     }
 
     bool GsSimInterface::SendResults(const GsResults& results) {
-        GS_LOG_TRACE_MSG(trace, "GsSimInterface::SendResults - No Golf Sim connected to Launch Monitor.  Results are: " + results.Format());
+        GS_LOG_TRACE_MSG(trace,
+                         "GsSimInterface::SendResults - No Golf Sim connected to Launch Monitor.  "
+                         "Results are: " +
+                             results.Format());
         return true;
     }
 
@@ -282,8 +276,11 @@ namespace golf_sim {
     }
 
     bool GsSimInterface::ProcessReceivedData(const std::string received_data) {
-        GS_LOG_TRACE_MSG(trace, "GsSimInterface::ProcessReceivedData - No Golf Sim connected to Launch Monitor, so not doing anything with data.  Data was:\n" + received_data);
+        GS_LOG_TRACE_MSG(trace,
+                         "GsSimInterface::ProcessReceivedData - No Golf Sim connected to Launch "
+                         "Monitor, so not doing anything with data.  Data was:\n" +
+                             received_data);
         return true;
     }
 
-}
+}  // namespace golf_sim

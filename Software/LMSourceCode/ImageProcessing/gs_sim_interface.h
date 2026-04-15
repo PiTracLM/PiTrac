@@ -8,24 +8,17 @@
 #include <boost/asio.hpp>
 #include <boost/thread/mutex.hpp>
 
-
-#include "logging_tools.h"
 #include "golf_ball.h"
 #include "gs_results.h"
-
+#include "logging_tools.h"
 
 // Base class for interfaces to 3rd-party golf simulators
 
 namespace golf_sim {
 
     class GsSimInterface {
-
-    public:
-        enum GolfSimulatorType {
-            kNone = 0,
-            kGSPro = 1,
-            kE6 = 2
-        };
+       public:
+        enum GolfSimulatorType { kNone = 0, kGSPro = 1, kE6 = 2 };
 
         GsSimInterface();
         virtual ~GsSimInterface();
@@ -75,7 +68,7 @@ namespace golf_sim {
         static long GetShotCounter() { return shot_counter_; };
 
         // Find the GSPro or E6 or whatever interface (if available) by type
-        static GsSimInterface *GetSimInterfaceByType(GolfSimulatorType sim_type);
+        static GsSimInterface* GetSimInterfaceByType(GolfSimulatorType sim_type);
 
         // Returns true only if each of the available interfaces is armed
         static bool GetAllSystemsArmed();
@@ -84,8 +77,7 @@ namespace golf_sim {
         static void SendHeartbeat(bool ball_detected);
         static inline void ResetHeartbeatState() {}
 
-    protected:
-
+       protected:
         // Typical derived-class behavior will be to convert the results into a
         // sim-specific data packet, such as a JSON string
         virtual std::string GenerateResultsDataToSend(const GsResults& results);
@@ -93,13 +85,12 @@ namespace golf_sim {
         // Called when the LM receives data
         virtual bool ProcessReceivedData(const std::string received_data);
 
-    protected:
-
+       protected:
         // Holds pointers to derived interfaces for each attached sim
         static std::vector<GsSimInterface*> interfaces_;
 
         static std::string launch_monitor_id_string_;
-        
+
         // True if all the attached sims have been initialized
         static bool sims_initialized_;
 
@@ -118,4 +109,4 @@ namespace golf_sim {
         boost::mutex sim_arming_mutex_;
     };
 
-}
+}  // namespace golf_sim

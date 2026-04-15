@@ -3,12 +3,12 @@
 /* Copyright 2005-2011 Mark Dufour and contributors; License Expat (See LICENSE) */
 /* Copyright (C) 2022-2025, Verdant Consultants, LLC. */
 
-// Thanks to Mark Dufour and contributors to the shed skin project for ideas and direction on this module
+// Thanks to Mark Dufour and contributors to the shed skin project for ideas and direction on this
+// module
 
 #include "colorsys.h"
 
 #include <algorithm>
-
 
 /**
 Conversion functions between RGB and other color systems.
@@ -35,9 +35,7 @@ namespace golf_sim {
     const float colorsys::kOneSixth = (1.0f / 6.0f);
     const float colorsys::kTwoThird = (2.0f / 3.0f);
 
-
-    GsColorTriplet colorsys::rgbToYiq(const GsColorTriplet& rgb)
-    {
+    GsColorTriplet colorsys::rgbToYiq(const GsColorTriplet& rgb) {
         float r = (float)rgb[0];
         float g = (float)rgb[1];
         float b = (float)rgb[2];
@@ -49,9 +47,7 @@ namespace golf_sim {
         return (GsColorTriplet(y, i, q));
     }
 
-
-    GsColorTriplet colorsys::yiqToRgb(const GsColorTriplet& yiq)
-    {
+    GsColorTriplet colorsys::yiqToRgb(const GsColorTriplet& yiq) {
         float y = (float)yiq[0];
         float i = (float)yiq[1];
         float q = (float)yiq[2];
@@ -63,29 +59,23 @@ namespace golf_sim {
         return (GsColorTriplet(r, g, b));
     }
 
-
-    GsColorTriplet colorsys::rgb_to_hls(const GsColorTriplet& rgb)
-    {
+    GsColorTriplet colorsys::rgb_to_hls(const GsColorTriplet& rgb) {
         float bc, gc, h, l, maxc, minc, rc, s;
 
         float r = (float)rgb[0];
         float g = (float)rgb[1];
         float b = (float)rgb[2];
 
-        maxc = std::max({ r, g, b });
-        minc = std::min({ r, g, b });
+        maxc = std::max({r, g, b});
+        minc = std::min({r, g, b});
 
         l = ((minc + maxc) / 2.0f);
-        if (minc == maxc)
-        {
+        if (minc == maxc) {
             return (GsColorTriplet(0.0, l, 0.0));
         }
-        if (l <= 0.5)
-        {
+        if (l <= 0.5) {
             s = ((maxc - minc) / (maxc + minc));
-        }
-        else
-        {
+        } else {
             s = ((maxc - minc) / ((2.0f - maxc) - minc));
         }
 
@@ -95,11 +85,9 @@ namespace golf_sim {
 
         if (r == maxc) {
             h = (bc - gc);
-        }
-        else if (g == maxc) {
+        } else if (g == maxc) {
             h = ((2.0f + rc) - bc);
-        }
-        else {
+        } else {
             h = ((4.0f + gc) - rc);
         }
         h = fmods((h / 6.0f), 1.0);
@@ -107,8 +95,7 @@ namespace golf_sim {
         return (GsColorTriplet(h, l, s));
     }
 
-    GsColorTriplet colorsys::hls_to_rgb(const GsColorTriplet& hls)
-    {
+    GsColorTriplet colorsys::hls_to_rgb(const GsColorTriplet& hls) {
         float m1, m2;
 
         float h = (float)hls[0];
@@ -120,17 +107,16 @@ namespace golf_sim {
         }
         if ((l <= 0.5)) {
             m2 = (l * (1.0f + s));
-        }
-        else {
+        } else {
             m2 = ((l + s) - (l * s));
         }
         m1 = ((2.0f * l) - m2);
-        GsColorTriplet result = (GsColorTriplet(_v(m1, m2, (h + kOneThird)), _v(m1, m2, h), _v(m1, m2, (h - kOneThird))));
+        GsColorTriplet result = (GsColorTriplet(_v(m1, m2, (h + kOneThird)), _v(m1, m2, h),
+                                                _v(m1, m2, (h - kOneThird))));
         return (result);
     }
 
     float colorsys::_v(float m1, float m2, float hue) {
-
         hue = fmods(hue, 1.0);
         if ((hue < kOneSixth)) {
             return (m1 + (((m2 - m1) * hue) * 6.0f));
@@ -144,16 +130,15 @@ namespace golf_sim {
         return m1;
     }
 
-    GsColorTriplet colorsys::rgb_to_hsv(const GsColorTriplet& rgb)
-    {
+    GsColorTriplet colorsys::rgb_to_hsv(const GsColorTriplet& rgb) {
         float bc, gc, h, maxc, minc, rc, s, v;
 
         float r = (float)rgb[0];
         float g = (float)rgb[1];
         float b = (float)rgb[2];
 
-        maxc = std::max({ r, g, b });
-        minc = std::min({ r, g, b });
+        maxc = std::max({r, g, b});
+        minc = std::min({r, g, b});
         v = maxc;
 
         if (minc == maxc) {
@@ -165,11 +150,9 @@ namespace golf_sim {
         bc = ((maxc - b) / (maxc - minc));
         if (r == maxc) {
             h = (bc - gc);
-        }
-        else if (g == maxc) {
+        } else if (g == maxc) {
             h = ((2.0f + rc) - bc);
-        }
-        else {
+        } else {
             h = ((4.0f + gc) - rc);
         }
         h = fmods((h / 6.0f), 1.0);
@@ -177,8 +160,7 @@ namespace golf_sim {
         return (GsColorTriplet(h, s, v));
     }
 
-    GsColorTriplet colorsys::hsv_to_rgb(const GsColorTriplet& hsv)
-    {
+    GsColorTriplet colorsys::hsv_to_rgb(const GsColorTriplet& hsv) {
         float f, p, q, t;
         int i;
 
@@ -235,12 +217,14 @@ namespace golf_sim {
         assert(compareVec3f(colorsys::rgb_to_hsv(Vec3f(0.2, 0.4, 0.4)), Vec3f(0.5, 0.5, 0.4), 3));
         assert(compareVec3f(colorsys::hsv_to_rgb(Vec3f(0.5, 0.5, 0.4)), Vec3f(0.2, 0.4, 0.4), 3));
 
-        assert(compareVec3f(colorsys::hls_to_rgb(Vec3f(1.0, 0.5, 0.7)), Vec3f(0.85, 0.15, 0.15), 3));
-        assert(compareVec3f(colorsys::rgb_to_hls(Vec3f(1.0, 0.5, 0.7)), Vec3f(0.93, 0.75, 1.00), 2));
-        assert(compareVec3f(colorsys::rgbToYiq(GsColorTriplet(1.0, 0.5, 0.7)), GsColorTriplet(0.67, 0.24, 0.17), 2));
-        assert(compareVec3f(colorsys::hsv_to_rgb(GsColorTriplet(1.0, 0.5, 0.7)), GsColorTriplet(0.70, 0.35, 0.35), 2));
-        assert(compareVec3f(colorsys::rgb_to_hsv(GsColorTriplet(1.0, 0.5, 0.7)), GsColorTriplet(0.93, 0.50, 1.00), 2));
+        assert(compareVec3f(colorsys::hls_to_rgb(Vec3f(1.0, 0.5, 0.7)), Vec3f(0.85, 0.15, 0.15),
+    3)); assert(compareVec3f(colorsys::rgb_to_hls(Vec3f(1.0, 0.5, 0.7)), Vec3f(0.93, 0.75, 1.00),
+    2)); assert(compareVec3f(colorsys::rgbToYiq(GsColorTriplet(1.0, 0.5, 0.7)), GsColorTriplet(0.67,
+    0.24, 0.17), 2)); assert(compareVec3f(colorsys::hsv_to_rgb(GsColorTriplet(1.0, 0.5, 0.7)),
+    GsColorTriplet(0.70, 0.35, 0.35), 2));
+        assert(compareVec3f(colorsys::rgb_to_hsv(GsColorTriplet(1.0, 0.5, 0.7)),
+    GsColorTriplet(0.93, 0.50, 1.00), 2));
     }
     */
 
-}
+}  // namespace golf_sim

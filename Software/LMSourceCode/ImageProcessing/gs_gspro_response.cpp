@@ -12,12 +12,9 @@
 
 namespace golf_sim {
 
-    GsGSProResponse::GsGSProResponse() {
-    }
-
+    GsGSProResponse::GsGSProResponse() {}
 
     bool GsGSProResponse::ParseJson(const std::string& gspro_json_string) {
-
         int return_code = 0;
         std::string message_str;
         std::string handedness_str;
@@ -36,20 +33,19 @@ namespace golf_sim {
             message_str = pt.get<std::string>("Message", "");
 
             // Player handedness and club may not be set
-            boost::optional< boost::property_tree::ptree& > child = pt.get_child_optional("Player");
+            boost::optional<boost::property_tree::ptree&> child = pt.get_child_optional("Player");
             if (!child) {
-                GS_LOG_MSG(warning, "GsGSProResponse::ParseJson - No player information was provided.");
-            }
-            else {
+                GS_LOG_MSG(warning,
+                           "GsGSProResponse::ParseJson - No player information was provided.");
+            } else {
                 handedness_str = pt.get<std::string>("Player.Handed", "");
                 club_str = pt.get<std::string>("Player.Club", "");
             }
-        }
-        catch (std::exception const& e)
-        {
-            // For now, return true even if we failed - TBD - need to figure out what garbage at end means
-            // from the boost library
-            GS_LOG_MSG(error, "GsGSProResponse::ParseJson failed to parse GSPro response: " + std::string(e.what()));
+        } catch (std::exception const& e) {
+            // For now, return true even if we failed - TBD - need to figure out what garbage at end
+            // means from the boost library
+            GS_LOG_MSG(error, "GsGSProResponse::ParseJson failed to parse GSPro response: " +
+                                  std::string(e.what()));
             return true;
         }
 
@@ -57,23 +53,25 @@ namespace golf_sim {
 
         if (handedness_str == "RH") {
             player_handed_ = PlayerHandedness::kRightHanded;
-        }
-        else if (handedness_str == "LH") {
+        } else if (handedness_str == "LH") {
             player_handed_ = PlayerHandedness::kLeftHanded;
-        }
-        else {
+        } else {
             // Don't bail even if this is not set
-            GS_LOG_MSG(warning, "GsGSProResponse::ParseJson received unknown player handedness value from GSPro response:" + handedness_str);
+            GS_LOG_MSG(warning,
+                       "GsGSProResponse::ParseJson received unknown player handedness value from "
+                       "GSPro response:" +
+                           handedness_str);
         }
 
         if (club_str == "DR") {
             player_club_ = PlayerClub::kDriver;
-        }
-        else if (club_str == "PT") {
+        } else if (club_str == "PT") {
             player_club_ = PlayerClub::kPutter;
-        }
-        else {
-            GS_LOG_MSG(warning, "GsGSProResponse::ParseJson received unknown player club value from GSPro response:" + club_str + ". Defaulting to Driver");
+        } else {
+            GS_LOG_MSG(warning,
+                       "GsGSProResponse::ParseJson received unknown player club value from GSPro "
+                       "response:" +
+                           club_str + ". Defaulting to Driver");
             player_club_ = PlayerClub::kDriver;
         }
 
@@ -94,12 +92,11 @@ namespace golf_sim {
             }
 
             default: {
-                if (return_code == 500 ||
-                    (return_code > 501 && return_code < 600)) {
+                if (return_code == 500 || (return_code > 501 && return_code < 600)) {
                     return_code_ = kShotOtherFailure;
-                }
-                else {
-                    GS_LOG_MSG(error, "Received unknown return_code response from GSPro: " + std::to_string(return_code));
+                } else {
+                    GS_LOG_MSG(error, "Received unknown return_code response from GSPro: " +
+                                          std::to_string(return_code));
                     return_code_ = kShotOtherFailure;
                 }
                 break;
@@ -109,9 +106,7 @@ namespace golf_sim {
         return true;
     }
 
-    GsGSProResponse::~GsGSProResponse() {
-
-    }
+    GsGSProResponse::~GsGSProResponse() {}
 
     std::string GsGSProResponse::Format() const {
         std::string s;
@@ -127,4 +122,4 @@ namespace golf_sim {
         return s;
     }
 
-}
+}  // namespace golf_sim

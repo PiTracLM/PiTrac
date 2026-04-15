@@ -17,82 +17,74 @@
 
 namespace golf_sim {
 
-	class GolfSimConfiguration {
+    class GolfSimConfiguration {
+       public:
+        enum ConnectionBoardType {
+            kVersion1_0 = 1,
+            kVersion2_0 = 2,
+            kVersion3_0 = 3,
+            kRConnectionBoardTypeUnknown = 0
+        };
 
-	public:
+        enum EnclosureType {
+            kEnclosureVersion_1 = 1,
+            kEnclosureVersion_2 = 2,
+            kEnclosureVersion_3 = 3,
+            kEnclosureVersion_Unknown = 0
+        };
 
-		enum ConnectionBoardType {
-			kVersion1_0 = 1,
-			kVersion2_0 = 2,
-			kVersion3_0 = 3,
-			kRConnectionBoardTypeUnknown = 0
-		};
+        // The type of the physical enclosure (e.g., tower) that the PiTrac system is installed in
+        static EnclosureType kEnclosureVersion;
 
-		enum EnclosureType {
-			kEnclosureVersion_1 = 1,
-			kEnclosureVersion_2 = 2,
-			kEnclosureVersion_3 = 3,
-			kEnclosureVersion_Unknown = 0
-		};
+        enum PiModel { kRPi5, kRPi4, kRPiUnknown };
 
-		// The type of the physical enclosure (e.g., tower) that the PiTrac system is installed in
-		static EnclosureType kEnclosureVersion;
+        static bool Initialize(const std::string& configuration_filename = "gs_config.json");
 
-		enum PiModel {
-			kRPi5,
-			kRPi4,
-			kRPiUnknown
-		};
+        // Uses a safer version of getenv when in Windows environment.
+        static std::string safe_getenv(const std::string& varname);
 
-		static bool Initialize(const std::string& configuration_filename = "gs_config.json");
+        static PiModel GetPiModel();
 
-		// Uses a safer version of getenv when in Windows environment.
-		static std::string safe_getenv(const std::string& varname);
+        // Reads any values that need to be initialized early, such as static members of
+        // classes that won't otherwise have a good place to be otherwise initialized because,
+        // e.g., there's not constructor that will be called.
+        static bool ReadValues();
 
-		static PiModel GetPiModel();
+        static bool PropertyExists(const std::string& value_tag);
 
-		// Reads any values that need to be initialized early, such as static members of
-		// classes that won't otherwise have a good place to be otherwise initialized because,
-		// e.g., there's not constructor that will be called.
-		static bool ReadValues();
+        static void SetConstant(const std::string& value_tag, bool& constant_value);
+        static void SetConstant(const std::string& value_tag, int& constant_value);
+        static void SetConstant(const std::string& value_tag, long& constant_value);
+        static void SetConstant(const std::string& value_tag, unsigned int& constant_value);
+        static void SetConstant(const std::string& value_tag, float& constant_value);
+        static void SetConstant(const std::string& value_tag, double& constant_value);
+        static void SetConstant(const std::string& value_tag, std::string& constant_value);
+        static void SetConstant(const std::string& tag_name, cv::Vec3d& vec);
+        static void SetConstant(const std::string& tag_name, cv::Vec3f& vec);
+        static void SetConstant(const std::string& tag_name, cv::Vec2d& vec);
+        static void SetConstant(const std::string& tag_name, std::vector<cv::Vec3d>& vec);
+        static void SetConstant(const std::string& tag_name, std::vector<float>& vec);
+        static void SetConstant(const std::string& tag_name, cv::Mat& matrix);
 
-		static bool PropertyExists(const std::string& value_tag);
+        static bool ReadShotInjectionData(std::vector<GsResults>& shots,
+                                          int& kInterShotInjectionPauseSeconds);
 
-		static void SetConstant(const std::string& value_tag, bool& constant_value);
-		static void SetConstant(const std::string& value_tag, int& constant_value);
-		static void SetConstant(const std::string& value_tag, long& constant_value);
-		static void SetConstant(const std::string& value_tag, unsigned int& constant_value);
-		static void SetConstant(const std::string& value_tag, float& constant_value);
-		static void SetConstant(const std::string& value_tag, double& constant_value);
-		static void SetConstant(const std::string& value_tag, std::string& constant_value);
-		static void SetConstant(const std::string& tag_name, cv::Vec3d& vec);
-		static void SetConstant(const std::string& tag_name, cv::Vec3f& vec);
-		static void SetConstant(const std::string& tag_name, cv::Vec2d& vec);
-		static void SetConstant(const std::string& tag_name, std::vector<cv::Vec3d>& vec);
-		static void SetConstant(const std::string& tag_name, std::vector<float>& vec);
-		static void SetConstant(const std::string& tag_name, cv::Mat& matrix);
+        // Set the specified value to the value.  The node will be created if necessary
+        static bool SetTreeValue(const std::string& tag_name, const cv::Vec2d& vec);
+        static bool SetTreeValue(const std::string& tag_name, const double value);
 
+        // Write the current json tree to the specified file
+        static bool WriteTreeToFile(const std::string& file_name);
 
-		static bool ReadShotInjectionData(std::vector<GsResults>& shots,
-								   int& kInterShotInjectionPauseSeconds);
+        // Remove the named node in the json tree if it exists.
+        // Returns true if the node had previously existed, false if not
+        static bool RemoveTreeNode(const std::string& tag_name);
 
-		// Set the specified value to the value.  The node will be created if necessary
-		static bool SetTreeValue(const std::string& tag_name, const cv::Vec2d& vec);
-		static bool SetTreeValue(const std::string& tag_name, const double value);
+        // Returns the valiue of the environment variable PITRAC_ROOT
+        static std::string GetPiTracRootPath();
 
-		// Write the current json tree to the specified file
-		static bool WriteTreeToFile(const std::string& file_name);
+       protected:
+        static boost::property_tree::ptree configuration_root_;
+    };
 
-		// Remove the named node in the json tree if it exists.  
-		// Returns true if the node had previously existed, false if not
-		static bool RemoveTreeNode(const std::string& tag_name);
-
-		// Returns the valiue of the environment variable PITRAC_ROOT
-		static std::string GetPiTracRootPath();
-
-	protected:
-
-		static boost::property_tree::ptree configuration_root_;
-	};
-
-}
+}  // namespace golf_sim

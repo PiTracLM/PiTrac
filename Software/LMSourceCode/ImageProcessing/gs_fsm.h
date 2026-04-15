@@ -3,7 +3,7 @@
  * Copyright (C) 2022-2025, Verdant Consultants, LLC.
  */
 
-// The data structures and methods in this file describe the various states that 
+// The data structures and methods in this file describe the various states that
 // the system's finite state machine can be in at any given time.
 // Certain states have associated state information, such as a golf_ball structure or image.
 
@@ -11,26 +11,22 @@
 
 #ifdef __unix__  // Ignore in Windows environment
 
+    #include <chrono>
 
+    #include <opencv2/core.hpp>
 
-#include <chrono>
-
-#include <opencv2/core.hpp>
-
-#include "golf_ball.h"
-#include "gs_result_types.h"
-#include "gs_events.h"
-
+    #include "golf_ball.h"
+    #include "gs_events.h"
+    #include "gs_result_types.h"
 
 namespace golf_sim {
 
     // TBD - Put the FSM in a class at some point
     namespace state {
 
-        // The following states are relevant to the camera 1 systtem that is watching 
+        // The following states are relevant to the camera 1 systtem that is watching
         // for the ball to be hit.
-        struct InitializingCamera1System {
-        };
+        struct InitializingCamera1System {};
 
         struct WaitingForBall {
             std::chrono::steady_clock::time_point startTime_;
@@ -49,7 +45,7 @@ namespace golf_sim {
         };
 
         struct WaitingForBallHit {
-            std::chrono::steady_clock::time_point  startTime_;
+            std::chrono::steady_clock::time_point startTime_;
             GolfBall cam1_ball_;
             cv::Mat ball_image_;
             cv::Mat camera2_pre_image_;
@@ -61,19 +57,14 @@ namespace golf_sim {
             cv::Mat camera2_pre_image_;
         };
 
-        struct Exiting {
-        };
+        struct Exiting {};
 
-    }
+    }  // namespace state
 
-    using GolfSimState = std::variant<  state::InitializingCamera1System,
-                                        state::Exiting,
-                                        state::WaitingForSimulatorArmed,
-                                        state::WaitingForBall,
-                                        state::WaitingForBallStabilization,
-                                        state::WaitingForBallHit,
-                                        state::BallHitNowWaitingForCam2Image
-                                    >;
+    using GolfSimState = std::variant<state::InitializingCamera1System, state::Exiting,
+                                      state::WaitingForSimulatorArmed, state::WaitingForBall,
+                                      state::WaitingForBallStabilization, state::WaitingForBallHit,
+                                      state::BallHitNowWaitingForCam2Image>;
 
     // Send a status message to the web server via HTTP POST
     // Such messages can be states like "WaitingForBallStabilization"
@@ -86,9 +77,9 @@ namespace golf_sim {
     // This function is really the brains of the operation.
     bool RunGolfSimFsm(const GolfSimState& starting_state);
 
-    // Control messages are external messages coming to the system.  
+    // Control messages are external messages coming to the system.
     // Currently driver/putter changes are the only such messages.
-    bool ProcessControlMessageEvent(GolfSimEvent::ControlMessage &event);
+    bool ProcessControlMessageEvent(GolfSimEvent::ControlMessage& event);
 
     bool PerformSystemStartupTasks();
     bool PerformSystemShutdownTasks();
@@ -96,6 +87,6 @@ namespace golf_sim {
     // Signal to (for example), any threads that the FSM is going to be shutdown soon.
     void StartFsmShutdown();
 
-}
-	
-#endif //#ifdef __unix__  // Ignore in Windows environment
+}  // namespace golf_sim
+
+#endif  // #ifdef __unix__  // Ignore in Windows environment

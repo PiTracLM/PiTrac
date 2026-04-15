@@ -10,21 +10,19 @@
 #pragma once
 
 #include <string>
-#include "logging_tools.h"
 #include "cv_utils.h"
 #include "gs_globals.h"
 #include "gs_options.h"
+#include "logging_tools.h"
 
 namespace golf_sim {
 
     class CameraHardware {
-
-    public:
-
-        // If set to >0, init_camera_parameters will use these values instead of camera-model-specific values
-        // That way, if you want to use an image with X,Y resolution different than the current camera, you
-        // can sort of make-believe that a camera with just your X,Y resolution took the picture.
-        // TBD - Should not be static
+       public:
+        // If set to >0, init_camera_parameters will use these values instead of
+        // camera-model-specific values That way, if you want to use an image with X,Y resolution
+        // different than the current camera, you can sort of make-believe that a camera with just
+        // your X,Y resolution took the picture. TBD - Should not be static
         static int resolution_x_override_;
         static int resolution_y_override_;
 
@@ -39,12 +37,7 @@ namespace golf_sim {
             kCameraUnknown = 100
         };
 
-        enum LensType {
-            Lens_6mm = 1,
-            Lens_3_6mm_M12 = 2,
-            Lens_Custom = 3,
-            kLensUnknown = 100
-        };
+        enum LensType { Lens_6mm = 1, Lens_3_6mm_M12 = 2, Lens_Custom = 3, kLensUnknown = 100 };
 
         // An initial set of states to simulate a camera repeatedly taking pictures until
         // (at some point in time), the object of interest in the image changes.
@@ -56,27 +49,25 @@ namespace golf_sim {
             BallGoneFrames
         };
 
-		// kUpsideUp means the camera is mounted normally, kUpsideDown means the camera is upside down
-		// The "normal" orientation depends on the specific camera model, but means that when you use rpicam-still or
-		// other utilities to take a picture, the image appears right-side up.
-        enum CameraOrientation {
-            kUpsideUp = 1,
-            kUpsideDown = 2,
-            kCameraOrientationUnknown
-        };
+        // kUpsideUp means the camera is mounted normally, kUpsideDown means the camera is upside
+        // down The "normal" orientation depends on the specific camera model, but means that when
+        // you use rpicam-still or other utilities to take a picture, the image appears right-side
+        // up.
+        enum CameraOrientation { kUpsideUp = 1, kUpsideDown = 2, kCameraOrientationUnknown };
 
         // This is the camera number from the perspective of the PiTrac system.
-        // So kGsCamera1 is the camera that watches the teed-up ball, and 
+        // So kGsCamera1 is the camera that watches the teed-up ball, and
         // kGsCamera2 is the camera that images the ball in flight
         GsCameraNumber camera_number_ = GsCameraNumber::kGsCamera1;
 
         CameraModel camera_model_ = CameraModel::PiGS;
         LensType lens_type_ = LensType::Lens_6mm;
-		CameraOrientation camera_orientation_ = CameraOrientation::kCameraOrientationUnknown;
+        CameraOrientation camera_orientation_ = CameraOrientation::kCameraOrientationUnknown;
 
-        float focal_length_ = 0;        // In millimeters
-        float sensor_width_ = 0;        // The physical size of the camera sensor, inclusive of all the pixels.  In mm
-        float sensor_height_ = 0;       // In mm
+        float focal_length_ = 0;  // In millimeters
+        float sensor_width_ =
+            0;  // The physical size of the camera sensor, inclusive of all the pixels.  In mm
+        float sensor_height_ = 0;  // In mm
 
         bool use_undistortion_matrix_ = false;
 
@@ -88,7 +79,7 @@ namespace golf_sim {
         int resolution_x_ = -1;
         int resolution_y_ = -1;
 
-        // For some cameras, the video resolution may be different (and 
+        // For some cameras, the video resolution may be different (and
         // typically lower) than the still-picture resolution
         int video_resolution_x_ = -1;
         int video_resolution_y_ = -1;
@@ -96,7 +87,7 @@ namespace golf_sim {
         cv::Vec2d camera_angles_;
 
         // Will be set to a reasonable default based on the camera in use
-        // Can be overridden from the .json config file using either of 
+        // Can be overridden from the .json config file using either of
         // kExpectedBallRadiusPixelsAt40cmCamera1 or 2
         int expected_ball_radius_pixels_at_40cm_ = 0;
 
@@ -117,7 +108,8 @@ namespace golf_sim {
 
         static CameraModel string_to_camera_model(const std::string& model_enum_value_string);
         static LensType string_to_lens_type(const std::string& lens_enum_value_string);
-        static CameraOrientation string_to_camera_orientation(const std::string& lens_enum_value_string);
+        static CameraOrientation string_to_camera_orientation(
+            const std::string& lens_enum_value_string);
 
         bool camera_is_mono() const;
 
@@ -128,10 +120,8 @@ namespace golf_sim {
         void init_camera();
         void deinit_camera();
 
-        void init_camera_parameters(const GsCameraNumber camera_number, 
-                                    const CameraModel model, 
-                                    const LensType lens_type,
-                                    const CameraOrientation orientation,
+        void init_camera_parameters(const GsCameraNumber camera_number, const CameraModel model,
+                                    const LensType lens_type, const CameraOrientation orientation,
                                     const bool use_default_focal_length = false);
 
         bool prepareToTakePhoto();
@@ -140,11 +130,11 @@ namespace golf_sim {
         bool prepareToTakeVideo();
         cv::Mat getNextFrame();
 
-        // TBD - Probably should be private, but the higher-level golf_sim_camara needs to check this sometimes
+        // TBD - Probably should be private, but the higher-level golf_sim_camara needs to check
+        // this sometimes
         bool cameraInitialized = false;
 
-    private:
-
+       private:
         // Counts the number of static images that have been sent so far if this camera is
         // being emulated by software to take the place of a real camera.
         int staticImagesSent = 0;
@@ -153,4 +143,4 @@ namespace golf_sim {
         int currentStaticImageIndex = 0;
     };
 
-}
+}  // namespace golf_sim

@@ -6,9 +6,9 @@
 // Hides whatever format library we're using
 
 #ifdef __unix__  // Ignore in Windows environment
-#include <fmt/core.h>
-#define GS_FORMATLIB_FORMAT fmt::format
+    #include <fmt/core.h>
+    #define GS_FORMATLIB_FORMAT fmt::format
 #else
-#include <format>
-#define GS_FORMATLIB_FORMAT std::format
-#endif // __unix__
+    #include <format>
+    #define GS_FORMATLIB_FORMAT std::format
+#endif  // __unix__

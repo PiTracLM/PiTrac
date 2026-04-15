@@ -18,8 +18,7 @@ using ip::tcp;
 namespace golf_sim {
 
     class GsGSProInterface : public GsSimSocketInterface {
-
-    public:
+       public:
         GsGSProInterface();
         virtual ~GsGSProInterface();
 
@@ -27,21 +26,20 @@ namespace golf_sim {
         static bool InterfaceIsPresent();
 
         // Must be called before SendResults is called.
-         virtual bool Initialize();
+        virtual bool Initialize();
 
         // Deals with, for example, shutting down any socket connection
-         virtual void DeInitialize();
+        virtual void DeInitialize();
 
-         virtual bool SendResults(const GsResults& results);
+        virtual bool SendResults(const GsResults& results);
 
-         virtual void SetSimSystemArmed(const bool is_armed);
-         virtual bool GetSimSystemArmed();
+        virtual void SetSimSystemArmed(const bool is_armed);
+        virtual bool GetSimSystemArmed();
 
-    protected:
-
+       protected:
         virtual std::string GenerateResultsDataToSend(const GsResults& results);
 
-         virtual bool ProcessReceivedData(const std::string received_data);
+        virtual bool ProcessReceivedData(const std::string received_data);
     };
 
-}
+}  // namespace golf_sim

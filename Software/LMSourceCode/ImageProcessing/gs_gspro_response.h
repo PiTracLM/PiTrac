@@ -5,14 +5,12 @@
 
 #pragma once
 
-
 // Class for representing, parsing and transferring Golf Sim responses from GsPro
 
 namespace golf_sim {
 
     class GsGSProResponse {
-
-    public:
+       public:
         enum ReturnCode {
             kShotReceivedSuccessfully = 200,
             kPlayerInformation = 201,
@@ -20,17 +18,11 @@ namespace golf_sim {
             kShotOtherFailure = 599
         };
 
-        enum PlayerHandedness {
-            kRightHanded = 0,
-            kLeftHanded = 1
-        };
+        enum PlayerHandedness { kRightHanded = 0, kLeftHanded = 1 };
 
-        enum PlayerClub {
-            kDriver = 0,
-            kPutter = 1
-        };
+        enum PlayerClub { kDriver = 0, kPutter = 1 };
 
-    public:
+       public:
         GsGSProResponse();
         bool ParseJson(const std::string& gspro_json_string);
         virtual ~GsGSProResponse();
@@ -40,7 +32,6 @@ namespace golf_sim {
         std::string message_ = "Not Set";
         PlayerHandedness player_handed_ = PlayerHandedness::kRightHanded;
         PlayerClub player_club_ = PlayerClub::kDriver;
-
     };
 
-}
+}  // namespace golf_sim

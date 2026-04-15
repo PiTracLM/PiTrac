@@ -10,22 +10,14 @@
 
 namespace golf_sim {
 
-	class GolfSimClubs {
+    class GolfSimClubs {
+       public:
+        enum GsClubType { kNotSelected = 0, kDriver = 1, kIron = 2, kPutter = 3 };
 
-	public:
+        static GsClubType current_club_;
 
-		enum GsClubType	{
-			kNotSelected = 0,
-			kDriver = 1,
-			kIron = 2,
-			kPutter = 3
-		};
+        static GsClubType GetCurrentClubType();
+        static void SetCurrentClubType(GsClubType club_type);
+    };
 
-		static GsClubType current_club_;
-
-		static GsClubType GetCurrentClubType();
-		static void SetCurrentClubType(GsClubType club_type);
-
-	};
-
-}
+}  // namespace golf_sim
