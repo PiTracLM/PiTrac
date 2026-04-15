@@ -9,7 +9,7 @@ body:
       ## Feature Request
 
       Help us make PiTrac better! Consider:
-      - Checking our [Roadmap](https://pitraclm.github.io/PiTrac/getting-started/roadmap.html)
+      - Checking our [Roadmap](https://docs.pitrac.org/reference/roadmap/)
 - type: dropdown
   id: feature-area
   attributes:
