@@ -39,9 +39,10 @@ function updateDisplay(data) {
         const element = document.getElementById(id);
         if (!element) return;
         const unitSpan = element.querySelector('.metric-unit');
-        const currentText = element.firstChild && element.firstChild.nodeType === Node.TEXT_NODE
-            ? element.firstChild.textContent.trim()
-            : '';
+        const currentText =
+            element.firstChild && element.firstChild.nodeType === Node.TEXT_NODE
+                ? element.firstChild.textContent.trim()
+                : '';
         const newValue = String(value);
 
         if (currentText !== newValue) {
@@ -77,8 +78,8 @@ function updateDisplay(data) {
         imageInner.className = 'image-panel-inner';
         imageInner.innerHTML =
             '<div class="image-empty-state">' +
-                '<div class="empty-icon"></div>' +
-                '<div class="empty-text">Waiting for shot...</div>' +
+            '<div class="empty-icon"></div>' +
+            '<div class="empty-text">Waiting for shot...</div>' +
             '</div>';
     }
 }
@@ -87,8 +88,7 @@ function handleImageReady(filename) {
     const imageInner = document.getElementById('image-panel-inner');
     const ts = Date.now();
     imageInner.className = 'image-panel-inner';
-    imageInner.innerHTML =
-        `<img src="/images/${filename}?t=${ts}" alt="Shot image" class="shot-image" onclick="openImage('${filename}')">`;
+    imageInner.innerHTML = `<img src="/images/${filename}?t=${ts}" alt="Shot image" class="shot-image" onclick="openImage('${filename}')">`;
 }
 
 function updateBallStatus(resultType, message, isPiTracRunning) {
@@ -164,8 +164,8 @@ async function resetShot() {
             imageInner.className = 'image-panel-inner';
             imageInner.innerHTML =
                 '<div class="image-empty-state">' +
-                    '<div class="empty-icon"></div>' +
-                    '<div class="empty-text">Waiting for shot...</div>' +
+                '<div class="empty-icon"></div>' +
+                '<div class="empty-text">Waiting for shot...</div>' +
                 '</div>';
         }
     } catch (error) {
@@ -174,7 +174,7 @@ async function resetShot() {
 }
 
 let originalCheckPiTracStatus;
-const dashboardCheckPiTracStatus = async function() {
+const dashboardCheckPiTracStatus = async function () {
     if (!originalCheckPiTracStatus) {
         originalCheckPiTracStatus = window.checkPiTracStatus;
     }
@@ -191,7 +191,7 @@ const dashboardCheckPiTracStatus = async function() {
     }
 
     return isRunning;
-}
+};
 
 function showStatusMessage(message, type = 'info') {
     const statusMessage = document.getElementById('status-strip-message');

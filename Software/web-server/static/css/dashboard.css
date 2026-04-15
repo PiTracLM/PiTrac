@@ -12,9 +12,15 @@
 }
 
 @keyframes metricPop {
-    0%   { transform: scale(1); }
-    40%  { transform: scale(1.06); }
-    100% { transform: scale(1); }
+    0% {
+        transform: scale(1);
+    }
+    40% {
+        transform: scale(1.06);
+    }
+    100% {
+        transform: scale(1);
+    }
 }
 
 /* Status strip — accent left border changes per state */
@@ -41,19 +47,25 @@
 }
 
 /* Status strip states */
-.status-strip.initializing { border-left-color: var(--color-info); }
+.status-strip.initializing {
+    border-left-color: var(--color-info);
+}
 .status-strip.initializing .ball-icon {
     background-color: var(--color-info);
     animation: pulse 2s infinite;
 }
 
-.status-strip.waiting { border-left-color: var(--color-warning); }
+.status-strip.waiting {
+    border-left-color: var(--color-warning);
+}
 .status-strip.waiting .ball-icon {
     background-color: var(--color-warning);
     animation: pulse 2s infinite;
 }
 
-.status-strip.stabilizing { border-left-color: #fbbf24; }
+.status-strip.stabilizing {
+    border-left-color: #fbbf24;
+}
 .status-strip.stabilizing .ball-icon {
     background-color: #fbbf24;
     animation: bounce 1s infinite;
@@ -61,7 +73,11 @@
 
 .status-strip.ready {
     border-left-color: var(--color-success);
-    background: linear-gradient(90deg, color-mix(in oklch, var(--color-success) 6%, transparent) 0%, transparent 40%);
+    background: linear-gradient(
+        90deg,
+        color-mix(in oklch, var(--color-success) 6%, transparent) 0%,
+        transparent 40%
+    );
 }
 .status-strip.ready .ball-icon {
     background-color: var(--color-success);
@@ -71,13 +87,17 @@
     color: var(--color-success);
 }
 
-.status-strip.hit { border-left-color: var(--color-primary); }
+.status-strip.hit {
+    border-left-color: var(--color-primary);
+}
 .status-strip.hit .ball-icon {
     background-color: var(--color-primary);
     animation: none;
 }
 
-.status-strip.error { border-left-color: var(--color-error); }
+.status-strip.error {
+    border-left-color: var(--color-error);
+}
 .status-strip.error .ball-icon {
     background-color: var(--color-error);
 }
@@ -138,15 +158,27 @@
     cursor: pointer;
     transition: opacity 0.3s ease;
 }
-.shot-image:hover { opacity: 0.92; }
+.shot-image:hover {
+    opacity: 0.92;
+}
 
 @media (max-width: 767px) {
-    .status-strip-separator { display: none; }
-    .metric-number { font-size: 1.75rem !important; }
-    .metric-card.hero .metric-number { font-size: 2.5rem !important; }
+    .status-strip-separator {
+        display: none;
+    }
+    .metric-number {
+        font-size: 1.75rem !important;
+    }
+    .metric-card.hero .metric-number {
+        font-size: 2.5rem !important;
+    }
 }
 
 @media (min-width: 1400px) {
-    .metric-card.hero .metric-number { font-size: 5rem !important; }
-    .metric-number { font-size: 3.5rem !important; }
+    .metric-card.hero .metric-number {
+        font-size: 5rem !important;
+    }
+    .metric-number {
+        font-size: 3.5rem !important;
+    }
 }

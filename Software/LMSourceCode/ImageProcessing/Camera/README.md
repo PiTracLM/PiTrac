@@ -9,12 +9,14 @@
 ## Quick Start
 
 ### Option 1: Simple PowerShell Script (Recommended)
+
 ```powershell
 # From Camera directory
 .\build_tests.ps1
 ```
 
 ### Option 2: Manual CMake
+
 ```powershell
 # Create and enter build directory
 mkdir build
@@ -33,6 +35,7 @@ cmake --build .
 ```
 
 ### Option 3: Using CTest
+
 ```powershell
 cd build\tests
 ctest -C Debug -V
@@ -47,6 +50,7 @@ ctest -C Debug -V
 - **Parametric**: Tests with comprehensive data sets
 
 ## Test Output Example
+
 ```
 Running 15 test cases...
 Setting up domain type test fixture
@@ -61,7 +65,9 @@ Test suite "CameraBoundedContextTests" passed with:
 ## Troubleshooting
 
 ### Boost Not Found
+
 If CMake can't find Boost:
+
 ```powershell
 # Option 1: Set environment variable
 $env:BOOST_ROOT = "C:\path\to\boost"
@@ -75,6 +81,7 @@ cmake --build .
 ```
 
 ### Different Compiler
+
 ```powershell
 # For Visual Studio
 cmake .. -G "Visual Studio 16 2019"
@@ -88,6 +95,7 @@ The test framework is completely self-contained and doesn't require the full PiT
 ## Continuous Integration
 
 The Camera tests run automatically on GitHub Actions:
+
 - **Triggers**: Push to any branch, Pull Requests
 - **Platform**: Windows (Visual Studio 2019)
 - **Path Filter**: Only runs when Camera code changes

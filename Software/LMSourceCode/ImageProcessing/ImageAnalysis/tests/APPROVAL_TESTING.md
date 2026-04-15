@@ -5,6 +5,7 @@ This directory contains approval tests that use actual PiTrac test images to val
 ## Overview
 
 Approval testing works by:
+
 1. **First Run**: Creates "approved" baseline files representing expected behavior
 2. **Subsequent Runs**: Compares current results against approved baselines
 3. **Failure**: When outputs differ, manual review determines if change is intended or a regression
@@ -26,16 +27,19 @@ The tests use real PiTrac images from `C:\kata\PiTrac\Software\LMSourceCode\Imag
 For each test, the framework generates:
 
 ### Text Artifacts
+
 - `{test_name}.approved.txt` - Baseline expected results
 - `{test_name}.received.txt` - Current test run results
 
-### Visual Artifacts  
+### Visual Artifacts
+
 - `{test_name}.approved.png` - Baseline visualization with detected ball highlighted
 - `{test_name}.received.png` - Current run visualization
 
 ## Running Approval Tests
 
 ### Using the Build Script (Recommended)
+
 ```powershell
 # From ImageAnalysis directory
 .\build_tests.ps1 -Verbose
@@ -45,6 +49,7 @@ For each test, the framework generates:
 ```
 
 ### Using CMake Directly
+
 ```powershell
 # Build and run all tests
 mkdir build
@@ -58,6 +63,7 @@ ctest --verbose
 ```
 
 ### Using Custom Targets
+
 ```powershell
 # Run all tests
 cmake --build . --target run_tests
@@ -69,23 +75,27 @@ cmake --build . --target run_approval_tests
 ## Approval Workflow
 
 ### Initial Setup (First Time)
+
 1. Run the tests - they will create baseline `.approved.txt` and `.approved.png` files
 2. Manually review the generated artifacts to ensure they represent correct behavior
 3. Commit the approved files to version control
 
 ### Regular Development
+
 1. Run tests normally - they compare against approved baselines
 2. If tests fail, examine the differences:
-   - Review `.received.txt` vs `.approved.txt` 
-   - Compare `.received.png` vs `.approved.png`
+    - Review `.received.txt` vs `.approved.txt`
+    - Compare `.received.png` vs `.approved.png`
 3. If changes are intended (new features, improvements):
-   - Copy `.received.*` files over `.approved.*` files to update baselines
-   - Commit the updated approved files
+    - Copy `.received.*` files over `.approved.*` files to update baselines
+    - Commit the updated approved files
 4. If changes are unintended:
-   - Fix the code to match expected behavior
+    - Fix the code to match expected behavior
 
 ### Updating Baselines
+
 When intentional changes require new baselines:
+
 ```powershell
 # Copy received files to approved (Windows)
 copy "approval_artifacts\*.received.txt" "approval_artifacts\*.approved.txt"
@@ -134,21 +144,24 @@ The approval tests are designed for local development and validation. For CI/CD:
 ## Troubleshooting
 
 ### Test Images Not Found
+
 - Verify PiTrac images exist at `C:\kata\PiTrac\Software\LMSourceCode\Images\`
 - Check file permissions and accessibility
 
 ### Approval Artifacts Directory
+
 - Directory is automatically created at `approval_artifacts\`
 - Ensure write permissions in test directory
 
 ### Boost Test Framework Issues
+
 - Tests use same Boost configuration as Camera bounded context
 - Supports both linked and header-only Boost modes
 
 ## Benefits
 
 1. **Real Data Validation**: Uses actual golf ball images from PiTrac system
-2. **Regression Detection**: Automatically catches unintended behavior changes  
+2. **Regression Detection**: Automatically catches unintended behavior changes
 3. **Visual Verification**: Generated images show ball detection results
 4. **Baseline Management**: Simple workflow for updating expected results
 5. **Integration Ready**: Tests the full image analysis pipeline end-to-end
@@ -158,11 +171,13 @@ This approval testing framework provides confidence that the ImageAnalysis compo
 # Image Analysis Approval Testing Documentation
 
 ## Overview
+
 This document describes the approval testing framework implemented for the PiTrac Image Analysis bounded context. Approval testing validates that our image analysis algorithms produce consistent, expected results when processing real PiTrac golf ball images.
 
 ## Test Implementation Status ✅ COMPLETED
 
 ### Successfully Implemented
+
 - ✅ **Test Framework**: Complete approval testing framework using real PiTrac images
 - ✅ **Image Integration**: All 7 PiTrac test images successfully integrated
 - ✅ **Baseline Generation**: All baseline artifacts created and validated
@@ -170,6 +185,7 @@ This document describes the approval testing framework implemented for the PiTra
 - ✅ **Documentation**: Comprehensive testing documentation
 
 ### Test Results Summary
+
 **Build Status**: ✅ All tests passing (8/8 test cases)
 **Execution Time**: ~2 seconds for complete approval test suite
 **Coverage**: 7 real PiTrac images + 1 movement analysis integration test
@@ -177,6 +193,7 @@ This document describes the approval testing framework implemented for the PiTra
 ## Architecture
 
 ### Key Components
+
 1. **ApprovalTestFixture**: Core test infrastructure
 2. **Image Loading**: Automated PiTrac image discovery and loading
 3. **Result Analysis**: Detailed result summarization and visualization
@@ -185,23 +202,26 @@ This document describes the approval testing framework implemented for the PiTra
 ## Test Results Analysis
 
 ### Ball Detection Performance
+
 Based on our baseline runs, the system demonstrates:
 
-1. **High Confidence Detection**: 
-   - `log_ball_final_found_ball_img.png`: Ball detected at (998.5, 593.5) with 80% confidence
-   - State: TEED, Method: opencv_hough_circles
+1. **High Confidence Detection**:
+    - `log_ball_final_found_ball_img.png`: Ball detected at (998.5, 593.5) with 80% confidence
+    - State: TEED, Method: opencv_hough_circles
 
 2. **Low Confidence Cases**:
-   - `spin_ball_1_gray_image1.png`: Ball state ABSENT with 10% confidence
-   - Detected circle at (56.5, 54.5) but classified as insufficient confidence
+    - `spin_ball_1_gray_image1.png`: Ball state ABSENT with 10% confidence
+    - Detected circle at (56.5, 54.5) but classified as insufficient confidence
 
 3. **Movement Analysis**:
-   - Successfully detects movement between strobed images
-   - Movement magnitude: 187.359 pixels with 100% confidence
-   - Uses opencv_optical_flow method
+    - Successfully detects movement between strobed images
+    - Movement magnitude: 187.359 pixels with 100% confidence
+    - Uses opencv_optical_flow method
 
 ### Baseline Artifacts Generated
+
 All baseline files have been created in `tests/approval_artifacts/`:
+
 - **Text Summaries**: 8 `.approved.txt` files with detailed analysis results
 - **Visual Artifacts**: 7 `.approved.png` files with detected ball highlighting
 - **Movement Analysis**: 1 movement analysis result for strobed image sequence
@@ -209,11 +229,13 @@ All baseline files have been created in `tests/approval_artifacts/`:
 ## Build Integration Status
 
 ### CMake Integration ✅
+
 - Approval test executable: `test_approval_with_pitrac_images`
 - Test labels: `approval`, `images`, `pitrac`
 - Custom target: `approval_tests`
 
 ### PowerShell Build Script ✅
+
 - Full integration with `build_tests.ps1`
 - Automatic execution in test suite
 - Clean emoji-free output for cross-platform compatibility
@@ -221,6 +243,7 @@ All baseline files have been created in `tests/approval_artifacts/`:
 ## Usage
 
 ### Running Approval Tests
+
 ```powershell
 # Run all tests including approval tests
 .\build_tests.ps1

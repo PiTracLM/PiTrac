@@ -1,5 +1,5 @@
 ---
-name: "CLA Assistant"
+name: 'CLA Assistant'
 
 on:
   issue_comment:
@@ -20,14 +20,14 @@ concurrency:
 jobs:
   cla-assistant:
     runs-on: ubuntu-latest
- 
+
     env:
-      SIGNATURE_PHRASE: "I have read the CLA Document and I hereby sign the CLA"
-      RECHECK_PHRASE: "recheck"
-      PATH_TO-DOCUMENT: "https://gist.github.com/jamespilgrim/e6996a438adc0919ebbe70561efbb600#file-verdant-contributor-license-agreement-md"
+      SIGNATURE_PHRASE: 'I have read the CLA Document and I hereby sign the CLA'
+      RECHECK_PHRASE: 'recheck'
+      PATH_TO-DOCUMENT: 'https://gist.github.com/jamespilgrim/e6996a438adc0919ebbe70561efbb600#file-verdant-contributor-license-agreement-md'
 
     steps:
-      - name: "CLA Assistant"
+      - name: 'CLA Assistant'
         if: >
           (github.event.comment.body == 'recheck' ||
           github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA') ||
@@ -39,20 +39,20 @@ jobs:
           # Fine-grained / classic PAT that can write to PitracCLASignatures
           PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         with:
-          path-to-document: "https://gist.github.com/jamespilgrim/e6996a438adc0919ebbe70561efbb600#file-verdant-contributor-license-agreement-md"
-          path-to-signatures: "signatures/version1/cla.json"
+          path-to-document: 'https://gist.github.com/jamespilgrim/e6996a438adc0919ebbe70561efbb600#file-verdant-contributor-license-agreement-md'
+          path-to-signatures: 'signatures/version1/cla.json'
 
-          remote-organization-name: "PiTracLM"
-          remote-repository-name: "PitracCLASignatures"
+          remote-organization-name: 'PiTracLM'
+          remote-repository-name: 'PitracCLASignatures'
 
-          branch: "main"
+          branch: 'main'
 
-          allowlist: "dependabot[bot],github-actions[bot]"
+          allowlist: 'dependabot[bot],github-actions[bot]'
 
           # lock-pullrequest-aftermerge: true
 
-          create-file-commit-message: "Create signatures store"
-          signed-commit-message: "$contributorName has signed the CLA in $owner/$repo#$pullRequestNo"
+          create-file-commit-message: 'Create signatures store'
+          signed-commit-message: '$contributorName has signed the CLA in $owner/$repo#$pullRequestNo'
 
           custom-notsigned-prcomment: |
             Thanks for your PR! Before we can review it, please sign our Contributor License Agreement.
@@ -70,6 +70,6 @@ jobs:
 
           custom-pr-sign-comment: ${{ env.SIGNATURE_PHRASE }}
 
-          custom-allsigned-prcomment: "All contributors have signed the CLA. Thanks!"
+          custom-allsigned-prcomment: 'All contributors have signed the CLA. Thanks!'
 
           suggest-recheck: true

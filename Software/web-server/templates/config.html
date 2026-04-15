@@ -1,14 +1,10 @@
-{% extends "base.html" %}
-
-{% block title %}PiTrac Configuration{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="/static/css/config.css">
-{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% block title %}PiTrac Configuration{% endblock %} {% block extra_css %}
+<link rel="stylesheet" href="/static/css/config.css" />
+{% endblock %} {% block content %}
 <!-- Status bar -->
-<div class="status-bar card bg-base-200 border border-base-300 shadow-sm flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4 p-3 mb-4">
+<div
+    class="status-bar card bg-base-200 border border-base-300 shadow-sm flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4 p-3 mb-4"
+>
     <div class="status-left flex items-center gap-3 flex-1 min-w-0">
         <div class="config-status-indicator badge badge-outline gap-2 py-3 px-3">
             <span class="config-status-label text-sm opacity-60">Modified:</span>
@@ -20,40 +16,39 @@
         <button class="btn btn-primary btn-sm" onclick="saveChanges()" id="saveBtn" disabled>
             Save Changes
         </button>
-        <button class="btn btn-ghost btn-sm" onclick="reloadConfig()">
-            Reload
-        </button>
-        <button class="btn btn-outline btn-sm" onclick="showDiff()">
-            Diff
-        </button>
-        <button class="btn btn-error btn-sm" onclick="resetAll()">
-            Reset
-        </button>
+        <button class="btn btn-ghost btn-sm" onclick="reloadConfig()">Reload</button>
+        <button class="btn btn-outline btn-sm" onclick="showDiff()">Diff</button>
+        <button class="btn btn-error btn-sm" onclick="resetAll()">Reset</button>
     </div>
 </div>
 
 <!-- Main config layout -->
 <div class="config-container grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-4 mt-4">
     <!-- Sidebar -->
-    <div class="category-sidebar card bg-base-200 border border-base-300 shadow-sm p-4 h-fit sticky top-4">
+    <div
+        class="category-sidebar card bg-base-200 border border-base-300 shadow-sm p-4 h-fit sticky top-4"
+    >
         <h3 class="text-lg font-semibold text-primary mb-3">Categories</h3>
-        <ul id="categoryList" class="category-list menu bg-base-200 rounded-box p-0">
-        </ul>
+        <ul id="categoryList" class="category-list menu bg-base-200 rounded-box p-0"></ul>
     </div>
 
     <!-- Config panel -->
     <div class="config-panel flex flex-col gap-4">
         <div class="search-container flex gap-2">
-            <input type="text"
-                   id="searchInput"
-                   placeholder="Search settings..."
-                   class="search-input input input-bordered w-full"
-                   oninput="searchConfig()">
+            <input
+                type="text"
+                id="searchInput"
+                placeholder="Search settings..."
+                class="search-input input input-bordered w-full"
+                oninput="searchConfig()"
+            />
             <button onclick="clearSearch()" class="clear-search btn btn-ghost btn-sm">Clear</button>
         </div>
 
-        <div id="configContent" class="config-content card bg-base-200 border border-base-300 shadow-sm p-4 min-h-[500px]">
-        </div>
+        <div
+            id="configContent"
+            class="config-content card bg-base-200 border border-base-300 shadow-sm p-4 min-h-[500px]"
+        ></div>
     </div>
 </div>
 
@@ -65,20 +60,21 @@
 
 <!-- Confirm/diff modal (JS toggles .active class on #confirmModal) -->
 <div id="confirmModal">
-    <div class="modal-content bg-base-200 rounded-box shadow-xl border border-base-300 w-[95%] max-w-4xl max-h-[85vh] overflow-auto">
+    <div
+        class="modal-content bg-base-200 rounded-box shadow-xl border border-base-300 w-[95%] max-w-4xl max-h-[85vh] overflow-auto"
+    >
         <div class="modal-header flex justify-between items-center p-5 border-b border-base-300">
             <h2 id="modalTitle" class="text-lg font-bold text-primary">Confirm</h2>
-            <button class="modal-close btn btn-ghost btn-sm btn-square" onclick="closeModal()">&times;</button>
+            <button class="modal-close btn btn-ghost btn-sm btn-square" onclick="closeModal()">
+                &times;
+            </button>
         </div>
-        <div class="modal-body p-5" id="modalBody">
-        </div>
+        <div class="modal-body p-5" id="modalBody"></div>
         <div class="modal-footer flex justify-end gap-3 p-5 border-t border-base-300">
             <button class="btn btn-primary btn-sm" id="modalConfirmBtn">Confirm</button>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extra_scripts %}
+{% endblock %} {% block extra_scripts %}
 <script src="/static/js/config.js?v=2"></script>
 {% endblock %}

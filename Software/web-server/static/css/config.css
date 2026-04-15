@@ -1,11 +1,21 @@
 /* Config page — only what daisyUI/Tailwind can't cover */
 
 /* Status message coloring via JS-set classes (success/error/warning/info) */
-.status-message:empty { display: none; }
-.status-message.success { color: var(--color-success); }
-.status-message.error   { color: var(--color-error); }
-.status-message.warning { color: var(--color-warning); }
-.status-message.info    { color: var(--color-info); }
+.status-message:empty {
+    display: none;
+}
+.status-message.success {
+    color: var(--color-success);
+}
+.status-message.error {
+    color: var(--color-error);
+}
+.status-message.warning {
+    color: var(--color-warning);
+}
+.status-message.info {
+    color: var(--color-info);
+}
 
 /* Category sidebar items — JS creates these dynamically */
 .category-item {
@@ -14,7 +24,9 @@
     border-radius: 0.5rem;
     cursor: pointer;
     color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
-    transition: background 0.15s, color 0.15s;
+    transition:
+        background 0.15s,
+        color 0.15s;
 }
 
 .category-item:hover {
@@ -27,17 +39,17 @@
     color: var(--color-primary-content);
 }
 
-.category-item[data-category="Basic"] {
+.category-item[data-category='Basic'] {
     font-weight: 600;
 }
 
-.category-item[data-category="Basic"]::after {
-    content: "*";
+.category-item[data-category='Basic']::after {
+    content: '*';
     float: right;
     color: var(--color-warning);
 }
 
-.category-item.active[data-category="Basic"]::after {
+.category-item.active[data-category='Basic']::after {
     color: var(--color-primary-content);
 }
 
@@ -46,8 +58,12 @@
     margin-bottom: 2rem;
     animation: fadeIn 0.25s ease-out;
 }
-.config-group:last-child { margin-bottom: 0; }
-.config-group[style*="display: none"] { animation: none; }
+.config-group:last-child {
+    margin-bottom: 0;
+}
+.config-group[style*='display: none'] {
+    animation: none;
+}
 
 .config-group-title {
     font-size: 1.25rem;
@@ -62,7 +78,9 @@
     padding-bottom: 0.75rem;
     border-bottom: 2px solid var(--color-base-300);
 }
-.config-main-section-header:first-child { margin-top: 0; }
+.config-main-section-header:first-child {
+    margin-top: 0;
+}
 .config-main-section-header h2 {
     margin: 0;
     font-size: 1.5rem;
@@ -70,8 +88,12 @@
     color: var(--color-primary);
 }
 
-.config-section { margin-bottom: 3rem; }
-.config-section:last-child { margin-bottom: 0; }
+.config-section {
+    margin-bottom: 3rem;
+}
+.config-section:last-child {
+    margin-bottom: 0;
+}
 
 .config-section-header {
     margin: 1.5rem 0 0.75rem;
@@ -79,7 +101,9 @@
     align-items: center;
     gap: 0.5rem;
 }
-.config-section-header:first-of-type { margin-top: 0; }
+.config-section-header:first-of-type {
+    margin-top: 0;
+}
 
 .config-section-header .section-label {
     font-size: 0.8rem;
@@ -103,8 +127,12 @@
     border-bottom: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
     transition: background 0.15s;
 }
-.config-item:last-child { border-bottom: none; }
-.config-item:hover { background: color-mix(in oklch, var(--color-base-300) 30%, transparent); }
+.config-item:last-child {
+    border-bottom: none;
+}
+.config-item:hover {
+    background: color-mix(in oklch, var(--color-base-300) 30%, transparent);
+}
 
 .config-item.modified {
     border-left: 3px solid var(--color-warning);
@@ -167,7 +195,9 @@
     color: var(--color-base-content);
     font-size: 0.85rem;
     font-family: ui-monospace, monospace;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition:
+        border-color 0.15s,
+        box-shadow 0.15s;
 }
 
 .config-input:focus {
@@ -207,7 +237,10 @@ select.config-input {
     gap: 0.75rem;
 }
 .input-container select,
-.input-container input { flex: 1; min-width: 0; }
+.input-container input {
+    flex: 1;
+    min-width: 0;
+}
 
 .input-wrapper {
     position: relative;
@@ -215,8 +248,12 @@ select.config-input {
     align-items: center;
     width: 100%;
 }
-.input-wrapper .config-input { padding-right: 2rem; }
-.input-wrapper select.config-input { padding-right: 2.5rem; }
+.input-wrapper .config-input {
+    padding-right: 2rem;
+}
+.input-wrapper select.config-input {
+    padding-right: 2.5rem;
+}
 
 .clear-value-btn {
     position: absolute;
@@ -232,7 +269,9 @@ select.config-input {
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    transition: background 0.15s, color 0.15s;
+    transition:
+        background 0.15s,
+        color 0.15s;
 }
 .clear-value-btn:hover {
     background: color-mix(in oklch, var(--color-error) 10%, transparent);
@@ -315,9 +354,18 @@ select.config-input {
     cursor: help;
 }
 
-.counter-custom  { border: 1px solid var(--color-primary);  color: var(--color-primary); }
-.counter-default { border: 1px solid color-mix(in oklch, var(--color-base-content) 30%, transparent); color: color-mix(in oklch, var(--color-base-content) 40%, transparent); }
-.counter-total   { border: 1px solid var(--color-base-300);  color: color-mix(in oklch, var(--color-base-content) 50%, transparent); }
+.counter-custom {
+    border: 1px solid var(--color-primary);
+    color: var(--color-primary);
+}
+.counter-default {
+    border: 1px solid color-mix(in oklch, var(--color-base-content) 30%, transparent);
+    color: color-mix(in oklch, var(--color-base-content) 40%, transparent);
+}
+.counter-total {
+    border: 1px solid var(--color-base-300);
+    color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
+}
 
 /* Loading overlay — use specific class to avoid colliding with daisyUI's .loading */
 .config-loading-overlay {
@@ -329,7 +377,9 @@ select.config-input {
     text-align: center;
     z-index: 9999;
 }
-.config-loading-overlay.active { display: block; }
+.config-loading-overlay.active {
+    display: block;
+}
 
 /* Config modal — JS uses classList .active, not <dialog>.showModal().
    Scoped to #confirmModal so we don't clobber daisyUI's <dialog class="modal"> in base.html. */
@@ -342,13 +392,25 @@ select.config-input {
     align-items: center;
     justify-content: center;
 }
-#confirmModal.active { display: flex; }
+#confirmModal.active {
+    display: flex;
+}
 
 /* Diff viewer (rendered by JS into modal body) */
-.diff-viewer { max-width: 900px; margin: 0 auto; }
+.diff-viewer {
+    max-width: 900px;
+    margin: 0 auto;
+}
 
-.diff-header { margin-bottom: 1.25rem; text-align: center; }
-.diff-summary { opacity: 0.5; font-size: 0.85rem; margin-top: 0.4rem; }
+.diff-header {
+    margin-bottom: 1.25rem;
+    text-align: center;
+}
+.diff-summary {
+    opacity: 0.5;
+    font-size: 0.85rem;
+    margin-top: 0.4rem;
+}
 
 .diff-table {
     width: 100%;
@@ -367,7 +429,9 @@ select.config-input {
     border-bottom: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
 }
 
-.diff-key-name { font-weight: 500; }
+.diff-key-name {
+    font-weight: 500;
+}
 .diff-key-path {
     font-size: 0.7rem;
     opacity: 0.4;
@@ -391,7 +455,9 @@ select.config-input {
 }
 
 /* Dependency warning toast */
-.dependency-warning { animation: slideIn 0.3s ease; }
+.dependency-warning {
+    animation: slideIn 0.3s ease;
+}
 
 /* Small button variant used by JS (detect, reset, etc.) */
 .btn-small {
@@ -402,13 +468,25 @@ select.config-input {
 
 /* Animations */
 @keyframes slideIn {
-    from { opacity: 0; transform: translateX(100%); }
-    to   { opacity: 1; transform: translateX(0); }
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 @keyframes slideOut {
-    from { opacity: 1; transform: translateX(0); }
-    to   { opacity: 0; transform: translateX(100%); }
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
 }
 
 /* Mobile: stack everything */
@@ -456,11 +534,17 @@ select.config-input {
         flex-direction: column;
         gap: 0.4rem;
     }
-    .diff-footer button { width: 100%; }
+    .diff-footer button {
+        width: 100%;
+    }
 }
 
 /* Tablet: narrower sidebar */
 @media (min-width: 769px) and (max-width: 1024px) {
-    .config-container { grid-template-columns: 200px 1fr; }
-    .config-item { grid-template-columns: 1fr 1fr auto; }
+    .config-container {
+        grid-template-columns: 200px 1fr;
+    }
+    .config-item {
+        grid-template-columns: 1fr 1fr auto;
+    }
 }

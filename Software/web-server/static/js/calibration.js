@@ -67,7 +67,7 @@ class CalibrationManager {
     }
 
     setupEventListeners() {
-        document.querySelectorAll('input[name="camera"]').forEach(input => {
+        document.querySelectorAll('input[name="camera"]').forEach((input) => {
             input.addEventListener('change', (e) => {
                 this.updateSelectedCameras(e.target.value);
             });
@@ -134,24 +134,36 @@ class CalibrationManager {
         container.innerHTML = '';
 
         if (data.camera1) {
-            this.addCalibrationDataItem(container, 'Camera 1 Focal Length',
-                data.camera1.focal_length?.toFixed(3) || 'Not set');
+            this.addCalibrationDataItem(
+                container,
+                'Camera 1 Focal Length',
+                data.camera1.focal_length?.toFixed(3) || 'Not set'
+            );
 
             if (data.camera1.angles && Array.isArray(data.camera1.angles)) {
-                this.addCalibrationDataItem(container, 'Camera 1 Angles',
-                    `[${data.camera1.angles.map(a => parseFloat(a).toFixed(2)).join(', ')}]`);
+                this.addCalibrationDataItem(
+                    container,
+                    'Camera 1 Angles',
+                    `[${data.camera1.angles.map((a) => parseFloat(a).toFixed(2)).join(', ')}]`
+                );
             } else {
                 this.addCalibrationDataItem(container, 'Camera 1 Angles', 'Not set');
             }
         }
 
         if (data.camera2) {
-            this.addCalibrationDataItem(container, 'Camera 2 Focal Length',
-                data.camera2.focal_length?.toFixed(3) || 'Not set');
+            this.addCalibrationDataItem(
+                container,
+                'Camera 2 Focal Length',
+                data.camera2.focal_length?.toFixed(3) || 'Not set'
+            );
 
             if (data.camera2.angles && Array.isArray(data.camera2.angles)) {
-                this.addCalibrationDataItem(container, 'Camera 2 Angles',
-                    `[${data.camera2.angles.map(a => parseFloat(a).toFixed(2)).join(', ')}]`);
+                this.addCalibrationDataItem(
+                    container,
+                    'Camera 2 Angles',
+                    `[${data.camera2.angles.map((a) => parseFloat(a).toFixed(2)).join(', ')}]`
+                );
             } else {
                 this.addCalibrationDataItem(container, 'Camera 2 Angles', 'Not set');
             }
@@ -172,7 +184,7 @@ class CalibrationManager {
         if (this.currentStep === 1) {
             this.showStep(2);
         } else if (this.currentStep === 2) {
-            const allVerified = this.selectedCameras.every(cam => this.ballVerified[cam]);
+            const allVerified = this.selectedCameras.every((cam) => this.ballVerified[cam]);
             if (!allVerified) {
                 this.showMessage('Please verify ball placement for all selected cameras', 'error');
                 return;
@@ -189,13 +201,13 @@ class CalibrationManager {
     }
 
     showStep(stepNumber) {
-        document.querySelectorAll('.wizard-content').forEach(content => {
+        document.querySelectorAll('.wizard-content').forEach((content) => {
             content.style.display = 'none';
         });
 
         document.getElementById(`step${stepNumber}`).style.display = 'block';
 
-        document.querySelectorAll('.step').forEach(step => {
+        document.querySelectorAll('.step').forEach((step) => {
             const stepNum = parseInt(step.dataset.step);
             if (stepNum < stepNumber) {
                 step.classList.add('completed');
@@ -305,10 +317,11 @@ class CalibrationManager {
                     statusDiv.textContent = `Ball detected at position (${result.ball_info?.x || 0}, ${result.ball_info?.y || 0})`;
                     this.ballVerified[camera] = true;
 
-                    const allVerified = this.selectedCameras.every(cam => this.ballVerified[cam]);
+                    const allVerified = this.selectedCameras.every((cam) => this.ballVerified[cam]);
                     if (allVerified) {
                         document.getElementById('verify-next').disabled = false;
-                        document.getElementById('verification-message').className = 'alert alert-success';
+                        document.getElementById('verification-message').className =
+                            'alert alert-success';
                         document.getElementById('verification-message').textContent =
                             '✅ Ball placement verified! Ready to proceed with calibration.';
                     }
@@ -365,9 +378,10 @@ class CalibrationManager {
             statusText.textContent = 'Initializing...';
             detailsDiv.innerHTML = '';
 
-            const endpoint = method === 'auto'
-                ? `/api/calibration/auto/${camera}`
-                : `/api/calibration/manual/${camera}`;
+            const endpoint =
+                method === 'auto'
+                    ? `/api/calibration/auto/${camera}`
+                    : `/api/calibration/manual/${camera}`;
 
             const response = await fetch(endpoint, {
                 method: 'POST'
@@ -383,7 +397,9 @@ class CalibrationManager {
 
                 if (finalResult && finalResult.status === 'success') {
                     this.addLogEntry(`${camera} calibration completed successfully`);
-                    this.addLogEntry(`  Completion method: ${finalResult.completion_method || 'unknown'}`);
+                    this.addLogEntry(
+                        `  Completion method: ${finalResult.completion_method || 'unknown'}`
+                    );
 
                     const details = [];
                     if (finalResult.api_success) {
@@ -406,7 +422,7 @@ class CalibrationManager {
                     }
                     this.calibrationResults[camera] = finalResult;
 
-                    const allDone = this.selectedCameras.every(cam => {
+                    const allDone = this.selectedCameras.every((cam) => {
                         const status = document.getElementById(`${cam}-status`).textContent;
                         return status === 'Completed' || status === 'Failed';
                     });
@@ -472,15 +488,17 @@ class CalibrationManager {
                     statusText.textContent = cameraStatus.message;
                 }
 
-                if (cameraStatus &&
+                if (
+                    cameraStatus &&
                     (cameraStatus.status === 'completed' ||
-                     cameraStatus.status === 'failed' ||
-                     cameraStatus.status === 'error')) {
+                        cameraStatus.status === 'failed' ||
+                        cameraStatus.status === 'error')
+                ) {
                     return cameraStatus;
                 }
             }
 
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise((resolve) => setTimeout(resolve, 1000));
         }
 
         throw new Error('Calibration timeout');
@@ -510,7 +528,7 @@ class CalibrationManager {
 
                     if (data.camera1.angles && Array.isArray(data.camera1.angles)) {
                         document.getElementById('camera1-angles').textContent =
-                            `[${data.camera1.angles.map(a => parseFloat(a).toFixed(2)).join(', ')}]`;
+                            `[${data.camera1.angles.map((a) => parseFloat(a).toFixed(2)).join(', ')}]`;
                     } else {
                         document.getElementById('camera1-angles').textContent = '--';
                     }
@@ -538,7 +556,7 @@ class CalibrationManager {
 
                     if (data.camera2.angles && Array.isArray(data.camera2.angles)) {
                         document.getElementById('camera2-angles').textContent =
-                            `[${data.camera2.angles.map(a => parseFloat(a).toFixed(2)).join(', ')}]`;
+                            `[${data.camera2.angles.map((a) => parseFloat(a).toFixed(2)).join(', ')}]`;
                     } else {
                         document.getElementById('camera2-angles').textContent = '--';
                     }
@@ -565,7 +583,7 @@ class CalibrationManager {
                     this.addLogEntry('Calibration stopped by user');
                     this.calibrationInProgress = false;
 
-                    this.selectedCameras.forEach(camera => {
+                    this.selectedCameras.forEach((camera) => {
                         if (this[`${camera}PollInterval`]) {
                             clearInterval(this[`${camera}PollInterval`]);
                         }
@@ -593,19 +611,19 @@ class CalibrationManager {
         document.getElementById('calibration-progress').style.display = 'none';
         document.getElementById('verify-next').disabled = true;
 
-        document.querySelectorAll('.camera-preview img').forEach(img => {
+        document.querySelectorAll('.camera-preview img').forEach((img) => {
             img.style.display = 'none';
         });
-        document.querySelectorAll('.camera-placeholder').forEach(placeholder => {
+        document.querySelectorAll('.camera-placeholder').forEach((placeholder) => {
             placeholder.style.display = 'flex';
         });
 
-        document.querySelectorAll('.ball-status').forEach(status => {
+        document.querySelectorAll('.ball-status').forEach((status) => {
             status.textContent = '';
             status.className = 'ball-status';
         });
 
-        document.querySelectorAll('.progress-fill').forEach(bar => {
+        document.querySelectorAll('.progress-fill').forEach((bar) => {
             bar.style.width = '0%';
             bar.style.background = '';
         });
@@ -692,7 +710,9 @@ class CalibrationManager {
                 const settings = await settingsRes.json();
                 const dacEl = document.getElementById('strobe-saved-dac');
                 if (settings.dac_setting !== null && settings.dac_setting !== undefined) {
-                    dacEl.textContent = '0x' + parseInt(settings.dac_setting).toString(16).toUpperCase().padStart(2, '0');
+                    dacEl.textContent =
+                        '0x' +
+                        parseInt(settings.dac_setting).toString(16).toUpperCase().padStart(2, '0');
                     if (isV3) calBtn.textContent = 'Recalibrate';
                 } else {
                     dacEl.textContent = 'Not calibrated';
@@ -809,10 +829,12 @@ class CalibrationManager {
                 '0x' + status.dac_setting.toString(16).toUpperCase().padStart(2, '0');
         }
         if (status.led_current !== undefined) {
-            document.getElementById('strobe-result-current').textContent = status.led_current.toFixed(2) + ' A';
+            document.getElementById('strobe-result-current').textContent =
+                status.led_current.toFixed(2) + ' A';
         }
         if (status.ldo_voltage !== undefined) {
-            document.getElementById('strobe-result-ldo').textContent = status.ldo_voltage.toFixed(2) + ' V';
+            document.getElementById('strobe-result-ldo').textContent =
+                status.ldo_voltage.toFixed(2) + ' V';
         }
 
         resultArea.style.display = 'block';
@@ -883,13 +905,19 @@ class CalibrationManager {
             grid.innerHTML = '';
 
             const items = [
-                { label: 'LDO Voltage', value: data.ldo_voltage != null ? data.ldo_voltage.toFixed(2) + ' V' : '--' },
-                { label: 'LED Current', value: data.led_current != null ? data.led_current.toFixed(2) + ' A' : '--' },
+                {
+                    label: 'LDO Voltage',
+                    value: data.ldo_voltage != null ? data.ldo_voltage.toFixed(2) + ' V' : '--'
+                },
+                {
+                    label: 'LED Current',
+                    value: data.led_current != null ? data.led_current.toFixed(2) + ' A' : '--'
+                },
                 { label: 'ADC CH0 Raw', value: data.adc_ch0_raw != null ? data.adc_ch0_raw : '--' },
                 { label: 'ADC CH1 Raw', value: data.adc_ch1_raw != null ? data.adc_ch1_raw : '--' }
             ];
 
-            items.forEach(item => {
+            items.forEach((item) => {
                 this.addCalibrationDataItem(grid, item.label, item.value);
             });
 

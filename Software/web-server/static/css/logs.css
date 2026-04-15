@@ -30,13 +30,13 @@
 }
 
 /* Light theme overrides for service status badges */
-[data-theme="light"] .service-status.running {
+[data-theme='light'] .service-status.running {
     color: oklch(35% 0.16 145);
     background: oklch(92% 0.06 145 / 0.4);
     border-color: oklch(55% 0.12 145 / 0.4);
 }
 
-[data-theme="light"] .service-status.stopped {
+[data-theme='light'] .service-status.stopped {
     color: oklch(45% 0.19 25);
     background: oklch(90% 0.04 25 / 0.35);
     border-color: oklch(55% 0.14 25 / 0.4);
@@ -83,20 +83,20 @@
     min-height: 200px;
 }
 
-[data-theme="dark"] .log-viewer {
+[data-theme='dark'] .log-viewer {
     background: #0d1117;
     border: 1px solid oklch(15% 0.008 275);
 }
 
 /* Pseudo-content states (JS toggles these classes) */
 .log-viewer.loading::before {
-    content: "Loading logs...";
+    content: 'Loading logs...';
     color: oklch(50% 0 0);
     font-style: italic;
 }
 
 .log-viewer.empty::before {
-    content: "No logs available. Select a service to view logs.";
+    content: 'No logs available. Select a service to view logs.';
     color: oklch(50% 0 0);
     font-style: italic;
 }

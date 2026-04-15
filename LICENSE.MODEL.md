@@ -4,7 +4,7 @@ Version 1.0, April 2026
 
 Copyright © 2026 PiTracLM. All Rights Reserved.
 
------
+---
 
 ## Definitions
 
@@ -35,7 +35,7 @@ as an integrated, unmodified component of the PiTrac Software, running on hardwa
 operated by the Licensee for the Licensee’s own personal, non-commercial use of the
 PiTrac launch monitor system.
 
------
+---
 
 ## 1. Scope and Relationship to Other Licenses
 
@@ -54,7 +54,7 @@ construed to extend to the Model Materials in any way.
 These two licenses are independent. Rights granted under one do not extend to
 materials governed by the other.
 
------
+---
 
 ## 2. Grant of Rights
 
@@ -62,7 +62,7 @@ Subject to the terms of this Agreement, PiTracLM grants you a limited,
 non-exclusive, non-transferable, non-sublicensable, revocable, royalty-free license
 to use the Model Materials solely for Authorized Use as defined above.
 
------
+---
 
 ## 3. Restrictions
 
@@ -102,7 +102,7 @@ h. **Remove, alter, or obscure** any copyright notices, license files, metadata,
 watermarks, or other proprietary markings embedded in or accompanying the Model
 Materials.
 
------
+---
 
 ## 4. Intellectual Property
 
@@ -125,7 +125,7 @@ c. You acknowledge that the Model Materials were developed through significant
 investment of time, resources, and expertise by PiTracLM, and that unauthorized
 use or distribution would cause irreparable harm to PiTracLM.
 
------
+---
 
 ## 5. Enforcement and Remedies
 
@@ -147,7 +147,7 @@ c. Any unauthorized use, reproduction, or distribution of the Model Materials ma
 subject you to civil liability and criminal penalties under applicable copyright
 and trade secret laws.
 
------
+---
 
 ## 6. Written Permission for Other Uses
 
@@ -157,7 +157,7 @@ to the PiTracLM organization through official channels as published at
 https://github.com/PiTracLM. Permission, if granted, may be subject to additional
 terms and conditions at PiTracLM’s sole discretion.
 
------
+---
 
 ## 7. Disclaimer of Warranty
 
@@ -169,7 +169,7 @@ YOU ARE SOLELY RESPONSIBLE FOR DETERMINING THE APPROPRIATENESS OF USING THE MODE
 MATERIALS AND ASSUME ANY RISKS ASSOCIATED WITH YOUR USE OF THE MODEL MATERIALS AND
 ANY OUTPUT AND RESULTS.
 
------
+---
 
 ## 8. Limitation of Liability
 
@@ -179,7 +179,7 @@ ARISING OUT OF THIS AGREEMENT, FOR ANY LOST PROFITS OR ANY INDIRECT, SPECIAL,
 CONSEQUENTIAL, INCIDENTAL, EXEMPLARY, OR PUNITIVE DAMAGES, EVEN IF PITRACLM OR ITS
 CONTRIBUTORS HAVE BEEN ADVISED OF THE POSSIBILITY OF ANY OF THE FOREGOING.
 
------
+---
 
 ## 9. Term and Termination
 
@@ -202,7 +202,7 @@ in your possession or control and cease all use thereof.
 
 d. Sections 3, 4, 5, 7, 8, and 10 shall survive the termination of this Agreement.
 
------
+---
 
 ## 10. General
 
@@ -225,7 +225,7 @@ this Agreement in any court of competent jurisdiction worldwide. Nothing in this
 Agreement limits PiTracLM’s right to bring proceedings in any jurisdiction where
 the Licensee resides, operates, or where infringement occurs.
 
------
+---
 
 By accessing, downloading, or using the Model Materials in any way, you acknowledge
 that you have read, understood, and agree to be bound by this Agreement. If you do not

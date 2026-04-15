@@ -15,7 +15,7 @@ async function loadBranches() {
         const select = document.getElementById('branchSelect');
         select.innerHTML = '';
 
-        data.branches.forEach(b => {
+        data.branches.forEach((b) => {
             const opt = document.createElement('option');
             opt.value = b.name;
             opt.textContent = b.name + (b.name === currentBranch ? ' (current)' : '');
@@ -89,13 +89,21 @@ function showCommits(commits) {
     const list = document.getElementById('commitList');
     list.innerHTML = '';
 
-    commits.forEach(c => {
+    commits.forEach((c) => {
         const item = document.createElement('div');
         item.className = 'commit-item';
         item.innerHTML =
-            '<span class="commit-hash">' + escapeHtml(c.hash) + '</span>' +
-            '<span class="commit-message">' + escapeHtml(c.message) + '</span>' +
-            '<span class="commit-meta">' + escapeHtml(c.author) + ' · ' + escapeHtml(c.time) + '</span>';
+            '<span class="commit-hash">' +
+            escapeHtml(c.hash) +
+            '</span>' +
+            '<span class="commit-message">' +
+            escapeHtml(c.message) +
+            '</span>' +
+            '<span class="commit-meta">' +
+            escapeHtml(c.author) +
+            ' · ' +
+            escapeHtml(c.time) +
+            '</span>';
         list.appendChild(item);
     });
 
@@ -115,7 +123,7 @@ async function startUpdate(force) {
         const resp = await fetch('/api/update/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            body: JSON.stringify(body)
         });
         const data = await resp.json();
 
@@ -208,7 +216,7 @@ function renderLog(lines) {
     const el = document.getElementById('buildLog');
     el.innerHTML = '';
 
-    lines.forEach(line => {
+    lines.forEach((line) => {
         const div = document.createElement('div');
         div.className = 'log-line';
         if (line.includes('[ERROR]')) div.classList.add('error');

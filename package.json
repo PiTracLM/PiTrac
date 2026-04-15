@@ -1,12 +1,12 @@
 {
-  "private": true,
-  "scripts": {
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "lint": "npm run --prefix Software/web-server lint",
-    "lint:fix": "npm run --prefix Software/web-server lint:fix"
-  },
-  "devDependencies": {
-    "prettier": "^3.5.3"
-  }
+    "private": true,
+    "scripts": {
+        "format": "prettier --write .",
+        "format:check": "prettier --check .",
+        "lint": "npm run --prefix Software/web-server lint",
+        "lint:fix": "npm run --prefix Software/web-server lint:fix"
+    },
+    "devDependencies": {
+        "prettier": "^3.5.3"
+    }
 }

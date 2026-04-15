@@ -47,8 +47,9 @@ function initWebSocket() {
         if (data.type === 'config_update') {
             updateStatus(`Configuration updated: ${data.key}`, 'success');
             if (data.requires_restart) {
-                isPiTracRunning().then(running => {
-                    if (running) updateStatus('PiTrac restart needed for changes to take effect', 'warning');
+                isPiTracRunning().then((running) => {
+                    if (running)
+                        updateStatus('PiTrac restart needed for changes to take effect', 'warning');
                 });
             }
         } else if (data.type === 'config_reset') {
@@ -119,12 +120,12 @@ function renderCategories() {
     categoryList.appendChild(allItem);
 
     // Add each category with its settings count
-    Object.keys(categories).forEach(category => {
+    Object.keys(categories).forEach((category) => {
         const categoryData = categories[category];
         const basicCount = categoryData.basic ? categoryData.basic.length : 0;
         const advancedCount = categoryData.advanced ? categoryData.advanced.length : 0;
         const totalCount = basicCount + advancedCount;
-        
+
         if (totalCount > 0) {
             const li = document.createElement('li');
             li.className = 'category-item';
@@ -144,7 +145,7 @@ function renderCategories() {
 // Select category
 function selectCategory(category) {
     // Update active category
-    document.querySelectorAll('.category-item').forEach(item => {
+    document.querySelectorAll('.category-item').forEach((item) => {
         item.classList.remove('active');
         if (item.dataset.category === category) {
             item.classList.add('active');
@@ -163,96 +164,100 @@ function selectCategory(category) {
 function renderConfiguration(selectedCategory = null) {
     const content = document.getElementById('configContent');
     content.innerHTML = '';
-    
+
     // Determine which categories to render
-    const categoriesToRender = selectedCategory && selectedCategory !== 'all' 
-        ? { [selectedCategory]: categories[selectedCategory] }
-        : categories;
+    const categoriesToRender =
+        selectedCategory && selectedCategory !== 'all'
+            ? { [selectedCategory]: categories[selectedCategory] }
+            : categories;
 
     if (selectedCategory === null || selectedCategory === 'all') {
-        const hasBasicSettings = Object.entries(categoriesToRender).some(([_, categoryData]) => 
-            categoryData && categoryData.basic && categoryData.basic.length > 0
+        const hasBasicSettings = Object.entries(categoriesToRender).some(
+            ([_, categoryData]) =>
+                categoryData && categoryData.basic && categoryData.basic.length > 0
         );
-        
+
         if (hasBasicSettings) {
             const basicSection = document.createElement('div');
             basicSection.className = 'config-section';
-            
+
             const basicHeader = document.createElement('div');
             basicHeader.className = 'config-main-section-header';
             basicHeader.innerHTML = '<h2>Basic Settings</h2>';
             basicSection.appendChild(basicHeader);
-            
+
             Object.entries(categoriesToRender).forEach(([category, categoryData]) => {
                 if (!categoryData || !categoryData.basic || categoryData.basic.length === 0) return;
-                
+
                 const group = document.createElement('div');
                 group.className = 'config-group';
                 group.dataset.category = category;
-                
+
                 const title = document.createElement('h3');
                 title.className = 'config-group-title';
                 title.textContent = category;
                 group.appendChild(title);
-                
-                categoryData.basic.forEach(key => {
+
+                categoryData.basic.forEach((key) => {
                     const value = getNestedValue(currentConfig, key);
                     const defaultValue = getNestedValue(defaultConfig, key);
                     const isModified = getNestedValue(userSettings, key) !== undefined;
-                    
+
                     const item = createConfigItem(key, value, defaultValue, isModified);
                     group.appendChild(item);
                 });
-                
+
                 basicSection.appendChild(group);
             });
-            
+
             content.appendChild(basicSection);
         }
-        
-        const hasAdvancedSettings = Object.entries(categoriesToRender).some(([_, categoryData]) => 
-            categoryData && categoryData.advanced && categoryData.advanced.length > 0
+
+        const hasAdvancedSettings = Object.entries(categoriesToRender).some(
+            ([_, categoryData]) =>
+                categoryData && categoryData.advanced && categoryData.advanced.length > 0
         );
-        
+
         if (hasAdvancedSettings) {
             const advancedSection = document.createElement('div');
             advancedSection.className = 'config-section';
-            
+
             const advancedHeader = document.createElement('div');
             advancedHeader.className = 'config-main-section-header';
             advancedHeader.innerHTML = '<h2>Advanced Settings</h2>';
             advancedSection.appendChild(advancedHeader);
-            
+
             Object.entries(categoriesToRender).forEach(([category, categoryData]) => {
-                if (!categoryData || !categoryData.advanced || categoryData.advanced.length === 0) return;
-                
+                if (!categoryData || !categoryData.advanced || categoryData.advanced.length === 0)
+                    return;
+
                 const group = document.createElement('div');
                 group.className = 'config-group';
                 group.dataset.category = category;
-                
+
                 const title = document.createElement('h3');
                 title.className = 'config-group-title';
                 title.textContent = category;
                 group.appendChild(title);
-                
-                categoryData.advanced.forEach(key => {
+
+                categoryData.advanced.forEach((key) => {
                     const value = getNestedValue(currentConfig, key);
                     const defaultValue = getNestedValue(defaultConfig, key);
                     const isModified = getNestedValue(userSettings, key) !== undefined;
-                    
+
                     const item = createConfigItem(key, value, defaultValue, isModified);
                     group.appendChild(item);
                 });
-                
+
                 advancedSection.appendChild(group);
             });
-            
+
             content.appendChild(advancedSection);
         }
     } else {
         Object.entries(categoriesToRender).forEach(([category, categoryData]) => {
             if (!categoryData) return;
-            
+
             const group = document.createElement('div');
             group.className = 'config-group';
             group.dataset.category = category;
@@ -268,7 +273,7 @@ function renderConfiguration(selectedCategory = null) {
                 basicHeader.innerHTML = '<span class="section-label">Basic Settings</span>';
                 group.appendChild(basicHeader);
 
-                categoryData.basic.forEach(key => {
+                categoryData.basic.forEach((key) => {
                     const value = getNestedValue(currentConfig, key);
                     const defaultValue = getNestedValue(defaultConfig, key);
                     const isModified = getNestedValue(userSettings, key) !== undefined;
@@ -282,11 +287,12 @@ function renderConfiguration(selectedCategory = null) {
                 if (categoryData.basic && categoryData.basic.length > 0) {
                     const advancedHeader = document.createElement('div');
                     advancedHeader.className = 'config-section-header';
-                    advancedHeader.innerHTML = '<span class="section-label">Advanced Settings</span>';
+                    advancedHeader.innerHTML =
+                        '<span class="section-label">Advanced Settings</span>';
                     group.appendChild(advancedHeader);
                 }
 
-                categoryData.advanced.forEach(key => {
+                categoryData.advanced.forEach((key) => {
                     const value = getNestedValue(currentConfig, key);
                     const defaultValue = getNestedValue(defaultConfig, key);
                     const isModified = getNestedValue(userSettings, key) !== undefined;
@@ -305,15 +311,15 @@ function renderConfiguration(selectedCategory = null) {
 function createConfigItem(key, value, defaultValue, isModified) {
     const item = document.createElement('div');
     item.className = 'config-item';
-    
+
     const isUserSet = getNestedValue(userSettings, key) !== undefined;
-    
+
     if (isUserSet) {
         item.classList.add('user-set');
     } else {
         item.classList.add('using-default');
     }
-    
+
     if (isModified) {
         item.classList.add('modified');
     }
@@ -331,29 +337,31 @@ function createConfigItem(key, value, defaultValue, isModified) {
     label.className = 'config-label';
 
     // Use display name from metadata or extract readable name from key
-    const displayName = metadata.displayName || (() => {
-        const parts = key.split('.');
-        const name = parts[parts.length - 1]
-            .replace(/^k/, '')
-            .replace(/([A-Z])/g, ' $1')
-            .trim();
-        return name;
-    })();
+    const displayName =
+        metadata.displayName ||
+        (() => {
+            const parts = key.split('.');
+            const name = parts[parts.length - 1]
+                .replace(/^k/, '')
+                .replace(/([A-Z])/g, ' $1')
+                .trim();
+            return name;
+        })();
 
     let labelHTML = `<div class="config-label-name">`;
     labelHTML += displayName;
-    
+
     // Note: isUserSet already defined above
     if (!isUserSet) {
         labelHTML += ` <span class="default-badge" title="Using default value">DEFAULT</span>`;
     }
-    
+
     if (metadata.requiresRestart) {
         labelHTML += ` <span class="restart-indicator" title="Changing this requires a PiTrac restart to take effect">&#x21bb;</span>`;
     }
-    
+
     labelHTML += `</div>`;
-    
+
     if (metadata.description) {
         labelHTML += `<div class="config-description">${metadata.description}</div>`;
     }
@@ -369,20 +377,24 @@ function createConfigItem(key, value, defaultValue, isModified) {
     const input = createInput(key, value, defaultValue, isUserSet);
     input.className = 'config-input';
     input.dataset.key = key;
-    input.dataset.original = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : String(value);
-    input.dataset.default = (typeof defaultValue === 'object' && defaultValue !== null) ? JSON.stringify(defaultValue) : String(defaultValue);
-    
+    input.dataset.original =
+        typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
+    input.dataset.default =
+        typeof defaultValue === 'object' && defaultValue !== null
+            ? JSON.stringify(defaultValue)
+            : String(defaultValue);
+
     if (!isUserSet) {
         input.classList.add('default-value');
         if (input.tagName === 'INPUT' && input.type === 'text') {
             input.placeholder = `Default: ${defaultValue}`;
         }
     }
-    
+
     const inputWrapper = document.createElement('div');
     inputWrapper.className = 'input-wrapper';
     inputWrapper.appendChild(input);
-    
+
     if (isUserSet || isModified) {
         const clearBtn = document.createElement('button');
         clearBtn.className = 'clear-value-btn';
@@ -394,21 +406,21 @@ function createConfigItem(key, value, defaultValue, isModified) {
         };
         inputWrapper.appendChild(clearBtn);
     }
-    
+
     const validationError = document.createElement('div');
     validationError.className = 'validation-error';
     validationError.style.display = 'none';
-    
+
     const validateAndUpdate = async () => {
         const isValid = await validateInput(key, input.value, validationError);
         if (isValid) {
             handleValueChange(key, input.value, input.dataset.original);
-            
+
             if (input.value !== defaultValue) {
                 input.classList.remove('default-value');
                 item.classList.remove('using-default');
                 item.classList.add('user-set');
-                
+
                 if (!inputWrapper.querySelector('.clear-value-btn')) {
                     const clearBtn = document.createElement('button');
                     clearBtn.className = 'clear-value-btn';
@@ -423,18 +435,22 @@ function createConfigItem(key, value, defaultValue, isModified) {
             }
         }
     };
-    
+
     if (input.tagName === 'SELECT') {
         input.onchange = validateAndUpdate;
     } else {
         input.oninput = validateAndUpdate;
     }
-    
+
     inputContainer.appendChild(inputWrapper);
     inputContainer.appendChild(validationError);
 
-    if (key === 'cameras.slot1.type' || key === 'cameras.slot2.type' ||
-        key === 'cameras.slot1_type' || key === 'cameras.slot2_type') {
+    if (
+        key === 'cameras.slot1.type' ||
+        key === 'cameras.slot2.type' ||
+        key === 'cameras.slot1_type' ||
+        key === 'cameras.slot2_type'
+    ) {
         inputContainer.style.display = 'flex';
         inputContainer.style.alignItems = 'center';
         inputContainer.style.gap = '0.75rem';
@@ -513,7 +529,7 @@ function createInput(key, value, defaultValue, isUserSet) {
                 select.appendChild(option);
             }
         }
-        
+
         return select;
     }
 
@@ -599,7 +615,10 @@ async function handleValueChange(key, currentValue, originalValue) {
         if (current === 'true') current = true;
         else if (current === 'false') current = false;
         else if (!isNaN(current) && current !== '') current = Number(current);
-        else if (typeof current === 'string' && (current.trim().startsWith('[') || current.trim().startsWith('{'))) {
+        else if (
+            typeof current === 'string' &&
+            (current.trim().startsWith('[') || current.trim().startsWith('{'))
+        ) {
             try {
                 current = JSON.parse(current);
             } catch (e) {
@@ -610,7 +629,10 @@ async function handleValueChange(key, currentValue, originalValue) {
         if (original === 'true') original = true;
         else if (original === 'false') original = false;
         else if (!isNaN(original) && original !== '') original = Number(original);
-        else if (typeof original === 'string' && (original.trim().startsWith('[') || original.trim().startsWith('{'))) {
+        else if (
+            typeof original === 'string' &&
+            (original.trim().startsWith('[') || original.trim().startsWith('{'))
+        ) {
             try {
                 original = JSON.parse(original);
             } catch (e) {
@@ -650,14 +672,14 @@ async function handleValueChange(key, currentValue, originalValue) {
                 item.classList.remove('modified');
                 if (inputEl) inputEl.classList.remove('modified');
             }
-            
+
             if (isDifferentFromDefault) {
                 item.classList.remove('using-default');
                 item.classList.add('user-set');
-                
+
                 const badge = item.querySelector('.default-badge');
                 if (badge) badge.remove();
-                
+
                 const inputWrapper = item.querySelector('.input-wrapper');
                 if (inputWrapper && !inputWrapper.querySelector('.clear-value-btn')) {
                     const clearBtn = document.createElement('button');
@@ -670,7 +692,7 @@ async function handleValueChange(key, currentValue, originalValue) {
                     };
                     inputWrapper.appendChild(clearBtn);
                 }
-                
+
                 const input = item.querySelector('.config-input');
                 if (input) {
                     input.classList.remove('default-value');
@@ -678,19 +700,20 @@ async function handleValueChange(key, currentValue, originalValue) {
             } else {
                 item.classList.remove('user-set');
                 item.classList.add('using-default');
-                
+
                 let badge = item.querySelector('.default-badge');
                 if (!badge) {
                     const labelName = item.querySelector('.config-label-name');
                     if (labelName && !labelName.querySelector('.default-badge')) {
-                        const badgeHtml = ' <span class="default-badge" title="Using default value">DEFAULT</span>';
+                        const badgeHtml =
+                            ' <span class="default-badge" title="Using default value">DEFAULT</span>';
                         labelName.insertAdjacentHTML('beforeend', badgeHtml);
                     }
                 }
-                
+
                 const clearBtn = item.querySelector('.clear-value-btn');
                 if (clearBtn) clearBtn.remove();
-                
+
                 const input = item.querySelector('.config-input');
                 if (input) {
                     input.classList.add('default-value');
@@ -720,109 +743,116 @@ async function saveChanges() {
     if (saveBtn) saveBtn.disabled = true;
 
     try {
+        updateStatus('Saving changes...', '');
 
-    updateStatus('Saving changes...', '');
+        const errors = [];
+        const successfulKeys = [];
+        const requiresRestart = [];
+        let savedCount = 0;
+        let resetCount = 0;
 
-    const errors = [];
-    const successfulKeys = [];
-    const requiresRestart = [];
-    let savedCount = 0;
-    let resetCount = 0;
+        for (const key of modifiedSettings) {
+            const input = document.querySelector(`.config-input[data-key="${key}"]`);
+            if (!input) continue;
 
-    for (const key of modifiedSettings) {
-        const input = document.querySelector(`.config-input[data-key="${key}"]`);
-        if (!input) continue;
+            let value = input.value;
+            const defaultValue = getNestedValue(defaultConfig, key);
 
-        let value = input.value;
-        const defaultValue = getNestedValue(defaultConfig, key);
+            // Convert value type
+            if (value === 'true') value = true;
+            else if (value === 'false') value = false;
+            else if (!isNaN(value) && value !== '') value = Number(value);
+            else if (
+                typeof value === 'string' &&
+                (value.trim().startsWith('[') || value.trim().startsWith('{'))
+            ) {
+                try {
+                    value = JSON.parse(value);
+                } catch (e) {
+                    // Keep as string if invalid JSON
+                }
+            }
 
-        // Convert value type
-        if (value === 'true') value = true;
-        else if (value === 'false') value = false;
-        else if (!isNaN(value) && value !== '') value = Number(value);
-        else if (typeof value === 'string' && (value.trim().startsWith('[') || value.trim().startsWith('{'))) {
+            let defaultVal = defaultValue;
+            if (defaultVal === 'true' || defaultVal === '1') defaultVal = true;
+            else if (defaultVal === 'false' || defaultVal === '0') defaultVal = false;
+            else if (!isNaN(defaultVal) && defaultVal !== '') defaultVal = Number(defaultVal);
+
             try {
-                value = JSON.parse(value);
-            } catch (e) {
-                // Keep as string if invalid JSON
-            }
-        }
+                const response = await fetch(`/api/config/${key}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value })
+                });
 
-        let defaultVal = defaultValue;
-        if (defaultVal === 'true' || defaultVal === '1') defaultVal = true;
-        else if (defaultVal === 'false' || defaultVal === '0') defaultVal = false;
-        else if (!isNaN(defaultVal) && defaultVal !== '') defaultVal = Number(defaultVal);
+                const result = await response.json();
 
-        try {
-            const response = await fetch(`/api/config/${key}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ value })
-            });
-
-            const result = await response.json();
-
-            if (result.error) {
-                errors.push(`${key}: ${result.error}`);
-            } else {
-                successfulKeys.push(key);
-                if (input) {
-                    input.dataset.original = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : String(value);
-                }
-
-                const item = document.querySelector(`[data-key="${key}"]`);
-                if (item) {
-                    item.classList.remove('modified');
-                    const inputEl = item.querySelector('.config-input');
-                    if (inputEl) inputEl.classList.remove('modified');
-                }
-
-                if (value === defaultVal) {
-                    resetCount++;
+                if (result.error) {
+                    errors.push(`${key}: ${result.error}`);
                 } else {
-                    savedCount++;
+                    successfulKeys.push(key);
+                    if (input) {
+                        input.dataset.original =
+                            typeof value === 'object' && value !== null
+                                ? JSON.stringify(value)
+                                : String(value);
+                    }
+
+                    const item = document.querySelector(`[data-key="${key}"]`);
+                    if (item) {
+                        item.classList.remove('modified');
+                        const inputEl = item.querySelector('.config-input');
+                        if (inputEl) inputEl.classList.remove('modified');
+                    }
+
+                    if (value === defaultVal) {
+                        resetCount++;
+                    } else {
+                        savedCount++;
+                    }
+
+                    if (result.requires_restart) {
+                        requiresRestart.push(key);
+                    }
                 }
-                
-                if (result.requires_restart) {
-                    requiresRestart.push(key);
-                }
+            } catch (error) {
+                errors.push(`${key}: ${error.message}`);
             }
-        } catch (error) {
-            errors.push(`${key}: ${error.message}`);
         }
-    }
 
-    // Remove successfully saved keys even if some failed
-    for (const key of successfulKeys) {
-        modifiedSettings.delete(key);
-    }
-
-    if (errors.length > 0) {
-        updateStatus(`Errors: ${errors.join(', ')}`, 'error');
-    } else {
-        updateModifiedCount();
-
-        let message = '';
-        if (savedCount > 0) {
-            message += `Saved ${savedCount} custom setting${savedCount !== 1 ? 's' : ''}`;
+        // Remove successfully saved keys even if some failed
+        for (const key of successfulKeys) {
+            modifiedSettings.delete(key);
         }
-        if (resetCount > 0) {
-            if (message) message += ', ';
-            message += `Reset ${resetCount} to default${resetCount !== 1 ? 's' : ''}`;
-        }
-        
-        if (requiresRestart.length > 0) {
-            const running = await isPiTracRunning();
-            if (running) {
-                updateStatus(message + '. Restart PiTrac for changes to take effect.', 'warning');
+
+        if (errors.length > 0) {
+            updateStatus(`Errors: ${errors.join(', ')}`, 'error');
+        } else {
+            updateModifiedCount();
+
+            let message = '';
+            if (savedCount > 0) {
+                message += `Saved ${savedCount} custom setting${savedCount !== 1 ? 's' : ''}`;
+            }
+            if (resetCount > 0) {
+                if (message) message += ', ';
+                message += `Reset ${resetCount} to default${resetCount !== 1 ? 's' : ''}`;
+            }
+
+            if (requiresRestart.length > 0) {
+                const running = await isPiTracRunning();
+                if (running) {
+                    updateStatus(
+                        message + '. Restart PiTrac for changes to take effect.',
+                        'warning'
+                    );
+                } else {
+                    updateStatus(message || 'All changes saved successfully', 'success');
+                }
             } else {
                 updateStatus(message || 'All changes saved successfully', 'success');
             }
-        } else {
-            updateStatus(message || 'All changes saved successfully', 'success');
         }
-    }
-
     } catch (e) {
         console.error('Save failed:', e);
         updateStatus('Save failed: ' + e.message, 'error');
@@ -854,7 +884,11 @@ async function resetValue(key) {
             const originalRaw = input ? input.dataset.original : undefined;
             if (originalRaw !== undefined) {
                 let restored = originalRaw;
-                try { restored = JSON.parse(originalRaw); } catch (_) { /* keep as string */ }
+                try {
+                    restored = JSON.parse(originalRaw);
+                } catch (_) {
+                    /* keep as string */
+                }
                 setNestedValue(currentConfig, key, restored);
 
                 // Fix visual state: if this value matches default, show as default
@@ -908,7 +942,10 @@ async function resetValue(key) {
                 const input = item.querySelector('.config-input');
                 if (input) {
                     input.value = defaultValue;
-                    input.dataset.original = (typeof defaultValue === 'object' && defaultValue !== null) ? JSON.stringify(defaultValue) : String(defaultValue);
+                    input.dataset.original =
+                        typeof defaultValue === 'object' && defaultValue !== null
+                            ? JSON.stringify(defaultValue)
+                            : String(defaultValue);
                     input.classList.remove('modified');
                     input.classList.add('default-value');
                     if (input.tagName === 'INPUT' && input.type === 'text') {
@@ -920,7 +957,8 @@ async function resetValue(key) {
                 if (!badge) {
                     const labelName = item.querySelector('.config-label-name');
                     if (labelName) {
-                        const badgeHtml = ' <span class="default-badge" title="Using default value">DEFAULT</span>';
+                        const badgeHtml =
+                            ' <span class="default-badge" title="Using default value">DEFAULT</span>';
                         labelName.insertAdjacentHTML('beforeend', badgeHtml);
                     }
                 }
@@ -1008,7 +1046,7 @@ async function showDiff() {
             return;
         }
 
-        const unsavedCount = Object.values(diff).filter(v => v.unsaved).length;
+        const unsavedCount = Object.values(diff).filter((v) => v.unsaved).length;
 
         let diffHtml = `
             <div class="diff-viewer">
@@ -1099,7 +1137,7 @@ function formatValue(value) {
 async function resetValueFromDiff(key) {
     await resetValue(key);
     closeModal();
-    showDiff(); 
+    showDiff();
 }
 
 function resetAllFromDiff() {
@@ -1109,12 +1147,12 @@ function resetAllFromDiff() {
 
 function searchConfig() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-    
+
     if (!searchTerm) {
-        document.querySelectorAll('.config-item').forEach(item => {
+        document.querySelectorAll('.config-item').forEach((item) => {
             item.style.display = 'grid';
         });
-        document.querySelectorAll('.config-group').forEach(group => {
+        document.querySelectorAll('.config-group').forEach((group) => {
             group.style.display = 'block';
         });
         updateConditionalVisibility();
@@ -1122,17 +1160,22 @@ function searchConfig() {
     }
 
     let hasVisibleItems = false;
-    
-    document.querySelectorAll('.config-group').forEach(group => {
+
+    document.querySelectorAll('.config-group').forEach((group) => {
         group.style.display = 'none';
     });
-    
-    document.querySelectorAll('.config-item').forEach(item => {
+
+    document.querySelectorAll('.config-item').forEach((item) => {
         const key = item.dataset.key.toLowerCase();
         const labelName = item.querySelector('.config-label-name')?.textContent.toLowerCase() || '';
-        const description = item.querySelector('.config-description')?.textContent.toLowerCase() || '';
-        
-        if (key.includes(searchTerm) || labelName.includes(searchTerm) || description.includes(searchTerm)) {
+        const description =
+            item.querySelector('.config-description')?.textContent.toLowerCase() || '';
+
+        if (
+            key.includes(searchTerm) ||
+            labelName.includes(searchTerm) ||
+            description.includes(searchTerm)
+        ) {
             item.style.display = 'grid';
             const parentGroup = item.closest('.config-group');
             if (parentGroup) {
@@ -1143,7 +1186,7 @@ function searchConfig() {
             item.style.display = 'none';
         }
     });
-    
+
     if (!hasVisibleItems) {
         updateStatus('No settings found matching: ' + searchTerm, 'warning');
     }
@@ -1184,7 +1227,8 @@ async function validateInput(key, value, errorElement) {
         if (metadata.type === 'ip_address' && value) {
             const ipPortPattern = /^(([0-9]{1,3}\.){3}[0-9]{1,3})(:[0-9]{1,5})?$/;
             if (!ipPortPattern.test(value)) {
-                errorElement.textContent = 'Invalid IP address format. Use format: 192.168.1.100 or 192.168.1.100:921';
+                errorElement.textContent =
+                    'Invalid IP address format. Use format: 192.168.1.100 or 192.168.1.100:921';
                 errorElement.style.display = 'block';
                 return false;
             }
@@ -1225,9 +1269,13 @@ async function validateInput(key, value, errorElement) {
 function checkDependencies(key, value) {
     const dependencies = {
         'system.mode': {
-            'single': ['cameras.slot2 settings will be used for dual camera on single Pi'],
-            'dual_primary': ['This Pi will act as primary camera. Ensure secondary Pi is configured.'],
-            'dual_secondary': ['This Pi will act as secondary camera. Ensure primary Pi is configured.']
+            single: ['cameras.slot2 settings will be used for dual camera on single Pi'],
+            dual_primary: [
+                'This Pi will act as primary camera. Ensure secondary Pi is configured.'
+            ],
+            dual_secondary: [
+                'This Pi will act as secondary camera. Ensure primary Pi is configured.'
+            ]
         },
         'cameras.slot1.type': {
             '*': ['Camera type change may require recalibration']
@@ -1239,7 +1287,7 @@ function checkDependencies(key, value) {
             '*': ['Changing broker address will affect camera communication']
         }
     };
-    
+
     const keyDeps = dependencies[key];
     if (keyDeps) {
         const warnings = keyDeps[value] || keyDeps['*'] || [];
@@ -1251,7 +1299,7 @@ function checkDependencies(key, value) {
 
 function showDependencyWarning(key, warnings) {
     const message = `<strong>Changing ${key} affects:</strong><br>` + warnings.join('<br>');
-    
+
     const notification = document.createElement('div');
     notification.className = 'dependency-warning';
     notification.innerHTML = message;
@@ -1268,9 +1316,9 @@ function showDependencyWarning(key, warnings) {
         z-index: 1000;
         animation: slideIn 0.3s ease;
     `;
-    
+
     document.body.appendChild(notification);
-    
+
     setTimeout(() => {
         notification.style.animation = 'slideOut 0.3s ease';
         setTimeout(() => notification.remove(), 300);
@@ -1301,7 +1349,7 @@ function deleteNestedValue(obj, path) {
         delete obj[parts[0]];
         return;
     }
-    
+
     let current = obj;
     for (let i = 0; i < parts.length - 1; i++) {
         if (!(parts[i] in current)) {
@@ -1309,9 +1357,9 @@ function deleteNestedValue(obj, path) {
         }
         current = current[parts[i]];
     }
-    
+
     delete current[parts[parts.length - 1]];
-    
+
     let parent = obj;
     for (let i = 0; i < parts.length - 1; i++) {
         const nextParent = parent[parts[i]];
@@ -1332,12 +1380,12 @@ function updateStatus(message, type = '') {
 function updateModifiedCount() {
     const modifiedCount = modifiedSettings.size;
     document.getElementById('modifiedCount').textContent = modifiedCount;
-    
+
     const saveBtn = document.getElementById('saveBtn');
     if (saveBtn) {
         saveBtn.disabled = modifiedCount === 0;
     }
-    
+
     let userSetCount = 0;
     const countUserSettings = (obj, depth = 0) => {
         if (depth > 10) return;
@@ -1350,10 +1398,10 @@ function updateModifiedCount() {
         }
     };
     countUserSettings(userSettings);
-    
+
     const totalSettings = document.querySelectorAll('.config-item').length;
     const defaultCount = totalSettings - userSetCount;
-    
+
     let counterEl = document.getElementById('settingsCounter');
     if (!counterEl) {
         const statusBar = document.querySelector('.status-bar');
@@ -1364,7 +1412,7 @@ function updateModifiedCount() {
             statusBar.insertBefore(counterEl, statusBar.firstChild);
         }
     }
-    
+
     if (counterEl) {
         counterEl.innerHTML = `
             <span class="counter-custom" title="Settings you've customized">${userSetCount} custom</span>
@@ -1419,7 +1467,9 @@ async function detectAndSetCameras(targetKey = null) {
             console.log('Configuration:', config);
 
             if (targetKey === 'cameras.slot1.type') {
-                const input = document.querySelector('.config-input[data-key="cameras.slot1.type"]');
+                const input = document.querySelector(
+                    '.config-input[data-key="cameras.slot1.type"]'
+                );
                 console.log('Found slot1 input:', input);
                 if (input) {
                     const typeValue = String(config.slot1.type);
@@ -1430,13 +1480,19 @@ async function detectAndSetCameras(targetKey = null) {
                     const event = new Event('change', { bubbles: true });
                     input.dispatchEvent(event);
 
-                    await handleValueChange('cameras.slot1.type', typeValue, input.dataset.original);
+                    await handleValueChange(
+                        'cameras.slot1.type',
+                        typeValue,
+                        input.dataset.original
+                    );
                 } else {
                     console.error('Could not find input for cameras.slot1.type');
                 }
                 updateStatus(`Camera 1 detected: Type ${config.slot1.type}`, 'success');
             } else if (targetKey === 'cameras.slot2.type') {
-                const input = document.querySelector('.config-input[data-key="cameras.slot2.type"]');
+                const input = document.querySelector(
+                    '.config-input[data-key="cameras.slot2.type"]'
+                );
                 console.log('Found slot2 input:', input);
                 if (input) {
                     const typeValue = String(config.slot2.type);
@@ -1447,14 +1503,22 @@ async function detectAndSetCameras(targetKey = null) {
                     const event = new Event('change', { bubbles: true });
                     input.dispatchEvent(event);
 
-                    await handleValueChange('cameras.slot2.type', typeValue, input.dataset.original);
+                    await handleValueChange(
+                        'cameras.slot2.type',
+                        typeValue,
+                        input.dataset.original
+                    );
                 } else {
                     console.error('Could not find input for cameras.slot2.type');
                 }
                 updateStatus(`Camera 2 detected: Type ${config.slot2.type}`, 'success');
             } else {
-                const input1 = document.querySelector('.config-input[data-key="cameras.slot1.type"]');
-                const input2 = document.querySelector('.config-input[data-key="cameras.slot2.type"]');
+                const input1 = document.querySelector(
+                    '.config-input[data-key="cameras.slot1.type"]'
+                );
+                const input2 = document.querySelector(
+                    '.config-input[data-key="cameras.slot2.type"]'
+                );
                 console.log('Found inputs - slot1:', input1, 'slot2:', input2);
 
                 if (input1) {
@@ -1466,7 +1530,11 @@ async function detectAndSetCameras(targetKey = null) {
                     const event = new Event('change', { bubbles: true });
                     input1.dispatchEvent(event);
 
-                    await handleValueChange('cameras.slot1.type', typeValue, input1.dataset.original);
+                    await handleValueChange(
+                        'cameras.slot1.type',
+                        typeValue,
+                        input1.dataset.original
+                    );
                 } else {
                     console.warn('Could not find input for cameras.slot1.type');
                 }
@@ -1480,48 +1548,56 @@ async function detectAndSetCameras(targetKey = null) {
                     const event = new Event('change', { bubbles: true });
                     input2.dispatchEvent(event);
 
-                    await handleValueChange('cameras.slot2.type', typeValue, input2.dataset.original);
+                    await handleValueChange(
+                        'cameras.slot2.type',
+                        typeValue,
+                        input2.dataset.original
+                    );
                 } else {
                     console.warn('Could not find input for cameras.slot2.type');
                 }
 
-                updateStatus(`Detected cameras - Slot 1: Type ${config.slot1.type}, Slot 2: Type ${config.slot2.type}`, 'success');
+                updateStatus(
+                    `Detected cameras - Slot 1: Type ${config.slot1.type}, Slot 2: Type ${config.slot2.type}`,
+                    'success'
+                );
             }
-
         } else {
             const errorMsg = result.message || 'No cameras detected';
             updateStatus(`Camera detection failed: ${errorMsg}`, 'error');
             console.error('Camera detection failed:', result);
 
             if (result.warnings && result.warnings.length > 0) {
-                showModal('Camera Detection Failed',
+                showModal(
+                    'Camera Detection Failed',
                     `<p><strong>${errorMsg}</strong></p>` +
-                    '<p>Warnings:</p>' +
-                    '<ul style="text-align: left; margin: 10px 20px;">' +
-                    result.warnings.map(w => `<li>${w}</li>`).join('') +
-                    '</ul>' +
-                    '<p style="margin-top: 15px;">Troubleshooting:</p>' +
-                    '<ul style="text-align: left; margin: 10px 20px;">' +
-                    '<li>Check ribbon cable connections and orientation</li>' +
-                    '<li>Verify camera_auto_detect=1 in /boot/firmware/config.txt</li>' +
-                    '<li>Power cycle the Raspberry Pi</li>' +
-                    '<li>Ensure cameras are compatible (IMX296 recommended)</li>' +
-                    '</ul>'
+                        '<p>Warnings:</p>' +
+                        '<ul style="text-align: left; margin: 10px 20px;">' +
+                        result.warnings.map((w) => `<li>${w}</li>`).join('') +
+                        '</ul>' +
+                        '<p style="margin-top: 15px;">Troubleshooting:</p>' +
+                        '<ul style="text-align: left; margin: 10px 20px;">' +
+                        '<li>Check ribbon cable connections and orientation</li>' +
+                        '<li>Verify camera_auto_detect=1 in /boot/firmware/config.txt</li>' +
+                        '<li>Power cycle the Raspberry Pi</li>' +
+                        '<li>Ensure cameras are compatible (IMX296 recommended)</li>' +
+                        '</ul>'
                 );
             }
         }
     } catch (error) {
         console.error('Camera detection error:', error);
         updateStatus('Failed to detect cameras - check connection', 'error');
-        showModal('Connection Error',
+        showModal(
+            'Connection Error',
             '<p>Failed to connect to camera detection service.</p>' +
-            `<p>Error: ${error.message}</p>` +
-            '<p style="margin-top: 15px;">Please ensure:</p>' +
-            '<ul style="text-align: left; margin: 10px 20px;">' +
-            '<li>The PiTrac web service is running</li>' +
-            '<li>You have a stable network connection</li>' +
-            '<li>Try refreshing the page</li>' +
-            '</ul>'
+                `<p>Error: ${error.message}</p>` +
+                '<p style="margin-top: 15px;">Please ensure:</p>' +
+                '<ul style="text-align: left; margin: 10px 20px;">' +
+                '<li>The PiTrac web service is running</li>' +
+                '<li>You have a stable network connection</li>' +
+                '<li>Try refreshing the page</li>' +
+                '</ul>'
         );
     }
 }
@@ -1541,7 +1617,7 @@ function checkVisibilityCondition(condition) {
 }
 
 function updateConditionalVisibility() {
-    document.querySelectorAll('.config-item').forEach(item => {
+    document.querySelectorAll('.config-item').forEach((item) => {
         const key = item.dataset.key;
         const metadata = configMetadata[key];
 

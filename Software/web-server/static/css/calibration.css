@@ -205,24 +205,24 @@ div.progress-bar > .progress-fill {
     transition: background 0.3s;
 }
 
-.coverage-cell[data-count="1"] {
+.coverage-cell[data-count='1'] {
     background: color-mix(in oklch, var(--color-success) 35%, var(--color-base-300));
 }
 
-.coverage-cell[data-count="2"] {
+.coverage-cell[data-count='2'] {
     background: color-mix(in oklch, var(--color-success) 65%, var(--color-base-300));
 }
 
-.coverage-cell[data-count="3"] {
+.coverage-cell[data-count='3'] {
     background: var(--color-success);
 }
 
 /* ---- Light theme ---- */
-[data-theme="light"] .calibration-data-item {
+[data-theme='light'] .calibration-data-item {
     background: var(--color-base-200);
     border-color: var(--color-base-300);
 }
 
-[data-theme="light"] .log-content {
+[data-theme='light'] .log-content {
     border-color: var(--color-base-300);
 }

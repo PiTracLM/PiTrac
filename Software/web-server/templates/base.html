@@ -1,112 +1,138 @@
 {% from "_macros.html" import pitrac_btn, nav_item %}
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" data-theme="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}PiTrac Launch Monitor{% endblock %}</title>
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <link rel="stylesheet" href="/static/css/pitrac.css">
-    {% block extra_css %}{% endblock %}
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-</head>
-<body class="bg-base-100 text-base-content min-h-screen p-2 sm:p-4">
-    <div class="max-w-[1400px] mx-auto animate-fade-in">
-
-        <div class="navbar bg-base-200 rounded-box shadow-md border border-base-300 mb-4 px-3 min-h-0 py-2 gap-2">
-            <!-- Status dots -->
-            <div class="flex flex-col gap-1 pr-3 border-r border-base-300">
-                <div class="flex items-center gap-1.5">
-                    <div class="status-dot" id="ws-status-dot" title="WebSocket"></div>
-                    <span class="text-[0.6rem] font-semibold opacity-40 uppercase tracking-wide">WS</span>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>{% block title %}PiTrac Launch Monitor{% endblock %}</title>
+        <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+        <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+        <link rel="stylesheet" href="/static/css/pitrac.css" />
+        {% block extra_css %}{% endblock %}
+        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+        <meta http-equiv="Pragma" content="no-cache" />
+        <meta http-equiv="Expires" content="0" />
+    </head>
+    <body class="bg-base-100 text-base-content min-h-screen p-2 sm:p-4">
+        <div class="max-w-[1400px] mx-auto animate-fade-in">
+            <div
+                class="navbar bg-base-200 rounded-box shadow-md border border-base-300 mb-4 px-3 min-h-0 py-2 gap-2"
+            >
+                <!-- Status dots -->
+                <div class="flex flex-col gap-1 pr-3 border-r border-base-300">
+                    <div class="flex items-center gap-1.5">
+                        <div class="status-dot" id="ws-status-dot" title="WebSocket"></div>
+                        <span class="text-[0.6rem] font-semibold opacity-40 uppercase tracking-wide"
+                            >WS</span
+                        >
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <div class="status-dot" id="pitrac-status-dot" title="PiTrac"></div>
+                        <span class="text-[0.6rem] font-semibold opacity-40 uppercase tracking-wide"
+                            >LM</span
+                        >
+                    </div>
                 </div>
-                <div class="flex items-center gap-1.5">
-                    <div class="status-dot" id="pitrac-status-dot" title="PiTrac"></div>
-                    <span class="text-[0.6rem] font-semibold opacity-40 uppercase tracking-wide">LM</span>
+
+                <!-- Logo -->
+                <div class="flex-1 flex justify-center">
+                    <a href="/" title="Dashboard">
+                        <img
+                            src="/static/logos/PiTrac.svg"
+                            alt="PiTrac Logo"
+                            class="h-10 header-logo"
+                        />
+                    </a>
                 </div>
+
+                <!-- Desktop controls -->
+                <div class="hidden md:flex gap-2 mr-2 pitrac-controls">
+                    {{ pitrac_btn("start", "play", "Start", "desktop", "btn-success") }} {{
+                    pitrac_btn("stop", "square", "Stop", "desktop", "btn-error") }} {{
+                    pitrac_btn("restart", "rotate-cw", "Restart", "desktop", "btn-warning") }}
+                </div>
+
+                <!-- Menu -->
+                <details class="dropdown dropdown-end" id="nav-dropdown">
+                    <summary class="btn btn-ghost btn-square btn-sm">
+                        <i data-lucide="more-vertical" class="icon-md"></i>
+                    </summary>
+                    <ul
+                        class="menu dropdown-content bg-base-200 rounded-box z-50 w-56 p-2 shadow-xl border border-base-300 mt-2"
+                    >
+                        <li class="menu-title md:hidden">PiTrac Controls</li>
+                        <li class="md:hidden">
+                            <div class="flex flex-col gap-1.5 p-1">
+                                {{ pitrac_btn("start", "play", "Start", "mobile", "btn-success
+                                w-full") }} {{ pitrac_btn("stop", "square", "Stop", "mobile",
+                                "btn-error w-full") }} {{ pitrac_btn("restart", "rotate-cw",
+                                "Restart", "mobile", "btn-warning w-full") }}
+                            </div>
+                        </li>
+                        <div class="divider my-0 md:hidden"></div>
+                        {{ nav_item("/", "home", "Dashboard") }} {{ nav_item("/calibration",
+                        "crosshair", "Calibration") }} {{ nav_item("/config", "settings",
+                        "Configuration") }} {{ nav_item("/logs", "file-text", "Logs") }} {{
+                        nav_item("/testing", "flask-conical", "Testing Tools") }} {{
+                        nav_item("/update", "refresh-cw", "System Update") }}
+                        <div class="divider my-0"></div>
+                        <li class="menu-title">Theme</li>
+                        <li>
+                            <div class="flex gap-2 p-1">
+                                <button
+                                    class="theme-btn btn btn-ghost btn-sm flex-1"
+                                    data-theme="light"
+                                    title="Light"
+                                    onclick="setTheme('light')"
+                                >
+                                    <i data-lucide="sun"></i>
+                                </button>
+                                <button
+                                    class="theme-btn btn btn-ghost btn-sm flex-1"
+                                    data-theme="dark"
+                                    title="Dark"
+                                    onclick="setTheme('dark')"
+                                >
+                                    <i data-lucide="moon"></i>
+                                </button>
+                                <button
+                                    class="theme-btn btn btn-ghost btn-sm flex-1"
+                                    data-theme="system"
+                                    title="System"
+                                    onclick="setTheme('system')"
+                                >
+                                    <i data-lucide="monitor"></i>
+                                </button>
+                            </div>
+                        </li>
+                    </ul>
+                </details>
             </div>
 
-            <!-- Logo -->
-            <div class="flex-1 flex justify-center">
-                <a href="/" title="Dashboard">
-                    <img src="/static/logos/PiTrac.svg" alt="PiTrac Logo" class="h-10 header-logo">
-                </a>
-            </div>
-
-            <!-- Desktop controls -->
-            <div class="hidden md:flex gap-2 mr-2 pitrac-controls">
-                {{ pitrac_btn("start", "play", "Start", "desktop", "btn-success") }}
-                {{ pitrac_btn("stop", "square", "Stop", "desktop", "btn-error") }}
-                {{ pitrac_btn("restart", "rotate-cw", "Restart", "desktop", "btn-warning") }}
-            </div>
-
-            <!-- Menu -->
-            <details class="dropdown dropdown-end" id="nav-dropdown">
-                <summary class="btn btn-ghost btn-square btn-sm">
-                    <i data-lucide="more-vertical" class="icon-md"></i>
-                </summary>
-                <ul class="menu dropdown-content bg-base-200 rounded-box z-50 w-56 p-2 shadow-xl border border-base-300 mt-2">
-                    <li class="menu-title md:hidden">PiTrac Controls</li>
-                    <li class="md:hidden">
-                        <div class="flex flex-col gap-1.5 p-1">
-                            {{ pitrac_btn("start", "play", "Start", "mobile", "btn-success w-full") }}
-                            {{ pitrac_btn("stop", "square", "Stop", "mobile", "btn-error w-full") }}
-                            {{ pitrac_btn("restart", "rotate-cw", "Restart", "mobile", "btn-warning w-full") }}
-                        </div>
-                    </li>
-                    <div class="divider my-0 md:hidden"></div>
-                    {{ nav_item("/", "home", "Dashboard") }}
-                    {{ nav_item("/calibration", "crosshair", "Calibration") }}
-                    {{ nav_item("/config", "settings", "Configuration") }}
-                    {{ nav_item("/logs", "file-text", "Logs") }}
-                    {{ nav_item("/testing", "flask-conical", "Testing Tools") }}
-                    {{ nav_item("/update", "refresh-cw", "System Update") }}
-                    <div class="divider my-0"></div>
-                    <li class="menu-title">Theme</li>
-                    <li>
-                        <div class="flex gap-2 p-1">
-                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-theme="light" title="Light" onclick="setTheme('light')">
-                                <i data-lucide="sun"></i>
-                            </button>
-                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-theme="dark" title="Dark" onclick="setTheme('dark')">
-                                <i data-lucide="moon"></i>
-                            </button>
-                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-theme="system" title="System" onclick="setTheme('system')">
-                                <i data-lucide="monitor"></i>
-                            </button>
-                        </div>
-                    </li>
-                </ul>
-            </details>
+            {% block content %}{% endblock %}
         </div>
 
-        {% block content %}{% endblock %}
-    </div>
-
-    <!-- Strobe safety modal (hidden, shown by JS) -->
-    <dialog id="strobe-safety-modal" class="modal">
-        <div class="modal-box">
-            <div class="text-center mb-4 text-error">
-                <i data-lucide="triangle-alert" class="icon-lg"></i>
+        <!-- Strobe safety modal (hidden, shown by JS) -->
+        <dialog id="strobe-safety-modal" class="modal">
+            <div class="modal-box">
+                <div class="text-center mb-4 text-error">
+                    <i data-lucide="triangle-alert" class="icon-lg"></i>
+                </div>
+                <h3 class="text-lg font-bold text-center">Strobe Calibration Required</h3>
+                <p class="py-4 text-center opacity-60" id="strobe-safety-msg">
+                    V3 board requires strobe calibration before use.
+                </p>
+                <div class="modal-action justify-center">
+                    <a href="/calibration" class="btn btn-primary">Go to Calibration</a>
+                    <form method="dialog"><button class="btn btn-ghost">Dismiss</button></form>
+                </div>
             </div>
-            <h3 class="text-lg font-bold text-center">Strobe Calibration Required</h3>
-            <p class="py-4 text-center opacity-60" id="strobe-safety-msg">
-                V3 board requires strobe calibration before use.
-            </p>
-            <div class="modal-action justify-center">
-                <a href="/calibration" class="btn btn-primary">Go to Calibration</a>
-                <form method="dialog"><button class="btn btn-ghost">Dismiss</button></form>
-            </div>
-        </div>
-        <form method="dialog" class="modal-backdrop"><button>close</button></form>
-    </dialog>
+            <form method="dialog" class="modal-backdrop"><button>close</button></form>
+        </dialog>
 
-    <script src="/static/js/lucide.min.js"></script>
-    <script src="/static/js/common.js"></script>
-    {% block extra_scripts %}{% endblock %}
-</body>
+        <script src="/static/js/lucide.min.js"></script>
+        <script src="/static/js/common.js"></script>
+        {% block extra_scripts %}{% endblock %}
+    </body>
 </html>

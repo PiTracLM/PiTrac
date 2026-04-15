@@ -3,19 +3,19 @@ name: Camera Tests
 on:
   push:
     branches:
-      - "**"
+      - '**'
     paths:
       - 'Software/LMSourceCode/ImageProcessing/Camera/**'
       - '.github/workflows/camera-tests.yml'
   pull_request:
     branches:
-      - "**"
+      - '**'
     paths:
       - 'Software/LMSourceCode/ImageProcessing/Camera/**'
       - '.github/workflows/camera-tests.yml'
 env:
   BOOST_VERSION: 1.84.0
-  BOOST_MSVC_VERSION: "14.3"
+  BOOST_MSVC_VERSION: '14.3'
 jobs:
   camera-tests:
     name: Camera Bounded Context Tests
@@ -24,14 +24,13 @@ jobs:
       run:
         working-directory: Software/LMSourceCode/ImageProcessing/Camera
     steps:
-    
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Install CMake
         uses: jwlawson/actions-setup-cmake@v2
         with:
-          cmake-version: "3.20"
+          cmake-version: '3.20'
 
       - name: Install boost
         uses: MarkusJx/install-boost@v2
@@ -65,16 +64,16 @@ jobs:
         run: |
           Write-Host "=== Running Direct Test Executable ==="
           ./build/tests/camera_tests.exe
-        shell: pwsh      
-      
+        shell: pwsh
+
       - name: Comprehensive Test Report
         run: |
           Write-Host "=== Running CTest with Detailed Reporting ==="
           cd build/tests
-          
+
           # Run CTest with XML output (JUnit format) from the tests directory
           ctest -C Debug --verbose --output-on-failure --output-junit ./build/tests/test-results.xml
-          
+
           # Debug: Show what files were created
           Write-Host "=== Files in tests directory after CTest ==="
           Get-ChildItem | Format-Table Name, Length

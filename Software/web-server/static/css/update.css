@@ -2,15 +2,23 @@
 
 /* Loading dots animation on action buttons (JS toggles .loading) */
 .action-btn.loading span::after {
-    content: "...";
+    content: '...';
     animation: dots 1.5s steps(3, end) infinite;
 }
 
 @keyframes dots {
-    0% { content: ""; }
-    33% { content: "."; }
-    66% { content: ".."; }
-    100% { content: "..."; }
+    0% {
+        content: '';
+    }
+    33% {
+        content: '.';
+    }
+    66% {
+        content: '..';
+    }
+    100% {
+        content: '...';
+    }
 }
 
 /* Commit list items (built dynamically by JS) */
@@ -61,7 +69,7 @@
     word-wrap: break-word;
 }
 
-[data-theme="dark"] .build-log {
+[data-theme='dark'] .build-log {
     background: #0d1117;
     border: 1px solid oklch(15% 0.008 275);
 }
@@ -71,10 +79,18 @@
     padding: 0.125rem 0.5rem;
 }
 
-.log-line.error { color: #f48771; }
-.log-line.update { color: #9cdcfe; }
-.log-line.git { color: #b5cea8; }
-.log-line.build { color: #d4d4d4; }
+.log-line.error {
+    color: #f48771;
+}
+.log-line.update {
+    color: #9cdcfe;
+}
+.log-line.git {
+    color: #b5cea8;
+}
+.log-line.build {
+    color: #d4d4d4;
+}
 
 /* Update banner (JS creates this dynamically) */
 .update-banner {

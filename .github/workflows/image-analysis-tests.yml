@@ -3,13 +3,13 @@ name: Image Analysis Tests
 on:
   push:
     branches:
-      - "**"
+      - '**'
     paths:
       - 'Software/LMSourceCode/ImageProcessing/ImageAnalysis/**'
       - '.github/workflows/image-analysis-tests.yml'
   pull_request:
     branches:
-      - "**"
+      - '**'
     paths:
       - 'Software/LMSourceCode/ImageProcessing/ImageAnalysis/**'
       - '.github/workflows/image-analysis-tests.yml'
@@ -26,7 +26,7 @@ jobs:
         working-directory: Software/LMSourceCode/ImageProcessing/ImageAnalysis
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4   
+        uses: actions/checkout@v4
 
       - name: Cache OpenCV
         uses: actions/cache@v3
@@ -39,7 +39,7 @@ jobs:
       - name: Install CMake
         uses: jwlawson/actions-setup-cmake@v2
         with:
-          cmake-version: "4.0.3"
+          cmake-version: '4.0.3'
 
       - name: Install OpenCV
         run: |
@@ -56,8 +56,8 @@ jobs:
           } else {
             Write-Host "✓ OpenCV found in cache"
           }
-        shell: pwsh      
-        
+        shell: pwsh
+
       - name: Install boost
         uses: MarkusJx/install-boost@v2
         with:
@@ -69,28 +69,28 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
         with:
-          arch: x64      
+          arch: x64
 
       - name: Configure CMake
         run: |
           if (Test-Path build) { Remove-Item build -Recurse -Force }
           mkdir build
             $OpenCVConfigPath = "$env:OPENCV_DIR\build"
-          
+
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DOPENCV_DIR="$OpenCVConfigPath"
-        shell: pwsh      
-        
+        shell: pwsh
+
       - name: Build and Test
         run: |
           pushd build
           cmake --build . --config Release
-          
+
           # Add OpenCV DLLs to PATH for test execution
           $opencvBinPath = "$env:OPENCV_DIR\build\x64\vc16\bin"
           if (Test-Path $opencvBinPath) {
             $env:PATH = "$opencvBinPath;$env:PATH"
           }
-          
+
           ctest -C Release --output-on-failure
           popd
         shell: pwsh

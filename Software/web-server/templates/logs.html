@@ -1,29 +1,27 @@
-{% extends "base.html" %}
-
-{% block title %}PiTrac Logs{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="/static/css/logs.css">
-{% endblock %}
-
-{% block content %}
-<div class="logs-container flex flex-col gap-4" style="height: calc(100vh - 90px);">
-
+{% extends "base.html" %} {% block title %}PiTrac Logs{% endblock %} {% block extra_css %}
+<link rel="stylesheet" href="/static/css/logs.css" />
+{% endblock %} {% block content %}
+<div class="logs-container flex flex-col gap-4" style="height: calc(100vh - 90px)">
     <!-- Header / controls -->
     <div class="card bg-base-200 border border-base-300 shadow-sm p-4 mx-2 sm:mx-4">
         <div class="flex flex-wrap items-center gap-4 md:gap-6">
-
             <!-- Service picker -->
-            <div class="flex items-center gap-3 min-w-[220px] max-md:w-full max-md:flex-col max-md:items-stretch">
+            <div
+                class="flex items-center gap-3 min-w-[220px] max-md:w-full max-md:flex-col max-md:items-stretch"
+            >
                 <label for="serviceSelect" class="font-semibold whitespace-nowrap">Service:</label>
-                <select id="serviceSelect" class="select select-sm select-bordered flex-1" onchange="changeService()">
+                <select
+                    id="serviceSelect"
+                    class="select select-sm select-bordered flex-1"
+                    onchange="changeService()"
+                >
                     <option value="">Loading services...</option>
                 </select>
             </div>
 
             <!-- Service status + log stream connection -->
             <div class="flex items-center gap-4 flex-1">
-                <span id="serviceStatus" class="service-status" style="display: none;"></span>
+                <span id="serviceStatus" class="service-status" style="display: none"></span>
 
                 <div class="flex items-center gap-2 text-sm">
                     <span class="status-indicator disconnected" id="connectionIndicator"></span>
@@ -34,11 +32,19 @@
 
             <!-- Action buttons -->
             <div class="flex gap-2 max-md:w-full max-md:mt-2">
-                <button id="pauseButton" class="btn btn-sm btn-ghost max-md:flex-1" onclick="togglePause()">
+                <button
+                    id="pauseButton"
+                    class="btn btn-sm btn-ghost max-md:flex-1"
+                    onclick="togglePause()"
+                >
                     <i data-lucide="pause" class="icon-sm" id="pauseIcon"></i>
                     <span class="btn-text max-md:hidden">Pause</span>
                 </button>
-                <button id="clearButton" class="btn btn-sm btn-ghost text-error max-md:flex-1" onclick="clearLogs()">
+                <button
+                    id="clearButton"
+                    class="btn btn-sm btn-ghost text-error max-md:flex-1"
+                    onclick="clearLogs()"
+                >
                     <i data-lucide="trash-2" class="icon-sm"></i>
                     <span class="btn-text max-md:hidden">Clear</span>
                 </button>
@@ -51,7 +57,9 @@
     </div>
 
     <!-- Log viewer + stats -->
-    <div class="card bg-base-200 border border-base-300 shadow-sm flex-1 mx-2 sm:mx-4 mb-4 p-4 flex flex-col overflow-hidden">
+    <div
+        class="card bg-base-200 border border-base-300 shadow-sm flex-1 mx-2 sm:mx-4 mb-4 p-4 flex flex-col overflow-hidden"
+    >
         <div class="log-viewer empty" id="logViewer"></div>
 
         <div class="divider my-1"></div>
@@ -71,10 +79,7 @@
             </div>
         </div>
     </div>
-
 </div>
-{% endblock %}
-
-{% block extra_scripts %}
+{% endblock %} {% block extra_scripts %}
 <script src="/static/js/logs.js"></script>
 {% endblock %}

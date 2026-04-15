@@ -1,9 +1,9 @@
 ---
 name: Docs CI (build only)
-"on":
+'on':
   pull_request:
     paths:
-      - "docs/**"
+      - 'docs/**'
 
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.3'      # or omit to use docs/.ruby-version
+          ruby-version: '3.3' # or omit to use docs/.ruby-version
           bundler-cache: true
           cache-version: 0
         env:

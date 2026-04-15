@@ -49,13 +49,15 @@ const distortionCalibration = {
 
             this.log('Calibration task started');
             this.startStatusPolling();
-
         } catch (error) {
             console.error('Error starting distortion calibration:', error);
             this._stopFeed();
             statusEl.textContent = 'Could not connect to camera';
             statusEl.classList.add('text-error');
-            const safe = this._escapeHtml(error.message || 'Check that the camera is connected and not in use by another program.');
+            const safe = this._escapeHtml(
+                error.message ||
+                    'Check that the camera is connected and not in use by another program.'
+            );
             document.getElementById('distortion-details').innerHTML = `
                 <div class="alert alert-error mt-2">
                     <span>${safe}</span>
@@ -113,23 +115,27 @@ const distortionCalibration = {
 
         if (status.images_captured !== undefined) {
             const target = status.target_images || 40;
-            detailsText.textContent =
-                `${status.images_captured} of ${target} good images captured`;
+            detailsText.textContent = `${status.images_captured} of ${target} good images captured`;
 
             const imagesOk = status.images_captured >= target;
-            this._setRequirement('req-images', imagesOk,
-                `${status.images_captured}/${target} images captured`);
+            this._setRequirement(
+                'req-images',
+                imagesOk,
+                `${status.images_captured}/${target} images captured`
+            );
         }
         if (status.coverage && status.coverage.fraction !== undefined) {
             const coverageOk = status.coverage.fraction >= 1.0;
             const cellsCovered = Math.round(status.coverage.fraction * 9);
-            this._setRequirement('req-coverage', coverageOk,
-                `${cellsCovered}/9 areas covered`);
+            this._setRequirement('req-coverage', coverageOk, `${cellsCovered}/9 areas covered`);
         }
         if (status.tilt_fraction !== undefined) {
-            const tiltOk = status.tilt_fraction >= 0.40;
-            this._setRequirement('req-tilt', tiltOk,
-                tiltOk ? 'Tilted angles used' : 'Need more tilted angles');
+            const tiltOk = status.tilt_fraction >= 0.4;
+            this._setRequirement(
+                'req-tilt',
+                tiltOk,
+                tiltOk ? 'Tilted angles used' : 'Need more tilted angles'
+            );
         }
 
         if (status.coverage && status.coverage.grid) {
@@ -223,7 +229,6 @@ const distortionCalibration = {
             if (window.lucide && window.lucide.createIcons) {
                 window.lucide.createIcons({ nodes: [resultsDiv] });
             }
-
         } catch (error) {
             console.error('Error rendering calibration results:', error);
             this.log('Calibration completed but could not render results: ' + error.message);
@@ -330,8 +335,12 @@ const distortionCalibration = {
             ws.onmessage = (event) => {
                 if (typeof event.data === 'string') {
                     let msg;
-                    try { msg = JSON.parse(event.data); }
-                    catch (e) { console.warn('Bad JSON from feed:', e); return; }
+                    try {
+                        msg = JSON.parse(event.data);
+                    } catch (e) {
+                        console.warn('Bad JSON from feed:', e);
+                        return;
+                    }
 
                     if (msg.error) {
                         clearTimeout(timeout);
@@ -538,7 +547,9 @@ const distortionCalibration = {
                     el.classList.add('opacity-70');
                 }
             }
-        } catch (e) { /* ignore */ }
+        } catch (e) {
+            /* ignore */
+        }
     }
 };
 

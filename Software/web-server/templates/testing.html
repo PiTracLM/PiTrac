@@ -1,38 +1,45 @@
-{% extends "base.html" %}
-{% from "_macros.html" import result_item, status_row %}
-
-{% block title %}Testing Tools - PiTrac{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="/static/css/testing.css">
-{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% from "_macros.html" import result_item, status_row %} {% block title
+%}Testing Tools - PiTrac{% endblock %} {% block extra_css %}
+<link rel="stylesheet" href="/static/css/testing.css" />
+{% endblock %} {% block content %}
 <div class="flex flex-col gap-4">
-
     <!-- Image Upload Section -->
     <div class="card bg-base-200 border border-base-300 shadow-sm tool-category">
         <div class="card-body p-6">
-            <h2 class="text-xl font-semibold text-primary mb-4 category-title">Image Pipeline Testing</h2>
+            <h2 class="text-xl font-semibold text-primary mb-4 category-title">
+                Image Pipeline Testing
+            </h2>
             <div class="flex flex-col gap-4 items-center image-upload-container">
-                <div class="upload-area flex flex-col items-center justify-center gap-4 w-full max-w-[600px] min-h-[200px]
-                            border-2 border-dashed border-base-300 rounded-xl p-8 cursor-pointer
-                            transition-all duration-300 bg-base-100/50
-                            hover:border-primary hover:bg-base-300/30"
-                     id="uploadArea">
+                <div
+                    class="upload-area flex flex-col items-center justify-center gap-4 w-full max-w-[600px] min-h-[200px] border-2 border-dashed border-base-300 rounded-xl p-8 cursor-pointer transition-all duration-300 bg-base-100/50 hover:border-primary hover:bg-base-300/30"
+                    id="uploadArea"
+                >
                     <i data-lucide="cloud-upload" class="icon-lg opacity-40"></i>
                     <p class="m-0 font-medium">Drag and drop strobed ball image here</p>
-                    <p class="m-0 text-sm opacity-60 upload-hint">Flight camera image with strobe (or click to browse)</p>
-                    <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+                    <p class="m-0 text-sm opacity-60 upload-hint">
+                        Flight camera image with strobe (or click to browse)
+                    </p>
+                    <input type="file" id="imageUpload" accept="image/*" style="display: none" />
                 </div>
-                <div id="imagePreview" class="flex flex-col items-center gap-4 w-full max-w-[600px]" style="display: none;">
-                    <img id="previewImg" alt="Preview" class="w-full h-auto rounded-lg shadow-md">
-                    <div class="image-info flex justify-between items-center w-full p-3 bg-base-100 rounded-lg border border-base-300">
+                <div
+                    id="imagePreview"
+                    class="flex flex-col items-center gap-4 w-full max-w-[600px]"
+                    style="display: none"
+                >
+                    <img id="previewImg" alt="Preview" class="w-full h-auto rounded-lg shadow-md" />
+                    <div
+                        class="image-info flex justify-between items-center w-full p-3 bg-base-100 rounded-lg border border-base-300"
+                    >
                         <span id="imageName" class="font-medium text-sm"></span>
                         <button class="btn btn-error btn-sm" onclick="clearImage()">Remove</button>
                     </div>
                 </div>
-                <button id="runPipelineBtn" class="btn btn-primary btn-lg" style="display: none;" onclick="runImageTest()">
+                <button
+                    id="runPipelineBtn"
+                    class="btn btn-primary btn-lg"
+                    style="display: none"
+                    onclick="runImageTest()"
+                >
                     Run Full Pipeline Test
                 </button>
             </div>
@@ -43,36 +50,59 @@
     <div class="flex flex-col gap-4 tool-categories">
         <div class="card bg-base-200 border border-base-300 shadow-sm tool-category">
             <div class="card-body p-6">
-                <h2 class="text-xl font-semibold text-primary mb-4 category-title">Hardware Tests</h2>
-                <div class="tool-grid grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4" id="hardware-tools"></div>
+                <h2 class="text-xl font-semibold text-primary mb-4 category-title">
+                    Hardware Tests
+                </h2>
+                <div
+                    class="tool-grid grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4"
+                    id="hardware-tools"
+                ></div>
             </div>
         </div>
 
         <div class="card bg-base-200 border border-base-300 shadow-sm tool-category">
             <div class="card-body p-6">
                 <h2 class="text-xl font-semibold text-primary mb-4 category-title">Camera Tests</h2>
-                <div class="tool-grid grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4" id="camera-tools"></div>
+                <div
+                    class="tool-grid grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4"
+                    id="camera-tools"
+                ></div>
             </div>
         </div>
 
         <div class="card bg-base-200 border border-base-300 shadow-sm tool-category">
             <div class="card-body p-6">
-                <h2 class="text-xl font-semibold text-primary mb-4 category-title">Calibration Tests</h2>
-                <div class="tool-grid grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4" id="calibration-tools"></div>
+                <h2 class="text-xl font-semibold text-primary mb-4 category-title">
+                    Calibration Tests
+                </h2>
+                <div
+                    class="tool-grid grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4"
+                    id="calibration-tools"
+                ></div>
             </div>
         </div>
 
         <div class="card bg-base-200 border border-base-300 shadow-sm tool-category">
             <div class="card-body p-6">
-                <h2 class="text-xl font-semibold text-primary mb-4 category-title">Testing Suite</h2>
-                <div class="tool-grid grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4" id="testing-tools"></div>
+                <h2 class="text-xl font-semibold text-primary mb-4 category-title">
+                    Testing Suite
+                </h2>
+                <div
+                    class="tool-grid grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4"
+                    id="testing-tools"
+                ></div>
             </div>
         </div>
 
         <div class="card bg-base-200 border border-base-300 shadow-sm tool-category">
             <div class="card-body p-6">
-                <h2 class="text-xl font-semibold text-primary mb-4 category-title">Connectivity Tests</h2>
-                <div class="tool-grid grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4" id="connectivity-tools"></div>
+                <h2 class="text-xl font-semibold text-primary mb-4 category-title">
+                    Connectivity Tests
+                </h2>
+                <div
+                    class="tool-grid grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4"
+                    id="connectivity-tools"
+                ></div>
             </div>
         </div>
     </div>
@@ -80,29 +110,38 @@
     <!-- Output Panel -->
     <div class="card bg-base-200 border border-base-300 shadow-sm output-panel">
         <div class="card-body p-6 flex flex-col max-h-[600px]">
-            <div class="flex justify-between items-center mb-4 pb-4 border-b border-base-300 output-header">
+            <div
+                class="flex justify-between items-center mb-4 pb-4 border-b border-base-300 output-header"
+            >
                 <h3 class="text-lg font-semibold text-primary mb-0">Test Output</h3>
                 <button class="btn btn-sm btn-ghost" onclick="clearOutput()">Clear</button>
             </div>
             <div class="output-content flex-1 min-h-[300px] overflow-y-auto" id="testOutput">
-                <div class="output-placeholder text-center py-8 opacity-60">Select a test tool to see output here</div>
+                <div class="output-placeholder text-center py-8 opacity-60">
+                    Select a test tool to see output here
+                </div>
             </div>
         </div>
     </div>
-
 </div>
 
 <!-- Test Result Modal (div-based, JS controls via display: block/none) -->
-<div id="testModal" class="modal" style="display: none;">
+<div id="testModal" class="modal" style="display: none">
     <div class="modal-box max-w-3xl relative">
-        <button class="btn btn-sm btn-circle btn-ghost absolute right-4 top-4" onclick="document.getElementById('testModal').style.display='none'">&#x2715;</button>
+        <button
+            class="btn btn-sm btn-circle btn-ghost absolute right-4 top-4"
+            onclick="document.getElementById('testModal').style.display = 'none'"
+        >
+            &#x2715;
+        </button>
         <h3 class="text-lg font-bold" id="modalTitle">Test Result</h3>
         <div class="py-4" id="modalBody"></div>
     </div>
-    <div class="modal-backdrop" onclick="document.getElementById('testModal').style.display='none'"></div>
+    <div
+        class="modal-backdrop"
+        onclick="document.getElementById('testModal').style.display = 'none'"
+    ></div>
 </div>
-{% endblock %}
-
-{% block extra_scripts %}
+{% endblock %} {% block extra_scripts %}
 <script src="/static/js/testing.js"></script>
 {% endblock %}
