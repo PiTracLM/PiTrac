@@ -1,8 +1,10 @@
+const prettierConfig = require('eslint-config-prettier');
+
 module.exports = [
     {
         files: ['**/*.js'],
         languageOptions: {
-            ecmaVersion: 2021,
+            ecmaVersion: 'latest',
             sourceType: 'script',
             globals: {
                 window: 'readonly',
@@ -28,34 +30,15 @@ module.exports = [
             }
         },
         rules: {
-            'indent': ['error', 4],
-            'linebreak-style': ['error', 'unix'],
-            'quotes': ['error', 'single'],
-            'semi': ['error', 'always'],
-            'no-trailing-spaces': 'error',
             'no-unused-vars': ['error', {
                 'argsIgnorePattern': '^_|^e$',
                 'varsIgnorePattern': '^(saveChanges|resetAll|reloadConfig|showDiff|exportConfig|importConfig|filterConfig|closeModal|setTheme|openImage|resetShot|controlPiTrac|startBtn|stopBtn|restartBtn|calibration)$'
             }],
             'no-console': ['warn', { 'allow': ['warn', 'error'] }],
-            'comma-dangle': ['error', 'never'],
-            'no-multiple-empty-lines': ['error', { 'max': 1, 'maxEOF': 0 }],
-            'eol-last': ['error', 'always'],
-            'space-before-function-paren': ['error', {
-                'anonymous': 'never',
-                'named': 'never',
-                'asyncArrow': 'always'
-            }],
-            'object-curly-spacing': ['error', 'always'],
-            'array-bracket-spacing': ['error', 'never'],
-            'space-in-parens': ['error', 'never'],
-            'keyword-spacing': ['error', { 'before': true, 'after': true }],
-            'space-infix-ops': 'error',
-            'comma-spacing': ['error', { 'before': false, 'after': true }],
-            'brace-style': ['error', '1tbs', { 'allowSingleLine': true }],
             'curly': ['error', 'multi-line'],
             'no-var': 'error',
             'prefer-const': 'error'
         }
-    }
+    },
+    prettierConfig
 ];
