@@ -9,8 +9,8 @@ body:
       ## Hardware Issue Report 🔧
 
       For hardware help, also check:
-      - [Hardware Assembly Guide](https://pitraclm.github.io/PiTrac/hardware/assembly-guide.html)
-      - [Parts List](https://pitraclm.github.io/PiTrac/hardware/parts-list.html)
+      - [Hardware Assembly Guide](https://docs.pitrac.org/hardware/v3-enclosure/assembly/)
+      - [Parts List](https://docs.pitrac.org/hardware/parts-list/)
 
 - type: dropdown
   id: hardware-category
