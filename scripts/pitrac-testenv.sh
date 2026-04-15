@@ -26,7 +26,10 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-die() { echo -e "${RED}Error:${NC} $*" >&2; exit 1; }
+die() {
+    echo -e "${RED}Error:${NC} $*" >&2
+    exit 1
+}
 info() { echo -e "${GREEN}>>>${NC} $*"; }
 warn() { echo -e "${YELLOW}>>>${NC} $*"; }
 
@@ -107,7 +110,7 @@ cmd_create() {
     fi
 
     # Set hostname
-    echo "pitrac-test" > "$ENV_PATH/etc/hostname"
+    echo "pitrac-test" >"$ENV_PATH/etc/hostname"
 
     # Allow root login without password for convenience
     chroot "$ENV_PATH" passwd -d root 2>/dev/null || true
@@ -118,11 +121,11 @@ cmd_create() {
     # Add PiTrac APT repo
     info "Adding PiTrac APT repository..."
     mkdir -p "$ENV_PATH/usr/share/keyrings"
-    curl -fsSL https://pitraclm.github.io/packages/pitrac-repo.asc \
-        | gpg --dearmor -o "$ENV_PATH/usr/share/keyrings/pitrac-archive-keyring.gpg" 2>/dev/null || warn "Could not fetch GPG key"
+    curl -fsSL https://pitraclm.github.io/packages/pitrac-repo.asc |
+        gpg --dearmor -o "$ENV_PATH/usr/share/keyrings/pitrac-archive-keyring.gpg" 2>/dev/null || warn "Could not fetch GPG key"
 
     echo "deb [arch=arm64 signed-by=/usr/share/keyrings/pitrac-archive-keyring.gpg] https://pitraclm.github.io/packages trixie main" \
-        > "$ENV_PATH/etc/apt/sources.list.d/pitrac.list"
+        >"$ENV_PATH/etc/apt/sources.list.d/pitrac.list"
 
     info "Raspberry Pi OS Trixie environment created at $ENV_PATH"
     info "Run 'sudo $0 snapshot' to save this clean state"
@@ -220,14 +223,14 @@ cmd_status() {
 }
 
 case "${1:-}" in
-    create)   cmd_create ;;
-    enter)    cmd_enter ;;
-    snapshot) cmd_snapshot ;;
-    reset)    cmd_reset ;;
-    destroy)  cmd_destroy ;;
-    status)   cmd_status ;;
-    *)
-        echo "Usage: sudo $0 {create|enter|snapshot|reset|destroy|status}"
-        exit 1
-        ;;
+create) cmd_create ;;
+enter) cmd_enter ;;
+snapshot) cmd_snapshot ;;
+reset) cmd_reset ;;
+destroy) cmd_destroy ;;
+status) cmd_status ;;
+*)
+    echo "Usage: sudo $0 {create|enter|snapshot|reset|destroy|status}"
+    exit 1
+    ;;
 esac

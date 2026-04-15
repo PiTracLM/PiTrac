@@ -29,7 +29,7 @@ detect_pi_model() {
 # Apply Boost C++20 compatibility fix
 apply_boost_cxx20_fix() {
     local boost_header="/usr/include/boost/asio/awaitable.hpp"
-    
+
     if [[ -f "$boost_header" ]] && ! grep -q "#include <utility>" "$boost_header"; then
         log_info "Applying Boost 1.74 C++20 compatibility fix..."
         # Check if we need sudo
@@ -45,24 +45,24 @@ apply_boost_cxx20_fix() {
 # Configure libcamera with extended timeout
 configure_libcamera() {
     log_info "Configuring libcamera..."
-    
+
     # Install IMX296 NOIR sensor file if available
     install_imx296_sensor_file_dev() {
         local pi_model=$(detect_pi_model)
         local source_file=""
         local dest_dir=""
-        
+
         case "$pi_model" in
-            "pi5")
-                source_file="/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_noir.json.PI_5_FOR_PISP_DIRECTORY"
-                dest_dir="/usr/share/libcamera/ipa/rpi/pisp"
-                ;;
-            "pi4")
-                source_file="/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_noir.json.PI_4_FOR_VC4_DIRECTORY"
-                dest_dir="/usr/share/libcamera/ipa/rpi/vc4"
-                ;;
+        "pi5")
+            source_file="/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_noir.json.PI_5_FOR_PISP_DIRECTORY"
+            dest_dir="/usr/share/libcamera/ipa/rpi/pisp"
+            ;;
+        "pi4")
+            source_file="/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_noir.json.PI_4_FOR_VC4_DIRECTORY"
+            dest_dir="/usr/share/libcamera/ipa/rpi/vc4"
+            ;;
         esac
-        
+
         if [[ -n "$source_file" && -f "$source_file" && -d "$dest_dir" ]]; then
             log_info "Installing IMX296 NOIR sensor configuration for $pi_model..."
             if [[ -w "$dest_dir" ]]; then
@@ -78,15 +78,15 @@ configure_libcamera() {
             log_warn "This is only needed if using IMX296 NOIR cameras"
         fi
     }
-    
+
     # Install sensor file first
     install_imx296_sensor_file_dev
-    
+
     for pipeline in pisp vc4; do
         local config_dir="/usr/share/libcamera/pipeline/rpi/${pipeline}"
         local example_file="${config_dir}/example.yaml"
         local config_file="${config_dir}/rpi_apps.yaml"
-        
+
         if [[ -d "$config_dir" ]]; then
             if [[ -f "$example_file" ]] && [[ ! -f "$config_file" ]]; then
                 log_info "Creating ${pipeline} config from example..."
@@ -116,7 +116,7 @@ configure_libcamera() {
             fi
         fi
     done
-    
+
     # Set up LIBCAMERA_RPI_CONFIG_FILE environment variable (CRITICAL for camera detection)
     setup_libcamera_environment
 }
@@ -125,33 +125,33 @@ configure_libcamera() {
 setup_libcamera_environment() {
     local pi_model=$(detect_pi_model)
     local config_file=""
-    
+
     case "$pi_model" in
-        "pi5")
-            config_file="/usr/share/libcamera/pipeline/rpi/pisp/rpi_apps.yaml"
-            ;;
-        "pi4")
-            config_file="/usr/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml"
-            ;;
+    "pi5")
+        config_file="/usr/share/libcamera/pipeline/rpi/pisp/rpi_apps.yaml"
+        ;;
+    "pi4")
+        config_file="/usr/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml"
+        ;;
     esac
-    
+
     if [[ -n "$config_file" && -f "$config_file" ]]; then
         log_info "Setting up libcamera environment for $pi_model..."
-        
+
         # Set for current session
         export LIBCAMERA_RPI_CONFIG_FILE="$config_file"
-        
+
         # Add to system environment (for services)
         local env_file="/etc/environment"
         if ! grep -q "LIBCAMERA_RPI_CONFIG_FILE" "$env_file" 2>/dev/null; then
             if [[ -w "$env_file" ]]; then
-                echo "LIBCAMERA_RPI_CONFIG_FILE=\"$config_file\"" >> "$env_file"
+                echo "LIBCAMERA_RPI_CONFIG_FILE=\"$config_file\"" >>"$env_file"
             else
                 echo "LIBCAMERA_RPI_CONFIG_FILE=\"$config_file\"" | sudo tee -a "$env_file" >/dev/null
             fi
             log_success "Added LIBCAMERA_RPI_CONFIG_FILE to system environment"
         fi
-        
+
         log_success "libcamera environment configured"
     fi
 }
@@ -159,20 +159,20 @@ setup_libcamera_environment() {
 # Create pkg-config files for libraries that don't have them
 create_pkgconfig_files() {
     log_info "Creating pkg-config files..."
-    
+
     # Check if we need sudo
     local need_sudo=""
     if [[ ! -w /usr/lib/pkgconfig ]] && [[ ! -w /usr/lib ]]; then
         need_sudo="sudo"
     fi
-    
+
     $need_sudo mkdir -p /usr/lib/pkgconfig
-    
+
     # Create lgpio.pc if it doesn't exist
     if [[ ! -f /usr/lib/pkgconfig/lgpio.pc ]]; then
         log_info "Creating lgpio.pc pkg-config file..."
         if [[ -n "$need_sudo" ]]; then
-            sudo tee /usr/lib/pkgconfig/lgpio.pc > /dev/null << 'EOF'
+            sudo tee /usr/lib/pkgconfig/lgpio.pc >/dev/null <<'EOF'
 prefix=/usr
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib/aarch64-linux-gnu
@@ -185,7 +185,7 @@ Libs: -L${libdir} -llgpio
 Cflags: -I${includedir}
 EOF
         else
-            cat > /usr/lib/pkgconfig/lgpio.pc << 'EOF'
+            cat >/usr/lib/pkgconfig/lgpio.pc <<'EOF'
 prefix=/usr
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib/aarch64-linux-gnu
@@ -205,13 +205,13 @@ EOF
 # Get the actual user (not root) who is installing
 get_install_user() {
     local user="${SUDO_USER:-$(whoami)}"
-    
+
     # If we're root and there's no SUDO_USER, we can't determine the actual user
     if [[ "$user" == "root" ]] && [[ -z "${SUDO_USER:-}" ]]; then
         echo ""
         return 1
     fi
-    
+
     echo "$user"
     return 0
 }
@@ -228,18 +228,18 @@ install_test_images() {
 
         if [[ -f "$test_images_dir/gs_log_img__log_ball_final_found_ball_img.png" ]]; then
             cp "$test_images_dir/gs_log_img__log_ball_final_found_ball_img.png" \
-               "$dest_dir/teed-ball.png"
+                "$dest_dir/teed-ball.png"
         fi
         if [[ -f "$test_images_dir/log_cam2_last_strobed_img.png" ]]; then
             cp "$test_images_dir/log_cam2_last_strobed_img.png" \
-               "$dest_dir/strobed.png"
+                "$dest_dir/strobed.png"
         fi
 
         for img in "$test_images_dir"/*.png "$test_images_dir"/*.jpg "$test_images_dir"/*.jpeg; do
             if [[ -f "$img" ]]; then
                 local basename=$(basename "$img")
-                if [[ "$basename" != "gs_log_img__log_ball_final_found_ball_img.png" ]] && \
-                   [[ "$basename" != "log_cam2_last_strobed_img.png" ]]; then
+                if [[ "$basename" != "gs_log_img__log_ball_final_found_ball_img.png" ]] &&
+                    [[ "$basename" != "log_cam2_last_strobed_img.png" ]]; then
                     cp "$img" "$dest_dir/"
                 fi
             fi
@@ -329,16 +329,16 @@ install_models() {
 install_camera_tools() {
     local dest_dir="${1:-/usr/lib/pitrac}"
     local repo_root="${2:-${REPO_ROOT:-/opt/PiTrac}}"
-    
+
     log_info "Installing camera tools..."
-    
+
     local camera_tools_dir="$repo_root/Software/LMSourceCode/ImageProcessing/CameraTools"
     local imaging_dir="$repo_root/Software/LMSourceCode/ImageProcessing"
-    
+
     if [[ -d "$camera_tools_dir" ]]; then
         mkdir -p "$dest_dir/ImageProcessing/CameraTools"
         cp -r "$camera_tools_dir"/* "$dest_dir/ImageProcessing/CameraTools/"
-        
+
         # Install Pi-specific IMX296 NOIR sensor files
         for sensor_file in "imx296_noir.json.PI_4_FOR_VC4_DIRECTORY" "imx296_noir.json.PI_5_FOR_PISP_DIRECTORY"; do
             if [[ -f "$imaging_dir/$sensor_file" ]]; then
@@ -347,12 +347,12 @@ install_camera_tools() {
                 log_info "Installed sensor file: $sensor_file"
             fi
         done
-        
+
         find "$dest_dir/ImageProcessing/CameraTools" -name "*.sh" -type f -exec chmod 755 {} \;
         if [[ -f "$dest_dir/ImageProcessing/CameraTools/imx296_trigger" ]]; then
             chmod 755 "$dest_dir/ImageProcessing/CameraTools/imx296_trigger"
         fi
-        
+
         log_success "Camera tools installed"
     else
         log_warn "Camera tools not found: $camera_tools_dir"
@@ -361,53 +361,53 @@ install_camera_tools() {
 
 create_pitrac_directories() {
     log_info "Creating PiTrac directories..."
-    
+
     mkdir -p /usr/lib/pitrac
     mkdir -p /usr/share/pitrac/{templates,test-images,test-suites,calibration,webapp}
     mkdir -p /var/lib/pitrac
     mkdir -p /etc/pitrac
-    
+
     if local user=$(get_install_user); then
         local user_home=$(eval echo "~$user")
         mkdir -p "$user_home/.pitrac/config"
         mkdir -p "$user_home/.pitrac/state"
         mkdir -p "$user_home/LM_Shares/Images"
         mkdir -p "$user_home/LM_Shares/WebShare"
-        
+
         chown -R "$user:$user" "$user_home/.pitrac"
         chown -R "$user:$user" "$user_home/LM_Shares"
     fi
-    
+
     log_success "Directories created"
 }
 
 manage_service_restart() {
     local service_name="$1"
     local action_func="${2:-true}"
-    
+
     log_info "Managing $service_name service..."
-    
+
     if systemctl is-active --quiet "$service_name" 2>/dev/null; then
         log_info "Stopping $service_name..."
         systemctl stop "$service_name"
-        
+
         if [[ -f "/etc/init.d/$service_name" ]]; then
             sleep 3
         else
             sleep 2
         fi
     fi
-    
+
     if [[ "$action_func" != "true" ]] && type -t "$action_func" &>/dev/null; then
         $action_func
     fi
-    
+
     log_info "Starting $service_name..."
     systemctl start "$service_name" || {
         log_warn "Failed to start $service_name"
         return 1
     }
-    
+
     sleep 2
     if systemctl is-active --quiet "$service_name"; then
         log_success "$service_name started successfully"
@@ -420,7 +420,7 @@ set_config_permissions() {
     local file="$1"
     local owner="${2:-root:root}"
     local perms="${3:-644}"
-    
+
     if [[ -f "$file" ]]; then
         chown "$owner" "$file"
         chmod "$perms" "$file"
@@ -430,17 +430,17 @@ set_config_permissions() {
 
 install_python_dependencies() {
     local web_server_dir="${1:-/usr/lib/pitrac/web-server}"
-    
+
     if [[ ! -d "$web_server_dir" ]]; then
         log_warn "Web server directory not found: $web_server_dir"
         return 1
     fi
-    
+
     if [[ ! -f "$web_server_dir/requirements.txt" ]]; then
         log_warn "Requirements file not found: $web_server_dir/requirements.txt"
         return 1
     fi
-    
+
     log_info "Installing Python dependencies for web server..."
 
     # gpiozero (in requirements.txt) needs these system GPIO backends on Raspberry Pi OS.
@@ -473,7 +473,7 @@ install_python_dependencies() {
             return 1
         fi
     fi
-    
+
     return 0
 }
 
@@ -482,12 +482,12 @@ install_service_from_template() {
     local install_user="$2"
     local template_file="${3:-/usr/share/pitrac/templates/${service_name}.service.template}"
     local target_file="/etc/systemd/system/${service_name}.service"
-    
+
     if [[ -z "$service_name" ]]; then
         log_error "Service name is required"
         return 1
     fi
-    
+
     if [[ "$install_user" == "root" ]]; then
         if [[ -n "${SUDO_USER:-}" ]] && [[ "$SUDO_USER" != "root" ]]; then
             install_user="$SUDO_USER"
@@ -498,63 +498,63 @@ install_service_from_template() {
             return 1
         fi
     fi
-    
+
     if ! id "$install_user" &>/dev/null; then
         log_error "User '$install_user' does not exist"
         return 1
     fi
-    
+
     if [[ ! "$install_user" =~ ^[a-zA-Z0-9_-]+$ ]]; then
         log_error "Username contains invalid characters"
         return 1
     fi
-    
+
     local install_group
     install_group=$(id -gn "$install_user")
-    
+
     local user_home
     user_home=$(getent passwd "$install_user" | cut -d: -f6)
-    
+
     if [[ -z "$user_home" ]]; then
         log_error "Could not determine home directory for user '$install_user'"
         return 1
     fi
-    
+
     if [[ ! "$user_home" =~ ^/.+ ]]; then
         log_error "Invalid home directory path: $user_home"
         return 1
     fi
-    
+
     log_info "Installing $service_name service:"
     log_info "  User: $install_user"
-    log_info "  Group: $install_group" 
+    log_info "  Group: $install_group"
     log_info "  Home: $user_home"
-    
+
     if [[ ! -f "$template_file" ]]; then
         log_error "Service template not found: $template_file"
         return 1
     fi
-    
+
     local temp_service
     temp_service=$(mktemp "/tmp/${service_name}.service.XXXXXX") || {
         log_error "Failed to create temp file"
         return 1
     }
-    
+
     trap 'rm -f '"$temp_service"'' RETURN INT TERM
-    
+
     local escaped_user
     local escaped_group
     local escaped_home
     escaped_user=$(printf '%s' "$install_user" | sed 's/[[\.*^$()+?{|]/\\&/g')
     escaped_group=$(printf '%s' "$install_group" | sed 's/[[\.*^$()+?{|]/\\&/g')
     escaped_home=$(printf '%s' "$user_home" | sed 's/[[\.*^$()+?{|]/\\&/g')
-    
+
     sed -e "s|@PITRAC_USER@|$escaped_user|g" \
         -e "s|@PITRAC_GROUP@|$escaped_group|g" \
         -e "s|@PITRAC_HOME@|$escaped_home|g" \
-        "$template_file" > "$temp_service"
-    
+        "$template_file" >"$temp_service"
+
     if [[ -f "$target_file" ]]; then
         local backup_file="${target_file}.bak.$(date +%s)"
         log_info "Backing up existing service to $backup_file"
@@ -564,22 +564,22 @@ install_service_from_template() {
             sudo cp "$target_file" "$backup_file"
         fi
     fi
-    
+
     log_info "Installing service file to $target_file"
     if [[ -w "/etc/systemd/system" ]]; then
         install -m 644 "$temp_service" "$target_file"
     else
         sudo install -m 644 "$temp_service" "$target_file"
     fi
-    
+
     if [[ -w "/etc/systemd/system" ]]; then
-        find /etc/systemd/system -name "${service_name}.service.bak.*" -type f 2>/dev/null | \
+        find /etc/systemd/system -name "${service_name}.service.bak.*" -type f 2>/dev/null |
             sort -r | tail -n +4 | xargs -r rm -f
     else
-        sudo find /etc/systemd/system -name "${service_name}.service.bak.*" -type f 2>/dev/null | \
+        sudo find /etc/systemd/system -name "${service_name}.service.bak.*" -type f 2>/dev/null |
             sort -r | tail -n +4 | xargs -r sudo rm -f
     fi
-    
+
     log_info "Reloading systemd daemon..."
     if command -v systemctl &>/dev/null; then
         if [[ $EUID -eq 0 ]]; then
@@ -588,14 +588,14 @@ install_service_from_template() {
             sudo systemctl daemon-reload
         fi
     fi
-    
+
     log_info "Enabling $service_name service..."
     if [[ $EUID -eq 0 ]]; then
         systemctl enable "${service_name}.service" 2>/dev/null || true
     else
         sudo systemctl enable "${service_name}.service" 2>/dev/null || true
     fi
-    
+
     log_success "$service_name service installed successfully!"
 
     return 0
@@ -611,7 +611,7 @@ detect_debian_codename() {
     local codename="unknown"
 
     # Try lsb_release first (most reliable)
-    if command -v lsb_release &> /dev/null; then
+    if command -v lsb_release &>/dev/null; then
         codename=$(lsb_release -cs 2>/dev/null)
     fi
 
@@ -624,8 +624,8 @@ detect_debian_codename() {
     if [[ "$codename" == "unknown" ]] && [[ -f /etc/debian_version ]]; then
         local version=$(cat /etc/debian_version)
         case "$version" in
-            12.*) codename="bookworm" ;;
-            13.*) codename="trixie" ;;
+        12.*) codename="bookworm" ;;
+        13.*) codename="trixie" ;;
         esac
     fi
 
@@ -658,7 +658,7 @@ configure_pitrac_apt_repo() {
     log_info "Detected Debian $codename"
 
     # Check if repository is accessible
-    if ! curl --head --silent --fail "$repo_url/dists/$codename/Release" > /dev/null 2>&1; then
+    if ! curl --head --silent --fail "$repo_url/dists/$codename/Release" >/dev/null 2>&1; then
         log_warn "PiTrac APT repository not accessible at $repo_url"
         log_info "Check network connectivity and try again"
         return 1
@@ -675,7 +675,7 @@ configure_pitrac_apt_repo() {
 
     # Create APT sources list entry
     log_info "Adding repository to APT sources..."
-    echo "deb [arch=arm64 signed-by=$keyring_file] $repo_url $codename main" > "$sources_file"
+    echo "deb [arch=arm64 signed-by=$keyring_file] $repo_url $codename main" >"$sources_file"
 
     # Update APT cache
     log_info "Updating APT package index..."
@@ -707,12 +707,12 @@ install_dependencies_from_apt() {
     # liblgpio-dev is in the system deps block in build.sh.
     # ========================================================================
     local packages=(
-        "libmsgpack-cxx-dev"      # MessagePack C++ (header-only)
-        "libactivemq-cpp"         # ActiveMQ C++ client runtime
-        "libactivemq-cpp-dev"     # ActiveMQ C++ client headers
-        "libopencv4.13"           # OpenCV runtime (Pi5-optimized build)
-        "libopencv-dev"           # OpenCV development headers
-        "libncnn-dev"             # ncnn inference framework (static lib + headers)
+        "libmsgpack-cxx-dev"  # MessagePack C++ (header-only)
+        "libactivemq-cpp"     # ActiveMQ C++ client runtime
+        "libactivemq-cpp-dev" # ActiveMQ C++ client headers
+        "libopencv4.13"       # OpenCV runtime (Pi5-optimized build)
+        "libopencv-dev"       # OpenCV development headers
+        "libncnn-dev"         # ncnn inference framework (static lib + headers)
     )
 
     # Check which packages are available

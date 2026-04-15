@@ -2,7 +2,7 @@
 #
 # Copyright (C) 2022-2025, Verdant Consultants, LLC.
 #
-#!/bin/bash 
+#!/bin/bash
 
 echo "Inserting Closed Source Object Files..."
 cp -f $PITRAC_ROOT/ImageProcessing/ClosedSourceObjectFiles/* $PITRAC_ROOT/ImageProcessing/build/pitrac_lm.p
