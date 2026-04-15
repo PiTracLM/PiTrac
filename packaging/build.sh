@@ -120,20 +120,6 @@ build_pitrac() {
         exit 1
     fi
 
-    # Generate Bashly CLI if needed
-    if [[ ! -f "$SCRIPT_DIR/pitrac" ]]; then
-        log_warn "Bashly CLI not found, generating it now..."
-        if [[ -f "$SCRIPT_DIR/generate.sh" ]]; then
-            cd "$SCRIPT_DIR"
-            ./generate.sh
-            cd - > /dev/null
-            log_success "Generated pitrac CLI tool"
-        else
-            log_error "generate.sh not found!"
-            exit 1
-        fi
-    fi
-
     # Setup QEMU for ARM64 emulation on x86_64
     setup_qemu
 
@@ -220,8 +206,8 @@ build_dev() {
     log_info "PiTrac Development Build - Direct Pi Installation"
 
     # Source common functions
-    if [[ -f "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh" ]]; then
-        source "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh"
+    if [[ -f "$SCRIPT_DIR/lib/pitrac-common-functions.sh" ]]; then
+        source "$SCRIPT_DIR/lib/pitrac-common-functions.sh"
     fi
 
     # Check if running on Raspberry Pi
@@ -234,17 +220,6 @@ build_dev() {
     if [[ $EUID -ne 0 ]]; then
         log_error "Dev mode requires root privileges to install to system locations"
         log_info "Please run: sudo ./build.sh dev"
-        exit 1
-    fi
-
-    log_info "Regenerating pitrac CLI tool..."
-    if [[ -f "$SCRIPT_DIR/generate.sh" ]]; then
-        cd "$SCRIPT_DIR"
-        ./generate.sh
-        cd - > /dev/null
-        log_success "Regenerated pitrac CLI tool"
-    else
-        log_error "generate.sh not found!"
         exit 1
     fi
 
@@ -545,10 +520,6 @@ build_dev() {
     # pitrac-web systemd service instead.
     setcap -r /usr/lib/pitrac/pitrac_lm 2>/dev/null || true
 
-    log_info "Installing CLI tool..."
-    install -m 755 "$SCRIPT_DIR/pitrac" /usr/bin/pitrac
-
-
     install_camera_tools "/usr/lib/pitrac" "$REPO_ROOT"
 
     # Configure libcamera AFTER camera tools are installed
@@ -673,13 +644,13 @@ ENVEOF
     cp "$SCRIPT_DIR/templates/pitrac-web.service.template" /usr/share/pitrac/templates/
     
     
-    if [[ -f "$SCRIPT_DIR/src/lib/web-service-install.sh" ]]; then
-        cp "$SCRIPT_DIR/src/lib/web-service-install.sh" /usr/lib/pitrac/
+    if [[ -f "$SCRIPT_DIR/lib/web-service-install.sh" ]]; then
+        cp "$SCRIPT_DIR/lib/web-service-install.sh" /usr/lib/pitrac/
         chmod 755 /usr/lib/pitrac/web-service-install.sh
     fi
     
-    if [[ -f "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh" ]]; then
-        cp "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh" /usr/lib/pitrac/
+    if [[ -f "$SCRIPT_DIR/lib/pitrac-common-functions.sh" ]]; then
+        cp "$SCRIPT_DIR/lib/pitrac-common-functions.sh" /usr/lib/pitrac/
         chmod 644 /usr/lib/pitrac/pitrac-common-functions.sh
     fi
     
@@ -759,7 +730,6 @@ SUDOEOF
     echo ""
     echo "PiTrac has been installed to system locations:"
     echo "  Binary: /usr/lib/pitrac/pitrac_lm"
-    echo "  CLI: /usr/bin/pitrac (regenerated)"
     echo "  Libraries: /usr/lib/pitrac/"
     echo "  Configs: /etc/pitrac/"
     echo "  Web Server: /usr/lib/pitrac/web-server (updated)"
