@@ -88,6 +88,9 @@ class StrobeCalibrationManager:
     # ------------------------------------------------------------------
 
     def _open_hardware(self):
+
+        logger.debug(f"_open_hardware()")
+
         if spidev is None:
             raise RuntimeError("spidev library not available -- not running on a Raspberry Pi?")
         if DigitalOutputDevice is None:
@@ -105,11 +108,14 @@ class StrobeCalibrationManager:
         self._spi_adc.max_speed_hz = self.SPI_MAX_SPEED_HZ
         self._spi_adc.mode = 0
 
+        logger.debug(f"Setting up GPIO pin {self.DIAG_GPIO_PIN}...")
         self._diag_pin = DigitalOutputDevice(self.DIAG_GPIO_PIN)
 
         os.chdir(saved_cwd)
 
     def _close_hardware(self):
+
+        logger.debug(f"_close_hardware()")
         for name, resource in [("diag", self._diag_pin),
                                ("dac", self._spi_dac),
                                ("adc", self._spi_adc)]:
@@ -121,7 +127,7 @@ class StrobeCalibrationManager:
                     time.sleep(0.1)
                 resource.close()
             except Exception:
-                logger.debug(f"Error closing {name}", exc_info=True)
+                logger.warning(f"Error closing {name}", exc_info=True)
 
         self._diag_pin = None
         self._spi_dac = None
@@ -129,6 +135,7 @@ class StrobeCalibrationManager:
 
         # gpiozero leaves GPIO10 in GPIO mode after close(); restore SPI0 MOSI.
         try:
+            logger.debug(f"Restoring use of SPI0 MOSI pin")
             result = subprocess.run(
                 ["pinctrl", "set", str(self.DIAG_GPIO_PIN), "a0"],
                 capture_output=True, text=True, timeout=5,
@@ -145,22 +152,48 @@ class StrobeCalibrationManager:
     # ------------------------------------------------------------------
 
     def _set_dac(self, value: int):
+
+        logger.debug(f"\n_set_dac( value = {value} )")
+
         """Write an 8-bit value to the MCP4801 DAC."""
+
         msb = self.MCP4801_WRITE_CMD | ((value >> 4) & 0x0F)
         lsb = (value << 4) & 0xF0
+        
+        logger.debug(f"_set_dac:  Message to send to DAC: {[format(b, '02x') for b in [msb, lsb]]}")
+
         self._spi_dac.xfer2([msb, lsb])
 
     def _read_adc(self, channel_cmd: int) -> int:
+
+        logger.debug(f"_read_adc( channel_cmd to send to ADC: {format(channel_cmd, '02x')} )")
+
         """Read a 12-bit value from the MCP3202 ADC."""
+
         response = self._spi_adc.xfer2([0x01, channel_cmd, 0x00])
+
+        logger.debug(f"Value read from ADC: {[format(b, '02x') for b in response]}")
+
         return ((response[1] & 0x0F) << 8) | response[2]
 
     def get_ldo_voltage(self) -> float:
+
+        logger.debug(f"get_ldo_voltage()")
+
         """Read the LDO gate voltage via ADC CH1 (2k/1k resistor divider)."""
         adc_value = self._read_adc(self.ADC_CH1_CMD)
-        return (3.3 / 4096) * adc_value * 3.0
+
+        logger.debug(f"Value read from ADC for LDO voltage: {format(adc_value, '02x')}" )
+
+        result = (3.3 / 4096) * adc_value * 3.0
+
+        logger.debug(f"Final result for get_ldo_voltage: {result}" )
+        return result
 
     def get_led_current(self) -> float:
+
+        logger.debug(f"get_led_current()" )
+
         """Pulse DIAG, read LED current sense via ADC CH0 (0.1 ohm sense resistor).
 
         Uses real-time scheduling and GC disable for deterministic timing.
@@ -182,7 +215,9 @@ class StrobeCalibrationManager:
 
             try:
                 diag.on()
+
                 response = spi.xfer2(msg)
+
             finally:
                 diag.off()
                 try:
@@ -192,14 +227,25 @@ class StrobeCalibrationManager:
         finally:
             gc.enable()
 
+        logger.debug(f"Returned msg from xfer2 for LED current measurement is: {[format(b, '02x') for b in response]}")
+
         adc_value = ((response[1] & 0x0F) << 8) | response[2]
-        return (3.3 / 4096) * adc_value * 10.0
+        logger.debug(f"Combined LED adc_value is: {adc_value}" )
+
+
+        final_value = (3.3 / 4096) * adc_value * 10.0
+
+        logger.debug(f"Final (computed) LED adc_value is: {final_value}" )
+
+        return final_value
 
     # ------------------------------------------------------------------
     # Calibration algorithm
     # ------------------------------------------------------------------
 
     def _find_dac_start(self):
+
+        logger.debug(f"_find_dac_start()" )
         """Sweep DAC 0->255, return last value where LDO stays >= LDO_MIN_V.
 
         Returns:
@@ -215,7 +261,7 @@ class StrobeCalibrationManager:
             self._set_dac(i)
             time.sleep(0.1)
             ldo = self.get_ldo_voltage()
-            logger.debug(f"DAC={i:#04x}, LDO={ldo:.2f}V")
+            logger.debug(f"    DAC={i:#04x}, LDO={ldo:.2f}V")
 
             self.status["progress"] = int((i / self.DAC_MAX) * 20)
             self.status["message"] = f"Finding safe start point... DAC {i}/{self.DAC_MAX}"
@@ -229,6 +275,9 @@ class StrobeCalibrationManager:
         return dac_start, ldo
 
     def _calibrate(self, target_current: float):
+
+        logger.debug(f"_calibrate(target_current={target_current}A)" )
+
         """Run full calibration: find safe start, sweep down to target, average.
 
         Returns:
@@ -236,6 +285,7 @@ class StrobeCalibrationManager:
         """
         # Pre-flight: check for current with strobe off — indicates blown MOSFET or gate driver
         idle_adc = self._read_adc(self.ADC_CH0_CMD)
+
         if idle_adc > self.PREFLIGHT_CURRENT_THRESHOLD:
             self.status["message"] = f"Current detected with strobe off (ADC CH0={idle_adc}). Likely blown MOSFET or gate driver — check V3 Connector Board."
             return False, -1, -1
@@ -278,7 +328,7 @@ class StrobeCalibrationManager:
                 return False, -1, -1
 
             led_current = self.get_led_current()
-            logger.debug(f"DAC={dac:#04x}, current={led_current:.2f}A")
+            logger.debug(f"    DAC={dac:#04x}, current={led_current:.2f}A")
 
             if led_current > self.HARD_CAP_CURRENT:
                 self.status["message"] = f"LED current ({led_current:.2f}A) exceeds hard cap ({self.HARD_CAP_CURRENT}A). This strongly indicates the LED is shorted."
@@ -303,10 +353,12 @@ class StrobeCalibrationManager:
         led_current = 0.0
         n_avg = 10
 
+        logger.debug(f"Beginning averaging readings...")
         while True:
             if self._cancel_requested:
                 return False, -1, -1
 
+            logger.debug(f"Current Final_dac (for averaging)={final_dac:.2f})")
             self._set_dac(final_dac)
             time.sleep(0.1)
 
@@ -320,6 +372,8 @@ class StrobeCalibrationManager:
                 current_sum += self.get_led_current()
                 time.sleep(0.1)
             led_current = current_sum / n_avg
+
+            logger.debug(f"Averaged led_current={led_current:.2f}A)")
 
             if led_current > target_current:
                 final_dac += 1
@@ -340,6 +394,8 @@ class StrobeCalibrationManager:
     async def start_calibration(self, led_type: str = "v3",
                                 target_current: Optional[float] = None,
                                 overwrite: bool = False) -> Dict[str, Any]:
+        logger.debug(f"start_calibration( led_type={led_type})" )
+
         """Run full strobe calibration. Blocking I/O is offloaded to a thread."""
 
         if self.status.get("state") == "calibrating":
@@ -380,6 +436,7 @@ class StrobeCalibrationManager:
             return {"status": "error", "message": str(e)}
 
     def _run_calibration_sync(self, target: float) -> Dict[str, Any]:
+        logger.debug(f"_run_calibration_sync( target={target} )" )
         """Synchronous calibration wrapper — runs in executor thread."""
         try:
             self._open_hardware()
@@ -417,14 +474,18 @@ class StrobeCalibrationManager:
             self._close_hardware()
 
     def cancel(self):
+        logger.debug(f"cancel()" )
         """Request cancellation of a running calibration."""
         self._cancel_requested = True
 
     def get_status(self) -> Dict[str, Any]:
+        logger.debug(f"get_status()" )
         """Return a snapshot of the current calibration status."""
         return dict(self.status)
 
     async def read_diagnostics(self) -> Dict[str, Any]:
+        logger.debug(f"read_diagnostics()" )
+
         """Read LDO voltage, LED current, and raw ADC values."""
         loop = asyncio.get_event_loop()
         try:
@@ -433,6 +494,7 @@ class StrobeCalibrationManager:
             return {"status": "error", "message": str(e)}
 
     def _read_diagnostics_sync(self) -> Dict[str, Any]:
+        logger.debug(f"_read_diagnostics_sync()" )
         try:
             # Gate on board version
             board_version = self.config_manager.get_config(
@@ -481,6 +543,7 @@ class StrobeCalibrationManager:
             self._close_hardware()
 
     async def set_dac_manual(self, value: int) -> Dict[str, Any]:
+        logger.debug(f"set_dac_manual: {value}")
         """Set DAC to a specific value and report LDO voltage."""
         if value < self.DAC_MIN or value > self.DAC_MAX:
             return {"status": "error",
@@ -490,6 +553,7 @@ class StrobeCalibrationManager:
         return await loop.run_in_executor(None, self._set_dac_manual_sync, value)
 
     def _set_dac_manual_sync(self, value: int) -> Dict[str, Any]:
+        logger.debug(f"set_dac_manual_sync: {value}")
         try:
             self._open_hardware()
             self._set_dac(value)
@@ -512,11 +576,15 @@ class StrobeCalibrationManager:
             self._close_hardware()
 
     async def get_dac_start(self) -> Dict[str, Any]:
+        logger.debug(f"get_dac_start()")
+
         """Run the safe-start sweep and return the boundary DAC value."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._get_dac_start_sync)
 
     def _get_dac_start_sync(self) -> Dict[str, Any]:
+        logger.debug("_get_dac_start_sync()")
+
         try:
             self._open_hardware()
             dac_start, ldo = self._find_dac_start()
@@ -536,6 +604,8 @@ class StrobeCalibrationManager:
             self._close_hardware()
 
     def is_strobe_safe(self) -> Dict[str, Any]:
+        logger.debug("is_strobe_safe()")
+
         """Check if the system is safe to fire strobes.
 
         Returns a dict with 'safe' (bool), 'reason' (str if unsafe),
@@ -550,6 +620,8 @@ class StrobeCalibrationManager:
             return {"safe": True, "board_version": board_version}
 
         dac_value = self.config_manager.get_config(self.DAC_CONFIG_KEY)
+        logger.debug(f"dac_value from config_manager is: {dac_value}" )
+
         if dac_value is None or int(dac_value) < 0:
             return {
                 "safe": False,
@@ -568,11 +640,14 @@ class StrobeCalibrationManager:
         return {"safe": True, "board_version": 3, "dac_setting": int(dac_value)}
 
     async def get_saved_settings(self) -> Dict[str, Any]:
+        logger.debug(f"get_saved_settings()")
         """Read the saved kDAC_setting from config."""
         value = self.config_manager.get_config(self.DAC_CONFIG_KEY)
         return {"dac_setting": value}
 
     def apply_dac_setting(self) -> bool:
+        logger.debug("apply_dac_setting()")
+
         """Write the saved calibrated DAC value to hardware via SPI1.
 
         Must be called on boot before any strobe fires. Without this,
