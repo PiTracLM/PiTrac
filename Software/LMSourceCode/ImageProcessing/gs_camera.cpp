@@ -2571,6 +2571,8 @@ namespace golf_sim {
                                     return_balls_and_timings);
 
             GS_LOG_MSG(info, "Time between center-most images: " + std::to_string((double)time_between_ball_images_uS/1000.0) + "ms");
+            GS_LOG_MSG(info, "The indexes of the center-most two balls are: " + std::to_string(most_centered_ball_index) + ", and " + std::to_string(second_ball_index) );
+
 
             // This is a "final" image, so we want to store it
             ShowAndLogBalls("AnalyzeStrobedBall_Final_Candidate_Balls", strobed_balls_color_image, return_balls, true, most_centered_ball_index, second_ball_index);
@@ -3966,6 +3968,12 @@ namespace golf_sim {
 
                     int best_local_offset_of_distance_ratios = FindClosestRatioPatternMatchOffset(distance_ratios, pulse_ratios, delta_to_closest_ratio, true /* Try any offset */);
 
+
+                    if (IsLikelyMissingBallsPattern(missing_ball_image_vector)) {
+						delta_to_closest_ratio *= 0.5;  // If the pattern is consistent with missing balls, give it a boost in score because it's more likely to be correct
+						GS_LOG_TRACE_MSG(trace, "Pattern is consistent with missing balls, so boosting score.  New delta_to_closest_ratio = " + std::to_string(delta_to_closest_ratio));
+                    }
+
                     // If this is the closest match seen so far, save the information
                     if (best_local_offset_of_distance_ratios >= 0 && delta_to_closest_ratio <= best_ratio_distance) {
 
@@ -4356,6 +4364,92 @@ namespace golf_sim {
             }
 
         }
+
+        bool GolfSimCamera::IsLikelyMissingBallsPattern(const std::vector<bool>& missing_balls_vector) {
+            bool results = false;
+            
+			// Make sure we don't have some weirdly short vector that doesn't even have enough balls to be common
+            if (missing_balls_vector.size() < 5) {
+                return false;
+            }
+
+			int number_last_consecutive_balls = 0;
+			bool found_first_missing_ball = false;
+			bool remainder_are_missed_balls = true;
+
+            // Look for a pattern of consecutive missing balls followed by consecutive present balls.  
+            // For example, like 1, 1, 1, ... 0, 0  (only caught the last few balls).
+			for (int i = (int)missing_balls_vector.size() - 1; i >= 0; i--) {
+
+                if (!found_first_missing_ball) {
+                    if (!missing_balls_vector[i]) {
+                        number_last_consecutive_balls++;
+                    }
+                    else {
+                        found_first_missing_ball = true;
+                    }
+                }
+				else {
+					if (!missing_balls_vector[i]) {
+						// We found a ball after we found a sequence of missing balls, so break out of the loop 
+                        // and evaluate the pattern
+                        remainder_are_missed_balls = false;
+						break;
+					}
+				}
+			}
+
+            if (number_last_consecutive_balls >= 3 && remainder_are_missed_balls) {
+
+                // First three balls are present, but the next two or more are missing. 
+                // This is a common pattern when the ball is moving fast or was teed up too far foward.
+
+                results = true;
+            }
+
+
+            int number_first_consecutive_balls = 0;
+            found_first_missing_ball = false;
+            remainder_are_missed_balls = true;
+
+            // Look for a pattern of consecutive present balls followed by consecutive missing balls.  
+            // For example,  like 0, 0, 0, ... 1, 1  (only caught the first few balls).
+            for (int i = 0; i < (int)missing_balls_vector.size() - 1; i++) {
+
+                if (!found_first_missing_ball) {
+                    if (!missing_balls_vector[i]) {
+                        number_first_consecutive_balls++;
+                    }
+                    else {
+                        found_first_missing_ball = true;
+                    }
+                }
+                else {
+                    if (!missing_balls_vector[i]) {
+                        // We found a ball after we found a sequence of missing balls, so break out of the loop 
+                        // and evaluate the pattern
+                        remainder_are_missed_balls = false;
+                        break;
+                    }
+                }
+            }
+
+            if (number_first_consecutive_balls >= 3 && remainder_are_missed_balls) {
+
+                // Last three balls are present, but the earlier two are missing. 
+                // This is a common pattern when the ball is moving slow or was teed up too far back.
+
+                results = true;
+            }
+
+			if (results) {
+				GS_LOG_TRACE_MSG(trace, "GolfSimCamera::IsLikelyMissingBallsPattern - found a common pattern:");
+				PrintPulseVector(missing_balls_vector);
+			}
+
+            return results;
+        }
+
 
 }
 

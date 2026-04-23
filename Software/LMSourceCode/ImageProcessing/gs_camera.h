@@ -402,6 +402,8 @@ namespace golf_sim {
             std::vector<float>& pulse_intervals,
             std::vector<double>& pulse_ratios);
 
+        bool IsLikelyMissingBallsPattern(const std::vector<bool>& missing_balls_vector);
+
         double GetPerpendicularDistanceFromLine(double x, double y, double x1, double y1, double x2, double y2);
 
         bool FindBestBallOnLineOfFlight(const std::vector<GolfBall>&balls,
