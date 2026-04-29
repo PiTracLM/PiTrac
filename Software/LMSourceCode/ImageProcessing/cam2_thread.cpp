@@ -65,7 +65,8 @@ bool Camera2Thread::init_pipeline() {
     options->Set().info_text = "";
 
     const CameraHardware::CameraModel camera_model = GolfSimCamera::kSystemSlot2CameraType;
-    if (camera_model != CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+    if (camera_model != CameraHardware::CameraModel::InnoMakerIMX296GS_Mono ||
+        camera_model != CameraHardware::CameraModel::Mira220_Mono) {
         options->Set().denoise = "cdn_off";
     } else {
         options->Set().denoise = "auto";

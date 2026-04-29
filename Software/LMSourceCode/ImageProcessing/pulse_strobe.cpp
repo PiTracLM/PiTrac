@@ -649,6 +649,8 @@ namespace golf_sim {
 			}
 		}
 
+		// NOTE - We're not yet sure if a Mira220-based sensor will need any priming pulses.  However, it should probably work similar to the IMX296
+
 		GS_LOG_TRACE_MSG(trace, "Sent " + std::to_string(kNumberPrimingPulses) + " initial priming pulses.  About to pause for " + 
 				std::to_string(kPauseBeforeReadyForFinalPrimingPulseMs) + " milliSeconds before sending penultimate priming pulse.");
 
