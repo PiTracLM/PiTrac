@@ -279,11 +279,10 @@ class CalibrationManager:
                 exit_code = process_task.result()
                 logger.info(f"Session {session_id}: Process exited with code {exit_code}")
 
-                api_result = (
-                    api_task.result()
-                    if api_task.done()
-                    else {"focal_length_received": False, "angles_received": False, "completed": False}
-                )
+                if api_task.done() and not api_task.cancelled():
+                    api_result = api_task.result()
+                else:
+                    api_result = {"focal_length_received": False, "angles_received": False, "completed": False}
 
                 return {
                     "completed": exit_code == 0,
@@ -1404,6 +1403,7 @@ class CalibrationManager:
             "--tuning-file", RPICAM_TUNING_FILE,
         ]
 
+        process = None
         try:
             process = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -1436,6 +1436,16 @@ class CalibrationManager:
         except Exception as e:
             logger.error(f"Error capturing image: {e}")
             return None
+        finally:
+            if process is not None and process.returncode is None:
+                try:
+                    process.terminate()
+                    await asyncio.wait_for(process.wait(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    process.kill()
+                    await process.wait()
+                except ProcessLookupError:
+                    pass
 
     def _save_distortion_results(
         self, camera: str, camera_matrix, dist_coeffs, rms_error: float

@@ -689,11 +689,14 @@ ENVEOF
     usermod -a -G video,gpio,i2c,spi,dialout "$INSTALL_USER" 2>/dev/null || true
 
     # Allow the web server user to run build.sh dev via sudo without a password
-    # This enables UI-triggered updates (git pull + rebuild)
-    log_info "Configuring sudoers for web-triggered updates..."
+    # This enables UI-triggered updates (git pull + rebuild) and calibration runs
+    # of pitrac_lm (which the web server invokes via `sudo -E`).
+    log_info "Configuring sudoers for web-triggered actions..."
     cat > /etc/sudoers.d/pitrac-update << SUDOEOF
 # Allow PiTrac web server to run build.sh dev for self-updates
 $INSTALL_USER ALL=(root) NOPASSWD: $SCRIPT_DIR/build.sh dev, $SCRIPT_DIR/build.sh dev force
+# Allow PiTrac web server to run pitrac_lm (calibration, ball location, still capture)
+$INSTALL_USER ALL=(root) NOPASSWD: /usr/lib/pitrac/pitrac_lm
 SUDOEOF
     chmod 440 /etc/sudoers.d/pitrac-update
     # Validate the sudoers file

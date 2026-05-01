@@ -148,7 +148,7 @@ class PiTracProcessManager:
             cmd = self._build_command(config_file_path=generated_config_path)
 
             with open(self.log_file, "a") as log:
-                self.process = subprocess.Popen(
+                process = subprocess.Popen(
                     cmd,
                     stdout=log,
                     stderr=subprocess.STDOUT,
@@ -156,16 +156,16 @@ class PiTracProcessManager:
                     cwd=str(Path.home()),
                     preexec_fn=os.setsid,
                 )
+                self.process = process
 
                 with open(self.pid_file, "w") as f:
-                    f.write(str(self.process.pid))
+                    f.write(str(process.pid))
 
                 await asyncio.sleep(self.startup_delay)
 
-                if self.process.poll() is None:
-                    pid = self.process.pid
-                    logger.info(f"PiTrac started with PID {pid}")
-                    return {"status": "started", "message": "PiTrac started successfully", "pid": pid}
+                if process.poll() is None:
+                    logger.info(f"PiTrac started with PID {process.pid}")
+                    return {"status": "started", "message": "PiTrac started successfully", "pid": process.pid}
                 else:
                     logger.error("PiTrac process exited immediately")
                     self._cleanup_process()
@@ -244,11 +244,8 @@ class PiTracProcessManager:
             try:
                 if self.process.poll() is None:
                     return self.process.pid
-                else:
-                    self.process = None
-                    self.pid_file.unlink(missing_ok=True)
             except (AttributeError, OSError):
-                self.process = None
+                pass
 
         if self.pid_file.exists():
             try:
