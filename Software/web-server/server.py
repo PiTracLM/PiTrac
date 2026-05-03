@@ -71,7 +71,7 @@ class RpicamVideoStream:
                 "--denoise", "cdn_off",
                 "--tuning-file", RPICAM_TUNING_FILE,
             ],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         )
         self._opened = self._proc.poll() is None
 

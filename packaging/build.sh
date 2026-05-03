@@ -695,8 +695,7 @@ ENVEOF
     cat > /etc/sudoers.d/pitrac-update << SUDOEOF
 # Allow PiTrac web server to run build.sh dev for self-updates
 $INSTALL_USER ALL=(root) NOPASSWD: $SCRIPT_DIR/build.sh dev, $SCRIPT_DIR/build.sh dev force
-# Allow PiTrac web server to run pitrac_lm (calibration, ball location, still capture)
-$INSTALL_USER ALL=(root) NOPASSWD: /usr/lib/pitrac/pitrac_lm
+$INSTALL_USER ALL=(root) NOPASSWD: SETENV: /usr/lib/pitrac/pitrac_lm
 SUDOEOF
     chmod 440 /etc/sudoers.d/pitrac-update
     # Validate the sudoers file
