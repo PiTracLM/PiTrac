@@ -605,6 +605,35 @@ class TestErrorHandling:
         assert any("Permission denied" in err or "Wait failed" in err for err in result["errors"])
 
 
+class TestWaitForCalibrationCompletion:
+    """Test wait_for_calibration_completion logic"""
+
+    @pytest.mark.asyncio
+    async def test_process_exits_first_api_cancelled(self):
+        """When process exits before API callback, cancelled api_task yields safe defaults"""
+        mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
+        manager = CalibrationManager(mock_config_manager)
+
+        mock_process = AsyncMock()
+        mock_process.wait = AsyncMock(return_value=0)
+        mock_process.returncode = 0
+
+        async def slow_api(*args, **kwargs):
+            await asyncio.sleep(999)
+
+        with patch.object(manager, "wait_for_calibration_fields", side_effect=slow_api):
+            result = await manager.wait_for_calibration_completion(
+                mock_process, "test-session", timeout=5
+            )
+
+        assert result["completed"] is True
+        assert result["method"] == "process"
+        assert result["focal_length_received"] is False
+        assert result["angles_received"] is False
+
+
 class TestRealCalibrationWorkflows:
     """Test actual calibration workflows with minimal mocking"""
 
