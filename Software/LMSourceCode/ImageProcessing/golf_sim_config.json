@@ -33,6 +33,7 @@
     },
     "ball_identification": {
       "kBallPlacementDetectionMethod": "experimental",
+      "kUseCircleRefinement": "1",
       "kBestCircleCannyLower": "55",
       "kBestCircleCannyUpper": "110",
       "kBestCircleHoughDpParam1": "1.5",

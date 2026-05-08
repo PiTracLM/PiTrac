@@ -529,6 +529,21 @@
       "requiresRestart": true,
       "passedVia": "json"
     },
+    "gs_config.ball_identification.kUseCircleRefinement": {
+      "category": "Ball Detection",
+      "subcategory": "basic",
+      "basicSubcategory": "Detection Methods",
+      "displayName": "Circle Refinement",
+      "description": "Use edge-based circle fit to tighten the YOLO bounding box radius. Helps with calibration and shot angle accuracy.",
+      "type": "select",
+      "options": {
+        "0": "Off",
+        "1": "On"
+      },
+      "default": "1",
+      "requiresRestart": true,
+      "passedVia": "json"
+    },
     "gs_config.ball_identification.kModelPath": {
       "category": "AI Detection",
       "subcategory": "basic",
