@@ -211,12 +211,6 @@
     <ClCompile Include="ball_image_proc.cpp" />
     <ClCompile Include="ball_watcher.cpp" />
     <ClCompile Include="ball_watcher_image_buffer.cpp" />
-    <ClCompile Include="Camera\build\CMakeFiles\4.0.2\CompilerIdCXX\CMakeCXXCompilerId.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="Camera\build\CMakeFiles\4.0.2\CompilerIdC\CMakeCCompilerId.c">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="camera_hardware.cpp" />
     <ClCompile Include="colorsys.cpp" />
     <ClCompile Include="configuration_manager.cpp" />
@@ -275,7 +269,6 @@
     <ClCompile Include="gs_sim_interface.cpp" />
     <ClCompile Include="gs_sim_socket_interface.cpp" />
     <ClCompile Include="gs_web_api.cpp" />
-    <ClCompile Include="ImageAnalysis\infrastructure\opencv_image_analyzer.cpp" />
     <ClCompile Include="lm_main.cpp" />
     <ClCompile Include="gs_options.cpp" />
     <ClCompile Include="gs_ui_system.cpp" />
@@ -383,10 +376,6 @@
     <ClInclude Include="ball_watcher.h" />
     <ClInclude Include="ball_watcher_image_buffer.h" />
     <ClInclude Include="blocking_queue.h" />
-    <ClInclude Include="Camera\camera_platform.hpp" />
-    <ClInclude Include="Camera\domain\camera_domain.hpp" />
-    <ClInclude Include="Camera\infrastructure\unix\libcamera_unix_impl.hpp" />
-    <ClInclude Include="Camera\tests\test_utilities.hpp" />
     <ClInclude Include="camera_hardware.h" />
     <ClInclude Include="colorsys.h" />
     <ClInclude Include="configuration_manager.h" />
@@ -444,12 +433,6 @@
     <ClInclude Include="gs_sim_interface.h" />
     <ClInclude Include="gs_sim_socket_interface.h" />
     <ClInclude Include="gs_ui_system.h" />
-    <ClInclude Include="ImageAnalysis\application\image_analysis_service.hpp" />
-    <ClInclude Include="ImageAnalysis\domain\analysis_results.hpp" />
-    <ClInclude Include="ImageAnalysis\domain\interfaces.hpp" />
-    <ClInclude Include="ImageAnalysis\domain\value_objects.hpp" />
-    <ClInclude Include="ImageAnalysis\infrastructure\ml_image_analyzer.hpp" />
-    <ClInclude Include="ImageAnalysis\infrastructure\opencv_image_analyzer.hpp" />
     <ClInclude Include="image\image.hpp" />
     <ClInclude Include="libcamera_interface.h" />
     <ClInclude Include="logging_tools.h" />
