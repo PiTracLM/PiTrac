@@ -269,6 +269,23 @@ dtoverlay=vc_mipi_imx296"
 
     log_success "config.txt configuration complete"
 
+    # Ensure i2c-dev kernel module loads on boot so /dev/i2c-* nodes appear.
+    # raspi-config does this when you enable I2C, but our installer bypasses raspi-config.
+    # Check both /etc/modules (raspi-config) and /etc/modules-load.d/ (systemd).
+    local needs_i2c_dev=true
+    if grep -qs "^i2c[-_]dev" /etc/modules 2>/dev/null; then
+        needs_i2c_dev=false
+        log_info "i2c-dev already in /etc/modules (likely via raspi-config)"
+    elif [[ -d /etc/modules-load.d ]] && grep -rqs "^i2c[-_]dev" /etc/modules-load.d/; then
+        needs_i2c_dev=false
+        log_info "i2c-dev already in /etc/modules-load.d/"
+    fi
+
+    if [[ "$needs_i2c_dev" == "true" ]] && [[ -d /etc/modules-load.d ]]; then
+        log_info "Adding i2c-dev to /etc/modules-load.d/pitrac.conf"
+        echo "i2c-dev" >> /etc/modules-load.d/pitrac.conf
+    fi
+
     log_warn "IMPORTANT: System must be rebooted for camera configuration changes to take effect"
 }
 
