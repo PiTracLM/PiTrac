@@ -33,10 +33,6 @@ Hardware/
 *.kicad_sch
 *.FCBak
 
-# Jekyll / docs build
-_site/
-.jekyll-cache/
-.sass-cache/
 
 # Generated coverage
 htmlcov/
