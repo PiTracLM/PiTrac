@@ -51,8 +51,9 @@ NOTE:  As of May 6, 2025, the portion of this guide that deals with measuring th
       1.   
    3. Measuring Distances and Angles  
       1. Remove the visible-light cut (long pass) filter from the front of the camera for now.  It’s easier to calibrate the camera in the visible light spectrum.  
-      2. Ensure that the triggering for the camera is not in external mode (where it usually will be when the camera2 system is running).    
-         1. If necessary, do:    sudo \~/CameraTools/setCameraTriggerInternal.sh   
+      2. Ensure that the triggering for the camera is not in external mode (where it usually will be when the camera2 system is running).
+         1. Run:    sudo /usr/lib/pitrac/ImageProcessing/CameraTools/setCameraTriggerInternal.sh
+         2. No reboot is required — the trigger mode is switched at runtime via sysfs.
       3. Set up a marker point (such as a cross hairs) on a piece of paper attached to an object or stand so that the point is about 15 cm above the ground and roughly centered in the view of the camera with the camera at a slight upward tilt and facing straight out.  The point should be a shape that will be crisp, sharp, and useful for focusing the camera.  
       4. Follow the instructions for Camera 1 (read that first), below, but use the following modifications when recording the various measurements:  
       5. ![][image6]  
