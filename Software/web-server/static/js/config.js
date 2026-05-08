@@ -1,6 +1,6 @@
 // Configuration Manager JavaScript
-/* global saveChanges, resetAll, reloadConfig, showDiff, 
-   filterConfig, closeModal, setTheme, openImage, resetShot, controlPiTrac, 
+/* global saveChanges, resetAll, reloadConfig, showDiff,
+   filterConfig, closeModal, setTheme, openImage, resetShot, controlPiTrac,
    resetValueFromDiff, resetAllFromDiff, clearSearch, searchConfig,
    resetToDefault */
 
@@ -124,7 +124,7 @@ function renderCategories() {
         const basicCount = categoryData.basic ? categoryData.basic.length : 0;
         const advancedCount = categoryData.advanced ? categoryData.advanced.length : 0;
         const totalCount = basicCount + advancedCount;
-        
+
         if (totalCount > 0) {
             const li = document.createElement('li');
             li.className = 'category-item';
@@ -163,96 +163,96 @@ function selectCategory(category) {
 function renderConfiguration(selectedCategory = null) {
     const content = document.getElementById('configContent');
     content.innerHTML = '';
-    
+
     // Determine which categories to render
-    const categoriesToRender = selectedCategory && selectedCategory !== 'all' 
+    const categoriesToRender = selectedCategory && selectedCategory !== 'all'
         ? { [selectedCategory]: categories[selectedCategory] }
         : categories;
 
     if (selectedCategory === null || selectedCategory === 'all') {
-        const hasBasicSettings = Object.entries(categoriesToRender).some(([_, categoryData]) => 
+        const hasBasicSettings = Object.entries(categoriesToRender).some(([_, categoryData]) =>
             categoryData && categoryData.basic && categoryData.basic.length > 0
         );
-        
+
         if (hasBasicSettings) {
             const basicSection = document.createElement('div');
             basicSection.className = 'config-section';
-            
+
             const basicHeader = document.createElement('div');
             basicHeader.className = 'config-main-section-header';
             basicHeader.innerHTML = '<h2>Basic Settings</h2>';
             basicSection.appendChild(basicHeader);
-            
+
             Object.entries(categoriesToRender).forEach(([category, categoryData]) => {
                 if (!categoryData || !categoryData.basic || categoryData.basic.length === 0) return;
-                
+
                 const group = document.createElement('div');
                 group.className = 'config-group';
                 group.dataset.category = category;
-                
+
                 const title = document.createElement('h3');
                 title.className = 'config-group-title';
                 title.textContent = category;
                 group.appendChild(title);
-                
+
                 categoryData.basic.forEach(key => {
                     const value = getNestedValue(currentConfig, key);
                     const defaultValue = getNestedValue(defaultConfig, key);
                     const isModified = getNestedValue(userSettings, key) !== undefined;
-                    
+
                     const item = createConfigItem(key, value, defaultValue, isModified);
                     group.appendChild(item);
                 });
-                
+
                 basicSection.appendChild(group);
             });
-            
+
             content.appendChild(basicSection);
         }
-        
-        const hasAdvancedSettings = Object.entries(categoriesToRender).some(([_, categoryData]) => 
+
+        const hasAdvancedSettings = Object.entries(categoriesToRender).some(([_, categoryData]) =>
             categoryData && categoryData.advanced && categoryData.advanced.length > 0
         );
-        
+
         if (hasAdvancedSettings) {
             const advancedSection = document.createElement('div');
             advancedSection.className = 'config-section';
-            
+
             const advancedHeader = document.createElement('div');
             advancedHeader.className = 'config-main-section-header';
             advancedHeader.innerHTML = '<h2>Advanced Settings</h2>';
             advancedSection.appendChild(advancedHeader);
-            
+
             Object.entries(categoriesToRender).forEach(([category, categoryData]) => {
                 if (!categoryData || !categoryData.advanced || categoryData.advanced.length === 0) return;
-                
+
                 const group = document.createElement('div');
                 group.className = 'config-group';
                 group.dataset.category = category;
-                
+
                 const title = document.createElement('h3');
                 title.className = 'config-group-title';
                 title.textContent = category;
                 group.appendChild(title);
-                
+
                 categoryData.advanced.forEach(key => {
                     const value = getNestedValue(currentConfig, key);
                     const defaultValue = getNestedValue(defaultConfig, key);
                     const isModified = getNestedValue(userSettings, key) !== undefined;
-                    
+
                     const item = createConfigItem(key, value, defaultValue, isModified);
                     group.appendChild(item);
                 });
-                
+
                 advancedSection.appendChild(group);
             });
-            
+
             content.appendChild(advancedSection);
         }
     } else {
         Object.entries(categoriesToRender).forEach(([category, categoryData]) => {
             if (!categoryData) return;
-            
+
             const group = document.createElement('div');
             group.className = 'config-group';
             group.dataset.category = category;
@@ -305,15 +305,15 @@ function renderConfiguration(selectedCategory = null) {
 function createConfigItem(key, value, defaultValue, isModified) {
     const item = document.createElement('div');
     item.className = 'config-item';
-    
+
     const isUserSet = getNestedValue(userSettings, key) !== undefined;
-    
+
     if (isUserSet) {
         item.classList.add('user-set');
     } else {
         item.classList.add('using-default');
     }
-    
+
     if (isModified) {
         item.classList.add('modified');
     }
@@ -340,20 +340,20 @@ function createConfigItem(key, value, defaultValue, isModified) {
         return name;
     })();
 
-    let labelHTML = `<div class="config-label-name">`;
+    let labelHTML = '<div class="config-label-name">';
     labelHTML += displayName;
-    
+
     // Note: isUserSet already defined above
     if (!isUserSet) {
-        labelHTML += ` <span class="default-badge" title="Using default value">DEFAULT</span>`;
+        labelHTML += ' <span class="default-badge" title="Using default value">DEFAULT</span>';
     }
-    
+
     if (metadata.requiresRestart) {
-        labelHTML += ` <span class="restart-indicator" title="Changing this requires a PiTrac restart to take effect">&#x21bb;</span>`;
+        labelHTML += ' <span class="restart-indicator" title="Changing this requires a PiTrac restart to take effect">&#x21bb;</span>';
     }
-    
-    labelHTML += `</div>`;
-    
+
+    labelHTML += '</div>';
+
     if (metadata.description) {
         labelHTML += `<div class="config-description">${metadata.description}</div>`;
     }
@@ -371,18 +371,18 @@ function createConfigItem(key, value, defaultValue, isModified) {
     input.dataset.key = key;
     input.dataset.original = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : String(value);
     input.dataset.default = (typeof defaultValue === 'object' && defaultValue !== null) ? JSON.stringify(defaultValue) : String(defaultValue);
-    
+
     if (!isUserSet) {
         input.classList.add('default-value');
         if (input.tagName === 'INPUT' && input.type === 'text') {
             input.placeholder = `Default: ${defaultValue}`;
         }
     }
-    
+
     const inputWrapper = document.createElement('div');
     inputWrapper.className = 'input-wrapper';
     inputWrapper.appendChild(input);
-    
+
     if (isUserSet || isModified) {
         const clearBtn = document.createElement('button');
         clearBtn.className = 'clear-value-btn';
@@ -394,21 +394,21 @@ function createConfigItem(key, value, defaultValue, isModified) {
         };
         inputWrapper.appendChild(clearBtn);
     }
-    
+
     const validationError = document.createElement('div');
     validationError.className = 'validation-error';
     validationError.style.display = 'none';
-    
+
     const validateAndUpdate = async () => {
         const isValid = await validateInput(key, input.value, validationError);
         if (isValid) {
             handleValueChange(key, input.value, input.dataset.original);
-            
+
             if (input.value !== defaultValue) {
                 input.classList.remove('default-value');
                 item.classList.remove('using-default');
                 item.classList.add('user-set');
-                
+
                 if (!inputWrapper.querySelector('.clear-value-btn')) {
                     const clearBtn = document.createElement('button');
                     clearBtn.className = 'clear-value-btn';
@@ -423,13 +423,13 @@ function createConfigItem(key, value, defaultValue, isModified) {
             }
         }
     };
-    
+
     if (input.tagName === 'SELECT') {
         input.onchange = validateAndUpdate;
     } else {
         input.oninput = validateAndUpdate;
     }
-    
+
     inputContainer.appendChild(inputWrapper);
     inputContainer.appendChild(validationError);
 
@@ -513,7 +513,7 @@ function createInput(key, value, defaultValue, isUserSet) {
                 select.appendChild(option);
             }
         }
-        
+
         return select;
     }
 
@@ -650,14 +650,14 @@ async function handleValueChange(key, currentValue, originalValue) {
                 item.classList.remove('modified');
                 if (inputEl) inputEl.classList.remove('modified');
             }
-            
+
             if (isDifferentFromDefault) {
                 item.classList.remove('using-default');
                 item.classList.add('user-set');
-                
+
                 const badge = item.querySelector('.default-badge');
                 if (badge) badge.remove();
-                
+
                 const inputWrapper = item.querySelector('.input-wrapper');
                 if (inputWrapper && !inputWrapper.querySelector('.clear-value-btn')) {
                     const clearBtn = document.createElement('button');
@@ -670,7 +670,7 @@ async function handleValueChange(key, currentValue, originalValue) {
                     };
                     inputWrapper.appendChild(clearBtn);
                 }
-                
+
                 const input = item.querySelector('.config-input');
                 if (input) {
                     input.classList.remove('default-value');
@@ -678,8 +678,8 @@ async function handleValueChange(key, currentValue, originalValue) {
             } else {
                 item.classList.remove('user-set');
                 item.classList.add('using-default');
-                
-                let badge = item.querySelector('.default-badge');
+
+                const badge = item.querySelector('.default-badge');
                 if (!badge) {
                     const labelName = item.querySelector('.config-label-name');
                     if (labelName && !labelName.querySelector('.default-badge')) {
@@ -687,10 +687,10 @@ async function handleValueChange(key, currentValue, originalValue) {
                         labelName.insertAdjacentHTML('beforeend', badgeHtml);
                     }
                 }
-                
+
                 const clearBtn = item.querySelector('.clear-value-btn');
                 if (clearBtn) clearBtn.remove();
-                
+
                 const input = item.querySelector('.config-input');
                 if (input) {
                     input.classList.add('default-value');
@@ -721,107 +721,107 @@ async function saveChanges() {
 
     try {
 
-    updateStatus('Saving changes...', '');
+        updateStatus('Saving changes...', '');
 
-    const errors = [];
-    const successfulKeys = [];
-    const requiresRestart = [];
-    let savedCount = 0;
-    let resetCount = 0;
+        const errors = [];
+        const successfulKeys = [];
+        const requiresRestart = [];
+        let savedCount = 0;
+        let resetCount = 0;
 
-    for (const key of modifiedSettings) {
-        const input = document.querySelector(`.config-input[data-key="${key}"]`);
-        if (!input) continue;
+        for (const key of modifiedSettings) {
+            const input = document.querySelector(`.config-input[data-key="${key}"]`);
+            if (!input) continue;
 
-        let value = input.value;
-        const defaultValue = getNestedValue(defaultConfig, key);
+            let value = input.value;
+            const defaultValue = getNestedValue(defaultConfig, key);
 
-        // Convert value type
-        if (value === 'true') value = true;
-        else if (value === 'false') value = false;
-        else if (!isNaN(value) && value !== '') value = Number(value);
-        else if (typeof value === 'string' && (value.trim().startsWith('[') || value.trim().startsWith('{'))) {
-            try {
-                value = JSON.parse(value);
-            } catch (e) {
+            // Convert value type
+            if (value === 'true') value = true;
+            else if (value === 'false') value = false;
+            else if (!isNaN(value) && value !== '') value = Number(value);
+            else if (typeof value === 'string' && (value.trim().startsWith('[') || value.trim().startsWith('{'))) {
+                try {
+                    value = JSON.parse(value);
+                } catch (e) {
                 // Keep as string if invalid JSON
+                }
             }
-        }
 
-        let defaultVal = defaultValue;
-        if (defaultVal === 'true' || defaultVal === '1') defaultVal = true;
-        else if (defaultVal === 'false' || defaultVal === '0') defaultVal = false;
-        else if (!isNaN(defaultVal) && defaultVal !== '') defaultVal = Number(defaultVal);
+            let defaultVal = defaultValue;
+            if (defaultVal === 'true' || defaultVal === '1') defaultVal = true;
+            else if (defaultVal === 'false' || defaultVal === '0') defaultVal = false;
+            else if (!isNaN(defaultVal) && defaultVal !== '') defaultVal = Number(defaultVal);
 
-        try {
-            const response = await fetch(`/api/config/${key}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ value })
-            });
+            try {
+                const response = await fetch(`/api/config/${key}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value })
+                });
 
-            const result = await response.json();
+                const result = await response.json();
 
-            if (result.error) {
-                errors.push(`${key}: ${result.error}`);
-            } else {
-                successfulKeys.push(key);
-                if (input) {
-                    input.dataset.original = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : String(value);
-                }
-
-                const item = document.querySelector(`[data-key="${key}"]`);
-                if (item) {
-                    item.classList.remove('modified');
-                    const inputEl = item.querySelector('.config-input');
-                    if (inputEl) inputEl.classList.remove('modified');
-                }
-
-                if (value === defaultVal) {
-                    resetCount++;
+                if (result.error) {
+                    errors.push(`${key}: ${result.error}`);
                 } else {
-                    savedCount++;
+                    successfulKeys.push(key);
+                    if (input) {
+                        input.dataset.original = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : String(value);
+                    }
+
+                    const item = document.querySelector(`[data-key="${key}"]`);
+                    if (item) {
+                        item.classList.remove('modified');
+                        const inputEl = item.querySelector('.config-input');
+                        if (inputEl) inputEl.classList.remove('modified');
+                    }
+
+                    if (value === defaultVal) {
+                        resetCount++;
+                    } else {
+                        savedCount++;
+                    }
+
+                    if (result.requires_restart) {
+                        requiresRestart.push(key);
+                    }
                 }
-                
-                if (result.requires_restart) {
-                    requiresRestart.push(key);
-                }
+            } catch (error) {
+                errors.push(`${key}: ${error.message}`);
             }
-        } catch (error) {
-            errors.push(`${key}: ${error.message}`);
         }
-    }
 
-    // Remove successfully saved keys even if some failed
-    for (const key of successfulKeys) {
-        modifiedSettings.delete(key);
-    }
-
-    if (errors.length > 0) {
-        updateStatus(`Errors: ${errors.join(', ')}`, 'error');
-    } else {
-        updateModifiedCount();
-
-        let message = '';
-        if (savedCount > 0) {
-            message += `Saved ${savedCount} custom setting${savedCount !== 1 ? 's' : ''}`;
+        // Remove successfully saved keys even if some failed
+        for (const key of successfulKeys) {
+            modifiedSettings.delete(key);
         }
-        if (resetCount > 0) {
-            if (message) message += ', ';
-            message += `Reset ${resetCount} to default${resetCount !== 1 ? 's' : ''}`;
-        }
-        
-        if (requiresRestart.length > 0) {
-            const running = await isPiTracRunning();
-            if (running) {
-                updateStatus(message + '. Restart PiTrac for changes to take effect.', 'warning');
+
+        if (errors.length > 0) {
+            updateStatus(`Errors: ${errors.join(', ')}`, 'error');
+        } else {
+            updateModifiedCount();
+
+            let message = '';
+            if (savedCount > 0) {
+                message += `Saved ${savedCount} custom setting${savedCount !== 1 ? 's' : ''}`;
+            }
+            if (resetCount > 0) {
+                if (message) message += ', ';
+                message += `Reset ${resetCount} to default${resetCount !== 1 ? 's' : ''}`;
+            }
+
+            if (requiresRestart.length > 0) {
+                const running = await isPiTracRunning();
+                if (running) {
+                    updateStatus(message + '. Restart PiTrac for changes to take effect.', 'warning');
+                } else {
+                    updateStatus(message || 'All changes saved successfully', 'success');
+                }
             } else {
                 updateStatus(message || 'All changes saved successfully', 'success');
             }
-        } else {
-            updateStatus(message || 'All changes saved successfully', 'success');
         }
-    }
 
     } catch (e) {
         console.error('Save failed:', e);
@@ -916,7 +916,7 @@ async function resetValue(key) {
                     }
                 }
 
-                let badge = item.querySelector('.default-badge');
+                const badge = item.querySelector('.default-badge');
                 if (!badge) {
                     const labelName = item.querySelector('.config-label-name');
                     if (labelName) {
@@ -1099,7 +1099,7 @@ function formatValue(value) {
 async function resetValueFromDiff(key) {
     await resetValue(key);
     closeModal();
-    showDiff(); 
+    showDiff();
 }
 
 function resetAllFromDiff() {
@@ -1109,7 +1109,7 @@ function resetAllFromDiff() {
 
 function searchConfig() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-    
+
     if (!searchTerm) {
         document.querySelectorAll('.config-item').forEach(item => {
             item.style.display = 'grid';
@@ -1122,16 +1122,16 @@ function searchConfig() {
     }
 
     let hasVisibleItems = false;
-    
+
     document.querySelectorAll('.config-group').forEach(group => {
         group.style.display = 'none';
     });
-    
+
     document.querySelectorAll('.config-item').forEach(item => {
         const key = item.dataset.key.toLowerCase();
         const labelName = item.querySelector('.config-label-name')?.textContent.toLowerCase() || '';
         const description = item.querySelector('.config-description')?.textContent.toLowerCase() || '';
-        
+
         if (key.includes(searchTerm) || labelName.includes(searchTerm) || description.includes(searchTerm)) {
             item.style.display = 'grid';
             const parentGroup = item.closest('.config-group');
@@ -1143,7 +1143,7 @@ function searchConfig() {
             item.style.display = 'none';
         }
     });
-    
+
     if (!hasVisibleItems) {
         updateStatus('No settings found matching: ' + searchTerm, 'warning');
     }
@@ -1239,7 +1239,7 @@ function checkDependencies(key, value) {
             '*': ['Changing broker address will affect camera communication']
         }
     };
-    
+
     const keyDeps = dependencies[key];
     if (keyDeps) {
         const warnings = keyDeps[value] || keyDeps['*'] || [];
@@ -1251,7 +1251,7 @@ function checkDependencies(key, value) {
 
 function showDependencyWarning(key, warnings) {
     const message = `<strong>Changing ${key} affects:</strong><br>` + warnings.join('<br>');
-    
+
     const notification = document.createElement('div');
     notification.className = 'dependency-warning';
     notification.innerHTML = message;
@@ -1268,9 +1268,9 @@ function showDependencyWarning(key, warnings) {
         z-index: 1000;
         animation: slideIn 0.3s ease;
     `;
-    
+
     document.body.appendChild(notification);
-    
+
     setTimeout(() => {
         notification.style.animation = 'slideOut 0.3s ease';
         setTimeout(() => notification.remove(), 300);
@@ -1301,7 +1301,7 @@ function deleteNestedValue(obj, path) {
         delete obj[parts[0]];
         return;
     }
-    
+
     let current = obj;
     for (let i = 0; i < parts.length - 1; i++) {
         if (!(parts[i] in current)) {
@@ -1309,9 +1309,9 @@ function deleteNestedValue(obj, path) {
         }
         current = current[parts[i]];
     }
-    
+
     delete current[parts[parts.length - 1]];
-    
+
     let parent = obj;
     for (let i = 0; i < parts.length - 1; i++) {
         const nextParent = parent[parts[i]];
@@ -1332,12 +1332,12 @@ function updateStatus(message, type = '') {
 function updateModifiedCount() {
     const modifiedCount = modifiedSettings.size;
     document.getElementById('modifiedCount').textContent = modifiedCount;
-    
+
     const saveBtn = document.getElementById('saveBtn');
     if (saveBtn) {
         saveBtn.disabled = modifiedCount === 0;
     }
-    
+
     let userSetCount = 0;
     const countUserSettings = (obj, depth = 0) => {
         if (depth > 10) return;
@@ -1350,10 +1350,10 @@ function updateModifiedCount() {
         }
     };
     countUserSettings(userSettings);
-    
+
     const totalSettings = document.querySelectorAll('.config-item').length;
     const defaultCount = totalSettings - userSetCount;
-    
+
     let counterEl = document.getElementById('settingsCounter');
     if (!counterEl) {
         const statusBar = document.querySelector('.status-bar');
@@ -1364,7 +1364,7 @@ function updateModifiedCount() {
             statusBar.insertBefore(counterEl, statusBar.firstChild);
         }
     }
-    
+
     if (counterEl) {
         counterEl.innerHTML = `
             <span class="counter-custom" title="Settings you've customized">${userSetCount} custom</span>

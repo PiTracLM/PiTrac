@@ -330,8 +330,7 @@ const distortionCalibration = {
             ws.onmessage = (event) => {
                 if (typeof event.data === 'string') {
                     let msg;
-                    try { msg = JSON.parse(event.data); }
-                    catch (e) { console.warn('Bad JSON from feed:', e); return; }
+                    try { msg = JSON.parse(event.data); } catch (e) { console.warn('Bad JSON from feed:', e); return; }
 
                     if (msg.error) {
                         clearTimeout(timeout);
