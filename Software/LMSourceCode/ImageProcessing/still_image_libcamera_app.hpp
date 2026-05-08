@@ -43,4 +43,8 @@ bool still_image_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg);
 
 bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg);
 
+// IMX296 sysfs trigger mode control (requires always-on overlay)
+constexpr const char* kImx296TriggerModePath = "/sys/module/imx296/parameters/trigger_mode";
+void SetSysfsTriggerMode(int mode);
+
 #endif // #ifdef __unix__  // Ignore in Windows environment
