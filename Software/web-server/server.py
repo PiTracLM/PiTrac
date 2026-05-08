@@ -652,8 +652,11 @@ class PiTracServer:
                     square_length=CHARUCO_SQUARE_LENGTH, marker_length=CHARUCO_MARKER_LENGTH,
                 )
 
+                await self.calibration_manager.request_free_running(camera_index)
+
                 cap = await asyncio.to_thread(open_camera, camera_index, 1456, 1088)
                 if cap is None:
+                    await self.calibration_manager.release_free_running(camera_index)
                     await websocket.send_json({"error": f"Cannot open camera {camera_index}"})
                     await websocket.close()
                     return
@@ -745,6 +748,7 @@ class PiTracServer:
                 if camera_index is not None:
                     self._active_cameras.pop(camera_index, None)
                     self.calibration_manager.clear_shared_frame(camera_index)
+                    await self.calibration_manager.release_free_running(camera_index)
 
         @self.app.websocket("/ws/undistort-preview")
         async def undistort_preview_feed(websocket: WebSocket) -> None:
@@ -783,8 +787,11 @@ class PiTracServer:
                     await websocket.close()
                     return
 
+                await self.calibration_manager.request_free_running(camera_index)
+
                 cap = await asyncio.to_thread(open_camera, camera_index, 1456, 1088)
                 if cap is None:
+                    await self.calibration_manager.release_free_running(camera_index)
                     await websocket.send_json({"error": f"Cannot open camera {camera_index}"})
                     await websocket.close()
                     return
@@ -870,6 +877,7 @@ class PiTracServer:
                     await asyncio.to_thread(cap.release)
                 if camera_index is not None:
                     self._active_cameras.pop(camera_index, None)
+                    await self.calibration_manager.release_free_running(camera_index)
 
         @self.app.post("/api/calibration/distortion/{camera}")
         async def run_distortion_calibration(camera: str, request: Request) -> Dict[str, Any]:
@@ -878,6 +886,8 @@ class PiTracServer:
                 return {"status": "error", "message": "Invalid camera"}
             if self.calibration_manager.loop is None:
                 return {"status": "error", "message": "Server still starting up, please retry in a moment"}
+            if self.pitrac_manager.is_running():
+                return {"status": "error", "message": "Stop PiTrac before running distortion calibration"}
 
             target_images = 40
             try:
