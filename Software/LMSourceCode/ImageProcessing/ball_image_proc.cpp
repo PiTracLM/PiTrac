@@ -208,6 +208,7 @@ namespace golf_sim {
     // Model Detection Configuration
     std::string BallImageProc::kStrobedBallDetectionMethod = "experimental";
     std::string BallImageProc::kBallPlacementDetectionMethod = "experimental";
+    std::atomic<bool> BallImageProc::kUseCircleRefinement{true};
     #ifdef _WIN32
     std::string BallImageProc::kModelPath = "../../Software/LMSourceCode/ml_models/yolo26-ball-detector";
     #else
@@ -590,11 +591,21 @@ namespace golf_sim {
                 // Convert GsCircle results to GolfBall objects for trajectory analysis
                 return_balls.clear();
                 for (size_t i = 0; i < detected_circles.size(); ++i) {
+                    GsCircle circle = detected_circles[i];
+
+                    // Refine bbox-derived radius with edge-based circle fit
+                    if (kUseCircleRefinement) {
+                        GsCircle refined;
+                        if (RefineCircleInROI(rgbImg, circle, refined)) {
+                            circle = refined;
+                        }
+                    }
+
                     GolfBall ball;
                     ball.quality_ranking = static_cast<int>(i);
-                    ball.set_circle(detected_circles[i]);
+                    ball.set_circle(circle);
                     ball.ball_color_ = GolfBall::BallColor::kModelDetected;
-                    ball.measured_radius_pixels_ = detected_circles[i][2];
+                    ball.measured_radius_pixels_ = circle[2];
                     ball.radius_at_calibration_pixels_ = baseBallWithSearchParams.radius_at_calibration_pixels_;
 
                     ball.average_color_ = baseBallWithSearchParams.average_color_;
@@ -4089,6 +4100,137 @@ namespace golf_sim {
         // LoggingTools::DebugShowImage("(closed) destination_image_gray", destination_image_gray);
     }
 
+    bool BallImageProc::RefineCircleInROI(const cv::Mat& image,
+                                          const GsCircle& reference_circle,
+                                          GsCircle& refined_circle) {
+
+        constexpr float kMinRadius = 5.0f;
+        constexpr float kRoiPadFactor = 0.3f;
+        constexpr int kBlurSize = 5;
+        constexpr double kCannyLow = 50.0;
+        constexpr double kCannyHigh = 120.0;
+        constexpr float kRingInnerFactor = 0.7f;
+        constexpr float kRingOuterFactor = 1.3f;
+        constexpr size_t kMinEdgePoints = 20;
+        constexpr size_t kMaxRingPoints = 50000;
+        constexpr double kRadiusTolerance = 0.20;
+        constexpr double kCenterDriftTolerance = 0.30;
+
+        if (image.empty()) return false;
+
+        float cx = reference_circle[0];
+        float cy = reference_circle[1];
+        float r = reference_circle[2];
+
+        if (r < kMinRadius) return false;
+
+        // Pad the ROI slightly so Canny can see the full ball edge
+        int pad = static_cast<int>(r * kRoiPadFactor);
+        int roi_x = std::max(0, static_cast<int>(cx - r) - pad);
+        int roi_y = std::max(0, static_cast<int>(cy - r) - pad);
+        int roi_r = std::min(image.cols, static_cast<int>(cx + r) + pad);
+        int roi_b = std::min(image.rows, static_cast<int>(cy + r) + pad);
+
+        if (roi_r - roi_x < 2 * r || roi_b - roi_y < 2 * r) return false;
+
+        cv::Rect roi(roi_x, roi_y, roi_r - roi_x, roi_b - roi_y);
+
+        // Only convert the ROI to gray, not the whole frame
+        cv::Mat sub;
+        if (image.channels() == 3) {
+            cv::cvtColor(image(roi), sub, cv::COLOR_BGR2GRAY);
+        } else {
+            sub = image(roi).clone();
+        }
+
+        cv::GaussianBlur(sub, sub, cv::Size(kBlurSize, kBlurSize), 0);
+
+        cv::Mat edges;
+        cv::Canny(sub, edges, kCannyLow, kCannyHigh);
+
+        std::vector<std::vector<cv::Point>> contours;
+        cv::findContours(edges, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+
+        if (contours.empty()) return false;
+
+        // Keep only edge points within a ring at the expected ball radius
+        float local_cx = cx - roi_x;
+        float local_cy = cy - roi_y;
+        float ring_min_sq = (r * kRingInnerFactor) * (r * kRingInnerFactor);
+        float ring_max_sq = (r * kRingOuterFactor) * (r * kRingOuterFactor);
+
+        std::vector<cv::Point2f> ring_points;
+        for (const auto& contour : contours) {
+            for (const auto& pt : contour) {
+                float dx = pt.x - local_cx;
+                float dy = pt.y - local_cy;
+                float dist_sq = dx * dx + dy * dy;
+                if (dist_sq >= ring_min_sq && dist_sq <= ring_max_sq) {
+                    ring_points.push_back(cv::Point2f(static_cast<float>(pt.x),
+                                                      static_cast<float>(pt.y)));
+                }
+            }
+        }
+
+        if (ring_points.size() < kMinEdgePoints) return false;
+        if (ring_points.size() > kMaxRingPoints) ring_points.resize(kMaxRingPoints);
+
+        // Kasa least-squares circle fit
+        int n = static_cast<int>(ring_points.size());
+        cv::Mat A(n, 3, CV_64F);
+        cv::Mat b(n, 1, CV_64F);
+
+        for (int i = 0; i < n; i++) {
+            double px = ring_points[i].x;
+            double py = ring_points[i].y;
+            A.at<double>(i, 0) = px;
+            A.at<double>(i, 1) = py;
+            A.at<double>(i, 2) = 1.0;
+            b.at<double>(i, 0) = px * px + py * py;
+        }
+
+        cv::Mat result;
+        cv::solve(A, b, result, cv::DECOMP_SVD);
+
+        double fit_cx = result.at<double>(0, 0) / 2.0;
+        double fit_cy = result.at<double>(1, 0) / 2.0;
+
+        double radicand = result.at<double>(2, 0) + fit_cx * fit_cx + fit_cy * fit_cy;
+        if (radicand <= 0.0) {
+            GS_LOG_TRACE_MSG(trace, "RefineCircleInROI: degenerate Kasa solution, rejecting");
+            return false;
+        }
+        double fit_r = std::sqrt(radicand);
+
+        if (fit_r < r * (1.0 - kRadiusTolerance) || fit_r > r * (1.0 + kRadiusTolerance)) {
+            GS_LOG_TRACE_MSG(trace, "RefineCircleInROI: fit radius " + std::to_string(fit_r) +
+                           " too far from NCNN radius " + std::to_string(r) + ", rejecting");
+            return false;
+        }
+
+        double dcx = fit_cx - local_cx;
+        double dcy = fit_cy - local_cy;
+        double center_shift_sq = dcx * dcx + dcy * dcy;
+        double max_drift = r * kCenterDriftTolerance;
+        if (center_shift_sq > max_drift * max_drift) {
+            GS_LOG_TRACE_MSG(trace, "RefineCircleInROI: center shifted " +
+                           std::to_string(std::sqrt(center_shift_sq)) + "px, rejecting");
+            return false;
+        }
+
+        // NOTE: Kasa fit is double but GsCircle is Vec3f, so we lose some sub-pixel precision
+        refined_circle[0] = static_cast<float>(fit_cx + roi_x);
+        refined_circle[1] = static_cast<float>(fit_cy + roi_y);
+        refined_circle[2] = static_cast<float>(fit_r);
+
+        GS_LOG_TRACE_MSG(trace, "RefineCircleInROI: NCNN r=" + std::to_string(r) +
+                       " -> fit r=" + std::to_string(fit_r) +
+                       " (delta=" + std::to_string(fit_r - r) + "px, " +
+                       std::to_string(ring_points.size()) + " edge pts)");
+
+        return true;
+    }
+
     bool BallImageProc::BboxToCircle(float bbox_x, float bbox_y, float bbox_w, float bbox_h,
                                      int image_cols, int image_rows,
                                      const char* backend_name,
@@ -4383,6 +4525,7 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelPath", kModelPath);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallDetectionMethod", kStrobedBallDetectionMethod);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBallPlacementDetectionMethod", kBallPlacementDetectionMethod);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kUseCircleRefinement", kUseCircleRefinement);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelConfidenceThreshold", kModelConfidenceThreshold);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelNMSThreshold", kModelNMSThreshold);
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kModelInputWidth", kModelInputWidth);

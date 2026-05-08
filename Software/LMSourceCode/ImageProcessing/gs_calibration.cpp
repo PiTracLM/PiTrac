@@ -157,6 +157,9 @@ namespace golf_sim {
 
         ball = return_balls[0];
 
+        // Refinement is handled inside GetBall() when kUseCircleRefinement is enabled,
+        // so no explicit RefineCircleInROI call needed here.
+
         // Because we are auto-calibrating, we know the exact distance from the ball to the lens
         double distance_direct_to_ball = CvUtils::GetDistance(kFinalAutoCalibrationBallPositionFromCameraMeters);
 

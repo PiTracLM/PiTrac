@@ -194,6 +194,7 @@ public:
     // Model Detection Configuration
     static std::string kStrobedBallDetectionMethod;
     static std::string kBallPlacementDetectionMethod;
+    static std::atomic<bool> kUseCircleRefinement;
     static std::string kModelPath;
     static float kModelConfidenceThreshold;
     static float kModelNMSThreshold;
@@ -281,6 +282,15 @@ public:
                                     const GolfBall& reference_ball,
                                     bool choose_largest_final_ball,
                                     GsCircle& final_circle);
+
+    // Fast circle refinement within an NCNN-detected bounding box.
+    // Crops a tight ROI, runs Canny + findContours, filters edge points to a
+    // ring around the expected radius, then does a least-squares circle fit (Kasa).
+    // Sub-millisecond on a typical ~150x150 crop. No Hough accumulator.
+    // Returns false if refinement fails (caller should keep the original circle).
+    static bool RefineCircleInROI(const cv::Mat& image,
+                                  const GsCircle& reference_circle,
+                                  GsCircle& refined_circle);
 
 
     // Waits for movement behind the ball (i.e., the club) and returns the first image containing the movement
