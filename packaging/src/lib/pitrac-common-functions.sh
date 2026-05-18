@@ -474,44 +474,39 @@ set_config_permissions() {
     fi
 }
 
+# Use a venv so pip doesn't fight Debian's apt-managed dist-packages.
+# --system-site-packages keeps apt's cv2/numpy/gpiozero visible.
 install_python_dependencies() {
     local web_server_dir="${1:-/usr/lib/pitrac/web-server}"
-    
-    if [[ ! -d "$web_server_dir" ]]; then
-        log_warn "Web server directory not found: $web_server_dir"
-        return 1
-    fi
-    
-    if [[ ! -f "$web_server_dir/requirements.txt" ]]; then
-        log_warn "Requirements file not found: $web_server_dir/requirements.txt"
-        return 1
-    fi
-    
-    log_info "Installing Python dependencies for web server..."
+    local venv_dir="$web_server_dir/.venv"
+    local req_file="$web_server_dir/requirements.txt"
 
-    # gpiozero (in requirements.txt) needs these system GPIO backends on Raspberry Pi OS.
-    # They're not available on PyPI so we install them via apt.
-    for pkg in python3-lgpio python3-rpi-lgpio; do
+    if [[ ! -f "$req_file" ]]; then
+        log_warn "Requirements file not found: $req_file"
+        return 1
+    fi
+
+    local sudo=""
+    [[ $EUID -ne 0 ]] && sudo="sudo"
+
+    for pkg in python3-venv python3-lgpio python3-rpi-lgpio; do
         if ! pkg_installed "$pkg"; then
-            log_info "Installing system GPIO backend: $pkg"
-            INITRD=No apt-get install -y "$pkg" 2>/dev/null || log_warn "Could not install $pkg"
+            log_info "Installing system package: $pkg"
+            $sudo env INITRD=No apt-get install -y "$pkg"
         fi
     done
 
-    local pip_cmd=(pip3 install -r "$web_server_dir/requirements.txt")
-    [[ $EUID -ne 0 ]] && pip_cmd=(sudo "${pip_cmd[@]}")
-
-    if "${pip_cmd[@]}" --break-system-packages 2>/dev/null; then
-        log_success "Python dependencies installed successfully"
-    elif "${pip_cmd[@]}" 2>/dev/null; then
-        log_success "Python dependencies installed successfully"
-    else
-        log_error "Failed to install Python dependencies"
-        log_info "Try manually: ${pip_cmd[*]} --break-system-packages"
-        return 1
+    # Recreate if the interpreter is missing or broken.
+    if ! "$venv_dir/bin/python" -c '' 2>/dev/null; then
+        log_info "Creating web-server venv at $venv_dir"
+        $sudo rm -rf "$venv_dir"
+        $sudo python3 -m venv --system-site-packages "$venv_dir"
     fi
-    
-    return 0
+
+    log_info "Installing web-server requirements into venv"
+    $sudo "$venv_dir/bin/pip" install --requirement "$req_file"
+
+    log_success "Web-server venv ready"
 }
 
 install_service_from_template() {
