@@ -1489,8 +1489,8 @@ bool PerformCameraSystemStartup() {
 
     SetLibCameraLoggingOff();
 
-    // Start in free-running mode; cam2_run_event_loop sets trigger_mode=1 when needed
-    SetSysfsTriggerMode(0);
+    // Defensive reset in case a prior crashed run left the sensor in external trigger.
+    SetImx296TriggerModeViaI2C(0);
 
     return true;
 }
