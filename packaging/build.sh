@@ -237,6 +237,8 @@ build_dev() {
         exit 1
     fi
 
+    pin_libcamera_workaround
+
     log_info "Regenerating pitrac CLI tool..."
     if [[ -f "$SCRIPT_DIR/generate.sh" ]]; then
         cd "$SCRIPT_DIR"

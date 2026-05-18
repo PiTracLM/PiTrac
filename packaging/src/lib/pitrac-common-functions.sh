@@ -32,6 +32,39 @@ detect_pi_model() {
     fi
 }
 
+# libcamera 0.7.1+rpt20260429 null-derefs in registerCamera() when rpi_apps.yaml
+# has a non-zero camera_timeout_value_ms — loadPipelineConfiguration calls
+# ipa_->setCameraTimeout.disconnect() before loadIPA() initializes ipa_. Pin
+# the previous Raspberry Pi build until a fixed libcamera ships upstream.
+LIBCAMERA_PIN_VERSION="0.7.0+rpt20260205-1"
+LIBCAMERA_PIN_PKGS=(libcamera0.7 libcamera-dev libcamera-ipa libcamera-tools libcamera-v4l2)
+
+pin_libcamera_workaround() {
+    local installed
+    installed=$(dpkg-query -W -f='${Version}' libcamera0.7 2>/dev/null || true)
+    if [[ "$installed" == "$LIBCAMERA_PIN_VERSION" ]] \
+            && apt-mark showhold 2>/dev/null | grep -qx libcamera0.7; then
+        return 0
+    fi
+
+    log_info "Pinning libcamera to $LIBCAMERA_PIN_VERSION"
+
+    local tmpdir
+    tmpdir=$(mktemp -d -t pitrac-libcam-pin.XXXXXX)
+    trap 'rm -rf "$tmpdir"' RETURN
+
+    local pool="https://archive.raspberrypi.com/debian/pool/main/libc/libcamera"
+    local pkg debs=()
+    for pkg in "${LIBCAMERA_PIN_PKGS[@]}"; do
+        local deb="${pkg}_${LIBCAMERA_PIN_VERSION}_arm64.deb"
+        curl -fsSL -o "$tmpdir/$deb" "$pool/$deb"
+        debs+=("$tmpdir/$deb")
+    done
+
+    INITRD=No apt-get install -y --allow-downgrades "${debs[@]}"
+    apt-mark hold "${LIBCAMERA_PIN_PKGS[@]}" >/dev/null
+}
+
 # Apply Boost C++20 compatibility fix
 apply_boost_cxx20_fix() {
     local boost_header="/usr/include/boost/asio/awaitable.hpp"
