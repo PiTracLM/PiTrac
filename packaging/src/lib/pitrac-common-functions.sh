@@ -44,10 +44,15 @@ RPICAM_APPS_PIN_ARM64=(librpicam-app1 rpicam-apps-core rpicam-apps-encoder rpica
 RPICAM_APPS_PIN_ALL=(rpicam-apps rpicam-apps-lite)
 
 pin_libcamera_workaround() {
-    local installed
-    installed=$(dpkg-query -W -f='${Version}' libcamera0.7 2>/dev/null || true)
-    if [[ "$installed" == "$LIBCAMERA_PIN_VERSION" ]] \
-            && apt-mark showhold 2>/dev/null | grep -qx libcamera0.7; then
+    local libcam rpicam held
+    libcam=$(dpkg-query -W -f='${Version}' libcamera0.7 2>/dev/null || true)
+    rpicam=$(dpkg-query -W -f='${Version}' rpicam-apps-core 2>/dev/null || true)
+    held=$(apt-mark showhold 2>/dev/null || true)
+    if [[ "$libcam" == "$LIBCAMERA_PIN_VERSION" ]] \
+            && [[ "$rpicam" == "$RPICAM_APPS_PIN_VERSION" ]] \
+            && grep -qx libcamera0.7 <<<"$held" \
+            && grep -qx rpicam-apps-core <<<"$held"; then
+        log_info "libcamera + rpicam-apps already pinned"
         return 0
     fi
 
