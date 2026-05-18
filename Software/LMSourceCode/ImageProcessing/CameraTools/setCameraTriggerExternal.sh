@@ -1,3 +1,3 @@
 #!/bin/sh
-TRIGGER_MODE=/sys/module/imx296/parameters/trigger_mode
-echo 1 > "$TRIGGER_MODE"
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+exec "$SCRIPT_DIR/imx296_trigger" 4 1
