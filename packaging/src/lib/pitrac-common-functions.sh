@@ -49,20 +49,21 @@ pin_libcamera_workaround() {
 
     log_info "Pinning libcamera to $LIBCAMERA_PIN_VERSION"
 
-    local tmpdir
-    tmpdir=$(mktemp -d -t pitrac-libcam-pin.XXXXXX)
-    trap 'rm -rf "$tmpdir"' RETURN
+    (
+        tmpdir=$(mktemp -d -t pitrac-libcam-pin.XXXXXX)
+        trap 'rm -rf "$tmpdir"' EXIT
 
-    local pool="https://archive.raspberrypi.com/debian/pool/main/libc/libcamera"
-    local pkg debs=()
-    for pkg in "${LIBCAMERA_PIN_PKGS[@]}"; do
-        local deb="${pkg}_${LIBCAMERA_PIN_VERSION}_arm64.deb"
-        curl -fsSL -o "$tmpdir/$deb" "$pool/$deb"
-        debs+=("$tmpdir/$deb")
-    done
+        pool="https://archive.raspberrypi.com/debian/pool/main/libc/libcamera"
+        debs=()
+        for pkg in "${LIBCAMERA_PIN_PKGS[@]}"; do
+            deb="${pkg}_${LIBCAMERA_PIN_VERSION}_arm64.deb"
+            curl -fsSL -o "$tmpdir/$deb" "$pool/$deb"
+            debs+=("$tmpdir/$deb")
+        done
 
-    INITRD=No apt-get install -y --allow-downgrades "${debs[@]}"
-    apt-mark hold "${LIBCAMERA_PIN_PKGS[@]}" >/dev/null
+        INITRD=No apt-get install -y --allow-downgrades "${debs[@]}"
+        apt-mark hold "${LIBCAMERA_PIN_PKGS[@]}" >/dev/null
+    )
 }
 
 # Apply Boost C++20 compatibility fix
