@@ -35,9 +35,13 @@ detect_pi_model() {
 # libcamera 0.7.1+rpt20260429 null-derefs in registerCamera() when rpi_apps.yaml
 # has a non-zero camera_timeout_value_ms — loadPipelineConfiguration calls
 # ipa_->setCameraTimeout.disconnect() before loadIPA() initializes ipa_. Pin
-# the previous Raspberry Pi build until a fixed libcamera ships upstream.
+# libcamera and the matching rpicam-apps (1.12.0 hard-depends on broken
+# libcamera) until a fixed libcamera ships upstream.
 LIBCAMERA_PIN_VERSION="0.7.0+rpt20260205-1"
 LIBCAMERA_PIN_PKGS=(libcamera0.7 libcamera-dev libcamera-ipa libcamera-tools libcamera-v4l2)
+RPICAM_APPS_PIN_VERSION="1.11.1-1"
+RPICAM_APPS_PIN_ARM64=(librpicam-app1 rpicam-apps-core rpicam-apps-encoder rpicam-apps-opencv-postprocess rpicam-apps-preview)
+RPICAM_APPS_PIN_ALL=(rpicam-apps rpicam-apps-lite)
 
 pin_libcamera_workaround() {
     local installed
@@ -47,22 +51,36 @@ pin_libcamera_workaround() {
         return 0
     fi
 
-    log_info "Pinning libcamera to $LIBCAMERA_PIN_VERSION"
+    log_info "Pinning libcamera $LIBCAMERA_PIN_VERSION + rpicam-apps $RPICAM_APPS_PIN_VERSION"
 
     (
         tmpdir=$(mktemp -d -t pitrac-libcam-pin.XXXXXX)
         trap 'rm -rf "$tmpdir"' EXIT
 
-        pool="https://archive.raspberrypi.com/debian/pool/main/libc/libcamera"
-        debs=()
+        libcam_pool="https://archive.raspberrypi.com/debian/pool/main/libc/libcamera"
+        rpicam_pool="https://archive.raspberrypi.com/debian/pool/main/r/rpicam-apps"
+        debs=() hold=()
+
         for pkg in "${LIBCAMERA_PIN_PKGS[@]}"; do
             deb="${pkg}_${LIBCAMERA_PIN_VERSION}_arm64.deb"
-            curl -fsSL -o "$tmpdir/$deb" "$pool/$deb"
-            debs+=("$tmpdir/$deb")
+            curl -fsSL -o "$tmpdir/$deb" "$libcam_pool/$deb"
+            debs+=("$tmpdir/$deb"); hold+=("$pkg")
+        done
+
+        for pkg in "${RPICAM_APPS_PIN_ARM64[@]}"; do
+            deb="${pkg}_${RPICAM_APPS_PIN_VERSION}_arm64.deb"
+            curl -fsSL -o "$tmpdir/$deb" "$rpicam_pool/$deb"
+            debs+=("$tmpdir/$deb"); hold+=("$pkg")
+        done
+
+        for pkg in "${RPICAM_APPS_PIN_ALL[@]}"; do
+            deb="${pkg}_${RPICAM_APPS_PIN_VERSION}_all.deb"
+            curl -fsSL -o "$tmpdir/$deb" "$rpicam_pool/$deb"
+            debs+=("$tmpdir/$deb"); hold+=("$pkg")
         done
 
         INITRD=No apt-get install -y --allow-downgrades "${debs[@]}"
-        apt-mark hold "${LIBCAMERA_PIN_PKGS[@]}" >/dev/null
+        apt-mark hold "${hold[@]}" >/dev/null
     )
 }
 
