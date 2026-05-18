@@ -28,9 +28,10 @@ class CameraDetector:
         "imx477": "Pi HQ Camera",
         "imx296": "Global Shutter Camera",
         "imx708": "Pi Camera v3",
+        "arducam-pivariety": "Arducam Mira220 (Mono)",
     }
 
-    PITRAC_TYPES = {"ov5647": 1, "imx219": 2, "imx477": 3, "imx296": 4, "imx708": 0}
+    PITRAC_TYPES = {"ov5647": 1, "imx219": 2, "imx477": 3, "imx296": 4, "imx708": 0, "arducam-pivariety": 6}
 
     CAMERA_STATUS = {
         "ov5647": "DEPRECATED",
@@ -38,15 +39,18 @@ class CameraDetector:
         "imx477": "DEPRECATED",
         "imx296": "SUPPORTED",
         "imx708": "UNSUPPORTED",
+        "arducam-pivariety": "EXPERIMENTAL",
     }
 
     PITRAC_TYPE_PI_GS = 4
     PITRAC_TYPE_INNOMAKER = 5
+    PITRAC_TYPE_MIRA220 = 6
 
     DT_ROOT = "/sys/firmware/devicetree/base"
     DT_ROOT_ALT = "/proc/device-tree"
 
     INNOMAKER_TRIGGER = "/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_trigger"
+    MIRA220_TRIGGER = "/usr/lib/pitrac/ImageProcessing/CameraTools/v4l2_trigger"
 
     def __init__(self):
         self.pi_model = self._detect_pi_model()
@@ -194,7 +198,7 @@ class CameraDetector:
         """Parse camera information from libcamera output"""
         cameras = []
 
-        camera_pattern = r"^(\d+)\s*:\s*(\w+)\s*\[([^\]]+)\](?:\s*\(([^)]+)\))?"
+        camera_pattern = r"^(\d+)\s*:\s*([\w-]+)\s*\[([^\]]+)\](?:\s*\(([^)]+)\))?"
 
         for match in re.finditer(camera_pattern, output, re.MULTILINE):
             idx = int(match.group(1))
@@ -224,6 +228,9 @@ class CameraDetector:
                 else:
                     pitrac_type = self.PITRAC_TYPE_PI_GS
                     description = "IMX296 (assumed color)"
+            elif sensor == "arducam-pivariety":
+                pitrac_type = self.PITRAC_TYPE_MIRA220
+                description = "Arducam Mira220 (Mono)"
             else:
                 description = model_name
 
@@ -535,6 +542,12 @@ class CameraDetector:
                 "label": "InnoMaker IMX296",
                 "description": "IMX296 Mono",
                 "status": "supported",
+            },
+            {
+                "value": 6,
+                "label": "Arducam Mira220",
+                "description": "Mira220 Mono Global Shutter",
+                "status": "experimental",
             },
         ]
 

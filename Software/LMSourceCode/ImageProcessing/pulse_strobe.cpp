@@ -585,7 +585,21 @@ namespace golf_sim {
 	void PulseStrobe::SendOnOffPulse(long length_us) {
 #ifdef __unix__  // Ignore in Windows environment
 
-		if (kUsingActiveHighTriggerCamera) {
+		const CameraHardware::CameraModel camera_model = GolfSimCamera::kSystemSlot2CameraType;
+
+		// The Mira220 external trigger (trigger_mode=1) requires a longer
+		// HIGH pulse on FSIN than the IMX296.  The Connector Board inverts
+		// GPIO→XTR, so we swap the on/off durations: the normally-short
+		// LOW pulse becomes a long LOW (XTR HIGH for ~66ms at 15fps),
+		// which Mira220 detects reliably.
+		if (camera_model == CameraHardware::CameraModel::Mira220_Mono) {
+			int kOnTimeUs = (int)((1.0 / kPrimingPulseFPS) * 1000000. - length_us);
+			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kON);
+			usleep(length_us);
+			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kOFF);
+			usleep(kOnTimeUs);
+			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kON);
+		} else if (kUsingActiveHighTriggerCamera) {
 			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kOFF);
 			usleep(length_us);
 			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kON);
@@ -648,6 +662,8 @@ namespace golf_sim {
 				usleep(kPauseToSetUpInnoMakerExternalTriggerMilliseconds * 1000);
 			}
 		}
+
+		// NOTE - We're not yet sure if a Mira220-based sensor will need any priming pulses.  However, it should probably work similar to the IMX296
 
 		GS_LOG_TRACE_MSG(trace, "Sent " + std::to_string(kNumberPrimingPulses) + " initial priming pulses.  About to pause for " + 
 				std::to_string(kPauseBeforeReadyForFinalPrimingPulseMs) + " milliSeconds before sending penultimate priming pulse.");

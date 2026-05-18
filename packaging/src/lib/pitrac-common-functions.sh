@@ -354,7 +354,6 @@ install_camera_tools() {
 
     local camera_tools_dir="$repo_root/Software/LMSourceCode/ImageProcessing/CameraTools"
     local imaging_dir="$repo_root/Software/LMSourceCode/ImageProcessing"
-
     if [[ ! -d "$camera_tools_dir" ]]; then
         log_warn "Camera tools not found: $camera_tools_dir"
         return
@@ -377,6 +376,9 @@ install_camera_tools() {
     find "$tools_dest" -name "*.sh" -type f -exec chmod 755 {} \;
     if [[ -f "$tools_dest/imx296_trigger" ]]; then
         chmod 755 "$tools_dest/imx296_trigger"
+    fi
+    if [[ -f "$tools_dest/v4l2_trigger" ]]; then
+        chmod 755 "$tools_dest/v4l2_trigger"
     fi
 
     log_success "Camera tools installed"

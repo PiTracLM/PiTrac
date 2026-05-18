@@ -59,35 +59,9 @@ static libcamera::PixelFormat mode_to_pixel_format(Mode const &mode)
 
 static void set_pipeline_configuration(Platform platform)
 {
-        GS_LOG_TRACE_MSG(trace, "Setting pipeline configuration file..");
-
-	// Respect any pre-existing value in the environment variable.
-	char const *existing_config = getenv("LIBCAMERA_RPI_CONFIG_FILE");
-	if (existing_config && existing_config[0]) {
-                GS_LOG_TRACE_MSG(trace, "LIBCAMERA_RPI_CONFIG_FILE already set.");
-		return;
-	}
-
-
-	// JPMOD - Added PISP options
-	// Otherwise point it at whichever of these we find first (if any) for the given platform.
-	static const std::vector<std::pair<Platform, std::string>> config_files = {
-		{ Platform::VC4, "/usr/local/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml" },
-		{ Platform::VC4, "/usr/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml" },
-                { Platform::PISP, "/usr/local/share/libcamera/pipeline/rpi/pisp/rpi_apps.yaml" },
-                { Platform::PISP, "/usr/share/libcamera/pipeline/rpi/pisp/rpi_apps.yaml" },
-	};
-
-	for (auto &config_file : config_files)
-	{
-		struct stat info;
-		if (config_file.first == platform && stat(config_file.second.c_str(), &info) == 0)
-		{
-                	GS_LOG_TRACE_MSG(trace, "LIBCAMERA_RPI_CONFIG_FILE = " + config_file.second);
-			setenv("LIBCAMERA_RPI_CONFIG_FILE", config_file.second.c_str(), 1);
-			break;
-		}
-	}
+	// Let libcamera auto-detect the pipeline config — the hardcoded
+	// rpi_apps.yaml causes a segfault with Mira220 (Arducam pivariety).
+	(void)platform;
 }
 
 RPiCamApp::RPiCamApp(std::unique_ptr<Options> opts)

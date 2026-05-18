@@ -43,6 +43,7 @@ declare -A CAMERA_MODELS=(
     ["imx477"]="Pi HQ Camera"
     ["imx296"]="Global Shutter Camera"
     ["imx708"]="Pi Camera v3"
+    ["arducam-pivariety"]="Arducam Mira220 (Mono)"
 )
 
 # PiTrac type mappings (from camera_hardware.h)
@@ -52,6 +53,7 @@ declare -A PITRAC_TYPES=(
     ["imx477"]=3    # Deprecated - not recommended
     ["imx296"]=4    # Default for IMX296 (Pi GS)
     ["imx708"]=0    # Unsupported
+    ["arducam-pivariety"]=6  # Arducam Mira220 Mono
 )
 
 # Camera support status
@@ -61,11 +63,13 @@ declare -A CAMERA_STATUS=(
     ["imx477"]="DEPRECATED"
     ["imx296"]="SUPPORTED"
     ["imx708"]="UNSUPPORTED"
+    ["arducam-pivariety"]="EXPERIMENTAL"
 )
 
 # IMX296 specific types
 PITRAC_TYPE_PI_GS=4           # Raspberry Pi Global Shutter (color)
 PITRAC_TYPE_INNOMAKER=5       # InnoMaker IMX296 (mono)
+PITRAC_TYPE_MIRA220=6         # Arducam Mira220 Mono
 
 # Device tree root paths
 DT_ROOT="/sys/firmware/devicetree/base"
@@ -438,6 +442,12 @@ detect_cameras() {
                     pitrac_type=$PITRAC_TYPE_PI_GS
                     description="IMX296 (Unknown variant)"
                 fi
+            fi
+            
+            # Special handling for Arducam Mira220 (arducam-pivariety driver)
+            if [[ "$sensor" == "arducam-pivariety" ]]; then
+                pitrac_type=$PITRAC_TYPE_MIRA220
+                description="Arducam Mira220 (Mono)"
             fi
             
             CAMERA_PITRAC_TYPE["$idx"]="$pitrac_type"

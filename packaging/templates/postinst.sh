@@ -140,27 +140,21 @@ case "$1" in
         # Install sensor file for detected Pi model
         install_imx296_sensor_file "$PI_MODEL"
 
-        # Use existing example.yaml files as base for configuration
-        # Both Pi 4 (vc4) and Pi 5 (pisp) ship with example.yaml
+        # Use existing example.yaml files as base for configuration.
+        # Both Pi 4 (vc4) and Pi 5 (pisp) ship with example.yaml.
+        # Copy it as rpi_apps.yaml WITHOUT uncommenting camera_timeout_value_ms.
+        # The default (computed by libcamera from the sensor frame rate) is fine;
+        # the application already sets a per-frame timeout of 100000s via
+        # options->Set().timeout.set("100000s") to handle external-trigger waits.
         for pipeline in pisp vc4; do
             CAMERA_DIR="/usr/share/libcamera/pipeline/rpi/${pipeline}"
             EXAMPLE_FILE="${CAMERA_DIR}/example.yaml"
             CAMERA_CONFIG="${CAMERA_DIR}/rpi_apps.yaml"
 
-            # Only proceed if the pipeline directory exists (Pi 4 has vc4, Pi 5 has pisp)
             if [ -d "$CAMERA_DIR" ]; then
-                # If example exists but rpi_apps doesn't, copy and configure
                 if [ -f "$EXAMPLE_FILE" ] && [ ! -f "$CAMERA_CONFIG" ]; then
                     echo "Creating ${pipeline} config from example..."
                     cp "$EXAMPLE_FILE" "$CAMERA_CONFIG"
-                    # Uncomment and set the camera timeout to 24 hours (86400000 ms)
-                    sed -i 's/# *"camera_timeout_value_ms": *[0-9][0-9]*/"camera_timeout_value_ms": 86400000/' "$CAMERA_CONFIG"
-                elif [ -f "$CAMERA_CONFIG" ]; then
-                    # Config exists, check if timeout needs updating
-                    if grep -q '# *"camera_timeout_value_ms"' "$CAMERA_CONFIG"; then
-                        echo "Updating ${pipeline} camera timeout..."
-                        sed -i 's/# *"camera_timeout_value_ms": *[0-9][0-9]*/"camera_timeout_value_ms": 86400000/' "$CAMERA_CONFIG"
-                    fi
                 fi
             fi
         done

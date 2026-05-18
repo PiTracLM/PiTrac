@@ -153,9 +153,36 @@ configure_boot_config() {
         log_warn "No cameras detected. Camera-specific overlays will be skipped, but base system parameters will be configured."
     fi
 
+    # If Mira220 was not auto-detected (needs its overlay present at boot time),
+    # ask the user if one is connected so we can add the overlay now.
+    if [[ "$slot1_type" != "6" ]] && [[ "$slot2_type" != "6" ]]; then
+        if [[ "$num_cameras" -le 1 ]]; then
+            echo ""
+            log_info "PiTrac supports the Arducam Mira220 (type 6) global-shutter camera."
+            log_info "This camera requires a dtoverlay to be set before libcamera can detect it."
+            log_info "If you have a Mira220 connected, answer 'y' to add the overlay now."
+            read -r -p "Do you have an Arducam Mira220 camera connected? [y/N]: " has_mira220
+            if [[ "$has_mira220" =~ ^[Yy]$ ]]; then
+                preserved_mira220_overlay="dtoverlay=arducam-pivariety"
+                log_info "Will add arducam-pivariety overlay. Reboot required for detection."
+            fi
+        fi
+    fi
+
     backup_config_txt "$config_path"
 
     log_info "Configuring ${config_path}..."
+
+    # Before wiping, check if the old PiTrac block contains a Mira220 overlay.
+    # The Mira220 requires its overlay to be loaded before libcamera can detect
+    # it. If we blindly delete the block, we create a chicken-and-egg: without
+    # overlay the camera is invisible, so the detector reports 1 camera, so we
+    # write single-camera config, so the overlay stays missing on next boot.
+    local preserved_mira220_overlay=""
+    if sed -n '/# PiTrac Camera Configuration/,/# End PiTrac Camera Configuration/p' "$config_path" 2>/dev/null | grep -q 'dtoverlay=arducam-pivariety'; then
+        preserved_mira220_overlay="dtoverlay=arducam-pivariety"
+        log_info "Preserving existing arducam-pivariety overlay from old config"
+    fi
 
     log_info "Removing existing PiTrac configuration (if present)..."
     sed -i '/# PiTrac Camera Configuration/,/# End PiTrac Camera Configuration/d' "$config_path" 2>/dev/null || true
@@ -210,22 +237,47 @@ arm_boost=1"
     fi
 
     if [[ "$num_cameras" -eq 2 ]]; then
+        local cam1_overlay="dtoverlay=imx296,sync-sink"
+        if [[ "$slot2_type" == "6" ]]; then
+            cam1_overlay="dtoverlay=arducam-pivariety"
+        elif [[ "$slot1_type" == "6" ]]; then
+            cam1_overlay="dtoverlay=arducam-pivariety"
+        fi
         config_block="$config_block
 
 # Dual camera configuration (single-pi system)
 # Camera 0: internal trigger, Camera 1: external trigger
 [all]
 dtoverlay=imx296,cam0
-dtoverlay=imx296,sync-sink"
+${cam1_overlay}"
     elif [[ "$num_cameras" -eq 1 ]]; then
-        config_block="$config_block
+        # If only one camera is detected but the old config had a Mira220
+        # overlay, the Mira220 is probably still connected — its overlay just
+        # wasn't loaded this boot, making it invisible to libcamera.  Write a
+        # dual-camera config so the overlay is present on next boot.
+        if [[ -n "$preserved_mira220_overlay" ]]; then
+            config_block="$config_block
+
+# Dual camera configuration (single-pi system)
+# Camera 0: internal trigger, Camera 1: Mira220 external trigger (preserved)
+[all]
+dtoverlay=imx296,cam0
+${preserved_mira220_overlay}"
+            log_info "Single camera detected, but preserving arducam-pivariety overlay for second camera"
+        else
+            local single_overlay="dtoverlay=imx296,cam0"
+            if [[ "$slot1_type" == "6" ]]; then
+                single_overlay="dtoverlay=arducam-pivariety,cam0"
+            fi
+            config_block="$config_block
 
 # Single camera configuration
 [all]
-dtoverlay=imx296,cam0"
+${single_overlay}"
+        fi
     fi
 
-    if [[ "$has_innomaker" == "true" ]]; then
+    if [[ "$has_innomaker" == "true" ]] && [[ "$slot1_type" != "6" ]] && [[ "$slot2_type" != "6" ]]; then
         config_block="$config_block
 
 # InnoMaker IMX296 camera support

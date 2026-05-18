@@ -982,7 +982,13 @@ bool SetLibcameraTuningFileEnvVariable(const GolfSimCamera& camera) {
 
     std::string tuning_file;
 
-    if (camera.camera_hardware_.camera_is_mono()) {
+    // Mira220 (Arducam pivariety) — no matching tuning file exists.
+    // Let libcamera auto-detect the best fallback.
+    if (camera.camera_hardware_.camera_model_ == CameraHardware::CameraModel::Mira220_Mono) {
+        unsetenv("LIBCAMERA_RPI_TUNING_FILE");
+        return true;
+    }
+    else if (camera.camera_hardware_.camera_is_mono()) {
         // If this is a mono camera, than we must use the "mono" tuning file, regardless of whether
         // the camera is camera 1 or camera 2
 
@@ -1012,7 +1018,9 @@ bool SetLibcameraTuningFileEnvVariable(const GolfSimCamera& camera) {
         }
     }
 
-    setenv("LIBCAMERA_RPI_TUNING_FILE", tuning_file.c_str(), 1);
+    if (!tuning_file.empty()) {
+        setenv("LIBCAMERA_RPI_TUNING_FILE", tuning_file.c_str(), 1);
+    }
 
     return true;
 }

@@ -88,6 +88,7 @@ namespace golf_sim {
             { "3", CameraModel::PiHQ },
             { "4", CameraModel::PiGS },
             { "5", CameraModel::InnoMakerIMX296GS_Mono },
+            { "6", CameraModel::Mira220_Mono },
             { "100", CameraModel::kCameraUnknown },
         };
         if (camera_table.count(model_enum_value_string) == 0)
@@ -133,7 +134,7 @@ namespace golf_sim {
 
 
     bool CameraHardware::camera_is_mono() const {
-        return (camera_model_ == CameraModel::InnoMakerIMX296GS_Mono);
+        return (camera_model_ == CameraModel::InnoMakerIMX296GS_Mono || camera_model_ == CameraModel::Mira220_Mono);
     }
 
 
@@ -236,17 +237,17 @@ namespace golf_sim {
         }
 
         // This section deals with the common characteristics of some of the cameras
-        if (model == PiGS || 
+        if (model == PiGS ||
             model == InnoMakerIMX296GS_Mono) {
 
-        GS_LOG_TRACE_MSG(trace, "Initializing with a PiGS or InnoMakerIMX296GS_Mono camera." );
+            GS_LOG_TRACE_MSG(trace, "Initializing with a PiGS or InnoMakerIMX296GS_Mono camera.");
             // Sensor pixel width is 3.45uM square?  No - 6.33mm diagonal.  It appears that
             // the actual width is the full resolution (1456)  * 3.4uM = 4.95mm,
             // Not simply the diagonal sensor width
 
             sensor_width_ = (float)5.077365371;   // 4.45;   // (1456.0 * 3.4) / 1000;   // = 4.95; //  In mm 6.3 / sqrt(2.0);  // TBD - Confirm math from diagonal measurement
             sensor_height_ = (float)3.789078635;    // 4.45; //(1088.0 * 3.4) / 1000;   //  In mm 6.3 / sqrt(2.0);
-            
+
             if (resolution_x_override_ > 0 && resolution_y_override_ > 0) {
                 resolution_x_ = resolution_x_override_;
                 resolution_y_ = resolution_y_override_;
@@ -263,6 +264,43 @@ namespace golf_sim {
             video_resolution_y_ = 1080;
 
             GS_LOG_TRACE_MSG(trace, "Video resolution (x,y) is: " + std::to_string(video_resolution_x_) + "/" + std::to_string(video_resolution_y_) + ".");
+        }
+
+        if (model == Mira220_Mono) {
+
+            // See https://look.ams-osram.com/m/7591efdbe4af32dc/original/Mira220-1-2-7-2-2-MP-NIR-enhanced-global-shutter-image-sensor.pdf for details
+
+            GS_LOG_TRACE_MSG(trace, "Initializing with a Mira220_Mono - based camera.");
+            // Sensor pixel width is 3.45uM square?  No - 6.33mm diagonal.  It appears that
+            // the actual width is the full resolution (1456)  * 3.4uM = 4.95mm,
+            // Not simply the diagonal sensor width
+
+            sensor_width_ = (float)4.464;   // 2.79um pixel size * 1600
+            sensor_height_ = (float)3.906;  // 2.79um pixel size * 1400
+
+            if (resolution_x_override_ > 0 && resolution_y_override_ > 0) {
+                resolution_x_ = resolution_x_override_;
+                resolution_y_ = resolution_y_override_;
+            }
+            else {
+                //  Defaults
+                resolution_x_ = 1600;
+                resolution_y_ = 1400;
+            }
+
+            // We ahve not tested .
+            video_resolution_x_ = resolution_x_;
+            video_resolution_y_ = resolution_y_;
+
+            GS_LOG_TRACE_MSG(trace, "Video resolution (x,y) is: " + std::to_string(video_resolution_x_) + "/" + std::to_string(video_resolution_y_) + ".");
+        }
+
+
+        // Ball radius parameters are common to most all of our potential cameras
+        if (model == PiGS ||
+            model == InnoMakerIMX296GS_Mono ||
+            model == Mira220_Mono) {
+
 
             // Attempt to get the expected ball radius from the .json file
             std::string ball_radius_pixels_at_40cm_name = "kExpectedBallRadiusPixelsAt40cmCamera" + std::string(camera_number == GsCameraNumber::kGsCamera1 ? "1" : "2");

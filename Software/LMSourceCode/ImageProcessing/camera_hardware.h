@@ -36,6 +36,7 @@ namespace golf_sim {
             PiHQ = 3,
             PiGS = 4,
             InnoMakerIMX296GS_Mono = 5,
+            Mira220_Mono = 6,
             kCameraUnknown = 100
         };
 

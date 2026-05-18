@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+# PiTrac External Trigger Utility for Mira220 (arducam-pivariety)
+#
+# Usage: v4l2_trigger <subdev_index> <mode>
+#   subdev_index: v4l-subdev index (e.g., 2 for /dev/v4l-subdev2 on Pi 5)
+#   mode: 0 = disable external trigger, 1 = enable external trigger
+#
+# Example: v4l2_trigger 2 1   # Enable external trigger on /dev/v4l-subdev2
+#
+# This uses the Arducam pivariety driver's v4l2 control 'trigger_mode':
+#   - trigger_mode=0: normal streaming (internal trigger)
+#   - trigger_mode=1: external trigger via FSIN pin, camera waits for signal
+#
+
+SUBDEV="${1:-2}"
+MODE="${2:-1}"
+
+v4l2-ctl -d "/dev/v4l-subdev${SUBDEV}" -c "trigger_mode=${MODE}"
+exit $?
