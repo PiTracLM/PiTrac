@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -34,7 +35,8 @@ DISTORTION_CAPTURE_TIMEOUT = 10.0  # timeout for rpicam-still
 RPICAM_TUNING_FILE = "/usr/share/libcamera/ipa/rpi/pisp/imx296_noir.json"
 RPICAM_CAL_SHUTTER_US = 11000
 
-IMX296_TRIGGER_MODE_PATH = "/sys/module/imx296/parameters/trigger_mode"
+IMX296_TRIGGER_BINARY = "/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_trigger"
+IMX296_I2C_BUS = "4"
 
 
 class CalibrationManager:
@@ -79,23 +81,39 @@ class CalibrationManager:
         self._free_running_refs = 0
         self._trigger_mode_lock = asyncio.Lock()
 
-    def _set_trigger_mode(self, mode: int) -> None:
-        """Write to sysfs to switch IMX296 between free-running (0) and external trigger (1)."""
+    def _set_trigger_mode(self, mode: int) -> bool:
+        """Set IMX296 trigger mode (0=free-running, 1=external). Returns True on success."""
+        if mode not in (0, 1):
+            logger.error(f"Invalid trigger_mode: {mode}")
+            return False
         try:
-            with open(IMX296_TRIGGER_MODE_PATH, "w") as f:
-                f.write(str(mode))
-            logger.debug(f"Set IMX296 trigger_mode={mode}")
-        except (IOError, PermissionError) as e:
-            logger.warning(f"Could not set trigger_mode: {e}")
+            result = subprocess.run(
+                [IMX296_TRIGGER_BINARY, IMX296_I2C_BUS, str(mode)],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
+            logger.warning(f"Could not invoke imx296_trigger: {e}")
+            return False
+        if result.returncode != 0:
+            logger.warning(
+                f"imx296_trigger {IMX296_I2C_BUS} {mode} failed "
+                f"(rc={result.returncode}): {result.stderr.strip()}"
+            )
+            return False
+        logger.debug(f"Set IMX296 trigger_mode={mode} via I2C")
+        return True
 
     async def request_free_running(self, camera_index: int) -> None:
         """Request Camera 2 be in free-running mode (ref-counted)."""
         if camera_index != 1:
             return
         async with self._trigger_mode_lock:
+            # Increment only on hardware success: refcount must mirror physical state.
+            if self._free_running_refs == 0 and not self._set_trigger_mode(0):
+                return
             self._free_running_refs += 1
-            if self._free_running_refs == 1:
-                self._set_trigger_mode(0)
 
     async def release_free_running(self, camera_index: int) -> None:
         """Release a free-running request for Camera 2 (ref-counted)."""
