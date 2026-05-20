@@ -191,7 +191,7 @@ const dashboardCheckPiTracStatus = async function() {
     }
 
     return isRunning;
-}
+};
 
 function showStatusMessage(message, type = 'info') {
     const statusMessage = document.getElementById('status-strip-message');

@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -33,6 +34,9 @@ DISTORTION_CAPTURE_TIMEOUT = 10.0  # timeout for rpicam-still
 
 RPICAM_TUNING_FILE = "/usr/share/libcamera/ipa/rpi/pisp/imx296_noir.json"
 RPICAM_CAL_SHUTTER_US = 11000
+
+IMX296_TRIGGER_BINARY = "/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_trigger"
+IMX296_I2C_BUS = "4"
 
 
 class CalibrationManager:
@@ -70,6 +74,58 @@ class CalibrationManager:
         # calibration loop can grab frames without opening a second VideoCapture.
         # Keys: camera_index (int) -> latest BGR numpy frame
         self._shared_frames: Dict[int, Any] = {}
+
+        # Reference count for Camera 2 free-running mode requests.
+        # When >0, trigger_mode is set to 0 (free-running) so rpicam-still
+        # and cv2.VideoCapture can capture without external triggers.
+        self._free_running_refs = 0
+        self._trigger_mode_lock = asyncio.Lock()
+
+    def _set_trigger_mode(self, mode: int) -> bool:
+        """Set IMX296 trigger mode (0=free-running, 1=external). Returns True on success."""
+        if mode not in (0, 1):
+            logger.error(f"Invalid trigger_mode: {mode}")
+            return False
+        try:
+            result = subprocess.run(
+                [IMX296_TRIGGER_BINARY, IMX296_I2C_BUS, str(mode)],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
+            logger.warning(f"Could not invoke imx296_trigger: {e}")
+            return False
+        if result.returncode != 0:
+            logger.warning(
+                f"imx296_trigger {IMX296_I2C_BUS} {mode} failed "
+                f"(rc={result.returncode}): {result.stderr.strip()}"
+            )
+            return False
+        logger.debug(f"Set IMX296 trigger_mode={mode} via I2C")
+        return True
+
+    async def request_free_running(self, camera_index: int) -> None:
+        """Request Camera 2 be in free-running mode (ref-counted)."""
+        if camera_index != 1:
+            return
+        async with self._trigger_mode_lock:
+            # Increment only on hardware success: refcount must mirror physical state.
+            if self._free_running_refs == 0 and not self._set_trigger_mode(0):
+                return
+            self._free_running_refs += 1
+
+    async def release_free_running(self, camera_index: int) -> None:
+        """Release a free-running request for Camera 2 (ref-counted)."""
+        if camera_index != 1:
+            return
+        async with self._trigger_mode_lock:
+            if self._free_running_refs <= 0:
+                logger.warning("release_free_running called with refcount already at 0")
+                return
+            self._free_running_refs -= 1
+            if self._free_running_refs == 0:
+                self._set_trigger_mode(1)
 
     def _on_calibration_update(self, key: str, value: Any) -> None:
         """
@@ -1041,6 +1097,8 @@ class CalibrationManager:
         }
 
         camera_index = 0 if camera == "camera1" else 1
+        await self.request_free_running(camera_index)
+
         config = self.config_manager.get_config()
         slot_key = "slot1" if camera == "camera1" else "slot2"
         slot_config = config.get("cameras", {}).get(slot_key, {})
@@ -1316,6 +1374,8 @@ class CalibrationManager:
             self.calibration_status[camera]["message"] = str(e)
             self._write_distortion_log(log_file, log_lines)
             return {"status": "error", "message": str(e), "log_file": str(log_file)}
+        finally:
+            await self.release_free_running(camera_index)
 
     def _detect_capture_backend(self) -> str:
         """Auto-detect whether to use rpicam-still (Pi) or cv2.VideoCapture (webcam)."""

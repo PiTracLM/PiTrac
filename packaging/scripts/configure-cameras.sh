@@ -213,10 +213,12 @@ arm_boost=1"
         config_block="$config_block
 
 # Dual camera configuration (single-pi system)
-# Camera 0: internal trigger, Camera 1: external trigger
+# Camera 0: free-running, Camera 1: trigger mode set at runtime via sysfs
+# Using always-on (instead of sync-sink) keeps the 1.8V regulator powered for
+# external triggering while allowing runtime trigger mode switching without reboot.
 [all]
 dtoverlay=imx296,cam0
-dtoverlay=imx296,sync-sink"
+dtoverlay=imx296,always-on"
     elif [[ "$num_cameras" -eq 1 ]]; then
         config_block="$config_block
 

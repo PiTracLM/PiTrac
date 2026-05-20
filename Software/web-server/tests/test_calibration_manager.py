@@ -1141,3 +1141,120 @@ class TestStopDistortionCalibrationFlag:
         assert manager.calibration_status["camera2"]["status"] == "stopping"
         assert result["status"] == "stopping"
         assert set(result["cameras"]) == {"camera1", "camera2"}
+
+
+class TestTriggerModeSwitching:
+    """Ref-counted trigger mode switching for Camera 2 (IMX296)."""
+
+    @pytest.fixture
+    def manager(self):
+        cfg = Mock()
+        cfg.get_cli_parameters = Mock(return_value=[])
+        cfg.register_callback = Mock()
+        return CalibrationManager(cfg)
+
+    def test_set_trigger_mode_rejects_invalid_mode(self, manager):
+        assert manager._set_trigger_mode(2) is False
+        assert manager._set_trigger_mode(-1) is False
+
+    @patch("calibration_manager.subprocess.run")
+    def test_set_trigger_mode_success(self, mock_run, manager):
+        mock_run.return_value = Mock(returncode=0, stderr="")
+        assert manager._set_trigger_mode(0) is True
+        args, kwargs = mock_run.call_args
+        assert args[0][-2:] == ["4", "0"]
+        assert kwargs["timeout"] == 5
+        assert kwargs["capture_output"] is True
+
+    @patch("calibration_manager.subprocess.run")
+    def test_set_trigger_mode_returns_false_on_nonzero_rc(self, mock_run, manager):
+        mock_run.return_value = Mock(returncode=1, stderr="permission denied")
+        assert manager._set_trigger_mode(1) is False
+
+    @patch("calibration_manager.subprocess.run")
+    def test_set_trigger_mode_returns_false_on_missing_binary(self, mock_run, manager):
+        mock_run.side_effect = FileNotFoundError("no such file")
+        assert manager._set_trigger_mode(0) is False
+
+    @patch("calibration_manager.subprocess.run")
+    def test_set_trigger_mode_returns_false_on_timeout(self, mock_run, manager):
+        import subprocess as _sp
+        mock_run.side_effect = _sp.TimeoutExpired(cmd="x", timeout=5)
+        assert manager._set_trigger_mode(1) is False
+
+    def test_request_release_ignore_non_camera2(self, manager):
+        async def go():
+            await manager.request_free_running(0)
+            await manager.release_free_running(0)
+        asyncio.run(go())
+        assert manager._free_running_refs == 0
+
+    @patch.object(CalibrationManager, "_set_trigger_mode")
+    def test_request_first_call_sets_mode_zero_and_increments(self, mock_set, manager):
+        mock_set.return_value = True
+
+        async def go():
+            await manager.request_free_running(1)
+
+        asyncio.run(go())
+        mock_set.assert_called_once_with(0)
+        assert manager._free_running_refs == 1
+
+    @patch.object(CalibrationManager, "_set_trigger_mode")
+    def test_request_subsequent_calls_skip_hardware(self, mock_set, manager):
+        mock_set.return_value = True
+
+        async def go():
+            await manager.request_free_running(1)
+            await manager.request_free_running(1)
+            await manager.request_free_running(1)
+
+        asyncio.run(go())
+        mock_set.assert_called_once_with(0)
+        assert manager._free_running_refs == 3
+
+    @patch.object(CalibrationManager, "_set_trigger_mode")
+    def test_request_does_not_increment_on_hardware_failure(self, mock_set, manager):
+        mock_set.return_value = False
+
+        async def go():
+            await manager.request_free_running(1)
+
+        asyncio.run(go())
+        assert manager._free_running_refs == 0
+
+    @patch.object(CalibrationManager, "_set_trigger_mode")
+    def test_release_at_zero_warns_and_no_hardware_call(self, mock_set, manager):
+        async def go():
+            await manager.release_free_running(1)
+
+        asyncio.run(go())
+        mock_set.assert_not_called()
+        assert manager._free_running_refs == 0
+
+    @patch.object(CalibrationManager, "_set_trigger_mode")
+    def test_release_decrements_without_hardware_until_zero(self, mock_set, manager):
+        mock_set.return_value = True
+
+        async def go():
+            await manager.request_free_running(1)
+            await manager.request_free_running(1)
+            mock_set.reset_mock()
+            await manager.release_free_running(1)
+
+        asyncio.run(go())
+        mock_set.assert_not_called()
+        assert manager._free_running_refs == 1
+
+    @patch.object(CalibrationManager, "_set_trigger_mode")
+    def test_release_transition_to_zero_restores_external_trigger(self, mock_set, manager):
+        mock_set.return_value = True
+
+        async def go():
+            await manager.request_free_running(1)
+            mock_set.reset_mock()
+            await manager.release_free_running(1)
+
+        asyncio.run(go())
+        mock_set.assert_called_once_with(1)
+        assert manager._free_running_refs == 0

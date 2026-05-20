@@ -47,6 +47,20 @@ using namespace std::placeholders;
 using libcamera::Stream;
 namespace gs = golf_sim;
 
+void SetImx296TriggerModeViaI2C(int mode) {
+	if (mode != 0 && mode != 1) {
+		GS_LOG_MSG(error, "Invalid trigger mode: " + std::to_string(mode) + " (must be 0 or 1)");
+		return;
+	}
+	const std::string cmd = "$PITRAC_ROOT/ImageProcessing/CameraTools/imx296_trigger 4 " + std::to_string(mode);
+	int rc = system(cmd.c_str());
+	if (rc != 0) {
+		GS_LOG_MSG(warning, "imx296_trigger 4 " + std::to_string(mode) + " failed (rc=" + std::to_string(rc) + ")");
+		return;
+	}
+	GS_LOG_TRACE_MSG(trace, "Set IMX296 trigger mode via I2C: " + std::to_string(mode));
+}
+
 enum FlightCameraState {
 	kUninitialized,
 	kWaitingForFirstPrimingPulseGroup,
@@ -89,6 +103,10 @@ void SetExternalTrigger(bool& flag) {
 // Calls StartCamera at entry and StopCamera when the final image arrives.
 bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_priming_pulses)
 {
+	struct TriggerModeResetGuard {
+		~TriggerModeResetGuard() { SetImx296TriggerModeViaI2C(0); }
+	} trigger_reset_guard;
+
 	app.StartCamera();
 	GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop: camera started, waiting for triggers");
 

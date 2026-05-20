@@ -1027,8 +1027,8 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
 
     LibcameraJpegApp* app = lci::libcamera_app_[hardware_camera_index];
 
-    if (app != nullptr || lci::libcamera_configuration_[hardware_camera_index] == lci::CameraConfiguration::kStillPicture) {
-        return lci::libcamera_app_[camera_number];
+    if (app != nullptr && lci::libcamera_configuration_[hardware_camera_index] == lci::CameraConfiguration::kStillPicture) {
+        return app;
     }
 
     if (app != nullptr) {
@@ -1489,24 +1489,8 @@ bool PerformCameraSystemStartup() {
 
     SetLibCameraLoggingOff();
 
-    // Setup the Pi Camera to be internally or externally triggered as appropriate
-
-    SystemMode mode = GolfSimOptions::GetCommandLineOptions().system_mode_;
-
-    switch (mode) {
-
-        case SystemMode::kCamera1:
-        case SystemMode::kCamera1TestStandalone:
-        case SystemMode::kTestSpin: {
-            // Camera triggering is configured via firmware config.txt dtoverlays,
-            // not programmatically. Nothing to do here.
-        }
-        break;
-
-        case SystemMode::kTest:
-        default:
-            break;
-    }
+    // Defensive reset in case a prior crashed run left the sensor in external trigger.
+    SetImx296TriggerModeViaI2C(0);
 
     return true;
 }
