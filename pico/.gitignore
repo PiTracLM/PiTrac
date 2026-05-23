@@ -1,0 +1,33 @@
+# CMake / Ninja build artefacts
+build/
+build-*/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+.ninja_deps
+.ninja_log
+
+# Firmware outputs — never check these in; they're produced from source.
+*.uf2
+*.elf
+*.bin
+*.hex
+*.map
+*.dis
+
+# Editor / IDE noise
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Generated PIO headers (created by pioasm during the build)
+*.pio.h
+
+# picotool save outputs from on-device flash dumps
+*.flash.bin
