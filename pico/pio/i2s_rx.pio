@@ -1,0 +1,135 @@
+;
+; i2s_rx.pio — SPH0645 I2S receiver, RP2040 PIO.
+;
+; The SPH0645 is fussy. Two things you need to know going in:
+;
+;   1. The datasheet says data is valid on the rising edge of BCLK in I2S
+;      mode, but the chip outputs MSB-first with a *one-cycle delay* after
+;      the LRCLK transition (classic I2S "Phillips" framing). So for slot N
+;      we shift in 32 bits starting one BCLK *after* LRCLK flips.
+;
+;   2. Bit 0 (LSB) of every 32-bit slot is undefined garbage on the SPH0645.
+;      Mask it off in software, or shift right by 1 before use. We don't do
+;      that here in PIO; the consumer handles it.
+;
+; Pin mapping (configured by C-side helper before sm_init):
+;   sideset(0) = BCLK   — driven by PIO, toggling at sysclk/(2*div) Hz
+;   sideset(1) = LRCLK  — driven by PIO, toggles once per 32-bit slot
+;   IN base    = DIN    — sampled by PIO, latched on BCLK falling edge
+;
+; To reach 3.072 MHz BCLK at 125 MHz sysclk:
+;   one BCLK period = 2 PIO cycles (one HIGH, one LOW)
+;   so we need PIO clk = 6.144 MHz → divisor = 125e6 / 6.144e6 ≈ 20.345
+;   Use sm_config_set_clkdiv with fractional clkdiv — we don't need bit-exact
+;   sample rate; the DSP is sample-clock-agnostic at the percent level.
+;
+; Each loop iteration produces one 32-bit word and pushes it to RX FIFO.
+; LRCLK low = left slot, LRCLK high = right slot. With SEL=GND, the SPH0645
+; only outputs on the left slot — right is high impedance, so we read zeros.
+; That's fine; we filter the right slot out in C (or just ignore: zero RMS
+; contribution).
+;
+; Credits: structure derived from moefh/pico-i2s-mic (Apache 2.0) and
+; vijaymarupudi/sph0645-pico-troubleshooting (sample alignment workaround
+; for the LRCLK-delayed first bit).
+
+.program i2s_rx
+.side_set 2          ; bit 0 = BCLK, bit 1 = LRCLK
+
+; Each "frame" = 2 slots × 32 bits = 64 BCLK cycles.
+; PIO sideset patterns:
+;   side 0b00 → BCLK low,  LRCLK low   (start of left slot)
+;   side 0b01 → BCLK high, LRCLK low
+;   side 0b10 → BCLK low,  LRCLK high  (start of right slot)
+;   side 0b11 → BCLK high, LRCLK high
+
+; --- Left slot: 32 bits with LRCLK low ---
+; Note the +1 cycle on the BCLK-high state. SPH0645 latches data on the
+; rising edge, so we hold BCLK high for 2 PIO cycles to give the mic's
+; output driver time to settle before we sample on the next falling edge.
+; This matches what vijaymarupudi found by scope; without it you get
+; intermittent bit-shifts at higher BCLK rates.
+
+left_loop:
+    set x, 31           side 0b00       ; 32 bits to shift — counter in X
+left_bit:
+    nop                 side 0b01 [1]   ; BCLK high, sample window
+    in pins, 1          side 0b00       ; BCLK low, latch DIN bit on falling edge
+    jmp x-- left_bit    side 0b00       ; decrement, loop (keep BCLK low, LRCLK low)
+
+    push                side 0b00       ; word complete → RX FIFO (32-bit auto-push works too)
+
+; --- Right slot: 32 bits with LRCLK high ---
+; Identical structure; only the LRCLK level differs. SPH0645 with SEL=GND
+; outputs zeros here (or tristate, which reads as either depending on board
+; pull-downs) — we still clock it through to keep frame timing locked.
+
+right_loop:
+    set x, 31           side 0b10
+right_bit:
+    nop                 side 0b11 [1]
+    in pins, 1          side 0b10
+    jmp x-- right_bit   side 0b10
+
+    push                side 0b10       ; word complete, then fall through to top
+
+% c-sdk {
+// Helper for the C side. Configures pin mux, sets the state machine clkdiv
+// for ~3.072 MHz BCLK, and starts the SM. Caller is responsible for setting
+// up DMA on the RX FIFO afterwards.
+//
+// `bclk_lrclk_pin_base` should be the BCLK GPIO; LRCLK is forced to
+// bclk_lrclk_pin_base+1 by the sideset configuration. `din_pin` is the data
+// input from SPH0645 DOUT.
+
+#include "hardware/clocks.h"
+#include "hardware/gpio.h"
+
+static inline void i2s_rx_program_init(PIO pio, uint sm, uint offset,
+                                       uint bclk_lrclk_pin_base,
+                                       uint din_pin,
+                                       float sample_rate_hz) {
+    pio_sm_config c = i2s_rx_program_get_default_config(offset);
+
+    // Sideset → BCLK (base+0) and LRCLK (base+1). Mark both as PIO-controlled
+    // outputs and initialise low. PIO will hold them deterministically once
+    // running; we just want them in a known state before sm_enable.
+    sm_config_set_sideset_pins(&c, bclk_lrclk_pin_base);
+    pio_gpio_init(pio, bclk_lrclk_pin_base);
+    pio_gpio_init(pio, bclk_lrclk_pin_base + 1);
+    pio_sm_set_consecutive_pindirs(pio, sm, bclk_lrclk_pin_base, 2, true);
+
+    // Data input pin → DIN. Pull-down disabled; the SPH0645 actively drives
+    // its output, no point fighting it.
+    sm_config_set_in_pins(&c, din_pin);
+    pio_gpio_init(pio, din_pin);
+    pio_sm_set_consecutive_pindirs(pio, sm, din_pin, 1, false);
+    gpio_disable_pulls(din_pin);
+
+    // IN shift: left (MSB first, matching I2S), autopush at 32 bits — saves
+    // an explicit `push` instruction and means our PIO program above can
+    // drop the manual push if we want it leaner. We leave the manual push
+    // in place for clarity; the autopush threshold acts as a safety net.
+    sm_config_set_in_shift(&c, false /* shift_left */, true /* autopush */, 32);
+
+    // FIFO config: RX-only, so steal the TX FIFO half too for a deeper RX
+    // buffer (8 entries instead of 4). DMA can drain plenty fast anyway,
+    // but the headroom protects against scheduler hiccups.
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);
+
+    // Compute clkdiv. The PIO program uses 2 cycles per BCLK edge transition
+    // (the [1] delay on the BCLK-high state extends each half-period by one
+    // cycle, so a full BCLK period = 4 PIO cycles). Total cycles per 32-bit
+    // word = 32 × 4 = 128 PIO cycles. Plus ~2 cycles for the loop overhead
+    // (`set x, 31` + `push`), so call it 130. Stereo frame = 260 cycles per
+    // sample, at sample_rate_hz Hz → PIO clk = 260 × sample_rate_hz.
+    //
+    // 48 kHz → 260 × 48000 = 12.48 MHz PIO clock → divisor 125e6/12.48e6 ≈ 10.02.
+    // (Pico stock sysclk is 125 MHz.)
+    float div = (float)clock_get_hz(clk_sys) / (260.0f * sample_rate_hz);
+    sm_config_set_clkdiv(&c, div);
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+%}
