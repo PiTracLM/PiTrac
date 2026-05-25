@@ -1,0 +1,100 @@
+;
+; ir_strobe.pio — cycle-accurate pulse-train output for IR LED strobe.
+;
+; The design here is dead simple on purpose: each FIFO word encodes one
+; "hold pin HIGH for N cycles, then LOW for M cycles" command. We chain a
+; sequence of these via DMA and the strobe fires deterministically with no
+; CPU intervention once it's armed.
+;
+; Word format (32 bits):
+;   bits  0..15 : high_count  — how many PIO cycles to hold the pin HIGH
+;   bits 16..31 : low_count   — how many PIO cycles to hold the pin LOW after
+;
+; Each count is "cycles minus 1" because the OSR-pop already consumes the
+; first sample point. So encode `cycles = N` as `N - 1` for N >= 1.
+;
+; PIO clock divisor: configured by the C side. We typically run at sysclk
+; (div = 1) so we get 125 MHz → 8 ns resolution. That's sub-cycle relative
+; to the 1 µs pulse widths in our strobe vectors, which is way more than the
+; MCP1407 + MOSFET turn-on time can resolve anyway (~30 ns rise time spec).
+;
+; Encoding a 15 µs HIGH pulse at 125 MHz: 1875 cycles → high_count = 1874.
+; Encoding a 1.8 ms gap at 125 MHz: 225000 cycles → low_count = 224999.
+; Note: low_count is 16 bits = max 65535 cycles ≈ 524 µs at 125 MHz. For
+; longer LOW intervals we emit multiple "zero high" entries — the C side
+; handles that. (See strobe.c::strobe_compile_pulse_train.)
+;
+; Pin mapping: one OUT pin = STROBE_OUT (GP13). Driven LOW at reset; PIO
+; controls it for the duration of the train, then C code parks it LOW again.
+
+.program ir_strobe
+.side_set 1 opt          ; sideset is the strobe pin itself; "opt" so we can
+                         ; emit instructions that don't change it.
+
+; Loop body:
+;   pull → read next 32-bit word from TX FIFO (blocks until DMA feeds one)
+;   out  → put high_count into Y (low 16 bits)
+;   out  → put low_count  into X (high 16 bits)
+;   high_phase: decrement Y while holding pin HIGH (sideset 1)
+;   low_phase : decrement X while holding pin LOW  (sideset 0)
+;   wrap back to start
+;
+; When the DMA's NULL handler runs (no more entries), the PIO will block on
+; the `pull` waiting for data — pin stays in whatever state the last entry
+; left it. We always queue a final 0/0 entry that explicitly forces LOW, so
+; the strobe pin is guaranteed safe after a train completes.
+
+.wrap_target
+    pull                     side 0     ; fetch next pulse-spec, pin LOW
+    out y, 16                side 0     ; Y = high_count - 1
+    out x, 16                side 0     ; X = low_count  - 1
+
+high_phase:
+    jmp y-- high_phase       side 1     ; hold HIGH while Y counts down
+
+low_phase:
+    jmp x-- low_phase        side 0     ; hold LOW while X counts down
+.wrap                                   ; back to pull next entry
+
+
+% c-sdk {
+
+#include "hardware/clocks.h"
+#include "hardware/gpio.h"
+
+// Initialise the strobe state machine.
+//   pio, sm    — which PIO block and state machine
+//   offset     — where the .program was loaded
+//   pin        — strobe GPIO (will be claimed by PIO)
+//   clkdiv     — PIO clock divisor; pass 1.0f for sysclk-rate (best resolution)
+static inline void ir_strobe_program_init(PIO pio, uint sm, uint offset,
+                                          uint pin, float clkdiv) {
+    pio_sm_config c = ir_strobe_program_get_default_config(offset);
+
+    // sideset + out both point at the strobe pin. We use sideset (not out)
+    // for the actual HIGH/LOW transitions because sideset is "free" — it
+    // happens *during* the instruction's existing cycle rather than costing
+    // an extra instruction slot.
+    sm_config_set_sideset_pins(&c, pin);
+    sm_config_set_out_pins(&c, pin, 1);
+
+    pio_gpio_init(pio, pin);
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
+
+    // OSR: shift right (so the low 16 bits — high_count — pop first via
+    // `out y,16`, then the next `out x,16` gets the high half). Auto-pull
+    // OFF — we want explicit `pull` so we can DMA-feed precisely-counted
+    // entries without the SM getting ahead of the host's queue setup.
+    sm_config_set_out_shift(&c, true /* shift_right */, false, 32);
+
+    // Join the TX FIFO to give us 8 deep instead of 4 — covers a bigger
+    // pulse train without re-DMAing mid-burst. We'd never come close at
+    // current pulse counts (8 entries max) but it costs nothing.
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
+
+    sm_config_set_clkdiv(&c, clkdiv);
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+%}
