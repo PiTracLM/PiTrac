@@ -235,6 +235,35 @@
       "requiresRestart": true,
       "passedVia": "json"
     },
+    "gs_config.pico.enabled": {
+      "category": "System",
+      "subcategory": "basic",
+      "basicSubcategory": "System",
+      "displayName": "Pico Bridge",
+      "description": "Use Raspberry Pi Pico for strobe and impact detection. auto = detect at startup, required = fail loud if absent, legacy = SPI-only Pico ignored.",
+      "type": "select",
+      "options": {
+        "auto": "Auto-detect (recommended)",
+        "required": "Required (fail if Pico is missing)",
+        "legacy": "Legacy SPI only (Pico ignored)"
+      },
+      "default": "auto",
+      "requiresRestart": true,
+      "passedVia": "environment",
+      "envVariable": "PITRAC_PICO_ENABLED"
+    },
+    "gs_config.pico.device": {
+      "category": "System",
+      "subcategory": "basic",
+      "basicSubcategory": "System",
+      "displayName": "Pico Serial Device",
+      "description": "Path to the Pico's USB-CDC serial device. Change only if your Pi enumerates the Pico as a different ACM index.",
+      "type": "string",
+      "default": "/dev/ttyACM0",
+      "requiresRestart": true,
+      "passedVia": "environment",
+      "envVariable": "PITRAC_PICO_DEVICE"
+    },
     "gs_config.strobing.kDAC_setting": {
       "category": "Strobing",
       "subcategory": "advanced",
