@@ -178,6 +178,7 @@ pitrac_lm_sources += ([
 			'spin_predictor.cpp',
 			'spin_surface.cpp',
 			'pulse_strobe.cpp',
+			'pico_strobe_client.cpp',
 			'colorsys.cpp',
 			'cv_utils.cpp',
 			'EllipseDetectorCommon.cpp',

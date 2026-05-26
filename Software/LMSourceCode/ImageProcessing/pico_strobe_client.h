@@ -1,0 +1,65 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+/*
+ * Copyright (C) 2022-2026, Verdant Consultants, LLC.
+ */
+
+#pragma once
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+namespace golf_sim {
+
+struct PicoStatus {
+    bool        armed = false;
+    int32_t     mic_threshold = 0;
+    float       pulse_width_us = 0.0f;
+    uint32_t    min_inter_shot_ms = 0;
+    bool        strobe_hold = false;
+    uint64_t    event_count = 0;
+    std::string fw_version;
+};
+
+class PicoStrobeClient {
+public:
+    explicit PicoStrobeClient(int lggpio_chip_handle = -1);
+    ~PicoStrobeClient();
+
+    PicoStrobeClient(const PicoStrobeClient&) = delete;
+    PicoStrobeClient& operator=(const PicoStrobeClient&) = delete;
+
+    // True iff the device behind device_path answers STATUS with a recognisable
+    // PiTrac Pico reply. Opens, probes, closes.
+    static bool Probe(const std::string& device_path);
+
+    bool Open(const std::string& device_path);
+    void Close();
+    bool IsOpen() const;
+
+    // Send pulse + train config; called once at startup and on any config change.
+    bool SendPulseConfig(float pulse_width_us,
+                         const std::vector<float>& intervals_ms);
+
+    // The two bridge intercepts.
+    bool CamPulse(uint32_t microseconds);
+    bool FireWithShutter();
+
+    // Calibration hold.
+    bool HoldOn();
+    bool HoldOff();
+
+    // Diagnostic readback.
+    bool ReadStatus(PicoStatus& out);
+
+    // Test-only seam: bypass termios and adopt an already-configured fd.
+    // Production code must use Open(device_path).
+    bool AttachFd(int fd);
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+};
+
+}  // namespace golf_sim
