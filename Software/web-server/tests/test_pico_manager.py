@@ -244,3 +244,68 @@ class TestRmsStream:
         asyncio.run(drive())
         writes = [c.args[0] for c in ser.write.call_args_list]
         assert b"CFG STREAM_RMS=100\n" in writes
+
+
+# --------------------------------------------------------------------- flash
+
+class TestFlash:
+    @patch("pico_manager.serial")
+    @patch("pico_manager.shutil.which")
+    @patch("pico_manager.asyncio.create_subprocess_exec")
+    def test_flash_invokes_picotool_load(
+        self, mock_exec, mock_which, mock_serial_mod, tmp_path
+    ):
+        mock_which.return_value = "/usr/bin/picotool"
+
+        proc = MagicMock()
+        proc.stdout = MagicMock()
+
+        async def _readline_seq():
+            for chunk in (b"Loading into Flash: 100%\n", b"Reboot complete\n", b""):
+                yield chunk
+
+        seq = _readline_seq()
+
+        async def _next_line():
+            try:
+                return await seq.__anext__()
+            except StopAsyncIteration:
+                return b""
+
+        proc.stdout.readline = _next_line
+
+        async def _wait():
+            return 0
+
+        proc.wait = _wait
+
+        async def _exec(*args, **kwargs):
+            return proc
+
+        mock_exec.side_effect = _exec
+
+        uf2 = tmp_path / "fake.uf2"
+        uf2.write_bytes(b"FAKE")
+
+        captured = []
+        mgr = _build(mock_serial_mod)
+        result = asyncio.run(mgr.flash(str(uf2), on_progress=captured.append))
+
+        assert result["ok"] is True
+        assert result["uf2"] == str(uf2)
+        called_args = [call.args for call in mock_exec.call_args_list]
+        assert any("load" in argv for argv in called_args)
+        assert any("Reboot" in line or "Loading" in line for line in captured)
+
+    @patch("pico_manager.serial")
+    @patch("pico_manager.shutil.which")
+    def test_flash_raises_when_picotool_missing(
+        self, mock_which, mock_serial_mod, tmp_path
+    ):
+        mock_which.return_value = None
+        uf2 = tmp_path / "x.uf2"
+        uf2.write_bytes(b"")
+
+        mgr = _build(mock_serial_mod)
+        with pytest.raises(RuntimeError, match="picotool"):
+            asyncio.run(mgr.flash(str(uf2)))
