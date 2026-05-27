@@ -299,6 +299,16 @@ build_dev() {
     # Configuration parsing tools
     pkg_installed yq || missing_deps+=("yq")
 
+    # picotool: needed by /pico flash UI. Available on Trixie; absence is
+    # not fatal but we log it so the operator knows the flash button won't work.
+    if ! command -v picotool &> /dev/null; then
+        if apt-cache show picotool &> /dev/null; then
+            missing_deps+=("picotool")
+        else
+            log_warning "picotool not found in apt repositories - /pico flash feature disabled"
+        fi
+    fi
+
 
     # ========================================================================
     # Fix initramfs-tools configuration issues on Raspberry Pi
