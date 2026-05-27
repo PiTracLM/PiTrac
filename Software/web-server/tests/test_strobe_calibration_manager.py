@@ -50,8 +50,12 @@ class TestOpenHardware:
 
     @patch("strobe_calibration_manager.spidev")
     @patch("strobe_calibration_manager.DigitalOutputDevice")
-    def test_open_creates_spi_and_gpio(self, mock_led_cls, mock_spidev_mod):
+    def test_open_creates_spi_and_gpio(self, mock_led_cls, mock_spidev_mod, monkeypatch):
         from strobe_calibration_manager import StrobeCalibrationManager
+
+        # Force the legacy GPIO 10 path; the Pico bridge has its own tests
+        # in test_pico_bridge_calibration.py.
+        monkeypatch.setenv("PITRAC_PICO_ENABLED", "legacy")
 
         mock_dac = MagicMock()
         mock_adc = MagicMock()

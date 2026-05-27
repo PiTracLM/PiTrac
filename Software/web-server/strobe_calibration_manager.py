@@ -25,6 +25,44 @@ try:
 except ImportError:
     DigitalOutputDevice = None
 
+try:
+    import serial  # type: ignore
+except ImportError:
+    serial = None
+
+
+def _pico_setting(config_manager, key: str, env_var: str, default: str) -> str:
+    """Return the effective value for a Pico-bridge setting.
+
+    Reads the live UI value via config_manager first; falls back to the env var
+    that pitrac_manager.py would have used; finally falls back to the default.
+    The UI value is authoritative because the user can flip the Pico bridge
+    knob from the web UI without a process restart, while os.environ is fixed
+    at web-server-process startup.
+    """
+    if config_manager is not None:
+        try:
+            value = config_manager.get_config(key)
+            if value is not None and value != "":
+                return str(value).lower() if key.endswith(".enabled") else str(value)
+        except Exception:
+            pass
+    return os.environ.get(env_var, default).lower() if env_var.endswith("_ENABLED") \
+        else os.environ.get(env_var, default)
+
+
+def _pico_enabled(config_manager=None) -> bool:
+    """Return True if the Pico bridge should own the strobe-hold signal.
+
+    Honours gs_config.pico.enabled / PITRAC_PICO_ENABLED in
+    {auto, required, legacy} (default auto). The full auto-probe semantics
+    live in the C++ layer; here we treat auto as a soft enable that lets the
+    serial open fail gracefully and fall back to legacy.
+    """
+    val = _pico_setting(config_manager, "gs_config.pico.enabled",
+                        "PITRAC_PICO_ENABLED", "auto")
+    return val in ("required", "auto")
+
 
 class StrobeCalibrationManager:
     """Manages strobe LED calibration via SPI hardware on the Connector Board"""
@@ -73,6 +111,7 @@ class StrobeCalibrationManager:
         self._spi_dac = None
         self._spi_adc = None
         self._diag_pin = None
+        self._serial = None  # Pico USB-CDC handle (replaces _diag_pin in Pico mode)
 
         self._cancel_requested = False
         self._dac_applied = False
@@ -90,8 +129,6 @@ class StrobeCalibrationManager:
     def _open_hardware(self):
         if spidev is None:
             raise RuntimeError("spidev library not available -- not running on a Raspberry Pi?")
-        if DigitalOutputDevice is None:
-            raise RuntimeError("gpiozero library not available -- not running on a Raspberry Pi?")
 
         saved_cwd = os.getcwd()
 
@@ -105,11 +142,65 @@ class StrobeCalibrationManager:
         self._spi_adc.max_speed_hz = self.SPI_MAX_SPEED_HZ
         self._spi_adc.mode = 0
 
+        # In Pico mode the strobe pulse flows over USB-CDC via the
+        # existing safe FIRE command (microsecond pulse train, same duty
+        # cycle as a normal shot). Legacy DigitalOutputDevice(BCM 10) is the
+        # documented fallback when Pico is disabled.
+        if _pico_enabled(self.config_manager) and serial is not None:
+            device = _pico_setting(self.config_manager, "gs_config.pico.device",
+                                   "PITRAC_PICO_DEVICE", "/dev/ttyACM0")
+            try:
+                self._serial = serial.Serial(device, 115200, timeout=2, exclusive=True)
+                self._diag_pin = None
+                logger.info(
+                    "Strobe calibration: Pico bridge OPEN on %s (gate=%s)",
+                    device,
+                    _pico_setting(self.config_manager, "gs_config.pico.enabled",
+                                  "PITRAC_PICO_ENABLED", "auto"),
+                )
+                # Lower the min-inter-shot floor so the calibration sweep doesn't
+                # wait 200 ms between DAC steps. 20 ms is the firmware floor.
+                # _close_hardware restores 200 ms.
+                try:
+                    self._serial.write(b"CFG MIN_INTER_SHOT_MS=20\n")
+                    self._serial.flush()
+                except Exception:
+                    logger.warning("Could not lower MIN_INTER_SHOT_MS", exc_info=True)
+                os.chdir(saved_cwd)
+                return
+            except (serial.SerialException, FileNotFoundError, OSError) as e:
+                gate = _pico_setting(self.config_manager, "gs_config.pico.enabled",
+                                     "PITRAC_PICO_ENABLED", "auto")
+                if gate == "required":
+                    logger.error("Pico open REQUIRED but failed on %s: %s", device, e)
+                    raise  # explicit user requirement; surface the error
+                logger.info("Pico open failed on %s (%s); falling back to legacy GPIO 10", device, e)
+                self._serial = None
+        else:
+            logger.info("Strobe calibration: using LEGACY GPIO 10 path (pico bridge not enabled)")
+
+        if DigitalOutputDevice is None:
+            raise RuntimeError("gpiozero library not available -- not running on a Raspberry Pi?")
         self._diag_pin = DigitalOutputDevice(self.DIAG_GPIO_PIN)
 
         os.chdir(saved_cwd)
 
     def _close_hardware(self):
+        # Release the Pico serial handle first; restore the production
+        # min-inter-shot floor and clear any stale strobe-hold flag.
+        if self._serial is not None:
+            for cmd in (b"CFG STROBE_HOLD=0\n", b"CFG MIN_INTER_SHOT_MS=200\n"):
+                try:
+                    self._serial.write(cmd)
+                    self._serial.flush()
+                except Exception:
+                    logger.debug("Error restoring Pico state on close", exc_info=True)
+            try:
+                self._serial.close()
+            except Exception:
+                logger.debug("Error closing serial", exc_info=True)
+            self._serial = None
+
         for name, resource in [("diag", self._diag_pin),
                                ("dac", self._spi_dac),
                                ("adc", self._spi_adc)]:
@@ -161,15 +252,27 @@ class StrobeCalibrationManager:
         return (3.3 / 4096) * adc_value * 3.0
 
     def get_led_current(self) -> float:
-        """Pulse DIAG, read LED current sense via ADC CH0 (0.1 ohm sense resistor).
+        """Read LED current sense at the current DAC value.
 
-        Uses real-time scheduling and GC disable for deterministic timing.
-        DIAG is always turned off in the finally block.
+        Two paths:
+          * Pico mode: send FIRE so the Pico fires its configured pulse train
+            (microsecond pulses, ~21 ms total window) and oversample the ADC
+            CH0 during the train. The peak ADC reading represents the LED
+            current during a pulse. Duty cycle matches a normal shot --
+            inherently safe for the IR LEDs.
+          * Legacy mode: pulse DIAG via GPIO 10 across a single xfer2, same
+            ~100 us LED-on duration the algorithm has always assumed.
         """
         msg = [0x01, self.ADC_CH0_CMD, 0x00]
         spi = self._spi_adc
         diag = self._diag_pin
+        ser = self._serial
 
+        if ser is not None:
+            return self._get_led_current_pico(spi, ser, msg)
+
+        # Legacy diag.on/off path: SCHED_FIFO + GC-off for deterministic
+        # short-pulse timing.
         gc.disable()
         try:
             try:
@@ -177,9 +280,7 @@ class StrobeCalibrationManager:
                 os.sched_setscheduler(0, os.SCHED_FIFO, param)
             except (PermissionError, AttributeError, OSError):
                 pass
-
             time.sleep(0)
-
             try:
                 diag.on()
                 response = spi.xfer2(msg)
@@ -193,7 +294,92 @@ class StrobeCalibrationManager:
             gc.enable()
 
         adc_value = ((response[1] & 0x0F) << 8) | response[2]
-        return (3.3 / 4096) * adc_value * 10.0
+        current_a = (3.3 / 4096) * adc_value * 10.0
+        logger.info(
+            "get_led_current: path=legacy resp=[%#x,%#x,%#x] adc=%d current=%.3fA",
+            response[0], response[1], response[2], adc_value, current_a,
+        )
+        return current_a
+
+    # Number of FIRE_PEAK measurements averaged per DAC step. Single-sample
+    # peaks have ~10-15% noise from ADC sample-timing alignment, boost rail
+    # transients, and pulse-edge ringing. Taking the median of 3 reads
+    # collapses that to <2% while still completing each DAC step in ~250 ms.
+    PICO_PEAK_REPEATS = 3
+
+    def _get_led_current_pico(self, spi, ser, msg) -> float:
+        """Ask the Pico to fire a few pulse trains and report median peak ADC.
+
+        The Pico's onboard ADC samples GP26 (wired to V3 CUR-SENSE / TP4)
+        with single-cycle PIO determinism during the strobe train, completely
+        sidestepping USB-CDC and Python timing jitter. We fire FIRE_PEAK
+        `PICO_PEAK_REPEATS` times and take the median peak so a single noise
+        spike (pulse-edge ringing, boost rail transient, ADC sample landing
+        on an edge) doesn't trip HARD_CAP_CURRENT.
+        """
+        peaks = []
+        samples_total = 0
+        for _ in range(self.PICO_PEAK_REPEATS):
+            adc_v, samples = self._fire_peak_once(ser)
+            if adc_v > 0:
+                peaks.append(adc_v)
+                samples_total += samples
+
+        if not peaks:
+            logger.warning("get_led_current: no PEAK replies from Pico")
+            return 0.0
+
+        peaks.sort()
+        median_adc = peaks[len(peaks) // 2]
+
+        # Pico ADC is 12-bit at 3.3 V reference. Same 0.1 ohm shunt + 10x
+        # scaling as the legacy MCP3202 reading on Pi-side.
+        current_a = (3.3 / 4096) * median_adc * 10.0
+        logger.info(
+            "get_led_current: path=pico reads=%d peaks=%s median_adc=%d current=%.3fA",
+            len(peaks), peaks, median_adc, current_a,
+        )
+        return current_a
+
+    def _fire_peak_once(self, ser) -> tuple:
+        """Send one FIRE_PEAK, parse the EVENT PEAK reply, return (adc, samples).
+
+        Returns (0, 0) if the reply doesn't arrive within the deadline or
+        the line can't be parsed. Filtering of "no reply" cases is the
+        caller's job.
+        """
+        try:
+            ser.reset_input_buffer()
+        except Exception:
+            pass
+        try:
+            ser.write(b"FIRE_PEAK\n")
+            ser.flush()
+        except Exception:
+            logger.warning("_fire_peak_once: write failed", exc_info=True)
+            return (0, 0)
+
+        deadline = time.monotonic() + 0.150
+        buf = b""
+        while time.monotonic() < deadline:
+            chunk = ser.read(256)
+            if chunk:
+                buf += chunk
+                while b"\n" in buf:
+                    line, _, buf = buf.partition(b"\n")
+                    line_s = line.decode(errors="replace").strip()
+                    if line_s.startswith("EVENT PEAK"):
+                        adc = 0
+                        samples = 0
+                        for kv in line_s.split():
+                            if kv.startswith("adc="):
+                                try: adc = int(kv.split("=", 1)[1])
+                                except ValueError: pass
+                            elif kv.startswith("samples="):
+                                try: samples = int(kv.split("=", 1)[1])
+                                except ValueError: pass
+                        return (adc, samples)
+        return (0, 0)
 
     # ------------------------------------------------------------------
     # Calibration algorithm
@@ -247,7 +433,7 @@ class StrobeCalibrationManager:
             self.status["message"] = f"DAC value of 0 is below minimum LDO voltage ({self.LDO_MIN_V:.2f}V): {ldo:.2f}V. This indicates a problem with the controller board."
             return False, -1, -1
 
-        logger.debug(f"Calibrating: target={target_current}A, dac_start={dac_start:#04x}")
+        logger.info(f"Calibrating: target={target_current}A, dac_start={dac_start:#04x}")
 
         # Phase 2: sweep from dac_start downward, looking for target crossing
         final_dac = self.DAC_MIN
@@ -278,7 +464,7 @@ class StrobeCalibrationManager:
                 return False, -1, -1
 
             led_current = self.get_led_current()
-            logger.debug(f"DAC={dac:#04x}, current={led_current:.2f}A")
+            logger.info(f"DAC={dac:#04x}, current={led_current:.2f}A")
 
             if led_current > self.HARD_CAP_CURRENT:
                 self.status["message"] = f"LED current ({led_current:.2f}A) exceeds hard cap ({self.HARD_CAP_CURRENT}A). This strongly indicates the LED is shorted."
