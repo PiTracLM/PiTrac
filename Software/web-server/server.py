@@ -9,7 +9,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from fastapi import FastAPI, File, Request, UploadFile, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    Response,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -1244,6 +1250,29 @@ class PiTracServer:
                     status_code=400, content={"ok": False, "errors": errors, "applied": applied}
                 )
             return JSONResponse({"ok": True, "applied": applied})
+
+        @self.app.get("/api/pico/rms-stream")
+        async def pico_rms_stream(hz: int = 20) -> StreamingResponse:
+            stream = await self.pico_manager.start_rms_stream(hz)
+
+            async def event_source():
+                try:
+                    async for evt in stream:
+                        yield f"data: {json.dumps(evt)}\n\n".encode("utf-8")
+                except asyncio.CancelledError:
+                    raise
+                finally:
+                    await self.pico_manager.stop_rms_stream()
+                    try:
+                        await stream.aclose()
+                    except Exception:
+                        pass
+
+            return StreamingResponse(
+                event_source(),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            )
 
     async def _stream_service_logs(self, websocket: WebSocket, service: str) -> None:
         """Stream logs for a specific service via WebSocket"""
