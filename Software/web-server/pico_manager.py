@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import shutil
 import time
 from typing import Any, AsyncIterator, Callable, Dict, Optional
 
@@ -324,6 +325,60 @@ class PicoManager:
         except OSError as exc:
             self.close()
             return {"ok": False, "error": str(exc)}
+
+
+    # ------------------------------------------------------------------
+    # firmware flash via picotool
+    # ------------------------------------------------------------------
+
+    async def flash(
+        self,
+        uf2_path: str,
+        on_progress: Optional[Callable[[str], None]] = None,
+    ) -> Dict[str, Any]:
+        if shutil.which("picotool") is None:
+            raise RuntimeError(
+                "picotool not installed; rerun packaging/build.sh dev"
+            )
+
+        async with self._lock:
+            # Close the local handle so picotool can claim the USB device.
+            self.close()
+            try:
+                await self._picotool(["reboot", "-f", "-u"], on_progress)
+            except Exception:
+                logger.info("picotool reboot returned non-zero (often fine)")
+            await asyncio.sleep(2)
+            ok = await self._picotool(
+                ["load", "-f", "-x", uf2_path], on_progress
+            )
+            await asyncio.sleep(2)
+            return {"ok": ok, "uf2": uf2_path}
+
+    async def _picotool(
+        self,
+        args: list,
+        on_progress: Optional[Callable[[str], None]],
+    ) -> bool:
+        proc = await asyncio.create_subprocess_exec(
+            "picotool",
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        assert proc.stdout is not None
+        while True:
+            line = await proc.stdout.readline()
+            if not line:
+                break
+            text = line.decode("utf-8", errors="replace").rstrip()
+            if on_progress is not None:
+                try:
+                    on_progress(text)
+                except Exception:
+                    logger.debug("on_progress callback raised", exc_info=True)
+        rc = await proc.wait()
+        return rc == 0
 
 
 def _coerce_scalar(value: str) -> Any:
