@@ -36,10 +36,12 @@
 #include <math.h>
 
 #include "pico/stdlib.h"
+#include "hardware/adc.h"
 #include "hardware/clocks.h"
 #include "hardware/dma.h"
 #include "hardware/gpio.h"
 #include "hardware/pio.h"
+#include "hardware/watchdog.h"
 
 #include "ir_strobe.pio.h"
 #include "proto.h"
@@ -293,6 +295,63 @@ bool strobe_fire(void) {
     /* Step 4: release both XTR pins back high. */
     gpio_put(PIN_CAM2_XTR, 1);
     gpio_put(PIN_CAM1_XTR, 1);
+    return true;
+}
+
+bool strobe_fire_peak(uint16_t *peak_adc_out, uint32_t *samples_out) {
+    if (peak_adc_out)  *peak_adc_out = 0u;
+    if (samples_out)   *samples_out  = 0u;
+
+    /* On Pico W main.c keeps ADC inside the CYW43 guard, so we bring it
+     * up the first time the host actually wants a peak read. */
+    static bool s_adc_ready = false;
+    if (!s_adc_ready) {
+        adc_init();
+        adc_gpio_init(PIN_CUR_SENSE_ADC);
+        s_adc_ready = true;
+    }
+    adc_select_input(ADC_CUR_SENSE_CHANNEL);
+
+    if (s_pattern_len == 0u) return false;
+    if (s_hold_active) return false;
+
+    const uint32_t pio_hz = (uint32_t)clock_get_hz(clk_sys);
+    const uint32_t max_high =
+        (uint32_t)(STROBE_MAX_PULSE_WIDTH_US * 1e-6f * (float)pio_hz);
+    for (uint32_t i = 0; i < s_pattern_len; ++i) {
+        if ((s_pattern[i] & 0xFFFFu) > max_high) return false;
+    }
+
+    if (g_state.pre_trigger_delay_ms > 0u) {
+        sleep_ms(g_state.pre_trigger_delay_ms);
+    }
+
+    gpio_put(PIN_CAM2_XTR, 0);
+    gpio_put(PIN_CAM1_XTR, 0);
+    busy_wait_us(g_state.cam_xtr_setup_us);
+
+    dma_channel_set_read_addr(STROBE_DMA_CHAN, s_pattern, false);
+    dma_channel_set_trans_count(STROBE_DMA_CHAN, s_pattern_len, true);
+
+    /* RP2040 ADC ~= 2 us/sample. With 8.68 us pulses ~4 samples land in any
+     * given pulse-ON window; running max captures the peak. 60 ms deadline
+     * keeps a wedged DMA from chewing through the 2 s watchdog. */
+    const uint64_t adc_deadline = time_us_64() + 60000ull;
+    uint16_t peak = 0u;
+    uint32_t samples = 0u;
+    while (dma_channel_is_busy(STROBE_DMA_CHAN) && time_us_64() < adc_deadline) {
+        uint16_t v = adc_read();
+        if (v > peak) peak = v;
+        ++samples;
+        if ((samples & 0x3FFu) == 0u) watchdog_update();
+    }
+    watchdog_update();
+
+    gpio_put(PIN_CAM2_XTR, 1);
+    gpio_put(PIN_CAM1_XTR, 1);
+
+    if (peak_adc_out) *peak_adc_out = peak;
+    if (samples_out)  *samples_out  = samples;
     return true;
 }
 

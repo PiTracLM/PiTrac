@@ -48,6 +48,9 @@ typedef enum {
     CMD_CFG_STROBE_HOLD,      /* CFG STROBE_HOLD=<0|1> — sustain DIAG HIGH for calibration */
     CMD_CAM_PULSE,            /* CAM_PULSE <us>: drive cam2 XTR LOW for N microseconds */
     CMD_FIRE,                 /* FIRE                               */
+    CMD_FIRE_PEAK,            /* FIRE_PEAK - fire train + return peak ADC0 reading
+                               * during the train window. Used for LED current
+                               * calibration sweeps to avoid Python timing slop. */
     CMD_STATUS,               /* STATUS                             */
     CMD_RESET,                /* RESET                              */
     CMD_BOOTSEL,              /* BOOTSEL — reboot into BOOTSEL mode */
@@ -109,6 +112,12 @@ typedef struct {
     uint64_t last_event_us;
     int32_t  last_rms;
     uint32_t event_count;
+
+    /* Most-recent FIRE_PEAK result. Updated by core 0 inside strobe_fire_peak;
+     * read by core 1 when emitting the EVENT PEAK reply. The MAILBOX push
+     * acts as the memory barrier between writes here and reads on core 1. */
+    uint16_t last_peak_adc;
+    uint32_t last_peak_samples;
 } pitrac_state_t;
 
 /* ------------------------------------------------------------- functions -- */

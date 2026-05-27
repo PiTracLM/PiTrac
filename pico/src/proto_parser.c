@@ -69,6 +69,10 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
     /* Quick keyword dispatch. We compare against fixed prefixes; arguments
      * follow after a space or '='. Strict terminator-checked via match_cmd. */
 
+    if (match_cmd(line, "FIRE_PEAK")) {
+        out->kind = CMD_FIRE_PEAK;
+        return true;
+    }
     if (match_cmd(line, "FIRE")) {
         out->kind = CMD_FIRE;
         return true;
