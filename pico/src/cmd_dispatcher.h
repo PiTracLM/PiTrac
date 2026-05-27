@@ -41,6 +41,9 @@ typedef struct {
     bool    (*hold_assert)(void);
     void    (*hold_release)(void);
 
+    /* Continuous mic RMS stream. 0 hz stops emission. */
+    void    (*set_stream_rms_hz)(uint32_t hz);
+
     /* IPC + control flow */
     void    (*request_manual_fire)(void);
     /* Like request_manual_fire, but also samples ADC0 (GP26, wired to the V3

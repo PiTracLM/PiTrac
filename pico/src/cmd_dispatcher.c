@@ -70,6 +70,15 @@ void cmd_dispatcher_apply(const pitrac_cmd_t *c, const hw_driver_t *hw) {
         hw->emit_log("decay_confirm updated");
         break;
 
+    case CMD_CFG_STREAM_RMS:
+        hw->set_stream_rms_hz(c->u.u32);
+        if (c->u.u32 == 0) {
+            hw->emit_log("stream_rms stopped");
+        } else {
+            hw->emit_log("stream_rms updated");
+        }
+        break;
+
     case CMD_CFG_STROBE_HOLD:
         if (c->u.armed) {
             if (hw->hold_assert()) {
