@@ -264,6 +264,14 @@
       "passedVia": "environment",
       "envVariable": "PITRAC_PICO_DEVICE"
     },
+    "gs_config.pico.last_uf2_path": {
+      "category": "System",
+      "displayName": "Last UF2 Path",
+      "description": "Most recent UF2 path uploaded to the Pico via the /pico flash card. Set by the web UI; not user-editable.",
+      "type": "string",
+      "default": "",
+      "internal": true
+    },
     "gs_config.strobing.kDAC_setting": {
       "category": "Strobing",
       "subcategory": "advanced",
