@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any, Callable, Dict, Optional
+from typing import Any, AsyncIterator, Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ THRESHOLD_MIN = 0
 THRESHOLD_MAX = 1_000_000_000
 MIN_INTER_SHOT_FLOOR_MS = 20
 MIN_INTER_SHOT_CEIL_MS = 60_000
+STREAM_RMS_MAX_HZ = 100
 
 
 class PicoManager:
@@ -47,6 +48,7 @@ class PicoManager:
         self._config_manager = config_manager
         self._lock = lock
         self._serial = None  # type: ignore[assignment]
+        self._stream_active = False
 
     # ------------------------------------------------------------------
     # serial fd lifecycle
@@ -242,6 +244,62 @@ class PicoManager:
         clamped = max(MIN_INTER_SHOT_FLOOR_MS, min(ms, MIN_INTER_SHOT_CEIL_MS))
         return await self._send_cfg(f"MIN_INTER_SHOT_MS={clamped}")
 
+    # ------------------------------------------------------------------
+    # RMS streaming
+    # ------------------------------------------------------------------
+
+    async def start_rms_stream(self, hz: int) -> AsyncIterator[Dict[str, int]]:
+        """Yield `{value, timestamp}` dicts at roughly `hz` samples/sec.
+
+        The iterator holds the serial handle (and the shared lock) for its
+        full lifetime; callers must `aclose()` it (or iterate to completion)
+        so the lock is released. The firmware caps hz at STREAM_RMS_MAX_HZ
+        regardless of what we ask for, so clamp here too.
+        """
+        clamped = max(1, min(int(hz), STREAM_RMS_MAX_HZ))
+        return self._rms_iter(clamped)
+
+    async def _rms_iter(self, hz: int) -> AsyncIterator[Dict[str, int]]:
+        await self._lock.acquire()
+        try:
+            if self._serial is None:
+                self._serial = await asyncio.to_thread(self._open)
+            ser = self._serial
+            try:
+                await asyncio.to_thread(ser.reset_input_buffer)
+            except Exception:
+                pass
+            self._stream_active = True
+            await asyncio.to_thread(self._write_line, ser, f"CFG STREAM_RMS={hz}")
+            buf = b""
+            try:
+                while self._stream_active:
+                    chunk = await asyncio.to_thread(ser.read, READ_CHUNK)
+                    if not chunk:
+                        await asyncio.sleep(0)
+                        continue
+                    buf += chunk
+                    while b"\n" in buf:
+                        line, _, buf = buf.partition(b"\n")
+                        text = line.decode("ascii", errors="replace").strip()
+                        if not text.startswith("EVENT RMS"):
+                            continue
+                        parsed = _parse_rms_event(text)
+                        if parsed is not None:
+                            yield parsed
+            finally:
+                try:
+                    await asyncio.to_thread(self._write_line, ser, "CFG STREAM_RMS=0")
+                except Exception:
+                    logger.debug("RMS stop write failed", exc_info=True)
+                self._stream_active = False
+        finally:
+            self._lock.release()
+
+    async def stop_rms_stream(self) -> None:
+        """Signal the active iterator to drain and release the lock."""
+        self._stream_active = False
+
     async def _send_cfg(self, suffix: str) -> Dict[str, Any]:
         async with self._lock:
             return await asyncio.to_thread(self._send_cfg_sync, suffix)
@@ -280,3 +338,21 @@ def _coerce_scalar(value: str) -> Any:
         return float(value)
     except ValueError:
         return value
+
+
+def _parse_rms_event(text: str) -> Optional[Dict[str, int]]:
+    """Parse `EVENT RMS value=<int> timestamp=<us>` into a dict."""
+    out: Dict[str, int] = {}
+    for token in text.split()[2:]:
+        if "=" not in token:
+            continue
+        key, _, value = token.partition("=")
+        if key not in ("value", "timestamp"):
+            continue
+        try:
+            out[key] = int(value)
+        except ValueError:
+            return None
+    if "value" not in out or "timestamp" not in out:
+        return None
+    return out
