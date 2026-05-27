@@ -115,3 +115,37 @@ class TestRmsStreamEndpoint:
         assert "100" in payload or "200" in payload
 
 
+class TestFlashEndpoint:
+    def test_flash_streams_progress_lines(self, server_instance, client):
+        async def fake_flash(path, on_progress=None):
+            for line in ("Loading...", "100%", "Reboot complete"):
+                if on_progress:
+                    on_progress(line)
+            return {"ok": True, "uf2": path}
+
+        server_instance.pico_manager.flash = fake_flash
+
+        response = client.post(
+            "/api/pico/flash",
+            files={"uf2": ("fake.uf2", b"FAKE-DATA", "application/octet-stream")},
+        )
+        assert response.status_code == 200
+        body = response.text
+        assert "Loading..." in body
+        assert "Reboot complete" in body
+        assert "DONE" in body or "ok" in body.lower()
+
+    def test_flash_error_emits_error_line(self, server_instance, client):
+        async def fake_flash(path, on_progress=None):
+            raise RuntimeError("picotool missing")
+
+        server_instance.pico_manager.flash = fake_flash
+
+        response = client.post(
+            "/api/pico/flash",
+            files={"uf2": ("x.uf2", b"X", "application/octet-stream")},
+        )
+        assert response.status_code == 200
+        assert "ERROR" in response.text
+
+

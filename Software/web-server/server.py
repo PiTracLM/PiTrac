@@ -1274,6 +1274,42 @@ class PiTracServer:
                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
             )
 
+        @self.app.post("/api/pico/flash")
+        async def pico_flash(uf2: UploadFile = File(...)) -> StreamingResponse:
+            tmp_dir = Path("/tmp")
+            tmp_path = tmp_dir / f"pico_upload_{int(asyncio.get_event_loop().time() * 1000)}.uf2"
+            data = await uf2.read()
+            tmp_path.write_bytes(data)
+            try:
+                self.config_manager.set_config("gs_config.pico.last_uf2_path", str(tmp_path))
+            except Exception:
+                logger.debug("Could not persist last_uf2_path", exc_info=True)
+
+            queue: asyncio.Queue = asyncio.Queue()
+
+            def on_progress(line: str) -> None:
+                queue.put_nowait(line)
+
+            async def run_flash() -> None:
+                try:
+                    result = await self.pico_manager.flash(str(tmp_path), on_progress=on_progress)
+                    queue.put_nowait("DONE: ok" if result.get("ok") else "ERROR: picotool exit non-zero")
+                except Exception as exc:
+                    queue.put_nowait(f"ERROR: {exc}")
+                finally:
+                    queue.put_nowait(None)
+
+            asyncio.create_task(run_flash())
+
+            async def progress_stream():
+                while True:
+                    item = await queue.get()
+                    if item is None:
+                        break
+                    yield (item + "\n").encode("utf-8")
+
+            return StreamingResponse(progress_stream(), media_type="text/plain")
+
     async def _stream_service_logs(self, websocket: WebSocket, service: str) -> None:
         """Stream logs for a specific service via WebSocket"""
         try:
