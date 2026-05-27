@@ -188,3 +188,59 @@ class TestSetters:
 
         writes = [c.args[0] for c in ser.write.call_args_list]
         assert any(w == b"CFG MIN_INTER_SHOT_MS=20\n" for w in writes)
+
+
+# --------------------------------------------------------------------- RMS stream
+
+class TestRmsStream:
+    @patch("pico_manager.serial")
+    def test_rms_stream_yields_parsed_events(self, mock_serial_mod):
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [
+            b"EVENT RMS value=42 timestamp=100\n",
+            b"EVENT RMS value=51 timestamp=200\n",
+            b"EVENT RMS value=39 timestamp=300\n",
+            b"", b"", b"",
+        ]
+
+        async def drive():
+            mgr = _build(mock_serial_mod)
+            stream = await mgr.start_rms_stream(hz=10)
+            samples = []
+            async for evt in stream:
+                samples.append(evt)
+                if len(samples) >= 3:
+                    await mgr.stop_rms_stream()
+                    await stream.aclose()
+                    break
+            return samples
+
+        samples = asyncio.run(drive())
+        writes = [c.args[0] for c in ser.write.call_args_list]
+        assert b"CFG STREAM_RMS=10\n" in writes
+        assert b"CFG STREAM_RMS=0\n" in writes
+        assert samples == [
+            {"value": 42, "timestamp": 100},
+            {"value": 51, "timestamp": 200},
+            {"value": 39, "timestamp": 300},
+        ]
+
+    @patch("pico_manager.serial")
+    def test_rms_stream_clamps_hz_to_max(self, mock_serial_mod):
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [
+            b"EVENT RMS value=1 timestamp=10\n",
+            b"", b"", b"",
+        ]
+
+        async def drive():
+            mgr = _build(mock_serial_mod)
+            stream = await mgr.start_rms_stream(hz=9999)
+            async for _ in stream:
+                await mgr.stop_rms_stream()
+                await stream.aclose()
+                break
+
+        asyncio.run(drive())
+        writes = [c.args[0] for c in ser.write.call_args_list]
+        assert b"CFG STREAM_RMS=100\n" in writes
