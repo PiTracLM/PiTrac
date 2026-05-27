@@ -40,6 +40,7 @@ from db.repositories import KeyValueRepository, SessionRepository, ShotRepositor
 from managers import ConnectionManager, ShotDataStore
 from models import ShotData
 from parsers import ShotDataParser
+from pico_manager import PicoManager
 from pitrac_manager import PiTracProcessManager
 from sim_manager import SimManager, SimSettingsError, import_legacy_settings
 from strobe_calibration_manager import StrobeCalibrationManager
@@ -206,7 +207,11 @@ class PiTracServer:
         self.pitrac_manager = PiTracProcessManager(self.config_manager)
         self.calibration_manager = CalibrationManager(self.config_manager)
         self.testing_manager = TestingToolsManager(self.config_manager)
-        self.strobe_calibration_manager = StrobeCalibrationManager(self.config_manager)
+        self.pico_lock = asyncio.Lock()
+        self.strobe_calibration_manager = StrobeCalibrationManager(
+            self.config_manager, self.pico_lock
+        )
+        self.pico_manager = PicoManager(self.config_manager, self.pico_lock)
         self.update_manager = UpdateManager()
         self.update_manager.set_broadcast_callback(self.connection_manager.broadcast)
         self.session_repo = SessionRepository(self.db)
@@ -1462,6 +1467,55 @@ class PiTracServer:
             result_lines, new_offset = await asyncio.to_thread(read_chunk_before, path, before, lines)
             next_cursor = {"file": path.name, "offset": new_offset} if new_offset > 0 else _prev_cursor()
             return {"lines": result_lines, "next": next_cursor}
+
+        # ---------------------------------------------------------------- Pico
+
+        @self.app.get("/pico", response_class=HTMLResponse)
+        async def pico_page(request: Request) -> Response:
+            return self.templates.TemplateResponse(request, "pico.html")
+
+        @self.app.get("/api/pico/status")
+        async def get_pico_status() -> Response:
+            data = await self.pico_manager.status()
+            if not data.get("present", False):
+                return JSONResponse(status_code=503, content=data)
+            return JSONResponse(data)
+
+        @self.app.post("/api/pico/selftest")
+        async def run_pico_selftest() -> Response:
+            data = await self.pico_manager.selftest()
+            if not data.get("ok", False):
+                return JSONResponse(status_code=503, content=data)
+            return JSONResponse(data)
+
+        @self.app.post("/api/pico/config")
+        async def set_pico_config(request: Request) -> Response:
+            body = await request.json()
+            applied: Dict[str, Any] = {}
+            errors: Dict[str, str] = {}
+            if "threshold" in body:
+                try:
+                    applied["threshold"] = await self.pico_manager.set_threshold(
+                        int(body["threshold"])
+                    )
+                except (TypeError, ValueError) as exc:
+                    errors["threshold"] = str(exc)
+            if "armed" in body:
+                applied["armed"] = await self.pico_manager.set_armed(
+                    bool(body["armed"])
+                )
+            if "min_inter_shot_ms" in body:
+                try:
+                    applied["min_inter_shot_ms"] = await self.pico_manager.set_min_inter_shot(
+                        int(body["min_inter_shot_ms"])
+                    )
+                except (TypeError, ValueError) as exc:
+                    errors["min_inter_shot_ms"] = str(exc)
+            if errors:
+                return JSONResponse(
+                    status_code=400, content={"ok": False, "errors": errors, "applied": applied}
+                )
+            return JSONResponse({"ok": True, "applied": applied})
 
     async def _stream_service_logs(self, websocket: WebSocket, service: str) -> None:
         """Stream logs for a specific service via WebSocket"""
