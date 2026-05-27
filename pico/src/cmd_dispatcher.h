@@ -43,6 +43,10 @@ typedef struct {
 
     /* IPC + control flow */
     void    (*request_manual_fire)(void);
+    /* Like request_manual_fire, but also samples ADC0 (GP26, wired to the V3
+     * CUR-SENSE node) during the strobe train and emits one EVENT line with
+     * the peak ADC reading. Used by the Pi-side calibration sweep. */
+    void    (*request_fire_peak)(void);
     void    (*request_reset)(void);
     void    (*request_bootsel)(void);
 

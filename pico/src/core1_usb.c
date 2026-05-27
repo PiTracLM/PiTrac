@@ -247,6 +247,10 @@ static void fw_request_manual_fire(void) {
     multicore_fifo_push_blocking(MAILBOX_MANUAL_FIRE);
 }
 
+static void fw_request_fire_peak(void) {
+    multicore_fifo_push_blocking(MAILBOX_MANUAL_FIRE_PEAK);
+}
+
 static void fw_request_reset(void) {
     fflush(stdout);
     watchdog_reboot(0, 0, 100);
@@ -321,6 +325,7 @@ static const hw_driver_t fw_driver = {
     .hold_assert           = fw_hold_assert,
     .hold_release          = fw_hold_release,
     .request_manual_fire   = fw_request_manual_fire,
+    .request_fire_peak     = fw_request_fire_peak,
     .request_reset         = fw_request_reset,
     .request_bootsel       = fw_request_bootsel,
     .cam_pulse             = fw_cam_pulse,
@@ -390,6 +395,19 @@ void core1_usb_entry(void) {
                 g_state.event_count++;
                 emit_event_hardware(now);
                 break;
+            case MAILBOX_MANUAL_FIRE_PEAK_DONE: {
+                /* core 0 fired a strobe train and sampled ADC0; report the
+                 * peak so the Pi-side calibration sweep can pick a DAC. */
+                g_state.event_count++;
+                char buf[96];
+                snprintf(buf, sizeof(buf),
+                         "EVENT PEAK timestamp=%llu adc=%u samples=%u\n",
+                         (unsigned long long)now,
+                         (unsigned)g_state.last_peak_adc,
+                         (unsigned)g_state.last_peak_samples);
+                fputs(buf, stdout);
+                break;
+            }
             case MAILBOX_DISARM_AFTER_FIRE:
                 emit_log("armed=0 (auto-disarm after fire)");
                 break;

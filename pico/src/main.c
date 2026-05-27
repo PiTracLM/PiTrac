@@ -475,6 +475,32 @@ int main(void) {
                         multicore_fifo_push_blocking(MAILBOX_DISARM_AFTER_FIRE);
                     }
                 }
+            } else if (msg == MAILBOX_MANUAL_FIRE_PEAK) {
+                /* Same cooldown gate, then fire + sample ADC0 for the train.
+                 * Result is stashed in g_state.last_peak_adc / last_peak_samples
+                 * before signalling completion to core 1 (the mailbox push is a
+                 * memory barrier so the read on the other core is consistent). */
+                uint64_t now_us = time_us_64();
+                uint64_t last_us = read_volatile_u64(&g_state.last_event_us);
+                uint64_t min_gap_us = (uint64_t)g_state.min_inter_shot_ms * 1000u;
+                if (last_us != 0 && now_us - last_us < min_gap_us) {
+                    multicore_fifo_push_blocking(MAILBOX_FIRE_REFUSED_COOLDOWN);
+                } else {
+                    uint16_t peak = 0u;
+                    uint32_t samples = 0u;
+                    if (strobe_fire_peak(&peak, &samples)) {
+                        g_state.last_event_us = time_us_64();
+                        g_state.last_peak_adc = peak;
+                        g_state.last_peak_samples = samples;
+                        multicore_fifo_push_blocking(MAILBOX_MANUAL_FIRE_PEAK_DONE);
+                    } else {
+                        multicore_fifo_push_blocking(MAILBOX_FIRE_REFUSED_HELD);
+                    }
+                    if (g_state.armed) {
+                        g_state.armed = false;
+                        multicore_fifo_push_blocking(MAILBOX_DISARM_AFTER_FIRE);
+                    }
+                }
             }
         }
 

@@ -84,6 +84,13 @@
  * by 3 to recover the real supply voltage. Used for brownout detection. */
 #define ADC_VSYS_CHANNEL 3
 
+/* V3 board CUR-SENSE (test point TP4) is wired to Pico GPIO 26 = ADC channel 0.
+ * Direct input, no divider — shunt sees 0 V at idle and ~1 V at 10 A peak,
+ * well within ADC range. Used for LED current calibration sampling during
+ * strobe_fire_peak(). */
+#define PIN_CUR_SENSE_ADC      26
+#define ADC_CUR_SENSE_CHANNEL  0
+
 /* ----------------------------------------------------------- audio path --- */
 
 /* Source sample rate. SPH0645 datasheet says it tolerates 32–64 fs on BCLK;
@@ -239,7 +246,7 @@
 #define STROBE_MAX_HOLD_MS  200u
 
 /* Firmware version string — surfaced on the boot LOG line. */
-#define PITRAC_PICO_FW_VERSION "0.3.0"
+#define PITRAC_PICO_FW_VERSION "0.4.0"
 
 /* Cam2 / Cam1 XTR setup time before the strobe train kicks off.
  * Host-tunable via CFG CAM_XTR_SETUP_US. IMX296/Mira220 datasheets imply
@@ -288,6 +295,8 @@
 #define MAILBOX_FIRE_REFUSED_HELD  0xA110C009u   /* core0 → core1: log strobe-held refusal */
 #define MAILBOX_HARDWARE_FIRE      0xA110C00Au   /* core0 <- gp9 irq: hardware fire requested */
 #define MAILBOX_HARDWARE_FIRE_DONE 0xA110C00Bu   /* core0 -> core1: emit EVENT HARDWARE_FIRE */
+#define MAILBOX_MANUAL_FIRE_PEAK   0xA110C00Cu   /* core1 -> core0: fire + sample ADC0 peak */
+#define MAILBOX_MANUAL_FIRE_PEAK_DONE 0xA110C00Du /* core0 -> core1: emit EVENT PEAK adc=N samples=M */
 
 /* USB CDC line accumulator. Sized for the worst-case CFG PULSE_INTERVALS line
  * (STROBE_MAX_PULSES floats × ~10 chars each + prefix). Overflow LOGs once

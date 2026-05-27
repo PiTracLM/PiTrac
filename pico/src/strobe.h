@@ -66,6 +66,20 @@ bool strobe_fire(void);
 /* Has the most-recent fire completed (DMA drained)? */
 bool strobe_is_idle(void);
 
+/* Like strobe_fire(), but additionally oversamples ADC channel 0 (which the
+ * caller must have initialised on GP26 wired to V3 CUR-SENSE) for the entire
+ * duration of the strobe train. Writes the peak ADC reading (0..4095) into
+ * *peak_adc_out and the total sample count into *samples_out, then returns
+ * the same true/false success flag as strobe_fire().
+ *
+ * Used by the Pi-side LED current calibration sweep: the Pico's PIO drives
+ * the strobe with single-cycle determinism, the ADC samples in a tight loop
+ * with no USB or Python jitter, and the host gets back one peak value per
+ * DAC step. Total LED on-time per call matches a normal shot (~60 us across
+ * the 7-pulse train) — inherently safe.
+ */
+bool strobe_fire_peak(uint16_t *peak_adc_out, uint32_t *samples_out);
+
 /* Drive PIN_CAM2_XTR LOW for `microseconds`, then back HIGH. No PIO, no DMA,
  * no IR strobe pulse. Active-low to match strobe_fire. Bounds: 1..100000 us.
  * Refuses (no-op) while strobe_hold is asserted. */

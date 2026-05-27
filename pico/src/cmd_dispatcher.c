@@ -91,6 +91,10 @@ void cmd_dispatcher_apply(const pitrac_cmd_t *c, const hw_driver_t *hw) {
         hw->request_manual_fire();
         break;
 
+    case CMD_FIRE_PEAK:
+        hw->request_fire_peak();
+        break;
+
     case CMD_STATUS:
         hw->emit_status();
         break;
