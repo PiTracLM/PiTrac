@@ -89,3 +89,29 @@ class TestConfigEndpoint:
         assert response.status_code == 400
 
 
+class TestRmsStreamEndpoint:
+    def test_rms_stream_emits_sse_lines(self, server_instance, client):
+        async def fake_iter():
+            yield {"value": 10, "timestamp": 100}
+            yield {"value": 20, "timestamp": 200}
+
+        async def fake_start(hz):
+            return fake_iter()
+
+        server_instance.pico_manager.start_rms_stream = fake_start
+        server_instance.pico_manager.stop_rms_stream = AsyncMock()
+
+        with client.stream("GET", "/api/pico/rms-stream?hz=20") as resp:
+            assert resp.status_code == 200
+            assert "text/event-stream" in resp.headers["content-type"]
+            chunks = []
+            for line in resp.iter_lines():
+                chunks.append(line)
+                if len(chunks) >= 4:
+                    break
+
+        payload = "\n".join(chunks)
+        assert "value" in payload
+        assert "100" in payload or "200" in payload
+
+
