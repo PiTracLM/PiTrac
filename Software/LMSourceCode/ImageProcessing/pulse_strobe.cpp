@@ -28,6 +28,9 @@
 #endif // #ifdef __unix__  // Ignore in Windows environment
 
 #include "pulse_strobe.h"
+#include "pico_strobe_client.h"
+
+#include <cstdlib>
 
 
 namespace golf_sim {
@@ -62,6 +65,17 @@ namespace golf_sim {
 	bool PulseStrobe::spiOpen_ = false;
 	bool PulseStrobe::kRecordAllImages = true;
 	bool PulseStrobe::gpio_system_initialized_ = false;
+	std::unique_ptr<PicoStrobeClient> PulseStrobe::pico_client_;
+
+	// Logging hooks declared in pico_strobe_client.cpp; routed through the
+	// real LoggingTools so wire-level events land in pitrac.log. Test target
+	// stubs these out in test_pico_strobe_client.cpp.
+	void PicoLogTrace(const std::string& msg) {
+		GS_LOG_TRACE_MSG(trace, msg);
+	}
+	void PicoLogWarn(const std::string& msg) {
+		GS_LOG_MSG(warning, msg);
+	}
 	int PulseStrobe::kPuttingStrobeDelayMs = 0;
 
 	long PulseStrobe::kCam2SetupPeriodMilliseconds = 2000;
@@ -97,12 +111,6 @@ namespace golf_sim {
 
 	const unsigned int kBitsPerWord = 16; // 57600; // 115200; // 38400
 
-
-	const int kCE0 = 5;
-	const int kCE1 = 6;
-	const int kMISO = 13;
-	const int kMOSI = 19; // BCM numbering.  Same as GPIO25
-	const int kSCLK = 12;
 
 	// Whatever test is run, it will run for this long in seconds
 	const int kTestPeriodSecs = 10; //  120;
@@ -350,6 +358,11 @@ namespace golf_sim {
 
 	bool PulseStrobe::SendCameraStrobeTriggerAndShutter(int lgGpioHandle, bool send_no_strobes) {
 
+		if (pico_client_ && pico_client_->IsOpen()) {
+			if (send_no_strobes) return true;
+			return pico_client_->FireWithShutter();
+		}
+
 		// The pulse sequence should have been pre-computed prior to calling this
 		unsigned long result_length = 0;
 		char* buf = 0;
@@ -486,6 +499,36 @@ namespace golf_sim {
 				return false;
 			}
 
+			// PITRAC_PICO_ENABLED: "legacy" skips the Pico entirely; "required"
+			// fails loudly if the open fails; "auto" probes and falls through
+			// silently on miss.
+			{
+				const char* gate_env = std::getenv("PITRAC_PICO_ENABLED");
+				std::string gate = gate_env ? gate_env : "auto";
+				if (gate != "legacy") {
+					const char* dev_env = std::getenv("PITRAC_PICO_DEVICE");
+					std::string device = dev_env ? dev_env : "/dev/ttyACM0";
+
+					bool should_open = (gate == "required") || PicoStrobeClient::Probe(device);
+					if (should_open) {
+						pico_client_ = std::make_unique<PicoStrobeClient>(lggpio_chip_handle_);
+						if (!pico_client_->Open(device)) {
+							pico_client_.reset();
+							if (gate == "required") {
+								GS_LOG_MSG(error, "PITRAC_PICO_ENABLED=required but Pico open failed: " + device);
+								return false;
+							}
+							GS_LOG_MSG(warning, "Pico probe succeeded but Open failed; using legacy SPI path");
+						} else {
+							GS_LOG_MSG(trace, "PicoStrobeClient open on " + device);
+							const float pulse_width_us =
+								(static_cast<float>(number_bits_for_fast_on_pulse_) / 115200.0f) * 1e6f;
+							pico_client_->SendPulseConfig(pulse_width_us,
+								{0.7f, 1.8f, 3.0f, 2.2f, 3.0f, 7.1f, 4.0f, 0.0f});
+						}
+					}
+				}
+			}
 
 			// The active-high setting will depend on which board the user sets
 			int kConnectionBoardVersionIntValue = 0;
@@ -566,6 +609,10 @@ namespace golf_sim {
 #ifdef __unix__  // Ignore in Windows environment
 		GS_LOG_TRACE_MSG(trace, "PulseStrobe::DeinitGPIOSystem.");
 
+		// Drop the Pico client first so its destructor closes the USB-CDC fd
+		// before we release the gpio chip it was using for the fast path.
+		pico_client_.reset();
+
 		if (spiOpen_) {
 			lgSpiClose(spiHandle_);
 			spiHandle_ = -1;
@@ -584,6 +631,13 @@ namespace golf_sim {
 
 	void PulseStrobe::SendOnOffPulse(long length_us) {
 #ifdef __unix__  // Ignore in Windows environment
+
+		// Route the on/off pulse through the Pico when the bridge is up:
+		// it as a single CAM_PULSE command (firmware handles edge timing).
+		if (pico_client_ && pico_client_->IsOpen()) {
+			pico_client_->CamPulse(static_cast<uint32_t>(length_us));
+			return;
+		}
 
 		if (kUsingActiveHighTriggerCamera) {
 			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kOFF);

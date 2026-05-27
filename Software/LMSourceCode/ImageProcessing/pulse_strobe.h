@@ -9,12 +9,15 @@
 #pragma once
 
 
+#include <memory>
 #include <vector>
 
 #include "logging_tools.h"
 
 
 namespace golf_sim {
+
+	class PicoStrobeClient;
 
 	class PulseStrobe {
 
@@ -113,6 +116,11 @@ namespace golf_sim {
 		static int spiHandle_;
 		static bool spiOpen_;
 		static int lggpio_chip_handle_;
+
+		// Pico bridge. When non-null and open, the strobe trigger + on/off
+		// pulse paths short-circuit through USB-CDC + BCM 26 instead of the
+		// legacy SPI + GPIO 10 path.
+		static std::unique_ptr<PicoStrobeClient> pico_client_;
 
 
 		// The number of times the last (usually quite long pulse-off interval)
