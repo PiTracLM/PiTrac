@@ -46,6 +46,7 @@ typedef enum {
     CMD_CFG_PRE_TRIGGER_DELAY,/* CFG PRE_TRIGGER_DELAY_MS=<int>     */
     CMD_CFG_DECAY_CONFIRM,    /* CFG DECAY_CONFIRM_MS=<int>         */
     CMD_CFG_STROBE_HOLD,      /* CFG STROBE_HOLD=<0|1> — sustain DIAG HIGH for calibration */
+    CMD_CFG_STREAM_RMS,       /* CFG STREAM_RMS=<hz> — emit EVENT RMS at this rate; 0 = stop */
     CMD_CAM_PULSE,            /* CAM_PULSE <us>: drive cam2 XTR LOW for N microseconds */
     CMD_FIRE,                 /* FIRE                               */
     CMD_FIRE_PEAK,            /* FIRE_PEAK - fire train + return peak ADC0 reading

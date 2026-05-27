@@ -248,6 +248,11 @@
 /* Firmware version string — surfaced on the boot LOG line. */
 #define PITRAC_PICO_FW_VERSION "0.4.0"
 
+/* Upper bound on the EVENT RMS streaming rate (samples per second). The web
+ * UI's mic visualiser doesn't need anything faster than this; capping it keeps
+ * the USB CDC TX queue from saturating and starving STATUS replies. */
+#define STREAM_RMS_MAX_HZ  100u
+
 /* Cam2 / Cam1 XTR setup time before the strobe train kicks off.
  * Host-tunable via CFG CAM_XTR_SETUP_US. IMX296/Mira220 datasheets imply
  * a few hundred µs minimum; 1 ms is a safe default. */

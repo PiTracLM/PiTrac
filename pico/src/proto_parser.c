@@ -224,6 +224,18 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
             out->u.u32 = (uint32_t)v;
             return true;
         }
+        if (strcmp(key, "STREAM_RMS") == 0) {
+            /* Continuous mic RMS emission rate. 0 stops streaming, anything
+             * above STREAM_RMS_MAX_HZ snaps down to the cap so the USB CDC
+             * TX queue can't be flooded by a typo. */
+            long v;
+            if (!parse_int(val, &v)) return false;
+            if (v < 0) v = 0;
+            if (v > (long)STREAM_RMS_MAX_HZ) v = (long)STREAM_RMS_MAX_HZ;
+            out->kind = CMD_CFG_STREAM_RMS;
+            out->u.u32 = (uint32_t)v;
+            return true;
+        }
         if (strcmp(key, "STROBE_HOLD") == 0) {
             /* Sustain the strobe pin HIGH for LED-current calibration.
              * 1 = assert, 0 = release. The Pi-side calibration sweep uses
