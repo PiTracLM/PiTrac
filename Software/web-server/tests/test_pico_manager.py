@@ -246,6 +246,40 @@ class TestRmsStream:
         assert b"CFG STREAM_RMS=100\n" in writes
 
 
+# --------------------------------------------------------------------- lock sharing
+
+class TestSharedLock:
+    """PicoManager.status() awaits when the calibration manager holds the lock."""
+
+    @patch("pico_manager.serial")
+    def test_status_awaits_until_held_lock_releases(self, mock_serial_mod):
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [b"STATUS armed=0\n", b""]
+
+        async def drive():
+            lock = asyncio.Lock()
+            from pico_manager import PicoManager
+
+            cm = MagicMock()
+            cm.get_config.return_value = None
+            mgr = PicoManager(cm, lock)
+
+            await lock.acquire()
+            try:
+                # Status call should be pending because someone else holds the lock.
+                task = asyncio.create_task(mgr.status())
+                await asyncio.sleep(0.05)
+                assert not task.done(), "status returned while calibration owned the lock"
+            finally:
+                lock.release()
+
+            return await task
+
+        data = asyncio.run(drive())
+        assert data["present"] is True
+        assert data["armed"] == 0
+
+
 # --------------------------------------------------------------------- flash
 
 class TestFlash:

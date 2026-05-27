@@ -105,8 +105,12 @@ class StrobeCalibrationManager:
     # Config key for persisting the result
     DAC_CONFIG_KEY = "gs_config.strobing.kDAC_setting"
 
-    def __init__(self, config_manager):
+    def __init__(self, config_manager, pico_lock: Optional[asyncio.Lock] = None):
         self.config_manager = config_manager
+        # Shared across both managers so concurrent /api/calibration and
+        # /api/pico requests don't fight over /dev/ttyACM0. Constructed on
+        # demand if none was injected — keeps the existing test wiring valid.
+        self._pico_lock = pico_lock or asyncio.Lock()
 
         self._spi_dac = None
         self._spi_adc = None
@@ -558,7 +562,8 @@ class StrobeCalibrationManager:
 
         loop = asyncio.get_event_loop()
         try:
-            result = await loop.run_in_executor(None, self._run_calibration_sync, target)
+            async with self._pico_lock:
+                result = await loop.run_in_executor(None, self._run_calibration_sync, target)
             return result
         except Exception as e:
             logger.error(f"Calibration error: {e}")
@@ -614,7 +619,8 @@ class StrobeCalibrationManager:
         """Read LDO voltage, LED current, and raw ADC values."""
         loop = asyncio.get_event_loop()
         try:
-            return await loop.run_in_executor(None, self._read_diagnostics_sync)
+            async with self._pico_lock:
+                return await loop.run_in_executor(None, self._read_diagnostics_sync)
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
@@ -673,7 +679,8 @@ class StrobeCalibrationManager:
                     "message": f"DAC value must be {self.DAC_MIN}-{self.DAC_MAX}"}
 
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self._set_dac_manual_sync, value)
+        async with self._pico_lock:
+            return await loop.run_in_executor(None, self._set_dac_manual_sync, value)
 
     def _set_dac_manual_sync(self, value: int) -> Dict[str, Any]:
         try:
@@ -700,7 +707,8 @@ class StrobeCalibrationManager:
     async def get_dac_start(self) -> Dict[str, Any]:
         """Run the safe-start sweep and return the boundary DAC value."""
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self._get_dac_start_sync)
+        async with self._pico_lock:
+            return await loop.run_in_executor(None, self._get_dac_start_sync)
 
     def _get_dac_start_sync(self) -> Dict[str, Any]:
         try:
