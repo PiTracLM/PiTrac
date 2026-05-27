@@ -1,0 +1,282 @@
+"""Async PicoManager — owns the USB CDC handle to /dev/ttyACM0.
+
+The Pico bridge already takes the serial port whenever a strobe calibration
+sweep is in flight. PicoManager runs alongside that flow: it shares a single
+asyncio.Lock with the calibration manager so neither one writes while the
+other is mid-command. Hold times for any one round-trip stay well under a
+human-perceptible window so the calibration sweep is never starved.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+from typing import Any, Callable, Dict, Optional
+
+logger = logging.getLogger(__name__)
+
+try:
+    import serial  # type: ignore
+except ImportError:
+    serial = None  # type: ignore
+
+
+DEFAULT_DEVICE = "/dev/ttyACM0"
+BAUDRATE = 115200
+DEFAULT_DEADLINE_S = 0.5
+SELFTEST_DEADLINE_S = 3.0
+READ_CHUNK = 256
+
+THRESHOLD_MIN = 0
+THRESHOLD_MAX = 1_000_000_000
+MIN_INTER_SHOT_FLOOR_MS = 20
+MIN_INTER_SHOT_CEIL_MS = 60_000
+
+
+class PicoManager:
+    """Wraps the Pico's USB CDC line protocol behind asyncio-friendly helpers.
+
+    All public methods take the shared lock for the duration of one
+    write+read round-trip. The lock is module-shared with the calibration
+    manager so concurrent /api/pico/* and /api/calibration/* requests don't
+    fight over the serial fd.
+    """
+
+    def __init__(self, config_manager: Any, lock: asyncio.Lock):
+        self._config_manager = config_manager
+        self._lock = lock
+        self._serial = None  # type: ignore[assignment]
+
+    # ------------------------------------------------------------------
+    # serial fd lifecycle
+    # ------------------------------------------------------------------
+
+    def _device_path(self) -> str:
+        if self._config_manager is None:
+            return DEFAULT_DEVICE
+        try:
+            value = self._config_manager.get_config("gs_config.pico.device")
+            if value:
+                return str(value)
+        except Exception:
+            pass
+        return DEFAULT_DEVICE
+
+    def _open(self) -> Any:
+        if serial is None:
+            raise RuntimeError("pyserial not installed; cannot reach the Pico")
+        path = self._device_path()
+        ser = serial.Serial(path, BAUDRATE, timeout=1, exclusive=True)
+        logger.info("PicoManager: opened %s", path)
+        return ser
+
+    def close(self) -> None:
+        if self._serial is not None:
+            try:
+                self._serial.close()
+            except Exception:
+                logger.debug("PicoManager: close error", exc_info=True)
+            self._serial = None
+
+    # ------------------------------------------------------------------
+    # primitive read/write
+    # ------------------------------------------------------------------
+
+    def _write_line(self, ser: Any, line: str) -> None:
+        payload = line if line.endswith("\n") else line + "\n"
+        ser.write(payload.encode("ascii"))
+        ser.flush()
+
+    def _read_until(
+        self,
+        ser: Any,
+        predicate: Callable[[str], bool],
+        deadline_s: float,
+    ) -> Optional[str]:
+        deadline = time.monotonic() + deadline_s
+        buf = b""
+        while time.monotonic() < deadline:
+            chunk = ser.read(READ_CHUNK)
+            if not chunk:
+                continue
+            buf += chunk
+            while b"\n" in buf:
+                line, _, buf = buf.partition(b"\n")
+                text = line.decode("ascii", errors="replace").strip()
+                if predicate(text):
+                    return text
+        return None
+
+    @staticmethod
+    def _parse_status_line(line: str) -> Dict[str, Any]:
+        """Turn `STATUS armed=0 threshold=4096 ...` into a dict.
+
+        Anything past the leading `STATUS` token is parsed as key=value pairs,
+        with numerics coerced. The trailing `intervals=` CSV is split into a
+        list of floats so the UI can show / round-trip it without re-parsing.
+        """
+        out: Dict[str, Any] = {"raw": line}
+        if not line.startswith("STATUS"):
+            return out
+        for token in line.split()[1:]:
+            if "=" not in token:
+                continue
+            key, _, value = token.partition("=")
+            if key == "intervals":
+                vals = []
+                for piece in value.split(","):
+                    piece = piece.strip()
+                    if not piece:
+                        continue
+                    try:
+                        vals.append(float(piece))
+                    except ValueError:
+                        pass
+                out["intervals"] = vals
+                continue
+            out[key] = _coerce_scalar(value)
+        return out
+
+    # ------------------------------------------------------------------
+    # public API
+    # ------------------------------------------------------------------
+
+    async def probe(self) -> Dict[str, Any]:
+        """One-shot: open, ask STATUS, close. Use for the connection card."""
+        async with self._lock:
+            return await asyncio.to_thread(self._probe_sync)
+
+    def _probe_sync(self) -> Dict[str, Any]:
+        try:
+            ser = self._open()
+        except (RuntimeError, OSError) as exc:
+            return {"present": False, "error": str(exc)}
+        try:
+            ser.reset_input_buffer()
+            self._write_line(ser, "STATUS")
+            line = self._read_until(
+                ser, lambda t: t.startswith("STATUS"), DEFAULT_DEADLINE_S
+            )
+            if line is None:
+                return {"present": False, "error": "no STATUS reply"}
+            data = self._parse_status_line(line)
+            data["present"] = True
+            data["device"] = self._device_path()
+            return data
+        finally:
+            try:
+                ser.close()
+            except Exception:
+                pass
+
+    async def status(self) -> Dict[str, Any]:
+        """Reuses the internal serial handle so back-to-back polls don't pay
+        the open/close cost on every tick. Falls back to probe semantics on
+        first call or after close()."""
+        async with self._lock:
+            return await asyncio.to_thread(self._status_sync)
+
+    def _status_sync(self) -> Dict[str, Any]:
+        if self._serial is None:
+            try:
+                self._serial = self._open()
+            except (RuntimeError, OSError) as exc:
+                return {"present": False, "error": str(exc)}
+        try:
+            self._serial.reset_input_buffer()
+            self._write_line(self._serial, "STATUS")
+            line = self._read_until(
+                self._serial, lambda t: t.startswith("STATUS"), DEFAULT_DEADLINE_S
+            )
+            if line is None:
+                return {"present": False, "error": "no STATUS reply"}
+            data = self._parse_status_line(line)
+            data["present"] = True
+            data["device"] = self._device_path()
+            return data
+        except OSError as exc:
+            self.close()
+            return {"present": False, "error": str(exc)}
+
+    async def selftest(self) -> Dict[str, Any]:
+        async with self._lock:
+            return await asyncio.to_thread(self._selftest_sync)
+
+    def _selftest_sync(self) -> Dict[str, Any]:
+        if self._serial is None:
+            self._serial = self._open()
+        ser = self._serial
+        try:
+            ser.reset_input_buffer()
+            self._write_line(ser, "SELFTEST")
+            result = self._read_until(
+                ser,
+                lambda t: t.startswith("SELFTEST"),
+                SELFTEST_DEADLINE_S,
+            )
+            if result is None:
+                return {"ok": False, "error": "no SELFTEST reply"}
+            out: Dict[str, Any] = {"ok": True, "raw": result}
+            for token in result.split()[1:]:
+                if "=" not in token:
+                    continue
+                key, _, value = token.partition("=")
+                out[key] = _coerce_scalar(value)
+            return out
+        except OSError as exc:
+            self.close()
+            return {"ok": False, "error": str(exc)}
+
+    async def set_threshold(self, value: int) -> Dict[str, Any]:
+        if not isinstance(value, int) or value < THRESHOLD_MIN or value > THRESHOLD_MAX:
+            raise ValueError(f"threshold out of range: {value!r}")
+        return await self._send_cfg(f"MIC_THRESHOLD={value}")
+
+    async def set_armed(self, armed: bool) -> Dict[str, Any]:
+        return await self._send_cfg(f"ARMED={1 if armed else 0}")
+
+    async def set_min_inter_shot(self, ms: int) -> Dict[str, Any]:
+        if not isinstance(ms, int):
+            raise ValueError(f"min_inter_shot must be int: {ms!r}")
+        clamped = max(MIN_INTER_SHOT_FLOOR_MS, min(ms, MIN_INTER_SHOT_CEIL_MS))
+        return await self._send_cfg(f"MIN_INTER_SHOT_MS={clamped}")
+
+    async def _send_cfg(self, suffix: str) -> Dict[str, Any]:
+        async with self._lock:
+            return await asyncio.to_thread(self._send_cfg_sync, suffix)
+
+    def _send_cfg_sync(self, suffix: str) -> Dict[str, Any]:
+        if self._serial is None:
+            self._serial = self._open()
+        ser = self._serial
+        try:
+            ser.reset_input_buffer()
+            self._write_line(ser, f"CFG {suffix}")
+            ser.flush()
+            self._write_line(ser, "STATUS")
+            line = self._read_until(
+                ser, lambda t: t.startswith("STATUS"), DEFAULT_DEADLINE_S
+            )
+            if line is None:
+                return {"ok": False, "error": "no STATUS reply"}
+            data = self._parse_status_line(line)
+            data["ok"] = True
+            return data
+        except OSError as exc:
+            self.close()
+            return {"ok": False, "error": str(exc)}
+
+
+def _coerce_scalar(value: str) -> Any:
+    """Best-effort: int → float → leave-as-string."""
+    if value == "":
+        return value
+    try:
+        return int(value)
+    except ValueError:
+        pass
+    try:
+        return float(value)
+    except ValueError:
+        return value
