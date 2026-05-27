@@ -266,6 +266,23 @@ static void fw_cam_pulse(uint32_t us) {
     strobe_cam_pulse(us);
 }
 
+/* Continuous mic-RMS emission. The variable is written and read only on
+ * core 1 (CFG commands arrive here, the emit loop runs here), so no atomic
+ * is needed. Zero means streaming is off; positive values are Hz. */
+static uint32_t s_stream_rms_hz   = 0;
+static uint64_t s_next_rms_emit   = 0;
+
+static void fw_set_stream_rms_hz(uint32_t hz) {
+    s_stream_rms_hz = hz;
+    /* Send the first sample one period after now, not immediately, so a
+     * frantic CFG STREAM_RMS=hz spam doesn't flood the wire. */
+    if (hz > 0) {
+        s_next_rms_emit = time_us_64() + (1000000ULL / hz);
+    } else {
+        s_next_rms_emit = 0;
+    }
+}
+
 static void fw_emit_status(void) {
     pitrac_state_t snap;
     snap.mic_threshold        = g_state.mic_threshold;
@@ -324,6 +341,7 @@ static const hw_driver_t fw_driver = {
     .set_pre_trigger_delay = fw_set_pre_trigger_delay,
     .hold_assert           = fw_hold_assert,
     .hold_release          = fw_hold_release,
+    .set_stream_rms_hz     = fw_set_stream_rms_hz,
     .request_manual_fire   = fw_request_manual_fire,
     .request_fire_peak     = fw_request_fire_peak,
     .request_reset         = fw_request_reset,
@@ -422,6 +440,22 @@ void core1_usb_entry(void) {
                 break;
             default:
                 break;
+            }
+        }
+
+        /* Periodic RMS stream emission. When the host sets STREAM_RMS=hz,
+         * we sample the energy estimate at that rate so the web UI can draw
+         * a moving mic-level chart. Reading impact_detect_current_rms() from
+         * core 1 is safe per the comment in impact_detect.c (torn read is
+         * harmless for a level display). */
+        if (s_stream_rms_hz > 0) {
+            uint64_t now_us = time_us_64();
+            if (now_us >= s_next_rms_emit) {
+                int32_t rms = impact_detect_current_rms();
+                printf("EVENT RMS value=%ld timestamp=%llu\n",
+                       (long)rms,
+                       (unsigned long long)now_us);
+                s_next_rms_emit = now_us + (1000000ULL / s_stream_rms_hz);
             }
         }
 
