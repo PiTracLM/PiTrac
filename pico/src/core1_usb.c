@@ -120,7 +120,7 @@ int proto_format_status(const pitrac_state_t *st, char *buf, int buflen) {
     int n = snprintf(buf, buflen,
         "STATUS armed=%d threshold=%ld pulse_us=%.2f min_inter_shot_ms=%lu "
         "pre_trigger_delay_ms=%lu decay_confirm_ms=%lu strobe_hold=%d "
-        "vsys_mv=%lu vbus=%d fw=%s intervals=",
+        "vsys_mv=%lu vbus=%d fw=%s board=%s intervals=",
         (int)st->armed, (long)st->mic_threshold, (double)st->pulse_width_us,
         (unsigned long)st->min_inter_shot_ms,
         (unsigned long)st->pre_trigger_delay_ms,
@@ -128,7 +128,8 @@ int proto_format_status(const pitrac_state_t *st, char *buf, int buflen) {
         (int)strobe_is_held(),
         (unsigned long)read_vsys_mv(),
         (int)vbus_present(),
-        PITRAC_PICO_FW_VERSION);
+        PITRAC_PICO_FW_VERSION,
+        PITRAC_BOARD_NAME);
     if (n < 0 || n >= buflen) return n;
 
     /* Append comma-separated intervals — keep CSV in line with the

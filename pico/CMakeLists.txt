@@ -106,7 +106,7 @@ target_link_libraries(pitrac_pico PRIVATE
 # conditionally so plain-Pico builds don't pull it in. Plain `if()` instead
 # of a generator expression so the INTERFACE include dirs propagate at
 # configure time.
-if(PICO_BOARD STREQUAL "pico_w")
+if(PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
     target_link_libraries(pitrac_pico PRIVATE pico_cyw43_arch_none)
 endif()
 
@@ -140,6 +140,7 @@ target_compile_definitions(pitrac_pico PRIVATE
   # picotool / reset-via-vendor-interface keep working.
   USBD_MANUFACTURER="PiTrac"
   USBD_PRODUCT="PiTrac Pico Strobe"
+  PITRAC_BOARD_NAME="${PICO_BOARD}"
 )
 
 # Optimisation flags. The DSP loop is hot; -O2 keeps the binary small enough to
