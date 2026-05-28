@@ -119,14 +119,15 @@ int proto_format_status(const pitrac_state_t *st, char *buf, int buflen) {
     int n = snprintf(buf, buflen,
         "STATUS armed=%d threshold=%ld pulse_us=%.2f min_inter_shot_ms=%lu "
         "pre_trigger_delay_ms=%lu decay_confirm_ms=%lu strobe_hold=%d "
-        "vsys_mv=%lu vbus=%d intervals=",
+        "vsys_mv=%lu vbus=%d fw=%s intervals=",
         (int)st->armed, (long)st->mic_threshold, (double)st->pulse_width_us,
         (unsigned long)st->min_inter_shot_ms,
         (unsigned long)st->pre_trigger_delay_ms,
         (unsigned long)impact_detect_get_decay_confirm_ms(),
         (int)strobe_is_held(),
         (unsigned long)read_vsys_mv(),
-        (int)vbus_present());
+        (int)vbus_present(),
+        PITRAC_PICO_FW_VERSION);
     if (n < 0 || n >= buflen) return n;
 
     /* Append comma-separated intervals — keep CSV in line with the
@@ -266,21 +267,12 @@ static void fw_cam_pulse(uint32_t us) {
     strobe_cam_pulse(us);
 }
 
-/* Continuous mic-RMS emission. The variable is written and read only on
- * core 1 (CFG commands arrive here, the emit loop runs here), so no atomic
- * is needed. Zero means streaming is off; positive values are Hz. */
-static uint32_t s_stream_rms_hz   = 0;
-static uint64_t s_next_rms_emit   = 0;
+static uint32_t s_stream_rms_hz = 0;
+static uint64_t s_next_rms_emit = 0;
 
 static void fw_set_stream_rms_hz(uint32_t hz) {
     s_stream_rms_hz = hz;
-    /* Send the first sample one period after now, not immediately, so a
-     * frantic CFG STREAM_RMS=hz spam doesn't flood the wire. */
-    if (hz > 0) {
-        s_next_rms_emit = time_us_64() + (1000000ULL / hz);
-    } else {
-        s_next_rms_emit = 0;
-    }
+    s_next_rms_emit = (hz > 0) ? time_us_64() + (1000000ULL / hz) : 0;
 }
 
 static void fw_emit_status(void) {
@@ -443,11 +435,6 @@ void core1_usb_entry(void) {
             }
         }
 
-        /* Periodic RMS stream emission. When the host sets STREAM_RMS=hz,
-         * we sample the energy estimate at that rate so the web UI can draw
-         * a moving mic-level chart. Reading impact_detect_current_rms() from
-         * core 1 is safe per the comment in impact_detect.c (torn read is
-         * harmless for a level display). */
         if (s_stream_rms_hz > 0) {
             uint64_t now_us = time_us_64();
             if (now_us >= s_next_rms_emit) {
