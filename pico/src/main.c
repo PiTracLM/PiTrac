@@ -37,7 +37,8 @@
 
 #include "config.h"
 #include "core1_usb.h"
-#include "impact_detect.h"
+#include "sensor.h"
+#include "sensor_mic.h"
 #include "init_stage.h"
 #include "proto.h"
 #include "ring_buffer.h"
@@ -308,8 +309,8 @@ int main(void) {
     diag_blink(5);   /* checkpoint 5: i2s_setup returned */
     printf("LOG init: i2s ok\n");
 
-    /* Impact detector — reads from the ring buffer that I2S DMA fills. */
-    impact_detect_init(&s_audio_ring);
+    sensor_mic_set_ring(&s_audio_ring);
+    sensors_init_all();
     init_stage_advance(INIT_STAGE_I2S, INIT_STAGE_IMPACT);
     diag_blink(6);   /* checkpoint 6: impact_detect_init returned */
     printf("LOG init: impact ok\n");
@@ -399,7 +400,7 @@ int main(void) {
         /* Run impact detection. Reads what's available, returns true with
          * RMS value if it just fired a trigger. */
         int32_t rms = 0;
-        bool triggered = impact_detect_step(g_state.armed, &rms);
+        bool triggered = sensors_step(g_state.armed, &rms);
 
         if (triggered) {
             g_state.last_rms = rms;
