@@ -19,7 +19,7 @@ compile_commands.json
 *.dis
 
 # Exception: the bundled firmware shipped with the web UI Flash button.
-!firmware/pitrac_pico.uf2
+!firmware/*.uf2
 
 # Editor / IDE noise
 .vscode/
