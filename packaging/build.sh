@@ -299,13 +299,11 @@ build_dev() {
     # Configuration parsing tools
     pkg_installed yq || missing_deps+=("yq")
 
-    # picotool: needed by /pico flash UI. Available on Trixie; absence is
-    # not fatal but we log it so the operator knows the flash button won't work.
     if ! command -v picotool &> /dev/null; then
         if apt-cache show picotool &> /dev/null; then
             missing_deps+=("picotool")
         else
-            log_warning "picotool not found in apt repositories - /pico flash feature disabled"
+            log_warning "picotool not in apt - /pico flash buttons disabled"
         fi
     fi
 
@@ -523,6 +521,12 @@ build_dev() {
     install_test_suites "/usr/share/pitrac/test-suites" "$REPO_ROOT"
 
     install_models "$REPO_ROOT" "${SUDO_USER:-$(whoami)}"
+
+    if [[ -f "$REPO_ROOT/pico/firmware/pitrac_pico.uf2" ]]; then
+        mkdir -p /usr/share/pitrac
+        ln -sfn "$REPO_ROOT/pico/firmware/pitrac_pico.uf2" /usr/share/pitrac/pico-fw.uf2
+        log_info "Symlinked /usr/share/pitrac/pico-fw.uf2 -> $REPO_ROOT/pico/firmware/pitrac_pico.uf2"
+    fi
 
     # Install calibration tools
     log_info "Installing calibration tools..."

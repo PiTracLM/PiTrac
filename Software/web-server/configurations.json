@@ -272,6 +272,14 @@
       "default": "",
       "internal": true
     },
+    "gs_config.pico.bundled_fw_path": {
+      "category": "System",
+      "subcategory": "advanced",
+      "displayName": "Bundled Pico Firmware",
+      "description": "Path to the .uf2 flashed by the /pico Flash bundled firmware button. build.sh dev symlinks this to pico/firmware/pitrac_pico.uf2 in the active checkout.",
+      "type": "string",
+      "default": "/usr/share/pitrac/pico-fw.uf2"
+    },
     "gs_config.strobing.kDAC_setting": {
       "category": "Strobing",
       "subcategory": "advanced",

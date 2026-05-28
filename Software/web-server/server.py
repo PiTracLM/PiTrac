@@ -1310,6 +1310,42 @@ class PiTracServer:
 
             return StreamingResponse(progress_stream(), media_type="text/plain")
 
+        @self.app.post("/api/pico/flash-bundled")
+        async def pico_flash_bundled() -> StreamingResponse:
+            bundled_path = (
+                self.config_manager.get_config("gs_config.pico.bundled_fw_path")
+                or "/usr/share/pitrac/pico-fw.uf2"
+            )
+
+            queue: asyncio.Queue = asyncio.Queue()
+
+            def on_progress(line: str) -> None:
+                queue.put_nowait(line)
+
+            async def run() -> None:
+                try:
+                    result = await self.pico_manager.flash_bundled(
+                        bundled_path, on_progress=on_progress
+                    )
+                    queue.put_nowait(
+                        "DONE: ok" if result.get("ok") else "ERROR: flash_bundled exit non-zero"
+                    )
+                except Exception as exc:
+                    queue.put_nowait(f"ERROR: {exc}")
+                finally:
+                    queue.put_nowait(None)
+
+            asyncio.create_task(run())
+
+            async def progress_stream():
+                while True:
+                    item = await queue.get()
+                    if item is None:
+                        break
+                    yield (item + "\n").encode("utf-8")
+
+            return StreamingResponse(progress_stream(), media_type="text/plain")
+
     async def _stream_service_logs(self, websocket: WebSocket, service: str) -> None:
         """Stream logs for a specific service via WebSocket"""
         try:
