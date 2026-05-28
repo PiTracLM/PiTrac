@@ -69,6 +69,9 @@ add_executable(pitrac_pico
   src/impact_detect.c
   src/strobe.c
   src/ring_buffer.c
+  src/sensors.c
+  src/sensor_mic.c
+  src/sensor_optical.c
 )
 
 pico_generate_pio_header(pitrac_pico ${CMAKE_CURRENT_LIST_DIR}/pio/i2s_rx.pio)

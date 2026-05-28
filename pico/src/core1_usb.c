@@ -40,6 +40,7 @@
 #include "proto.h"
 #include "strobe.h"
 #include "impact_detect.h"
+#include "sensor.h"
 
 /* --- shared runtime state, exposed to core 0 ----------------------------- */
 
@@ -190,7 +191,7 @@ static void fw_set_threshold(int32_t v) {
 }
 
 static int32_t fw_get_threshold(void) { return g_state.mic_threshold; }
-static int32_t fw_current_rms(void)   { return impact_detect_current_rms(); }
+static int32_t fw_current_rms(void)   { return sensors_max_level(); }
 
 static void fw_set_decay_confirm(uint32_t ms) {
     impact_detect_set_decay_confirm_ms(ms);
@@ -298,14 +299,20 @@ static void fw_emit_status(void) {
 static void fw_selftest(void) {
     /* Deliberately does NOT pulse PIN_STROBE_OUT: a microsecond on that pin
      * flashes the IR bank, which is the foot-gun this command avoids. */
-    char buf[160];
-    snprintf(buf, sizeof(buf),
-        "SELFTEST vsys_mv=%lu vbus=%d mic_rms=%ld armed=%d fw=%s\n",
+    char buf[256];
+    int n = snprintf(buf, sizeof(buf),
+        "SELFTEST vsys_mv=%lu vbus=%d armed=%d fw=%s",
         (unsigned long)read_vsys_mv(),
         (int)vbus_present(),
-        (long)impact_detect_current_rms(),
         (int)g_state.armed,
         PITRAC_PICO_FW_VERSION);
+    if (n > 0 && n < (int)sizeof(buf)) {
+        sensors_selftest_append(buf, (int)sizeof(buf), &n);
+    }
+    if (n > 0 && n < (int)sizeof(buf) - 1) {
+        buf[n++] = '\n';
+        buf[n]   = '\0';
+    }
     fputs(buf, stdout);
 
     for (int i = 0; i < 3; i++) {
@@ -438,7 +445,7 @@ void core1_usb_entry(void) {
         if (s_stream_rms_hz > 0) {
             uint64_t now_us = time_us_64();
             if (now_us >= s_next_rms_emit) {
-                int32_t rms = impact_detect_current_rms();
+                int32_t rms = sensors_max_level();
                 printf("EVENT RMS value=%ld timestamp=%llu\n",
                        (long)rms,
                        (unsigned long long)now_us);
