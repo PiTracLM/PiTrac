@@ -1,10 +1,11 @@
-/**
- * PiTrac /pico page controller.
- *
- * Polls /api/pico/status at 1 Hz, drives the live RMS chart via
- * EventSource, and routes config saves + flash upload through the
- * /api/pico/* endpoints exposed by server.py.
- */
+const STREAM_STALE_MS = 3000;
+
+function formatThousands(value) {
+    const v = Number(value) || 0;
+    if (v >= 1_000_000) return (v / 1_000_000).toFixed(2) + 'M';
+    if (v >= 1_000) return (v / 1_000).toFixed(1) + 'k';
+    return String(Math.round(v));
+}
 
 class PicoController {
     constructor() {
@@ -12,9 +13,15 @@ class PicoController {
         this.rmsSource = null;
         this.rmsSamples = [];
         this.rmsCapacity = 240;
+        this.rmsPeak = 0;
+        this.rmsLastEventAt = 0;
+        this.rmsStaleTimer = null;
+        this.rmsPaused = false;
         this.canvas = null;
         this.ctx = null;
         this.lastStatus = null;
+        this.flashInProgress = false;
+        this.userTouchedThreshold = false;
 
         this.init();
         this.setupPageCleanup();
@@ -29,6 +36,7 @@ class PicoController {
         this.setupEventListeners();
         this.refreshStatus();
         this.startStatusPolling();
+        this.startRmsStream();
     }
 
     setupPageCleanup() {
@@ -36,7 +44,11 @@ class PicoController {
         window.addEventListener('beforeunload', cleanup);
         window.addEventListener('pagehide', cleanup);
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden) this.stopRmsStream();
+            if (document.hidden) {
+                this.stopRmsStream();
+            } else if (!this.rmsPaused && !this.flashInProgress) {
+                this.startRmsStream();
+            }
         });
     }
 
@@ -44,6 +56,10 @@ class PicoController {
         if (this.statusInterval) {
             clearInterval(this.statusInterval);
             this.statusInterval = null;
+        }
+        if (this.rmsStaleTimer) {
+            clearInterval(this.rmsStaleTimer);
+            this.rmsStaleTimer = null;
         }
         this.stopRmsStream();
     }
@@ -53,16 +69,24 @@ class PicoController {
         document.getElementById('pico-selftest-btn').addEventListener('click', () => this.runSelftest());
 
         document.getElementById('pico-armed-toggle').addEventListener('change', (e) => this.setArmed(e.target.checked));
-        document.getElementById('pico-threshold-save').addEventListener('click', () => this.saveThreshold());
         document.getElementById('pico-min-inter-shot-save').addEventListener('click', () => this.saveMinInterShot());
 
-        document.getElementById('pico-rms-start').addEventListener('click', () => this.startRmsStream());
-        document.getElementById('pico-rms-stop').addEventListener('click', () => this.stopRmsStream());
+        const thresholdSlider = document.getElementById('pico-threshold');
+        thresholdSlider.addEventListener('input', () => {
+            this.userTouchedThreshold = true;
+            document.getElementById('pico-threshold-value').textContent = thresholdSlider.value;
+            this.drawRms();
+        });
+        thresholdSlider.addEventListener('change', () => this.saveThreshold());
+
+        document.getElementById('pico-rms-toggle').addEventListener('click', () => this.toggleRmsStream());
+        document.getElementById('pico-rms-hz').addEventListener('change', () => this.restartRmsStream());
 
         document.getElementById('pico-uf2-file').addEventListener('change', (e) => {
             document.getElementById('pico-flash-btn').disabled = e.target.files.length === 0;
         });
-        document.getElementById('pico-flash-btn').addEventListener('click', () => this.flashFirmware());
+        document.getElementById('pico-flash-btn').addEventListener('click', () => this.flashFromUpload());
+        document.getElementById('pico-flash-bundled-btn').addEventListener('click', () => this.flashBundled());
     }
 
     startStatusPolling() {
@@ -94,9 +118,7 @@ class PicoController {
 
         document.getElementById('pico-fw').textContent = data.fw || data.fw_version || '--';
         document.getElementById('pico-device').textContent = data.device || '/dev/ttyACM0';
-        document.getElementById('pico-vsys').textContent = data.vsys_mv ?? '--';
         document.getElementById('pico-vbus').textContent = (data.vbus === 1 || data.vbus === true) ? 'present' : 'absent';
-        document.getElementById('pico-mic-rms').textContent = data.last_rms ?? data.mic_rms ?? '--';
         document.getElementById('pico-event-count').textContent = data.event_count ?? '--';
 
         const armed = data.armed === 1 || data.armed === true;
@@ -105,8 +127,13 @@ class PicoController {
         document.getElementById('pico-armed-state').textContent = armed ? 'armed' : 'disarmed';
 
         const thresholdInput = document.getElementById('pico-threshold');
-        if (document.activeElement !== thresholdInput && typeof data.threshold === 'number') {
+        if (!this.userTouchedThreshold
+            && document.activeElement !== thresholdInput
+            && typeof data.threshold === 'number') {
+            this.ensureSliderRange(data.threshold);
             thresholdInput.value = data.threshold;
+            document.getElementById('pico-threshold-value').textContent = data.threshold;
+            this.drawRms();
         }
 
         const minInput = document.getElementById('pico-min-inter-shot');
@@ -121,6 +148,7 @@ class PicoController {
         badge.className = 'badge badge-error';
         document.getElementById('pico-fw').textContent = '--';
         if (this.rmsSource) this.stopRmsStream();
+        this.setRmsHint('Pico disconnected. Reconnect USB and click Refresh.');
     }
 
     async runSelftest() {
@@ -175,7 +203,6 @@ class PicoController {
                 return;
             }
             this.flashMessage('Saved', 'success');
-            // Status poll will pick up the new values within ~1 s.
         } catch (err) {
             this.flashMessage(err.message, 'error');
         }
@@ -185,22 +212,27 @@ class PicoController {
         if (this.rmsSource) return;
         const hz = document.getElementById('pico-rms-hz').value || '20';
         this.rmsSamples = [];
+        this.rmsPeak = 0;
+        this.rmsLastEventAt = Date.now();
+        this.rmsPaused = false;
+        this.setRmsHint('Connecting to stream...');
+
         this.rmsSource = new EventSource(`/api/pico/rms-stream?hz=${hz}`);
         this.rmsSource.onmessage = (event) => {
             try {
                 const payload = JSON.parse(event.data);
                 this.pushRmsSample(payload);
             } catch {
-                // Ignore malformed frames; the firmware never emits these but a proxy might.
+                // ignore malformed frames
             }
         };
         this.rmsSource.onerror = () => {
-            // Browser auto-reconnects EventSource. We just surface the state.
-            document.getElementById('pico-rms-latest').textContent = '(stream error, retrying)';
+            this.setRmsHint('Stream interrupted, browser will retry...');
         };
 
-        document.getElementById('pico-rms-start').disabled = true;
-        document.getElementById('pico-rms-stop').disabled = false;
+        if (this.rmsStaleTimer) clearInterval(this.rmsStaleTimer);
+        this.rmsStaleTimer = setInterval(() => this.checkRmsStale(), 1000);
+        this.updateRmsToggleButton();
     }
 
     stopRmsStream() {
@@ -208,24 +240,91 @@ class PicoController {
             this.rmsSource.close();
             this.rmsSource = null;
         }
-        document.getElementById('pico-rms-start').disabled = false;
-        document.getElementById('pico-rms-stop').disabled = true;
+        if (this.rmsStaleTimer) {
+            clearInterval(this.rmsStaleTimer);
+            this.rmsStaleTimer = null;
+        }
+        this.updateRmsToggleButton();
+    }
+
+    restartRmsStream() {
+        this.stopRmsStream();
+        if (!this.rmsPaused && !this.flashInProgress) this.startRmsStream();
+    }
+
+    toggleRmsStream() {
+        this.rmsPaused = !this.rmsPaused;
+        if (this.rmsPaused) {
+            this.stopRmsStream();
+            this.setRmsHint('Paused');
+        } else {
+            this.startRmsStream();
+        }
+    }
+
+    updateRmsToggleButton() {
+        const btn = document.getElementById('pico-rms-toggle');
+        if (!btn) return;
+        const icon = btn.querySelector('i');
+        const label = btn.querySelector('span');
+        if (this.rmsSource) {
+            if (icon) icon.setAttribute('data-lucide', 'pause');
+            if (label) label.textContent = 'Pause';
+        } else {
+            if (icon) icon.setAttribute('data-lucide', 'play');
+            if (label) label.textContent = 'Resume';
+        }
+        if (window.lucide) window.lucide.createIcons();
+    }
+
+    checkRmsStale() {
+        if (!this.rmsSource) return;
+        if (this.rmsLastEventAt === 0) return;
+        const age = Date.now() - this.rmsLastEventAt;
+        if (age < STREAM_STALE_MS) return;
+        const fw = this.lastStatus && this.lastStatus.fw;
+        if (fw && fw !== '0.5.0' && !fw.startsWith('0.5') && !fw.startsWith('1.')) {
+            this.setRmsHint(`No events. Pico fw=${fw} predates CFG STREAM_RMS - flash 0.5.0 via the Firmware card below.`);
+        } else {
+            this.setRmsHint('No events. Check Pico mic wiring or USB-CDC link.');
+        }
+    }
+
+    setRmsHint(text) {
+        const el = document.getElementById('pico-rms-hint');
+        if (el) el.textContent = text;
     }
 
     pushRmsSample(sample) {
+        this.rmsLastEventAt = Date.now();
+        this.setRmsHint('Streaming');
         this.rmsSamples.push(sample);
         if (this.rmsSamples.length > this.rmsCapacity) {
             this.rmsSamples.shift();
         }
+        if (sample.value > this.rmsPeak) this.rmsPeak = sample.value;
         document.getElementById('pico-rms-latest').textContent = sample.value;
+        document.getElementById('pico-rms-peak').textContent = this.rmsPeak;
+        this.ensureSliderRange(this.rmsPeak);
         this.drawRms();
+    }
+
+    ensureSliderRange(observedValue) {
+        const slider = document.getElementById('pico-threshold');
+        const target = Math.max(100000, Math.ceil(observedValue * 2 / 10000) * 10000);
+        const currentMax = Number(slider.max) || 100000;
+        if (target > currentMax) {
+            slider.max = String(target);
+            slider.step = String(Math.max(1000, Math.floor(target / 200)));
+            document.getElementById('pico-threshold-max').textContent = formatThousands(target);
+        }
     }
 
     resizeCanvas() {
         if (!this.canvas) return;
         const ratio = window.devicePixelRatio || 1;
         const cssW = this.canvas.clientWidth || 600;
-        const cssH = this.canvas.clientHeight || 160;
+        const cssH = this.canvas.clientHeight || 120;
         this.canvas.width = Math.floor(cssW * ratio);
         this.canvas.height = Math.floor(cssH * ratio);
         if (this.ctx) this.ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
@@ -239,47 +338,91 @@ class PicoController {
         const h = this.canvas.height / ratio;
         this.ctx.clearRect(0, 0, w, h);
 
-        if (this.rmsSamples.length < 2) return;
+        const topPad = 6;
+        const bottomPad = 18;
+        const usableH = h - topPad - bottomPad;
 
-        const values = this.rmsSamples.map((s) => s.value);
-        const peak = Math.max(1, ...values);
+        const thresholdValue = Number(document.getElementById('pico-threshold').value) || 0;
+        const sampleMax = this.rmsSamples.length ? Math.max(...this.rmsSamples.map((s) => s.value)) : 0;
+        // Y scale tracks samples, not threshold, so the slider visibly moves the line.
+        const peak = Math.max(1, sampleMax * 1.1, this.rmsPeak * 0.4);
 
-        this.ctx.strokeStyle = 'rgba(100, 116, 139, 0.4)';
-        this.ctx.lineWidth = 1;
-        const thresholdValue = Number(document.getElementById('pico-threshold').value);
         if (thresholdValue > 0) {
-            const y = h - (Math.min(thresholdValue, peak) / peak) * (h - 8) - 4;
+            const clamped = Math.min(thresholdValue, peak);
+            const y = topPad + (1 - clamped / peak) * usableH;
+            this.ctx.strokeStyle = '#f97316';
+            this.ctx.lineWidth = thresholdValue > peak ? 2 : 1;
+            this.ctx.setLineDash([4, 4]);
             this.ctx.beginPath();
             this.ctx.moveTo(0, y);
             this.ctx.lineTo(w, y);
             this.ctx.stroke();
+            this.ctx.setLineDash([]);
+
+            this.ctx.fillStyle = '#f97316';
+            this.ctx.font = '10px ui-monospace, monospace';
+            this.ctx.textAlign = 'right';
+            const label = thresholdValue > peak ? `> ${formatThousands(peak)}` : formatThousands(thresholdValue);
+            this.ctx.fillText(label, w - 4, Math.max(y - 3, 10));
         }
 
-        this.ctx.strokeStyle = '#3b82f6';
-        this.ctx.lineWidth = 2;
-        this.ctx.beginPath();
-        values.forEach((v, i) => {
-            const x = (i / (this.rmsCapacity - 1)) * w;
-            const y = h - (v / peak) * (h - 8) - 4;
-            if (i === 0) this.ctx.moveTo(x, y); else this.ctx.lineTo(x, y);
-        });
-        this.ctx.stroke();
+        if (this.rmsSamples.length >= 2) {
+            const values = this.rmsSamples.map((s) => s.value);
+            this.ctx.strokeStyle = '#3b82f6';
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            values.forEach((v, i) => {
+                const x = (i / (this.rmsCapacity - 1)) * w;
+                const y = topPad + (1 - Math.min(v, peak) / peak) * usableH;
+                if (i === 0) this.ctx.moveTo(x, y); else this.ctx.lineTo(x, y);
+            });
+            this.ctx.stroke();
+        }
+
+        const hz = Number(document.getElementById('pico-rms-hz').value) || 20;
+        const windowSec = this.rmsCapacity / hz;
+        this.ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+        this.ctx.font = '10px ui-monospace, monospace';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText('-' + windowSec.toFixed(1) + 's', 4, h - 4);
+        this.ctx.textAlign = 'right';
+        this.ctx.fillText('now', w - 4, h - 4);
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText(formatThousands(peak), 4, topPad + 8);
     }
 
-    async flashFirmware() {
+    async flashFromUpload() {
         const fileInput = document.getElementById('pico-uf2-file');
-        const log = document.getElementById('pico-flash-log');
-        const btn = document.getElementById('pico-flash-btn');
-
         if (!fileInput.files.length) return;
         const form = new FormData();
         form.append('uf2', fileInput.files[0]);
+        await this.runFlashStream('/api/pico/flash', {
+            method: 'POST',
+            body: form
+        }, `Uploading ${fileInput.files[0].name}...`);
+    }
 
-        log.textContent = `Uploading ${fileInput.files[0].name}...\n`;
-        btn.disabled = true;
+    async flashBundled() {
+        await this.runFlashStream('/api/pico/flash-bundled', {
+            method: 'POST'
+        }, 'Flashing bundled firmware...');
+    }
+
+    async runFlashStream(url, fetchInit, headerLine) {
+        const log = document.getElementById('pico-flash-log');
+        const uploadBtn = document.getElementById('pico-flash-btn');
+        const bundledBtn = document.getElementById('pico-flash-bundled-btn');
+
+        const wasStreaming = this.rmsSource !== null;
+        if (wasStreaming) this.stopRmsStream();
+        this.flashInProgress = true;
+
+        log.textContent = `${headerLine}\n`;
+        uploadBtn.disabled = true;
+        bundledBtn.disabled = true;
 
         try {
-            const resp = await fetch('/api/pico/flash', { method: 'POST', body: form });
+            const resp = await fetch(url, fetchInit);
             if (!resp.body) {
                 log.textContent += '\nError: server did not stream a response';
                 return;
@@ -298,13 +441,19 @@ class PicoController {
         } catch (err) {
             log.textContent += `\nError: ${err.message}`;
         } finally {
-            btn.disabled = false;
+            uploadBtn.disabled = document.getElementById('pico-uf2-file').files.length === 0;
+            bundledBtn.disabled = false;
+            this.flashInProgress = false;
+            if (wasStreaming) {
+                setTimeout(() => {
+                    if (!this.rmsPaused && !document.hidden) this.startRmsStream();
+                }, 2500);
+            }
         }
     }
 
     flashMessage(text, type) {
         const badge = document.getElementById('pico-conn-state');
-        // Borrow the status badge for transient feedback.
         const prev = { text: badge.textContent, cls: badge.className };
         badge.textContent = text;
         badge.className = `badge ${type === 'error' ? 'badge-error' : 'badge-success'}`;
