@@ -1,18 +1,10 @@
-"""Async PicoManager — owns the USB CDC handle to /dev/ttyACM0.
-
-The Pico bridge already takes the serial port whenever a strobe calibration
-sweep is in flight. PicoManager runs alongside that flow: it shares a single
-asyncio.Lock with the calibration manager so neither one writes while the
-other is mid-command. Hold times for any one round-trip stay well under a
-human-perceptible window so the calibration sweep is never starved.
-"""
-
 from __future__ import annotations
 
 import asyncio
 import logging
 import shutil
 import time
+from pathlib import Path
 from typing import Any, AsyncIterator, Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -37,23 +29,11 @@ STREAM_RMS_MAX_HZ = 100
 
 
 class PicoManager:
-    """Wraps the Pico's USB CDC line protocol behind asyncio-friendly helpers.
-
-    All public methods take the shared lock for the duration of one
-    write+read round-trip. The lock is module-shared with the calibration
-    manager so concurrent /api/pico/* and /api/calibration/* requests don't
-    fight over the serial fd.
-    """
-
     def __init__(self, config_manager: Any, lock: asyncio.Lock):
         self._config_manager = config_manager
         self._lock = lock
         self._serial = None  # type: ignore[assignment]
         self._stream_active = False
-
-    # ------------------------------------------------------------------
-    # serial fd lifecycle
-    # ------------------------------------------------------------------
 
     def _device_path(self) -> str:
         if self._config_manager is None:
@@ -82,10 +62,6 @@ class PicoManager:
                 logger.debug("PicoManager: close error", exc_info=True)
             self._serial = None
 
-    # ------------------------------------------------------------------
-    # primitive read/write
-    # ------------------------------------------------------------------
-
     def _write_line(self, ser: Any, line: str) -> None:
         payload = line if line.endswith("\n") else line + "\n"
         ser.write(payload.encode("ascii"))
@@ -113,12 +89,6 @@ class PicoManager:
 
     @staticmethod
     def _parse_status_line(line: str) -> Dict[str, Any]:
-        """Turn `STATUS armed=0 threshold=4096 ...` into a dict.
-
-        Anything past the leading `STATUS` token is parsed as key=value pairs,
-        with numerics coerced. The trailing `intervals=` CSV is split into a
-        list of floats so the UI can show / round-trip it without re-parsing.
-        """
         out: Dict[str, Any] = {"raw": line}
         if not line.startswith("STATUS"):
             return out
@@ -141,12 +111,7 @@ class PicoManager:
             out[key] = _coerce_scalar(value)
         return out
 
-    # ------------------------------------------------------------------
-    # public API
-    # ------------------------------------------------------------------
-
     async def probe(self) -> Dict[str, Any]:
-        """One-shot: open, ask STATUS, close. Use for the connection card."""
         async with self._lock:
             return await asyncio.to_thread(self._probe_sync)
 
@@ -174,9 +139,6 @@ class PicoManager:
                 pass
 
     async def status(self) -> Dict[str, Any]:
-        """Reuses the internal serial handle so back-to-back polls don't pay
-        the open/close cost on every tick. Falls back to probe semantics on
-        first call or after close()."""
         async with self._lock:
             return await asyncio.to_thread(self._status_sync)
 
@@ -245,18 +207,7 @@ class PicoManager:
         clamped = max(MIN_INTER_SHOT_FLOOR_MS, min(ms, MIN_INTER_SHOT_CEIL_MS))
         return await self._send_cfg(f"MIN_INTER_SHOT_MS={clamped}")
 
-    # ------------------------------------------------------------------
-    # RMS streaming
-    # ------------------------------------------------------------------
-
     async def start_rms_stream(self, hz: int) -> AsyncIterator[Dict[str, int]]:
-        """Yield `{value, timestamp}` dicts at roughly `hz` samples/sec.
-
-        The iterator holds the serial handle (and the shared lock) for its
-        full lifetime; callers must `aclose()` it (or iterate to completion)
-        so the lock is released. The firmware caps hz at STREAM_RMS_MAX_HZ
-        regardless of what we ask for, so clamp here too.
-        """
         clamped = max(1, min(int(hz), STREAM_RMS_MAX_HZ))
         return self._rms_iter(clamped)
 
@@ -298,7 +249,6 @@ class PicoManager:
             self._lock.release()
 
     async def stop_rms_stream(self) -> None:
-        """Signal the active iterator to drain and release the lock."""
         self._stream_active = False
 
     async def _send_cfg(self, suffix: str) -> Dict[str, Any]:
@@ -327,10 +277,6 @@ class PicoManager:
             return {"ok": False, "error": str(exc)}
 
 
-    # ------------------------------------------------------------------
-    # firmware flash via picotool
-    # ------------------------------------------------------------------
-
     async def flash(
         self,
         uf2_path: str,
@@ -342,16 +288,29 @@ class PicoManager:
             )
 
         async with self._lock:
-            # Close the local handle so picotool can claim the USB device.
-            self.close()
+            sent_bootsel = False
             try:
-                await self._picotool(["reboot", "-f", "-u"], on_progress)
-            except Exception:
-                logger.info("picotool reboot returned non-zero (often fine)")
-            await asyncio.sleep(2)
-            ok = await self._picotool(
-                ["load", "-f", "-x", uf2_path], on_progress
-            )
+                if self._serial is None:
+                    self._serial = await asyncio.to_thread(self._open)
+                await asyncio.to_thread(self._write_line, self._serial, "BOOTSEL")
+                sent_bootsel = True
+                if on_progress is not None:
+                    on_progress("sent BOOTSEL over CDC, waiting for re-enumeration")
+            except Exception as exc:
+                if on_progress is not None:
+                    on_progress(f"BOOTSEL via CDC failed ({exc}); will try picotool reboot")
+
+            self.close()
+            await asyncio.sleep(2.5)
+
+            if not sent_bootsel:
+                try:
+                    await self._picotool(["reboot", "-f", "-u"], on_progress)
+                    await asyncio.sleep(1.5)
+                except Exception:
+                    pass
+
+            ok = await self._picotool(["load", "-f", "-x", uf2_path], on_progress)
             await asyncio.sleep(2)
             return {"ok": ok, "uf2": uf2_path}
 
@@ -380,9 +339,20 @@ class PicoManager:
         rc = await proc.wait()
         return rc == 0
 
+    async def flash_bundled(
+        self,
+        bundled_path: str,
+        on_progress: Optional[Callable[[str], None]] = None,
+    ) -> Dict[str, Any]:
+        uf2 = Path(bundled_path).expanduser().resolve()
+        if not uf2.is_file():
+            raise RuntimeError(f"bundled firmware not found at {uf2}")
+        if on_progress is not None:
+            on_progress(f"flashing {uf2} ({uf2.stat().st_size} bytes)")
+        return await self.flash(str(uf2), on_progress=on_progress)
+
 
 def _coerce_scalar(value: str) -> Any:
-    """Best-effort: int → float → leave-as-string."""
     if value == "":
         return value
     try:
@@ -396,7 +366,6 @@ def _coerce_scalar(value: str) -> Any:
 
 
 def _parse_rms_event(text: str) -> Optional[Dict[str, int]]:
-    """Parse `EVENT RMS value=<int> timestamp=<us>` into a dict."""
     out: Dict[str, int] = {}
     for token in text.split()[2:]:
         if "=" not in token:
