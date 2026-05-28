@@ -32,6 +32,8 @@
 
 namespace golf_sim {
 
+	std::atomic<bool> PulseStrobe::cam2_ready_for_final_trigger_{false};
+
 	std::vector<float>  PulseStrobe::pulse_intervals_fast_ms_;
 	int PulseStrobe::number_bits_for_fast_on_pulse_ = 0;
 

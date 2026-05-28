@@ -9,6 +9,7 @@
 #pragma once
 
 
+#include <atomic>
 #include <vector>
 
 #include "logging_tools.h"
@@ -85,6 +86,11 @@ namespace golf_sim {
 		static void SendOnOffPulse(long length_us);
 
 		static bool kRecordAllImages;
+
+		// Cleared by cam2's event loop on entry, set true once it exits the
+		// priming/quiesce window. gs_fsm waits on this before arming cam1 so
+		// a fast hit can't fire the trigger while cam2 is still ignoring it.
+		static std::atomic<bool> cam2_ready_for_final_trigger_;
 
 	protected:
 

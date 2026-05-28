@@ -107,6 +107,8 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 		~TriggerModeResetGuard() { SetImx296TriggerModeViaI2C(0); }
 	} trigger_reset_guard;
 
+	gs::PulseStrobe::cam2_ready_for_final_trigger_.store(false);
+
 	app.StartCamera();
 	GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop: camera started, waiting for triggers");
 
@@ -384,6 +386,7 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 						GS_LOG_TRACE_MSG(trace, "Priming period complete.  Ready for Final Image Trigger (before flush).");
 						state = kWaitingForFinalImageTrigger;
 					}
+					gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
 				}
 				else {
 					GS_LOG_TRACE_MSG(trace, "Priming period complete.  Ready for Pre-image Trigger.");
@@ -432,6 +435,7 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 
 			// TBD - If using second priming group, use state = kWaitingForSecondPrimingPulseGroup;
 			state = kWaitingForFinalImageTrigger;
+			gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
 			break;
 		}
 
@@ -469,6 +473,7 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 			else {
 				GS_LOG_TRACE_MSG(trace, "		Priming period complete.  Ready for Trigger.");
 				state = kWaitingForFinalImageTrigger;
+				gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
 			}
 			break;
 		}

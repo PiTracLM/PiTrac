@@ -300,6 +300,24 @@ namespace golf_sim {
             GS_LOG_MSG(error, "FAILED to PulseStrobe::SendCameraPrimingPulses");
         }
 
+        // Wait for cam2 to exit its priming/quiesce window before we arm the
+        // ball watcher. Otherwise a fast hit can fire SendExternalTrigger while
+        // cam2 is still rejecting triggers, producing a black final frame.
+        {
+            constexpr int kCam2ReadyTimeoutMs = 3000;
+            const auto wait_deadline = std::chrono::steady_clock::now()
+                                       + std::chrono::milliseconds(kCam2ReadyTimeoutMs);
+            while (!PulseStrobe::cam2_ready_for_final_trigger_.load() &&
+                   std::chrono::steady_clock::now() < wait_deadline) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            }
+            if (!PulseStrobe::cam2_ready_for_final_trigger_.load()) {
+                GS_LOG_MSG(warning, "cam2 not ready for trigger after " +
+                           std::to_string(kCam2ReadyTimeoutMs) +
+                           " ms -- arming ball watcher anyway. A fast hit could be dropped.");
+            }
+        }
+
         // Log the pertinent images for debugging & analysis
         // Add a center dot to the first image to analyze camera off-center
         // LoggingTools::LogImage("", img, std::vector < cv::Point >{ cv::Vec2i(1456 / 2, 1088 / 2) }, true, "log_view_last_ball_found_img.png");
