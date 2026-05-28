@@ -137,7 +137,7 @@ async function requireStrobeSafe() {
         if (data.safe) return true;
         showStrobeSafetyModal(data.reason || '');
         return false;
-    } catch (_) {
+    } catch {
         showStrobeSafetyModal('Could not verify strobe safety — check server connection.');
         return false;
     }
@@ -159,5 +159,6 @@ document.addEventListener('DOMContentLoaded', () => {
     checkSystemStatus();
     checkPiTracStatus();
     setInterval(checkSystemStatus, 5000);
-    setInterval(checkPiTracStatus, 5000);
+    // Indirect call so page-specific wrappers (e.g. dashboard.js) take effect.
+    setInterval(() => window.checkPiTracStatus(), 5000);
 });
