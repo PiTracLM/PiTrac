@@ -117,6 +117,7 @@ class PicoController {
         badge.className = 'badge badge-success';
 
         document.getElementById('pico-fw').textContent = data.fw || data.fw_version || '--';
+        document.getElementById('pico-board').textContent = data.board || '--';
         document.getElementById('pico-device').textContent = data.device || '/dev/ttyACM0';
         document.getElementById('pico-vbus').textContent = (data.vbus === 1 || data.vbus === true) ? 'present' : 'absent';
         document.getElementById('pico-event-count').textContent = data.event_count ?? '--';

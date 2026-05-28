@@ -341,15 +341,45 @@ class PicoManager:
 
     async def flash_bundled(
         self,
-        bundled_path: str,
+        fw_dir: str,
+        target: Optional[str] = None,
         on_progress: Optional[Callable[[str], None]] = None,
     ) -> Dict[str, Any]:
-        uf2 = Path(bundled_path).expanduser().resolve()
+        directory = Path(fw_dir).expanduser().resolve()
+        if not directory.is_dir():
+            raise RuntimeError(f"firmware dir not found at {directory}")
+
+        chosen = target
+        if not chosen:
+            chosen = await self._detect_target(on_progress)
+        uf2 = directory / f"pitrac_{chosen}.uf2"
         if not uf2.is_file():
-            raise RuntimeError(f"bundled firmware not found at {uf2}")
+            raise RuntimeError(f"no bundled firmware for board={chosen} at {uf2}")
         if on_progress is not None:
-            on_progress(f"flashing {uf2} ({uf2.stat().st_size} bytes)")
+            on_progress(f"target={chosen} -> {uf2} ({uf2.stat().st_size} bytes)")
         return await self.flash(str(uf2), on_progress=on_progress)
+
+    async def _detect_target(
+        self,
+        on_progress: Optional[Callable[[str], None]],
+    ) -> str:
+        proc = await asyncio.create_subprocess_exec(
+            "picotool", "info",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        out, _ = await proc.communicate()
+        text = out.decode("utf-8", errors="replace") if out else ""
+        if on_progress is not None:
+            for line in text.splitlines():
+                on_progress(line)
+        if "RP2350" in text:
+            return "pico2_w"
+        if "RP2040" in text:
+            return "pico_w"
+        raise RuntimeError(
+            "could not detect chip family via picotool; set gs_config.pico.target_board"
+        )
 
 
 def _coerce_scalar(value: str) -> Any:

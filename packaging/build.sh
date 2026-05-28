@@ -522,10 +522,10 @@ build_dev() {
 
     install_models "$REPO_ROOT" "${SUDO_USER:-$(whoami)}"
 
-    if [[ -f "$REPO_ROOT/pico/firmware/pitrac_pico.uf2" ]]; then
+    if [[ -d "$REPO_ROOT/pico/firmware" ]]; then
         mkdir -p /usr/share/pitrac
-        ln -sfn "$REPO_ROOT/pico/firmware/pitrac_pico.uf2" /usr/share/pitrac/pico-fw.uf2
-        log_info "Symlinked /usr/share/pitrac/pico-fw.uf2 -> $REPO_ROOT/pico/firmware/pitrac_pico.uf2"
+        ln -sfn "$REPO_ROOT/pico/firmware" /usr/share/pitrac/pico-firmware
+        log_info "Symlinked /usr/share/pitrac/pico-firmware -> $REPO_ROOT/pico/firmware"
     fi
 
     # Install calibration tools

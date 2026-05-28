@@ -1311,11 +1311,14 @@ class PiTracServer:
             return StreamingResponse(progress_stream(), media_type="text/plain")
 
         @self.app.post("/api/pico/flash-bundled")
-        async def pico_flash_bundled() -> StreamingResponse:
-            bundled_path = (
-                self.config_manager.get_config("gs_config.pico.bundled_fw_path")
-                or "/usr/share/pitrac/pico-fw.uf2"
+        async def pico_flash_bundled(target: Optional[str] = None) -> StreamingResponse:
+            fw_dir = (
+                self.config_manager.get_config("gs_config.pico.bundled_fw_dir")
+                or "/usr/share/pitrac/pico-firmware"
             )
+            target_override = target or self.config_manager.get_config(
+                "gs_config.pico.target_board"
+            ) or None
 
             queue: asyncio.Queue = asyncio.Queue()
 
@@ -1325,7 +1328,7 @@ class PiTracServer:
             async def run() -> None:
                 try:
                     result = await self.pico_manager.flash_bundled(
-                        bundled_path, on_progress=on_progress
+                        fw_dir, target=target_override, on_progress=on_progress
                     )
                     queue.put_nowait(
                         "DONE: ok" if result.get("ok") else "ERROR: flash_bundled exit non-zero"

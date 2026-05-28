@@ -272,13 +272,21 @@
       "default": "",
       "internal": true
     },
-    "gs_config.pico.bundled_fw_path": {
+    "gs_config.pico.bundled_fw_dir": {
       "category": "System",
       "subcategory": "advanced",
-      "displayName": "Bundled Pico Firmware",
-      "description": "Path to the .uf2 flashed by the /pico Flash bundled firmware button. build.sh dev symlinks this to pico/firmware/pitrac_pico.uf2 in the active checkout.",
+      "displayName": "Bundled Pico Firmware Dir",
+      "description": "Directory containing the per-board .uf2 artifacts (pitrac_pico.uf2, pitrac_pico_w.uf2, pitrac_pico2.uf2, pitrac_pico2_w.uf2). build.sh dev symlinks this to pico/firmware/ in the active checkout.",
       "type": "string",
-      "default": "/usr/share/pitrac/pico-fw.uf2"
+      "default": "/usr/share/pitrac/pico-firmware"
+    },
+    "gs_config.pico.target_board": {
+      "category": "System",
+      "subcategory": "advanced",
+      "displayName": "Pico Target Board",
+      "description": "Force which firmware variant the /pico Flash button uses. Leave blank to auto-detect chip family via picotool (RP2040 -> pico_w, RP2350 -> pico2_w). Set to pico, pico_w, pico2, or pico2_w to override.",
+      "type": "string",
+      "default": ""
     },
     "gs_config.strobing.kDAC_setting": {
       "category": "Strobing",
