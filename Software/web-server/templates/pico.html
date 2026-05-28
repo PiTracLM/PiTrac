@@ -7,12 +7,14 @@
 
     {# -- Status banner -- #}
     <div class="card bg-base-200 border border-base-300 shadow-sm">
-        <div class="card-body p-3 flex-row gap-4 items-center">
+        <div class="card-body p-3 flex-row gap-4 items-center flex-wrap">
             <i data-lucide="cpu" class="icon-md text-primary"></i>
             <span class="font-semibold">Pico</span>
             <span id="pico-conn-state" class="badge badge-warning">Connecting...</span>
             <span class="text-sm opacity-60">fw <span id="pico-fw">--</span></span>
             <span class="text-sm opacity-60">device <span id="pico-device" class="mono">/dev/ttyACM0</span></span>
+            <span class="text-sm opacity-60">vbus <span id="pico-vbus">--</span></span>
+            <span class="text-sm opacity-60">events <span id="pico-event-count">--</span></span>
             <div class="ml-auto">
                 <button id="pico-refresh-btn" class="btn btn-ghost btn-sm gap-1">
                     <i data-lucide="refresh-cw" class="icon-sm"></i>
@@ -22,57 +24,67 @@
         </div>
     </div>
 
-    {# -- Connection details -- #}
+    {# -- Mic tuning: armed + threshold + min_inter_shot + live RMS in one card -- #}
     <div class="card bg-base-200 border border-base-300 shadow-sm">
         <div class="card-body p-4 sm:p-6">
-            <h2 class="card-title text-primary">Connection</h2>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
-                <div>
-                    <div class="text-xs opacity-60">vsys (mV)</div>
-                    <div id="pico-vsys" class="text-lg font-semibold">--</div>
-                </div>
-                <div>
-                    <div class="text-xs opacity-60">vbus</div>
-                    <div id="pico-vbus" class="text-lg font-semibold">--</div>
-                </div>
-                <div>
-                    <div class="text-xs opacity-60">mic rms</div>
-                    <div id="pico-mic-rms" class="text-lg font-semibold">--</div>
-                </div>
-                <div>
-                    <div class="text-xs opacity-60">events</div>
-                    <div id="pico-event-count" class="text-lg font-semibold">--</div>
-                </div>
-            </div>
-        </div>
-    </div>
+            <h2 class="card-title text-primary">Mic tuning</h2>
+            <p class="text-sm opacity-60">
+                Live mic energy from the Pico. Adjust the threshold so the orange line sits just above the room noise floor, then arm and clap to verify.
+            </p>
 
-    {# -- Controls -- #}
-    <div class="card bg-base-200 border border-base-300 shadow-sm">
-        <div class="card-body p-4 sm:p-6">
-            <h2 class="card-title text-primary">Controls</h2>
+            <div class="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 mt-3">
+                <div class="flex flex-col gap-3">
+                    <label class="label cursor-pointer justify-start gap-3 p-0">
+                        <input id="pico-armed-toggle" type="checkbox" class="toggle toggle-primary" />
+                        <span class="label-text">Armed</span>
+                        <span id="pico-armed-state" class="text-xs opacity-60 ml-auto">disarmed</span>
+                    </label>
 
-            <div class="form-control flex-row items-center gap-3 mt-2">
-                <label class="label cursor-pointer gap-2">
-                    <span class="label-text">Armed</span>
-                    <input id="pico-armed-toggle" type="checkbox" class="toggle toggle-primary" />
-                </label>
-                <span id="pico-armed-state" class="text-sm opacity-60">disarmed</span>
-            </div>
+                    <div class="form-control">
+                        <div class="flex items-baseline justify-between pb-1">
+                            <span class="label-text text-xs opacity-60">Threshold (raw RMS)</span>
+                            <span id="pico-threshold-value" class="text-xs mono font-semibold">0</span>
+                        </div>
+                        <input id="pico-threshold" type="range" min="0" max="100000" step="1000" value="0" class="range range-primary range-sm" />
+                        <div class="flex justify-between text-[10px] opacity-50 mt-1 mono">
+                            <span>0</span>
+                            <span id="pico-threshold-max">100k</span>
+                        </div>
+                    </div>
 
-            <div class="form-control mt-3 max-w-md">
-                <label class="label"><span class="label-text">Mic threshold (raw)</span></label>
-                <div class="join">
-                    <input id="pico-threshold" type="number" class="input input-bordered join-item flex-1" min="0" step="1" value="0" />
-                    <button id="pico-threshold-save" class="btn btn-primary join-item">Save</button>
+                    <label class="form-control">
+                        <span class="label-text text-xs opacity-60 pb-1">Min inter-shot (ms)</span>
+                        <div class="join">
+                            <input id="pico-min-inter-shot" type="number" class="input input-bordered input-sm join-item flex-1 mono" min="20" max="60000" step="10" value="200" />
+                            <button id="pico-min-inter-shot-save" class="btn btn-primary btn-sm join-item">Save</button>
+                        </div>
+                    </label>
+
+                    <label class="form-control">
+                        <span class="label-text text-xs opacity-60 pb-1">Stream rate (hz)</span>
+                        <select id="pico-rms-hz" class="select select-bordered select-sm">
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </label>
+
+                    <div class="text-xs opacity-60 mt-1">
+                        Latest: <span id="pico-rms-latest" class="mono font-semibold">--</span>
+                        &nbsp;Peak: <span id="pico-rms-peak" class="mono font-semibold">--</span>
+                    </div>
                 </div>
-            </div>
 
-            <div class="form-control mt-3 max-w-md">
-                <label class="label"><span class="label-text">Min inter-shot (ms)</span></label>
-                <div class="join">
-                    <input id="pico-min-inter-shot" type="number" class="input input-bordered join-item flex-1" min="20" max="60000" step="1" value="200" />
-                    <button id="pico-min-inter-shot-save" class="btn btn-primary join-item">Save</button>
+                <div class="flex flex-col gap-2">
+                    <canvas id="pico-rms-canvas" class="w-full bg-base-300 rounded-md" height="120"></canvas>
+                    <div class="flex items-center justify-between text-xs opacity-60">
+                        <span id="pico-rms-hint">Connecting to stream...</span>
+                        <button id="pico-rms-toggle" class="btn btn-ghost btn-xs gap-1">
+                            <i data-lucide="pause" class="icon-sm"></i>
+                            <span>Pause</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -84,7 +96,7 @@
             <h2 class="card-title text-primary">SELFTEST</h2>
             <p class="text-sm opacity-60">Blinks the Pico onboard LED three times and reports sensor readings. Does not pulse the IR strobe.</p>
             <div class="flex items-center gap-3 mt-2">
-                <button id="pico-selftest-btn" class="btn btn-primary gap-1">
+                <button id="pico-selftest-btn" class="btn btn-primary btn-sm gap-1">
                     <i data-lucide="zap" class="icon-sm"></i>
                     Run SELFTEST
                 </button>
@@ -93,52 +105,28 @@
         </div>
     </div>
 
-    {# -- Live RMS chart -- #}
-    <div class="card bg-base-200 border border-base-300 shadow-sm">
-        <div class="card-body p-4 sm:p-6">
-            <h2 class="card-title text-primary">Live mic RMS</h2>
-            <p class="text-sm opacity-60">
-                Mic energy estimate streamed via Server-Sent Events. Use this to find an arming threshold above the room noise floor.
-            </p>
-            <div class="flex flex-wrap items-center gap-3 mt-2">
-                <button id="pico-rms-start" class="btn btn-primary btn-sm gap-1">
-                    <i data-lucide="play" class="icon-sm"></i>
-                    Start
-                </button>
-                <button id="pico-rms-stop" class="btn btn-ghost btn-sm gap-1" disabled>
-                    <i data-lucide="square" class="icon-sm"></i>
-                    Stop
-                </button>
-                <label class="label gap-2">
-                    <span class="label-text text-xs">Rate (hz)</span>
-                    <select id="pico-rms-hz" class="select select-bordered select-sm">
-                        <option value="10">10</option>
-                        <option value="20" selected>20</option>
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                    </select>
-                </label>
-                <span class="text-sm opacity-60">Latest: <span id="pico-rms-latest" class="mono">--</span></span>
-            </div>
-            <canvas id="pico-rms-canvas" class="w-full mt-3 bg-base-300 rounded-md" height="160"></canvas>
-        </div>
-    </div>
-
     {# -- Firmware flash -- #}
     <div class="card bg-base-200 border border-base-300 shadow-sm">
         <div class="card-body p-4 sm:p-6">
-            <h2 class="card-title text-primary">Firmware flash</h2>
+            <h2 class="card-title text-primary">Firmware</h2>
             <p class="text-sm opacity-60">
-                Upload a .uf2 file built from the <code>pico/</code> tree. picotool reboots the Pico into BOOTSEL, writes the new image, and reboots back to USB-CDC.
+                Flash the firmware bundled with this PiTrac release, or upload a custom .uf2. picotool reboots the Pico into BOOTSEL, writes the image, and reboots back to USB-CDC.
             </p>
-            <div class="flex flex-wrap items-center gap-3 mt-2">
+
+            <div class="flex flex-wrap items-center gap-3 mt-3">
+                <button id="pico-flash-bundled-btn" class="btn btn-primary btn-sm gap-1">
+                    <i data-lucide="package" class="icon-sm"></i>
+                    Flash bundled firmware
+                </button>
+                <span class="text-xs opacity-50">|</span>
                 <input id="pico-uf2-file" type="file" accept=".uf2" class="file-input file-input-bordered file-input-sm w-full max-w-xs" />
                 <button id="pico-flash-btn" class="btn btn-warning btn-sm gap-1" disabled>
                     <i data-lucide="upload" class="icon-sm"></i>
-                    Flash
+                    Flash uploaded
                 </button>
             </div>
-            <pre id="pico-flash-log" class="bg-base-300 text-base-content text-xs p-3 rounded-md mt-3 whitespace-pre-wrap min-h-24 max-h-80 overflow-auto"></pre>
+
+            <pre id="pico-flash-log" class="bg-base-300 text-base-content text-xs p-3 rounded-md mt-3 whitespace-pre-wrap min-h-24 max-h-96 overflow-auto"></pre>
         </div>
     </div>
 
