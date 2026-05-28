@@ -47,28 +47,35 @@
     animation: pulse 2s infinite;
 }
 
-.status-strip.waiting { border-left-color: var(--color-warning); }
+/* Traffic-light ramp at matched OKLCH L 80 / C 0.17, hue 50/85/150. */
+.status-strip.waiting { border-left-color: oklch(80% 0.17 50); }
 .status-strip.waiting .ball-icon {
-    background-color: var(--color-warning);
+    background-color: oklch(80% 0.17 50);
     animation: pulse 2s infinite;
 }
+.status-strip.waiting #status-strip-title {
+    color: oklch(80% 0.17 50);
+}
 
-.status-strip.stabilizing { border-left-color: #fbbf24; }
+.status-strip.stabilizing { border-left-color: oklch(80% 0.17 85); }
 .status-strip.stabilizing .ball-icon {
-    background-color: #fbbf24;
+    background-color: oklch(80% 0.17 85);
     animation: bounce 1s infinite;
+}
+.status-strip.stabilizing #status-strip-title {
+    color: oklch(80% 0.17 85);
 }
 
 .status-strip.ready {
-    border-left-color: var(--color-success);
-    background: linear-gradient(90deg, color-mix(in oklch, var(--color-success) 6%, transparent) 0%, transparent 40%);
+    border-left-color: oklch(80% 0.17 150);
+    background: linear-gradient(90deg, color-mix(in oklch, oklch(80% 0.17 150) 6%, transparent) 0%, transparent 40%);
 }
 .status-strip.ready .ball-icon {
-    background-color: var(--color-success);
+    background-color: oklch(80% 0.17 150);
     transform: scale(1.05);
 }
 .status-strip.ready #status-strip-title {
-    color: var(--color-success);
+    color: oklch(80% 0.17 150);
 }
 
 .status-strip.hit { border-left-color: var(--color-primary); }
