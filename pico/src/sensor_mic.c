@@ -31,7 +31,7 @@ static int32_t mic_current_level(void) {
 static void mic_selftest_append(char *buf, int buflen, int *cursor) {
     if (*cursor >= buflen) return;
     int k = snprintf(buf + *cursor, buflen - *cursor,
-                     " mic_rms=%ld", (long)impact_detect_current_rms());
+                     " mic_rms=%lld", (long long)impact_detect_current_rms());
     if (k > 0) *cursor += k;
 }
 

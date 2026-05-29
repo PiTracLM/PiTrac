@@ -12,9 +12,10 @@
  * M0+ which has no division/modulo support in hardware.
  *
  * The "samples" we store are raw 32-bit I2S words straight out of the PIO
- * RX FIFO. The MSB-aligned 18-bit SPH0645 mantissa lives in bits 31..14
- * after the chip's documented one-bit delay and undefined LSB. We don't
- * normalise here — that's the DSP's job.
+ * RX FIFO. The SPH0645's one-bit Philips delay lands a dummy in bit 31, so
+ * the 18-bit signed mantissa actually sits in bits 30..13 (see unpack_sample
+ * in impact_detect.c for the exact framing). We don't normalise here — that's
+ * the DSP's job.
  */
 
 #ifndef PITRAC_RING_BUFFER_H

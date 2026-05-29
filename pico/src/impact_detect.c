@@ -84,6 +84,14 @@ static struct {
     int32_t        lpf_lo_y;        /* output of <1 kHz low-pass */
     int32_t        lpf_hi_y;        /* output of <6 kHz low-pass */
 
+    /* I2S slot phase. The PIO emits left-then-right every frame, so the very
+     * first word out of a freshly-reset ring is the left slot. Toggle this per
+     * raw word consumed to track absolute L/R position — `sample_count` can't,
+     * it only advances per decimated *output*, so using it (as we once did)
+     * let right-slot zeros bleed into the decimator and dragged the realised
+     * rate off the 16 kHz every downstream constant assumes. 0 = left. */
+    uint8_t        lr_phase;
+
     /* Anti-alias decimator state — sum of last 3 raw samples */
     int32_t        dec_sum;
     uint8_t        dec_count;
@@ -123,14 +131,28 @@ static struct {
 /* Pull one I2S word, unpack to a signed 18-bit sample (the SPH0645's actual
  * usable range), and return it as a 32-bit signed int.
  *
- * SPH0645 layout in our 32-bit slot, MSB-first:
- *   [31:14] = 18-bit signed mantissa (sign-extended in PIO)
- *   [13:0]  = padding / undefined bits
+ * The framing reality, traced against i2s_rx.pio: the PIO starts sampling on
+ * the very first BCLK after LRCLK flips. SPH0645 Philips framing puts a dummy
+ * delay bit there and only presents the MSB on the *next* BCLK. So with our
+ * shift_left + 32-bit autopush, the word actually lands as:
  *
- * We shift right 14 to drop the padding, then sign-extend by the natural
- * arithmetic-right-shift. The result is a signed int in roughly +/- 131071. */
+ *   [31]    = dummy delay bit (NOT the sign)
+ *   [30:13] = 18-bit signed mantissa, MSB first (bit 30 is the true sign)
+ *   [12:0]  = trailing / undefined bits, last one garbage per the datasheet
+ *
+ * A bare `(int32_t)raw >> 14` would sign-extend from the dummy bit and halve
+ * (or invert) every sample. We could instead burn a non-sampling BCLK in the
+ * PIO to drop the dummy on the wire, but that scope-verified timing loop
+ * (vijaymarupudi's workaround) is exactly what keeps the bits from shifting at
+ * 3 MHz BCLK — not worth disturbing. So shift the dummy off the top first,
+ * which lifts the true MSB into bit 31, then arithmetic-right-shift 14 to keep
+ * the top 18 bits sign-extended. Result is a signed int in roughly ±131071.
+ *
+ * This assumes bit 30 is the sign, which is what the i2s_rx.pio trace says;
+ * the mapping is only fully nailed down with a logic analyser on the live
+ * mic, so confirm on a scope before trusting it in anger. */
 static inline int32_t unpack_sample(uint32_t raw) {
-    return ((int32_t)raw) >> 14;
+    return ((int32_t)(raw << 1)) >> 14;
 }
 
 /* Update both single-pole LPFs and return the band-pass result.
@@ -289,6 +311,7 @@ void impact_detect_init(ring_buffer_t *source) {
     s.sample_count = 0;
     s.lpf_lo_y = 0;
     s.lpf_hi_y = 0;
+    s.lr_phase = 0;
     s.dec_sum = 0;
     s.dec_count = 0;
     s.sq_hi_sum = 0;
@@ -323,13 +346,14 @@ bool impact_detect_step(bool armed, int32_t *rms_out) {
 
     bool triggered = false;
     for (uint32_t i = 0; i < got; ++i) {
-        /* I2S stereo: SPH0645 only outputs on left slot (SEL=GND), right is
-         * undefined. We can't tell which slot is which from the raw words
-         * alone — we know slot order is left-then-right because of how the
-         * PIO program is structured (left_loop runs first). So drop every
-         * other sample on an even index parity. Cheaper than tracking LRCLK
-         * state explicitly. */
-        if ((s.sample_count + i) & 1u) continue;
+        /* I2S stereo: SPH0645 only outputs on the left slot (SEL=GND); the
+         * right slot reads as zeros. The PIO emits left-then-right, so we ride
+         * a per-word toggle anchored to the first word out of the ring. Drop
+         * the right slot and advance the phase before anything can `continue`
+         * past it, so the parity never desyncs from the raw word stream. */
+        bool is_right = (s.lr_phase != 0u);
+        s.lr_phase ^= 1u;
+        if (is_right) continue;
 
         int32_t raw_sample = unpack_sample(buf[i]);
 
@@ -361,16 +385,25 @@ int32_t impact_detect_get_threshold(void) {
     return s.threshold;
 }
 
-/* Returns mean-square = sum-of-squares / window as an int32 — same energy
- * units as `s.threshold` (NOT amplitude). The name `current_rms` is loose
- * shorthand; the value is energy, no sqrt. Detector trips when env_hi
- * (not divided by window) exceeds threshold × WINDOW; this getter divides
- * the sum by WINDOW so callers compare on the same scale as threshold
- * directly. Reads `sq_hi_sum` updated every sample on core 0; torn 64-bit
- * read is harmless here — worst case the arm-quiet check sees a one-sample-
- * stale value. */
-int32_t impact_detect_current_rms(void) {
+/* Returns mean-square = sum-of-squares / window — same energy units as
+ * `s.threshold` (NOT amplitude). The name `current_rms` is loose shorthand;
+ * the value is energy, no sqrt. Detector trips when env_hi (not divided by
+ * window) exceeds threshold × WINDOW; this getter divides the sum by WINDOW so
+ * callers compare on the same scale as threshold directly.
+ *
+ * Returned as int64: a real strike drives the mean-square well past INT32_MAX
+ * (band amplitude ~46k is the crossover), and the old int32 cast wrapped that
+ * to a negative number — which then fooled the arm-quiet gate into thinking
+ * the room was silent. The whole comparison chain is already int64, so this
+ * just stops truncating at the boundary. Reads `sq_hi_sum` updated every
+ * sample on core 0; a torn 64-bit read is harmless — worst case the arm-quiet
+ * check sees a one-sample-stale value. */
+int64_t impact_detect_current_rms(void) {
     int64_t env = s.sq_hi_sum;
     if (env < 0) env = 0;
-    return (int32_t)(env / DSP_RMS_WINDOW_SAMPLES);
+    return env / DSP_RMS_WINDOW_SAMPLES;
+}
+
+uint32_t impact_detect_processed_sample_count(void) {
+    return s.sample_count;
 }

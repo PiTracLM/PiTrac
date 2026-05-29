@@ -63,8 +63,20 @@ uint32_t impact_detect_get_decay_confirm_ms(void);
 
 /* Snapshot of the latest high-band RMS the detector computed. Read from
  * core 1 to decide whether the room is quiet enough to honour a CFG ARMED=1
- * request — refusing the arm prevents auto-firing on a noise event's decay. */
-int32_t impact_detect_current_rms(void);
+ * request — refusing the arm prevents auto-firing on a noise event's decay.
+ *
+ * Returns int64 mean-square energy. A loud strike pushes the per-sample square
+ * past INT32_MAX (band amplitude ~46k is the crossover), so the old int32
+ * return wrapped negative. This getter now hands back the full 64-bit value,
+ * and STATUS emits it un-narrowed. The EVENT strike rms and the arm-quiet gate
+ * still pass through int32 (last_trigger_rms), so they keep wrapping until the
+ * downstream chain is widened — that's a separate change, not done here. */
+int64_t impact_detect_current_rms(void);
+
+/* Count of 16 kHz samples actually pushed through the DSP pipeline since init.
+ * Diagnostic — lets a host (or a host-side test) confirm the de-interleave +
+ * decimation are realising fs/2/DSP_DECIMATION rather than drifting. */
+uint32_t impact_detect_processed_sample_count(void);
 
 #ifdef __cplusplus
 }
