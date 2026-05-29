@@ -19,3 +19,20 @@ target_compile_options(test_proto_parser PRIVATE
 )
 
 add_test(NAME proto_parser COMMAND test_proto_parser)
+
+add_executable(test_impact_detect
+    test_impact_detect.c
+    ${CMAKE_CURRENT_LIST_DIR}/../src/impact_detect.c
+    ${CMAKE_CURRENT_LIST_DIR}/../src/ring_buffer.c
+)
+
+target_include_directories(test_impact_detect PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/../include
+    ${CMAKE_CURRENT_LIST_DIR}/../src
+)
+
+target_compile_options(test_impact_detect PRIVATE
+    -Wall -Wextra -Wno-unused-parameter -Werror
+)
+
+add_test(NAME impact_detect COMMAND test_impact_detect)
