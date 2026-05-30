@@ -35,7 +35,7 @@
         <div class="card-body p-4 sm:p-6">
             <h2 class="card-title text-primary">Mic tuning</h2>
             <p class="text-sm opacity-60">
-                Live mic energy from the Pico. Adjust the threshold so the orange line sits just above the room noise floor, then arm and clap to verify.
+                Live mic energy from the Pico. Drag the threshold to a comfortable margin above the room noise floor (grey line) &mdash; or hit <span class="font-semibold">Set above noise</span> &mdash; then arm and clap. A detected shot flashes on the chart.
             </p>
 
             <div class="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 mt-3">
@@ -49,13 +49,21 @@
                     <div class="form-control">
                         <div class="flex items-baseline justify-between pb-1">
                             <span id="pico-threshold-label" class="label-text text-xs opacity-60">Threshold (raw RMS)</span>
-                            <span id="pico-threshold-value" class="text-xs mono font-semibold" aria-live="polite">0</span>
+                            <span id="pico-threshold-value" class="text-xs mono font-semibold" aria-live="polite">--</span>
                         </div>
                         <input id="pico-threshold" type="range" min="0" max="100000" step="1000" value="0" class="range range-primary range-sm"
-                               aria-labelledby="pico-threshold-label" aria-valuetext="0" />
+                               aria-labelledby="pico-threshold-label" aria-valuetext="not set" />
                         <div class="flex justify-between text-[10px] opacity-50 mt-1 mono">
-                            <span>0</span>
+                            <span id="pico-threshold-min">0</span>
                             <span id="pico-threshold-max">100k</span>
+                        </div>
+                        <div class="flex items-center justify-between gap-2 mt-2">
+                            <span id="pico-threshold-margin" class="text-[11px] opacity-70" role="status" aria-live="polite">noise floor --</span>
+                            <button id="pico-threshold-auto" class="btn btn-ghost btn-xs gap-1" disabled
+                                    title="Available once live mic energy is streaming">
+                                <i data-lucide="wand-2" class="icon-sm"></i>
+                                Set above noise
+                            </button>
                         </div>
                     </div>
 
@@ -67,17 +75,7 @@
                         </div>
                     </label>
 
-                    <label class="form-control">
-                        <span class="label-text text-xs opacity-60 pb-1">Stream rate (hz)</span>
-                        <select id="pico-rms-hz" class="select select-bordered select-sm">
-                            <option value="10">10</option>
-                            <option value="20" selected>20</option>
-                            <option value="50">50</option>
-                            <option value="100">100</option>
-                        </select>
-                    </label>
-
-                    <div class="text-xs opacity-60 mt-1" role="status" aria-live="polite">
+                    <div class="text-xs opacity-60 mt-1">
                         Latest: <span id="pico-rms-latest" class="mono font-semibold">--</span>
                         &nbsp;Peak: <span id="pico-rms-peak" class="mono font-semibold">--</span>
                     </div>
@@ -85,46 +83,27 @@
 
                 <div class="flex flex-col gap-2">
                     <canvas id="pico-rms-canvas" class="w-full bg-base-300 rounded-md" height="120"
-                            role="img" aria-label="Live mic RMS energy plotted against the detection threshold. Numeric latest and peak values are shown above."></canvas>
+                            role="img" aria-label="Live mic energy charted against the noise floor and the detection threshold. The threshold, noise floor, and safety margin are reported as text in the controls beside the chart, and a detected shot is announced as a notification."></canvas>
                     <div class="flex items-center justify-between text-xs opacity-60">
                         <span id="pico-rms-hint">Connecting to stream...</span>
-                        <button id="pico-rms-toggle" class="btn btn-ghost btn-xs gap-1">
-                            <i data-lucide="pause" class="icon-sm"></i>
-                            <span>Pause</span>
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <label class="flex items-center gap-1">
+                                <span>Rate</span>
+                                <select id="pico-rms-hz" class="select select-bordered select-xs" aria-label="Chart stream rate (hz)">
+                                    <option value="10">10 hz</option>
+                                    <option value="20" selected>20 hz</option>
+                                    <option value="50">50 hz</option>
+                                    <option value="100">100 hz</option>
+                                </select>
+                            </label>
+                            <button id="pico-rms-toggle" class="btn btn-ghost btn-xs gap-1">
+                                <i data-lucide="pause" class="icon-sm"></i>
+                                <span>Pause</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    {# -- Strobe pulse shaping: width + interval vector -- #}
-    <div class="card bg-base-200 border border-base-300 shadow-sm">
-        <div class="card-body p-4 sm:p-6">
-            <h2 class="card-title text-primary">Strobe pulse</h2>
-            <p class="text-sm opacity-60">
-                Pulse width drives the per-flash LED on-time. The interval vector spaces the strobe sequence; consecutive gaps must have unique ratios so the trace stays decodable. The firmware re-validates and the saved values reflect what it echoed back.
-            </p>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
-                <label class="form-control">
-                    <span class="label-text text-xs opacity-60 pb-1">Pulse width (µs)</span>
-                    <div class="join">
-                        <input id="pico-pulse-width" type="number" class="input input-bordered input-sm join-item flex-1 mono" min="1" max="500" step="1" />
-                        <button id="pico-pulse-width-save" class="btn btn-primary btn-sm join-item">Save</button>
-                    </div>
-                </label>
-
-                <label class="form-control">
-                    <span class="label-text text-xs opacity-60 pb-1">Intervals (ms, comma-separated)</span>
-                    <div class="join">
-                        <input id="pico-pulse-intervals" type="text" class="input input-bordered input-sm join-item flex-1 mono" placeholder="e.g. 1, 2, 4, 8" />
-                        <button id="pico-pulse-intervals-save" class="btn btn-primary btn-sm join-item">Save</button>
-                    </div>
-                </label>
-            </div>
-
-            <p id="pico-pulse-current" class="text-xs opacity-50 mt-2 mono" role="status" aria-live="polite">--</p>
         </div>
     </div>
 
