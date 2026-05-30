@@ -23,6 +23,8 @@ namespace golf_sim {
 #include <sys/socket.h>
 #include <thread>
 #include <unistd.h>
+#include <utility>
+#include <vector>
 
 using golf_sim::PicoStatus;
 using golf_sim::PicoStrobeClient;
@@ -210,4 +212,68 @@ BOOST_AUTO_TEST_CASE(fire_with_shutter_falls_back_to_usb_cdc_without_gpio) {
 
     BOOST_REQUIRE(client.FireWithShutter());
     BOOST_CHECK_EQUAL(DrainHost(pair.host, 20), "FIRE\n");
+}
+
+// With a chip handle present, FireWithShutter must drive BCM 26 high then low
+// through the injected writer rather than writing "FIRE" to the CDC stream. This
+// exercises the production low-latency path without needing real lgpio hardware.
+BOOST_AUTO_TEST_CASE(fire_with_shutter_pulses_gpio_when_handle_present) {
+    SocketPair pair;
+    PicoStrobeClient client(7);  // any non-negative chip handle selects the fast path
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    std::vector<std::pair<int, int>> writes;  // (pin, level) in order
+    client.SetGpioWriterForTest([&](int handle, int pin, int level) {
+        BOOST_CHECK_EQUAL(handle, 7);
+        writes.emplace_back(pin, level);
+        return 0;
+    });
+
+    BOOST_REQUIRE(client.FireWithShutter());
+
+    BOOST_REQUIRE_EQUAL(writes.size(), 2u);
+    BOOST_CHECK_EQUAL(writes[0].first, 26);   // BCM 26 high
+    BOOST_CHECK_EQUAL(writes[0].second, 1);
+    BOOST_CHECK_EQUAL(writes[1].first, 26);   // BCM 26 low
+    BOOST_CHECK_EQUAL(writes[1].second, 0);
+
+    // Nothing should have leaked onto the CDC wire on the fast path.
+    BOOST_CHECK_EQUAL(DrainHost(pair.host, 20), "");
+}
+
+// Both club profiles are pre-staged once; SelectClubProfile then re-pushes the
+// matching pulse width + interval vector only when the club actually changes.
+// This is the branch SendCameraStrobeTriggerAndShutter relies on so a putt fires
+// the putter pattern instead of the driver pattern.
+BOOST_AUTO_TEST_CASE(select_club_profile_pushes_matching_vector_on_change) {
+    SocketPair pair;
+    PicoStrobeClient client;
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    client.StageClubProfile(PicoStrobeClient::ClubProfile::kDriver,
+                            8.68f, {0.7f, 1.8f, 3.0f, 0.0f});
+    client.StageClubProfile(PicoStrobeClient::ClubProfile::kPutter,
+                            12.5f, {1.1f, 2.4f, 5.0f, 0.0f});
+
+    // First driver selection pushes the driver config.
+    BOOST_REQUIRE(client.SelectClubProfile(PicoStrobeClient::ClubProfile::kDriver));
+    BOOST_CHECK_EQUAL(DrainHost(pair.host, 30),
+        "CFG PULSE_WIDTH_US=8.680\n"
+        "CFG PULSE_INTERVALS=0.700,1.800,3.000,0.000\n");
+
+    // Re-selecting the same club is a no-op on the wire.
+    BOOST_REQUIRE(client.SelectClubProfile(PicoStrobeClient::ClubProfile::kDriver));
+    BOOST_CHECK_EQUAL(DrainHost(pair.host, 20), "");
+
+    // Switching to the putter pushes the putter config.
+    BOOST_REQUIRE(client.SelectClubProfile(PicoStrobeClient::ClubProfile::kPutter));
+    BOOST_CHECK_EQUAL(DrainHost(pair.host, 30),
+        "CFG PULSE_WIDTH_US=12.500\n"
+        "CFG PULSE_INTERVALS=1.100,2.400,5.000,0.000\n");
 }

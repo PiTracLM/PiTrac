@@ -360,6 +360,18 @@ namespace golf_sim {
 
 		if (pico_client_ && pico_client_->IsOpen()) {
 			if (send_no_strobes) return true;
+			// Fire the pattern that matches the club. The Pico keeps the last
+			// selected train, so this only re-sends config on a club change.
+			const PicoStrobeClient::ClubProfile profile =
+				(GolfSimClubs::GetCurrentClubType() == GolfSimClubs::GsClubType::kPutter)
+					? PicoStrobeClient::ClubProfile::kPutter
+					: PicoStrobeClient::ClubProfile::kDriver;
+			// If the re-push fails the Pico is still holding the previously
+			// selected train, so the shot would fire on the wrong pattern. We
+			// still fire (losing the shot entirely is worse), but say so loudly.
+			if (!pico_client_->SelectClubProfile(profile)) {
+				GS_LOG_MSG(warning, "Pico club-profile select failed; firing on the previously-active strobe pattern");
+			}
 			return pico_client_->FireWithShutter();
 		}
 
@@ -521,10 +533,8 @@ namespace golf_sim {
 							GS_LOG_MSG(warning, "Pico probe succeeded but Open failed; using legacy SPI path");
 						} else {
 							GS_LOG_MSG(trace, "PicoStrobeClient open on " + device);
-							const float pulse_width_us =
-								(static_cast<float>(number_bits_for_fast_on_pulse_) / 115200.0f) * 1e6f;
-							pico_client_->SendPulseConfig(pulse_width_us,
-								{0.7f, 1.8f, 3.0f, 2.2f, 3.0f, 7.1f, 4.0f, 0.0f});
+							// Pulse trains are staged below, once the per-club interval
+							// vectors and on-pulse widths have been loaded from config.
 						}
 					}
 				}
@@ -585,6 +595,21 @@ namespace golf_sim {
 		long kBaudRateForSlowPulses;
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kBaudRateForFastPulses", kBaudRateForFastPulses);
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kBaudRateForSlowPulses", kBaudRateForSlowPulses);
+
+		// Stage both club pulse trains on the Pico from the configured
+		// vectors. SendCameraStrobeTriggerAndShutter then selects driver vs
+		// putter per shot, mirroring the legacy SPI fast/slow sequence pick.
+		if (pico_client_ && pico_client_->IsOpen()) {
+			const float driver_pulse_us =
+				(static_cast<float>(number_bits_for_fast_on_pulse_) / static_cast<float>(kBaudRateForFastPulses)) * 1e6f;
+			const float putter_pulse_us =
+				(static_cast<float>(number_bits_for_slow_on_pulse_) / static_cast<float>(kBaudRateForSlowPulses)) * 1e6f;
+			pico_client_->StageClubProfile(PicoStrobeClient::ClubProfile::kDriver,
+				driver_pulse_us, pulse_intervals_fast_ms_);
+			pico_client_->StageClubProfile(PicoStrobeClient::ClubProfile::kPutter,
+				putter_pulse_us, pulse_intervals_slow_ms_);
+			pico_client_->SelectClubProfile(PicoStrobeClient::ClubProfile::kDriver);
+		}
 
 		// Pre-compute the pulse sequences to save time later
 		GS_LOG_TRACE_MSG(trace, "Building Fast pulse sequence.");

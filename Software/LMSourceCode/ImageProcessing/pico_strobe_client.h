@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -42,6 +43,19 @@ public:
     bool SendPulseConfig(float pulse_width_us,
                          const std::vector<float>& intervals_ms);
 
+    // The legacy SPI path picks a different pulse train for putting versus full
+    // swings. These let the bridge mirror that: stage both profiles once, then
+    // select the active one so a putt fires the putter pattern.
+    enum class ClubProfile { kDriver, kPutter };
+
+    void StageClubProfile(ClubProfile profile,
+                          float pulse_width_us,
+                          const std::vector<float>& intervals_ms);
+
+    // Pushes the staged config for profile iff it differs from the last one
+    // pushed, so back-to-back shots of the same club don't re-send over CDC.
+    bool SelectClubProfile(ClubProfile profile);
+
     // The two bridge intercepts.
     bool CamPulse(uint32_t microseconds);
     bool FireWithShutter();
@@ -56,6 +70,12 @@ public:
     // Test-only seam: bypass termios and adopt an already-configured fd.
     // Production code must use Open(device_path).
     bool AttachFd(int fd);
+
+    // GPIO write seam. Signature matches lgGpioWrite(handle, gpio, level) and
+    // returns its status code. Production defaults to lgGpioWrite on the Pi; the
+    // test target injects a recorder to exercise the BCM 26 fast path.
+    using GpioWriteFn = std::function<int(int handle, int gpio, int level)>;
+    void SetGpioWriterForTest(GpioWriteFn writer);
 
 private:
     struct Impl;
