@@ -137,25 +137,68 @@ static inline uint64_t read_volatile_u64(const volatile uint64_t *p) {
     return a;
 }
 
-/* Refresh the ring's head pointer from the DMA's transfer counter. The
- * write address wraps automatically thanks to set_ring; we just need to
- * update head so the consumer can see the new data. */
-static inline void i2s_sync_head(void) {
+/* Refresh the ring's head pointer from the DMA's transfer counter, then guard
+ * against producer overrun. Returns true if it just dropped stale audio, so the
+ * caller can emit a one-shot LOG.
+ *
+ * During a fire the DSP loop is blocked tens of ms in strobe_fire() while the
+ * I2S DMA keeps filling the ring at 48 kHz. If it laps the consumer, `head -
+ * tail` exceeds the ring's capacity and the older slots between tail and
+ * (head - capacity) have already been overwritten — reading them serves torn
+ * audio. We explicitly skip tail forward to the newest full window instead.
+ *
+ * We're the consumer (sole writer of tail), so advancing it here races nothing.
+ * The skip count is forced even so the detector's left/right slot parity, which
+ * rides a per-word toggle through the word stream, stays aligned. */
+static inline bool i2s_sync_head(void) {
     /* `transfer_count` counts down from initial to 0 — completed transfers
      * = initial - remaining. */
     uint32_t remaining = dma_channel_hw_addr(I2S_DMA_CHAN)->transfer_count;
     uint32_t completed = s_dma_initial_count - remaining;
     s_audio_ring.head = completed;
+
+    uint32_t available = s_audio_ring.head - s_audio_ring.tail;
+    if (available <= I2S_RING_SAMPLES) {
+        return false;
+    }
+
+    /* Drop everything but the newest full ring. Keep the dropped count even so
+     * an odd skip can't flip the L/R phase the detector tracks. */
+    uint32_t new_tail = s_audio_ring.head - I2S_RING_SAMPLES;
+    if (((new_tail - s_audio_ring.tail) & 1u) != 0u) {
+        new_tail += 1u;   /* drop one more word — stays an even skip, in-bounds */
+    }
+    s_audio_ring.tail = new_tail;
+    return true;
 }
 
 /* --- main --------------------------------------------------------------- */
 
-/* GP9 FIRE_IN rising-edge handler. Calls strobe_fire() directly to meet the
- * <= 2 us latency criterion: dispatching via mailbox would add a multi-ms
- * round trip through the DSP loop. The callback runs on whichever core
- * registered it (core 0 here, the same core that owns strobe state in
- * strobe.c), so the direct call is safe. Kept tiny: hold check, fire,
- * IRQ_OUT pulse, mailbox notify for the EVENT line. */
+/* Post a telemetry/notify line to core 1's event queue. core0 → core1 messages
+ * are all droppable (LOG / EVENT lines): if core 1 is briefly behind and the
+ * FIFO is full, dropping a line beats blocking the DSP loop and missing the
+ * watchdog feed. Control state never travels this way. */
+static inline void notify_core1(uint32_t msg) {
+    multicore_fifo_push_timeout_us(msg, FIFO_PUSH_TIMEOUT_US);
+}
+
+/* Set true by the FIRE_IN ISR once it has kicked a hardware fire; the DSP loop
+ * watches it, finalises the fire when the train drains, and emits the event.
+ * Written only on core 0 (ISR sets, loop clears) so there's no cross-core race;
+ * the ISR refuses to start a second fire while one is in flight, so at most one
+ * finalise is ever outstanding. */
+static volatile bool s_hw_fire_pending = false;
+
+/* GP9 FIRE_IN rising-edge handler. The first edge — opening the camera shutter
+ * and starting the strobe train — still happens right here so the FIRE_IN →
+ * shutter latency stays as tight as before (a few GPIO writes + the same
+ * cam-XTR setup busy-wait). What moved OUT of the ISR is the tail: we used to
+ * call strobe_fire(), which blocks in dma_channel_wait_for_finish_blocking for
+ * the whole train (tens of ms) and could sleep_ms on the pre-trigger delay —
+ * both illegal-to-deadly in interrupt context. Now strobe_fire_begin() kicks
+ * the DMA and returns; the DSP loop releases XTR and emits the EVENT line once
+ * strobe_is_idle(). The callback runs on core 0 (where it was registered), the
+ * same core that owns the strobe state, so no cross-core hop is involved. */
 static void m2_fire_in_irq_callback(uint gpio, uint32_t events) {
     /* Defensive: the SDK calls this for any registered pin/event pair on
      * the same core, so re-check we are actually the FIRE_IN rising edge. */
@@ -165,18 +208,13 @@ static void m2_fire_in_irq_callback(uint gpio, uint32_t events) {
 
     /* No cooldown check here. The Pi side gates fire requests; firmware
      * trusts the wire. strobe_is_held protects against firing while the
-     * calibration sweep is sustaining DIAG HIGH. */
-    if (strobe_is_held()) {
-        multicore_fifo_push_blocking(MAILBOX_FIRE_REFUSED_HELD);
+     * calibration sweep is sustaining DIAG HIGH. Never block on a push from
+     * interrupt context — drop the (telemetry-only) refusal if the FIFO is
+     * full rather than wedge the ISR. */
+    if (strobe_is_held() || !strobe_fire_begin()) {
+        multicore_fifo_push_timeout_us(MAILBOX_FIRE_REFUSED_HELD, FIFO_PUSH_TIMEOUT_US);
         return;
     }
-
-    if (!strobe_fire()) {
-        multicore_fifo_push_blocking(MAILBOX_FIRE_REFUSED_HELD);
-        return;
-    }
-
-    g_state.last_event_us = time_us_64();
 
     /* IRQ_OUT pulse so the Pi-side ISR can latch the rising edge
      * deterministically (separate from the EVENT line which Pi reads later). */
@@ -184,7 +222,8 @@ static void m2_fire_in_irq_callback(uint gpio, uint32_t events) {
     busy_wait_us_32(IRQ_OUT_PULSE_US);
     gpio_put(PIN_IRQ_OUT, 0);
 
-    multicore_fifo_push_blocking(MAILBOX_HARDWARE_FIRE_DONE);
+    /* Hand the tail to the DSP loop. */
+    s_hw_fire_pending = true;
 }
 
 /* Diagnostic LED-blink helper. Each "checkpoint" blinks the onboard LED N
@@ -369,6 +408,7 @@ int main(void) {
 
     absolute_time_t led_next_toggle = make_timeout_time_ms(500);
     bool led_state = false;
+    bool ring_overflow_logged = false;
 
     /* --- main DSP loop ------------------------------------------------ */
 
@@ -388,14 +428,22 @@ int main(void) {
          * push the LOG to core 1 via the mailbox rather than printf-ing
          * from core 0 — stdio over USB CDC is core-1-owned and concurrent
          * writes from core 0 would risk garbled output. */
-        if (g_state.armed && time_us_64() > read_volatile_u64(&g_state.arm_deadline_us)) {
+        if (g_state.armed && time_us_64() > g_state.arm_deadline_us) {
             g_state.armed = false;
-            multicore_fifo_push_blocking(MAILBOX_DISARM_TIMEOUT);
+            notify_core1(MAILBOX_DISARM_TIMEOUT);
         }
 
-        /* Update the ring head from the DMA counter so the detector sees
-         * fresh data. */
-        i2s_sync_head();
+        /* Update the ring head from the DMA counter so the detector sees fresh
+         * data. If the producer lapped us (typically right after a fire's
+         * blocking window), it drops the stale audio and we LOG once per
+         * episode — edge-triggered so a sustained overrun doesn't spam. */
+        bool ring_lapped = i2s_sync_head();
+        if (ring_lapped && !ring_overflow_logged) {
+            notify_core1(MAILBOX_RING_OVERFLOW);
+            ring_overflow_logged = true;
+        } else if (!ring_lapped) {
+            ring_overflow_logged = false;
+        }
 
         /* Run impact detection. Reads what's available, returns true with
          * RMS value if it just fired a trigger. */
@@ -414,11 +462,11 @@ int main(void) {
             uint64_t last_us = read_volatile_u64(&g_state.last_event_us);
             uint64_t min_gap_us = (uint64_t)g_state.min_inter_shot_ms * 1000u;
             if (last_us != 0 && now_us - last_us < min_gap_us) {
-                multicore_fifo_push_blocking(MAILBOX_FIRE_REFUSED_COOLDOWN);
+                notify_core1(MAILBOX_FIRE_REFUSED_COOLDOWN);
                 /* Still consume the arm — a host that triggered noise during
                  * cooldown has to explicitly re-arm anyway. */
                 g_state.armed = false;
-                multicore_fifo_push_blocking(MAILBOX_DISARM_AFTER_FIRE);
+                notify_core1(MAILBOX_DISARM_AFTER_FIRE);
             } else {
                 /* Fire the strobe + camera trigger. This blocks until the DMA
                  * train completes (~tens of ms worst case); during that window
@@ -429,7 +477,7 @@ int main(void) {
                     g_state.last_event_us = time_us_64();
                     /* EVENT before disarm-LOG so the wire order reads
                      * naturally (EVENT first, consequence second). */
-                    multicore_fifo_push_blocking(MAILBOX_STRIKE);
+                    notify_core1(MAILBOX_STRIKE);
 
                     /* Pi-side IRQ on rising edge. Stay HIGH for 100 us so a
                      * polled sampler can't miss the edge. */
@@ -437,21 +485,45 @@ int main(void) {
                     busy_wait_us_32(IRQ_OUT_PULSE_US);
                     gpio_put(PIN_IRQ_OUT, 0);
                 } else {
-                    multicore_fifo_push_blocking(MAILBOX_FIRE_REFUSED_HELD);
+                    notify_core1(MAILBOX_FIRE_REFUSED_HELD);
                 }
 
                 /* Disarm even on refusal: noise during a held sweep still
                  * burned the one-shot arm. */
                 g_state.armed = false;
-                multicore_fifo_push_blocking(MAILBOX_DISARM_AFTER_FIRE);
+                notify_core1(MAILBOX_DISARM_AFTER_FIRE);
             }
         }
 
-        /* Check for a manual FIRE request from core 1. Non-blocking — if
-         * no message is waiting, just continue the DSP loop. */
+        /* Finalise a hardware (GP9) fire once its train has drained. The ISR
+         * kicked the DMA and left; here we release the cam XTR pins, stamp the
+         * event time (core 0 stays the sole writer of last_event_us), and emit
+         * the EVENT line. Checking strobe_is_idle() keeps us off the pin until
+         * the PIO has clocked the last pulse. */
+        if (s_hw_fire_pending && strobe_is_idle()) {
+            strobe_fire_end();
+            g_state.last_event_us = time_us_64();
+            s_hw_fire_pending = false;
+            notify_core1(MAILBOX_HARDWARE_FIRE_DONE);
+        }
+
+        /* Drain one inbound request from core 1. Non-blocking — if nothing is
+         * waiting, fall through. core 1 posts arm/disarm intent and manual fire
+         * requests on this same FIFO; core 0 is the single point that applies
+         * arm state, so there's no multi-writer race on g_state.armed or the
+         * 64-bit arm_deadline_us. One pop per loop is plenty: the host can't
+         * issue requests faster than the loop spins. */
         if (multicore_fifo_rvalid()) {
             uint32_t msg = multicore_fifo_pop_blocking();
-            if (msg == MAILBOX_MANUAL_FIRE) {
+            if (msg == MAILBOX_REQ_ARM) {
+                /* Sole-writer arm: compute the deadline here from the (atomic
+                 * 32-bit) arm_timeout_ms core 1 set, then raise the gate. */
+                g_state.arm_deadline_us =
+                    time_us_64() + (uint64_t)g_state.arm_timeout_ms * 1000u;
+                g_state.armed = true;
+            } else if (msg == MAILBOX_REQ_DISARM) {
+                g_state.armed = false;
+            } else if (msg == MAILBOX_MANUAL_FIRE) {
                 /* Same cooldown gate as the mic-triggered path. Calibration
                  * sweeps can lower min_inter_shot_ms via CFG when each fire
                  * is a tiny single pulse. */
@@ -459,13 +531,13 @@ int main(void) {
                 uint64_t last_us = read_volatile_u64(&g_state.last_event_us);
                 uint64_t min_gap_us = (uint64_t)g_state.min_inter_shot_ms * 1000u;
                 if (last_us != 0 && now_us - last_us < min_gap_us) {
-                    multicore_fifo_push_blocking(MAILBOX_FIRE_REFUSED_COOLDOWN);
+                    notify_core1(MAILBOX_FIRE_REFUSED_COOLDOWN);
                 } else {
                     if (strobe_fire()) {
                         g_state.last_event_us = time_us_64();
-                        multicore_fifo_push_blocking(MAILBOX_MANUAL_FIRE_DONE);
+                        notify_core1(MAILBOX_MANUAL_FIRE_DONE);
                     } else {
-                        multicore_fifo_push_blocking(MAILBOX_FIRE_REFUSED_HELD);
+                        notify_core1(MAILBOX_FIRE_REFUSED_HELD);
                     }
                     /* Same disarm-after-fire policy for manual fires — keeps
                      * the arm gate predictable: ARMED=1 is a one-shot intent.
@@ -473,7 +545,7 @@ int main(void) {
                      * misleading lines on FIRE-while-already-disarmed. */
                     if (g_state.armed) {
                         g_state.armed = false;
-                        multicore_fifo_push_blocking(MAILBOX_DISARM_AFTER_FIRE);
+                        notify_core1(MAILBOX_DISARM_AFTER_FIRE);
                     }
                 }
             } else if (msg == MAILBOX_MANUAL_FIRE_PEAK) {
@@ -485,7 +557,7 @@ int main(void) {
                 uint64_t last_us = read_volatile_u64(&g_state.last_event_us);
                 uint64_t min_gap_us = (uint64_t)g_state.min_inter_shot_ms * 1000u;
                 if (last_us != 0 && now_us - last_us < min_gap_us) {
-                    multicore_fifo_push_blocking(MAILBOX_FIRE_REFUSED_COOLDOWN);
+                    notify_core1(MAILBOX_FIRE_REFUSED_COOLDOWN);
                 } else {
                     uint16_t peak = 0u;
                     uint32_t samples = 0u;
@@ -493,13 +565,13 @@ int main(void) {
                         g_state.last_event_us = time_us_64();
                         g_state.last_peak_adc = peak;
                         g_state.last_peak_samples = samples;
-                        multicore_fifo_push_blocking(MAILBOX_MANUAL_FIRE_PEAK_DONE);
+                        notify_core1(MAILBOX_MANUAL_FIRE_PEAK_DONE);
                     } else {
-                        multicore_fifo_push_blocking(MAILBOX_FIRE_REFUSED_HELD);
+                        notify_core1(MAILBOX_FIRE_REFUSED_HELD);
                     }
                     if (g_state.armed) {
                         g_state.armed = false;
-                        multicore_fifo_push_blocking(MAILBOX_DISARM_AFTER_FIRE);
+                        notify_core1(MAILBOX_DISARM_AFTER_FIRE);
                     }
                 }
             }

@@ -17,7 +17,10 @@ typedef struct {
     /* DSP config */
     void    (*set_threshold)(int32_t);
     int32_t (*get_threshold)(void);
-    int32_t (*current_rms)(void);
+    /* int64 so the arm-quiet gate never narrows the mic's mean-square RMS —
+     * a loud strike pushes it past INT32_MAX and an int32 return wrapped
+     * negative, silently passing the quiet check. */
+    int64_t (*current_rms)(void);
     void    (*set_decay_confirm)(uint32_t ms);
 
     /* Strobe pattern. Pass intervals_ms=NULL to keep current intervals;

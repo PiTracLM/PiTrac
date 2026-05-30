@@ -234,6 +234,93 @@ static void test_dispatcher_routes_stream_rms_to_vtable(void) {
     EXPECT(mock_stream_rms_last_hz == 0u, "zero argument forwards as stop");
 }
 
+/* --- arm-quiet gate: the int64 widening must survive a loud RMS --- */
+
+static int64_t mock_current_rms_value = 0;
+static int64_t mock_current_rms(void) { return mock_current_rms_value; }
+
+static int32_t mock_threshold_value = 0;
+static int32_t mock_get_threshold(void) { return mock_threshold_value; }
+
+static int      mock_set_armed_calls = 0;
+static bool     mock_set_armed_last = false;
+static void mock_set_armed(bool a) {
+    mock_set_armed_calls++;
+    mock_set_armed_last = a;
+}
+
+static void test_arm_refused_when_rms_exceeds_int32(void) {
+    /* A loud strike pushes the mic's mean-square RMS past INT32_MAX. If the
+     * gate narrowed it to int32 it would wrap negative and sail under the quiet
+     * ceiling, arming on a noisy room. With the chain int64, the comparison
+     * holds and the arm is refused. */
+    hw_driver_t hw = (hw_driver_t){
+        .current_rms = mock_current_rms,
+        .get_threshold = mock_get_threshold,
+        .set_armed = mock_set_armed,
+        .emit_log = mock_emit_log,
+    };
+    mock_threshold_value = 4000;                 /* ceiling = 1000 after /4 */
+    mock_current_rms_value = (int64_t)INT32_MAX + 1000;  /* would wrap negative */
+    mock_set_armed_calls = 0;
+    mock_emit_log_calls = 0;
+
+    pitrac_cmd_t cmd = { .kind = CMD_CFG_ARMED, .u.armed = true };
+    cmd_dispatcher_apply(&cmd, &hw);
+
+    EXPECT(mock_set_armed_calls == 0, "loud room must NOT arm");
+    EXPECT(mock_emit_log_calls == 1, "refusal logs once");
+}
+
+static void test_arm_allowed_when_quiet(void) {
+    hw_driver_t hw = (hw_driver_t){
+        .current_rms = mock_current_rms,
+        .get_threshold = mock_get_threshold,
+        .set_armed = mock_set_armed,
+        .emit_log = mock_emit_log,
+    };
+    mock_threshold_value = 4000;                 /* ceiling = 1000 */
+    mock_current_rms_value = 10;                 /* well under ceiling */
+    mock_set_armed_calls = 0;
+    mock_set_armed_last = false;
+
+    pitrac_cmd_t cmd = { .kind = CMD_CFG_ARMED, .u.armed = true };
+    cmd_dispatcher_apply(&cmd, &hw);
+
+    EXPECT(mock_set_armed_calls == 1, "quiet room arms");
+    EXPECT(mock_set_armed_last == true, "armed=true forwarded");
+}
+
+static void test_dispatcher_cmd_none_is_silent_noop(void) {
+    /* A whitespace-only or empty line parses to CMD_NONE. The dispatcher must
+     * not bark "invalid command" at an honest no-op (regression: it used to
+     * share the CMD_INVALID arm). */
+    hw_driver_t hw = (hw_driver_t){ .emit_log = mock_emit_log };
+    mock_emit_log_calls = 0;
+    pitrac_cmd_t cmd = { .kind = CMD_NONE };
+    cmd_dispatcher_apply(&cmd, &hw);
+    EXPECT(mock_emit_log_calls == 0, "CMD_NONE emits nothing");
+}
+
+static void test_dispatcher_cmd_invalid_still_logs(void) {
+    /* The flip side: a genuinely bad command must still surface a LOG line. */
+    hw_driver_t hw = (hw_driver_t){ .emit_log = mock_emit_log };
+    mock_emit_log_calls = 0;
+    pitrac_cmd_t cmd = { .kind = CMD_INVALID };
+    cmd_dispatcher_apply(&cmd, &hw);
+    EXPECT(mock_emit_log_calls == 1, "CMD_INVALID logs once");
+}
+
+static void test_whitespace_line_parses_to_cmd_none(void) {
+    /* End-to-end: the parser turns a blank/whitespace line into CMD_NONE so
+     * the silent-noop path above is the one that fires. */
+    pitrac_cmd_t cmd;
+    char line[] = "   ";
+    bool ok = proto_parse_line(line, &cmd);
+    EXPECT(!ok, "whitespace line is not a recognised command");
+    EXPECT(cmd.kind == CMD_NONE, "whitespace line parses to CMD_NONE");
+}
+
 int main(void) {
     test_fire_parses_correctly();
     test_status_parses_correctly();
@@ -257,11 +344,16 @@ int main(void) {
     test_cfg_stream_rms_clamped_to_max();
     test_dispatcher_routes_cam_pulse_to_vtable();
     test_dispatcher_routes_stream_rms_to_vtable();
+    test_dispatcher_cmd_none_is_silent_noop();
+    test_dispatcher_cmd_invalid_still_logs();
+    test_whitespace_line_parses_to_cmd_none();
+    test_arm_refused_when_rms_exceeds_int32();
+    test_arm_allowed_when_quiet();
 
     if (failures > 0) {
         printf("%d failure(s)\n", failures);
         return 1;
     }
-    printf("%d tests passed\n", 22);
+    printf("%d tests passed\n", 27);
     return 0;
 }

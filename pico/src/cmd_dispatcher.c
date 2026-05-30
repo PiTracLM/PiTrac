@@ -33,9 +33,11 @@ void cmd_dispatcher_apply(const pitrac_cmd_t *c, const hw_driver_t *hw) {
     case CMD_CFG_ARMED:
         if (c->u.armed) {
             /* Refuse arm if the decay tail of a recent noise event would
-             * re-trigger us immediately. */
-            int32_t now_rms = hw->current_rms();
-            int32_t quiet_ceiling = hw->get_threshold() / DSP_ARM_QUIET_FACTOR;
+             * re-trigger us immediately. Kept entirely in int64 — the mic RMS
+             * is a mean-square energy that runs past INT32_MAX on a loud room,
+             * and narrowing either side here would wrap the comparison. */
+            int64_t now_rms = hw->current_rms();
+            int64_t quiet_ceiling = (int64_t)hw->get_threshold() / DSP_ARM_QUIET_FACTOR;
             if (now_rms > quiet_ceiling) {
                 hw->emit_log("error: arm refused (room too loud, retry when quiet)");
                 break;
@@ -123,6 +125,11 @@ void cmd_dispatcher_apply(const pitrac_cmd_t *c, const hw_driver_t *hw) {
         break;
 
     case CMD_NONE:
+        /* Empty or whitespace-only line — the host sent nothing actionable
+         * (a stray newline, a blank keep-alive). Silently ignore it rather
+         * than barking "invalid command" at an honest no-op. */
+        break;
+
     case CMD_INVALID:
     default:
         hw->emit_log("error: invalid command");

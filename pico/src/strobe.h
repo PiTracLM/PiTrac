@@ -63,8 +63,30 @@ bool strobe_set_pulse_train(const float *intervals_ms,
  */
 bool strobe_fire(void);
 
+/* Deferred-completion fire for the GP9 FIRE_IN interrupt, which must not block
+ * (a dma_channel_wait_for_finish_blocking in an ISR stalls every other IRQ for
+ * the whole train; the pre-trigger sleep_ms could deadlock outright).
+ *
+ *   strobe_fire_begin() — hold/sanity check, open the shutter and kick the DMA,
+ *                         then return immediately. Skips the pre-trigger delay.
+ *                         Returns false if refused or a fire is already in
+ *                         flight (re-kicking mid-train would corrupt it).
+ *   strobe_fire_end()   — release the cam XTR pins. Call from loop context once
+ *                         strobe_is_idle() reports the train has drained.
+ */
+bool strobe_fire_begin(void);
+void strobe_fire_end(void);
+
 /* Has the most-recent fire completed (DMA drained)? */
 bool strobe_is_idle(void);
+
+/* Shared-ADC mutual exclusion for callers that touch the ADC mux off the
+ * strobe path (core 1's VSYS read). strobe_adc_acquire() returns false if a
+ * FIRE_PEAK sweep currently owns the mux — the caller must skip its read. On
+ * true it has taken the ADC lock; the caller selects its channel, reads, then
+ * calls strobe_adc_release(). Keep the held region short (a few reads). */
+bool strobe_adc_acquire(void);
+void strobe_adc_release(void);
 
 /* Like strobe_fire(), but additionally oversamples ADC channel 0 (which the
  * caller must have initialised on GP26 wired to V3 CUR-SENSE) for the entire

@@ -36,11 +36,13 @@
 #include <math.h>
 
 #include "pico/stdlib.h"
+#include "pico/sync.h"
 #include "hardware/adc.h"
 #include "hardware/clocks.h"
 #include "hardware/dma.h"
 #include "hardware/gpio.h"
 #include "hardware/pio.h"
+#include "hardware/sync.h"
 #include "hardware/watchdog.h"
 
 #include "ir_strobe.pio.h"
@@ -71,6 +73,19 @@ static uint8_t  s_interval_count = 0;
  * hold the gate driver on long enough for an ADC reading. */
 static volatile bool      s_hold_active   = false;
 static volatile uint64_t  s_hold_deadline_us = 0;
+
+/* --- Shared-ADC mutual exclusion ----------------------------------------
+ *
+ * One ADC, one mux. core 0 selects ADC_CUR_SENSE_CHANNEL for the entire
+ * FIRE_PEAK sweep (tens of ms); core 1 selects ADC_VSYS_CHANNEL for a brief
+ * STATUS read. A STATUS landing mid-sweep would reprogram the mux and corrupt
+ * both readings. We can't hold a spinlock across the 60 ms sweep, so instead
+ * core 0 raises s_peak_in_flight (under the lock) for the sweep's duration and
+ * core 1 refuses the VSYS read while it's set. The short reads that DO touch
+ * the mux take the lock so the flag check and the mux select can't interleave. */
+static spin_lock_t       *s_adc_spin     = NULL;
+static volatile bool      s_peak_in_flight = false;
+static uint32_t           s_adc_save_irq = 0;   /* IRQ state across acquire/release */
 
 /* --- Pattern compiler ------------------------------------------------------ */
 
@@ -188,6 +203,13 @@ bool strobe_set_pulse_train(const float *intervals_ms,
 }
 
 bool strobe_init(void) {
+    /* Claim a hardware spinlock to serialise ADC mux access between core 0's
+     * FIRE_PEAK sweep and core 1's VSYS reads (see s_adc_spin notes above). */
+    if (s_adc_spin == NULL) {
+        int sl = spin_lock_claim_unused(true);
+        s_adc_spin = spin_lock_instance((uint)sl);
+    }
+
     /* Cam2 XTR — straight GPIO, active low. Idle HIGH. */
     gpio_init(PIN_CAM2_XTR);
     gpio_set_dir(PIN_CAM2_XTR, GPIO_OUT);
@@ -242,65 +264,105 @@ bool strobe_init(void) {
     return true;
 }
 
-bool strobe_fire(void) {
+/* Shared fire-time guard: pattern present, not held, every compiled word's
+ * high_count within the per-pulse-width budget. The high-count scan is cheap
+ * defense-in-depth — stack corruption that poked 0xFFFF into a word's low 16
+ * bits would otherwise hold the LED on for 524 ms at 125 MHz PIO clock, well
+ * past the boost cap's spec. Returns true if it's safe to start the train. */
+static bool strobe_fire_ok(void) {
     if (s_pattern_len == 0u) return false;
+
+    /* Refuse if a train is still draining — re-kicking the DMA mid-flight
+     * corrupts the in-flight transfer. This matters most when FIRE_IN (the GP9
+     * ISR) and the mic/manual loop path can both fire: the ISR train runs for
+     * tens of ms and last_event_us isn't stamped until it finalizes, so the
+     * inter-shot cooldown won't catch a loop-side fire landing on top of it. */
+    if (dma_channel_is_busy(STROBE_DMA_CHAN)) return false;
 
     /* Refuse to fire while the Pi is holding DIAG HIGH for calibration —
      * the pin is currently owned by SIO, not PIO, so the PIO state machine
      * can't drive it anyway. */
     if (s_hold_active) return false;
 
-    /* Fire-time sanity check: each compiled word's high_count must fit within
-     * the per-pulse-width budget. Stack corruption that pokes 0xFFFF into the
-     * low 16 bits of a word would otherwise hold the LED on for 524 ms at
-     * 125 MHz PIO clock — well past the boost cap's spec. Cheap defense-in-
-     * depth on top of strobe_set_pulse_train's compile-time bounds. */
     const uint32_t pio_hz = (uint32_t)clock_get_hz(clk_sys);
     const uint32_t max_high =
         (uint32_t)(STROBE_MAX_PULSE_WIDTH_US * 1e-6f * (float)pio_hz);
     for (uint32_t i = 0; i < s_pattern_len; ++i) {
         if ((s_pattern[i] & 0xFFFFu) > max_high) return false;
     }
+    return true;
+}
 
+/* Open the camera shutter and kick the DMA train — no completion wait. The
+ * train then runs autonomously from PIO while the caller is free to leave.
+ * `allow_pre_trigger_delay` gates the host-tunable settle pause: it's a
+ * sleep_ms (yields, can't run from an ISR), so the FIRE_IN interrupt path
+ * passes false and never touches it. */
+static void strobe_kick_dma(bool allow_pre_trigger_delay) {
     /* Pre-trigger delay — host-tunable pause before we touch the camera. Used
-     * by putts (kPuttingStrobeDelayMs equivalent). 0 by default = no-op. */
-    if (g_state.pre_trigger_delay_ms > 0u) {
+     * by putts (kPuttingStrobeDelayMs equivalent). 0 by default = no-op. Only
+     * the loop-context callers allow it; the ISR path can't sleep. */
+    if (allow_pre_trigger_delay && g_state.pre_trigger_delay_ms > 0u) {
         sleep_ms(g_state.pre_trigger_delay_ms);
     }
 
-    /* Step 1: open camera shutter (active low). Drive both cam triggers in
-     * lockstep — single-camera installs ignore PIN_CAM1_XTR, dual-camera
-     * stereo installs see synchronised exposure starts. */
+    /* Open camera shutter (active low). Drive both cam triggers in lockstep —
+     * single-camera installs ignore PIN_CAM1_XTR, dual-camera stereo installs
+     * see synchronised exposure starts. */
     gpio_put(PIN_CAM2_XTR, 0);
     gpio_put(PIN_CAM1_XTR, 0);
 
-    /* Step 2: tiny setup delay — IMX296/Mira220 spec'd at ~few hundred µs
-     * shutter response. Default is CAM_XTR_DEFAULT_SETUP_US (1 ms); host
-     * may have tuned it via `CFG CAM_XTR_SETUP_US=<int>`. busy_wait_us is
-     * interrupt-safe and stalls under 1 instruction overhead. */
+    /* Tiny setup delay — IMX296/Mira220 spec'd at ~few hundred µs shutter
+     * response. Default is CAM_XTR_DEFAULT_SETUP_US (1 ms); host may have tuned
+     * it via `CFG CAM_XTR_SETUP_US=<int>`. busy_wait_us is interrupt-safe, so
+     * this stays correct even on the ISR path. */
     busy_wait_us(g_state.cam_xtr_setup_us);
 
-    /* Step 3: kick the DMA. Re-set read address + transfer count each time
-     * because the channel doesn't auto-rewind. set_trans_count(true) starts
-     * immediately. */
+    /* Kick the DMA. Re-set read address + transfer count each time because the
+     * channel doesn't auto-rewind. set_trans_count(true) starts immediately. */
     dma_channel_set_read_addr(STROBE_DMA_CHAN, s_pattern, false);
     dma_channel_set_trans_count(STROBE_DMA_CHAN, s_pattern_len, true /* start */);
+}
 
-    /* The strobe is now firing autonomously. We could wait for completion
-     * and then release XTR, but the train is short enough (max ~30 ms for
-     * all 8 pulses with the longest gaps) that we just block here. Keeps
-     * the API simple and the XTR timing predictable for the camera. */
-    dma_channel_wait_for_finish_blocking(STROBE_DMA_CHAN);
-
-    /* Step 4: release both XTR pins back high. */
+/* Release both XTR pins back high. Call once the train has drained. */
+static void strobe_release_xtr(void) {
     gpio_put(PIN_CAM2_XTR, 1);
     gpio_put(PIN_CAM1_XTR, 1);
+}
+
+bool strobe_fire(void) {
+    if (!strobe_fire_ok()) return false;
+
+    strobe_kick_dma(true /* loop context — pre-trigger delay allowed */);
+
+    /* The train is short enough (max ~30 ms for all 8 pulses with the longest
+     * gaps) that the loop-context callers just block here. Keeps the API
+     * simple and the XTR timing predictable for the camera. The deferred
+     * begin/end pair below exists for the FIRE_IN ISR, which must not block. */
+    dma_channel_wait_for_finish_blocking(STROBE_DMA_CHAN);
+
+    strobe_release_xtr();
     return true;
+}
+
+bool strobe_fire_begin(void) {
+    if (!strobe_fire_ok()) return false;
+
+    /* No pre-trigger delay on this path: it's the GP9 FIRE_IN ISR, and the
+     * Pi only asserts FIRE_IN when it has already decided to fire *now*. */
+    strobe_kick_dma(false);
+    return true;
+}
+
+void strobe_fire_end(void) {
+    strobe_release_xtr();
 }
 
 bool strobe_fire_peak(uint16_t *peak_adc_out, uint32_t *samples_out) {
     if (peak_adc_out)  *peak_adc_out = 0u;
     if (samples_out)   *samples_out  = 0u;
+
+    if (!strobe_fire_ok()) return false;
 
     /* On Pico W main.c keeps ADC inside the CYW43 guard, so we bring it
      * up the first time the host actually wants a peak read. */
@@ -310,28 +372,21 @@ bool strobe_fire_peak(uint16_t *peak_adc_out, uint32_t *samples_out) {
         adc_gpio_init(PIN_CUR_SENSE_ADC);
         s_adc_ready = true;
     }
-    adc_select_input(ADC_CUR_SENSE_CHANNEL);
 
-    if (s_pattern_len == 0u) return false;
-    if (s_hold_active) return false;
-
-    const uint32_t pio_hz = (uint32_t)clock_get_hz(clk_sys);
-    const uint32_t max_high =
-        (uint32_t)(STROBE_MAX_PULSE_WIDTH_US * 1e-6f * (float)pio_hz);
-    for (uint32_t i = 0; i < s_pattern_len; ++i) {
-        if ((s_pattern[i] & 0xFFFFu) > max_high) return false;
+    /* Claim the mux for the whole sweep: raise the in-flight flag and select
+     * CUR_SENSE under the lock so a concurrent core-1 VSYS read sees the flag
+     * and backs off instead of reprogramming the mux mid-sweep. We then drop
+     * the lock — the flag alone keeps core 1 out for the rest of the sweep. */
+    if (s_adc_spin != NULL) {
+        uint32_t save = spin_lock_blocking(s_adc_spin);
+        s_peak_in_flight = true;
+        adc_select_input(ADC_CUR_SENSE_CHANNEL);
+        spin_unlock(s_adc_spin, save);
+    } else {
+        adc_select_input(ADC_CUR_SENSE_CHANNEL);
     }
 
-    if (g_state.pre_trigger_delay_ms > 0u) {
-        sleep_ms(g_state.pre_trigger_delay_ms);
-    }
-
-    gpio_put(PIN_CAM2_XTR, 0);
-    gpio_put(PIN_CAM1_XTR, 0);
-    busy_wait_us(g_state.cam_xtr_setup_us);
-
-    dma_channel_set_read_addr(STROBE_DMA_CHAN, s_pattern, false);
-    dma_channel_set_trans_count(STROBE_DMA_CHAN, s_pattern_len, true);
+    strobe_kick_dma(true /* loop context — pre-trigger delay allowed */);
 
     /* RP2040 ADC ~= 2 us/sample. With 8.68 us pulses ~4 samples land in any
      * given pulse-ON window; running max captures the peak. 60 ms deadline
@@ -347,8 +402,14 @@ bool strobe_fire_peak(uint16_t *peak_adc_out, uint32_t *samples_out) {
     }
     watchdog_update();
 
-    gpio_put(PIN_CAM2_XTR, 1);
-    gpio_put(PIN_CAM1_XTR, 1);
+    /* Release the mux back to core 1. */
+    if (s_adc_spin != NULL) {
+        uint32_t save = spin_lock_blocking(s_adc_spin);
+        s_peak_in_flight = false;
+        spin_unlock(s_adc_spin, save);
+    }
+
+    strobe_release_xtr();
 
     if (peak_adc_out) *peak_adc_out = peak;
     if (samples_out)  *samples_out  = samples;
@@ -371,6 +432,28 @@ void strobe_cam_pulse(uint32_t microseconds) {
 
 bool strobe_is_idle(void) {
     return !dma_channel_is_busy(STROBE_DMA_CHAN);
+}
+
+bool strobe_adc_acquire(void) {
+    /* No lock claimed yet (called before strobe_init) — nothing to guard. */
+    if (s_adc_spin == NULL) return true;
+
+    uint32_t save = spin_lock_blocking(s_adc_spin);
+    if (s_peak_in_flight) {
+        /* core 0 owns the mux for its sweep — caller must back off. */
+        spin_unlock(s_adc_spin, save);
+        return false;
+    }
+    /* Hold the lock until release so the caller's mux select + read can't be
+     * interleaved by the peak path flipping the flag. Stash the saved IRQ
+     * state in a module global — only one holder at a time by construction. */
+    s_adc_save_irq = save;
+    return true;
+}
+
+void strobe_adc_release(void) {
+    if (s_adc_spin == NULL) return;
+    spin_unlock(s_adc_spin, s_adc_save_irq);
 }
 
 float    strobe_get_pulse_width_us(void) { return s_pulse_width_us; }
