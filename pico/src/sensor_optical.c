@@ -12,7 +12,7 @@ static bool optical_step(bool armed, int32_t *level_out) {
     return false;
 }
 
-static int32_t optical_current_level(void) {
+static int64_t optical_current_level(void) {
     return 0;
 }
 

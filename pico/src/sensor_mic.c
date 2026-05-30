@@ -24,7 +24,7 @@ static bool mic_step(bool armed, int32_t *level_out) {
     return fired;
 }
 
-static int32_t mic_current_level(void) {
+static int64_t mic_current_level(void) {
     return impact_detect_current_rms();
 }
 

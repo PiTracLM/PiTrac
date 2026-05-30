@@ -83,6 +83,11 @@ void g_state_runtime_init(void) {
 /* Forward decl — defined further down with the rest of the IO helpers. */
 static void emit_log(const char *msg);
 
+/* STATUS line worst case: ~208-char prefix + STROBE_MAX_PULSES intervals at up
+ * to ~9 chars each ("-1000.00,") + '\n' + '\0'. 512 covers it with headroom so
+ * the interval CSV never truncates at max count. */
+#define STATUS_LINE_BUF_SIZE  512
+
 /* Read VSYS via the on-board ÷3 divider on ADC3 / GPIO 29. The Pico's
  * reference is 3.3 V; ADC is 12-bit (4096 codes). Multiply by 3 to recover
  * the real supply voltage. Returns millivolts.
@@ -94,12 +99,20 @@ static uint32_t read_vsys_mv(void) {
 #if PITRAC_LED_VIA_CYW43
     return 0;     /* Pico W — VSYS sense path not yet wired through CYW43. */
 #else
+    /* The ADC mux is shared with core 0's FIRE_PEAK sweep. Back off rather than
+     * reprogram it mid-sweep — a transient vsys=0 in a STATUS line is harmless
+     * next to a corrupted current-sense reading on the calibration side. */
+    if (!strobe_adc_acquire()) return 0;
+
     adc_select_input(ADC_VSYS_CHANNEL);
     /* Average a few samples — the divider node is high-impedance and a
      * single read can be jittery even with SMPS in forced-PWM. */
     uint32_t sum = 0;
     for (int i = 0; i < 8; i++) sum += adc_read();
     uint32_t avg = sum / 8u;                /* 0..4095 */
+
+    strobe_adc_release();
+
     /* mV = avg × (3300 / 4096) × 3.  Integer math, no float; multiply first
      * to keep precision, then divide. 3 × 3300 = 9900. */
     return (avg * 9900u) / 4096u;
@@ -132,20 +145,28 @@ int proto_format_status(const pitrac_state_t *st, char *buf, int buflen) {
         PITRAC_BOARD_NAME);
     if (n < 0 || n >= buflen) return n;
 
+    /* Reserve the final two bytes for '\n' + '\0' up front. Each interval token
+     * is bounded ("-1000.00," ≈ 9 chars), but with STROBE_MAX_PULSES=32 the CSV
+     * can run a few hundred bytes — without a reservation a tight buffer could
+     * consume the last slot mid-token and drop the newline. The caller sizes
+     * buf for the worst case (STATUS_LINE_BUF_SIZE), so in practice nothing
+     * truncates; this just makes the bound provably safe. */
+    const int csv_limit = buflen - 2;
+
     /* Append comma-separated intervals — keep CSV in line with the
      * CFG PULSE_INTERVALS input format so round-tripping STATUS → CFG is
      * trivial from the host side. */
-    for (uint8_t i = 0; i < st->interval_count && n < buflen - 16; ++i) {
-        int k = snprintf(buf + n, buflen - n,
+    for (uint8_t i = 0; i < st->interval_count && n < csv_limit; ++i) {
+        int k = snprintf(buf + n, (size_t)(csv_limit - n),
                          (i == 0) ? "%.2f" : ",%.2f",
                          (double)st->intervals_ms[i]);
         if (k < 0) break;
+        if (n + k >= csv_limit) break;   /* token wouldn't fit whole; stop clean */
         n += k;
     }
-    if (n < buflen - 2) {
-        buf[n++] = '\n';
-        buf[n]   = '\0';
-    }
+    /* csv_limit kept two bytes free, so this always fits. */
+    buf[n++] = '\n';
+    buf[n]   = '\0';
     return n;
 }
 
@@ -192,7 +213,7 @@ static void fw_set_threshold(int32_t v) {
 }
 
 static int32_t fw_get_threshold(void) { return g_state.mic_threshold; }
-static int32_t fw_current_rms(void)   { return sensors_max_level(); }
+static int64_t fw_current_rms(void)   { return sensors_max_level(); }
 
 static void fw_set_decay_confirm(uint32_t ms) {
     impact_detect_set_decay_confirm_ms(ms);
@@ -231,11 +252,12 @@ static bool fw_set_pulse_train(const float *intervals_ms,
 }
 
 static void fw_set_armed(bool armed) {
-    if (armed) {
-        g_state.arm_deadline_us =
-            time_us_64() + (uint64_t)g_state.arm_timeout_ms * 1000u;
-    }
-    g_state.armed = armed;
+    /* core 0 owns g_state.armed and arm_deadline_us — we only post intent. The
+     * push is blocking (not interrupt context, and arm/disarm is control, not
+     * droppable telemetry); core 0 drains within one bounded fire at worst, so
+     * this can't wedge. core 0 computes the deadline from arm_timeout_ms when
+     * it applies the arm, keeping the 64-bit field a single-writer value. */
+    multicore_fifo_push_blocking(armed ? MAILBOX_REQ_ARM : MAILBOX_REQ_DISARM);
 }
 
 static void fw_set_arm_timeout(uint32_t ms)        { g_state.arm_timeout_ms      = ms; }
@@ -246,12 +268,20 @@ static void fw_set_pre_trigger_delay(uint32_t ms)  { g_state.pre_trigger_delay_m
 static bool fw_hold_assert(void)  { return strobe_hold_assert(); }
 static void fw_hold_release(void) { strobe_hold_release(); }
 
+/* Manual FIRE / FIRE_PEAK requests are best-effort: if core 0 is mid-train and
+ * the FIFO is briefly full, dropping the request is better than wedging core 1
+ * (the host can re-issue FIRE). Unlike arm/disarm — which are safety-relevant
+ * and posted blocking above — a missed manual fire has no lingering state. */
 static void fw_request_manual_fire(void) {
-    multicore_fifo_push_blocking(MAILBOX_MANUAL_FIRE);
+    if (!multicore_fifo_push_timeout_us(MAILBOX_MANUAL_FIRE, FIFO_PUSH_TIMEOUT_US)) {
+        emit_log("error: fire dropped (core busy, retry)");
+    }
 }
 
 static void fw_request_fire_peak(void) {
-    multicore_fifo_push_blocking(MAILBOX_MANUAL_FIRE_PEAK);
+    if (!multicore_fifo_push_timeout_us(MAILBOX_MANUAL_FIRE_PEAK, FIFO_PUSH_TIMEOUT_US)) {
+        emit_log("error: fire_peak dropped (core busy, retry)");
+    }
 }
 
 static void fw_request_reset(void) {
@@ -292,7 +322,7 @@ static void fw_emit_status(void) {
     snap.last_rms             = g_state.last_rms;
     snap.event_count          = g_state.event_count;
 
-    char buf[256];
+    char buf[STATUS_LINE_BUF_SIZE];
     proto_format_status(&snap, buf, sizeof(buf));
     fputs(buf, stdout);
 }
@@ -380,7 +410,9 @@ void core1_usb_entry(void) {
         bool connected_now = stdio_usb_connected();
         if (was_connected && !connected_now) {
             if (g_state.armed) {
-                g_state.armed = false;
+                /* core 0 is the sole writer of armed — post the disarm rather
+                 * than clearing it here, closing the multi-writer race. */
+                multicore_fifo_push_blocking(MAILBOX_REQ_DISARM);
                 emit_log("armed=0 (USB disconnect)");
             }
         }
@@ -438,6 +470,9 @@ void core1_usb_entry(void) {
             case MAILBOX_FIRE_REFUSED_HELD:
                 emit_log("error: fire refused (strobe held for calibration)");
                 break;
+            case MAILBOX_RING_OVERFLOW:
+                emit_log("warn: i2s ring overrun, dropped stale audio");
+                break;
             default:
                 break;
             }
@@ -446,10 +481,18 @@ void core1_usb_entry(void) {
         if (s_stream_rms_hz > 0) {
             uint64_t now_us = time_us_64();
             if (now_us >= s_next_rms_emit) {
-                int32_t rms = sensors_max_level();
-                printf("EVENT RMS value=%ld timestamp=%llu\n",
-                       (long)rms,
-                       (unsigned long long)now_us);
+                /* Streaming telemetry is droppable. If the host stopped reading
+                 * with DTR still asserted, a plain printf would block on CDC
+                 * backpressure and stall the whole core-1 loop — command
+                 * parsing and FIFO drain stop with it. Only emit while the host
+                 * is actually attached; the schedule still advances so we don't
+                 * spew a burst the moment it reconnects. */
+                if (stdio_usb_connected()) {
+                    int64_t rms = sensors_max_level();
+                    printf("EVENT RMS value=%lld timestamp=%llu\n",
+                           (long long)rms,
+                           (unsigned long long)now_us);
+                }
                 s_next_rms_emit = now_us + (1000000ULL / s_stream_rms_hz);
             }
         }

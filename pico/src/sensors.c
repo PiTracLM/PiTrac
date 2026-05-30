@@ -31,11 +31,11 @@ bool sensors_step(bool armed, int32_t *peak_level_out) {
     return any_fired;
 }
 
-int32_t sensors_max_level(void) {
-    int32_t peak = 0;
+int64_t sensors_max_level(void) {
+    int64_t peak = 0;
     for (uint8_t i = 0; i < s_sensor_count; ++i) {
         if (!s_sensors[i]->current_level) continue;
-        int32_t lvl = s_sensors[i]->current_level();
+        int64_t lvl = s_sensors[i]->current_level();
         if (lvl > peak) peak = lvl;
     }
     return peak;
