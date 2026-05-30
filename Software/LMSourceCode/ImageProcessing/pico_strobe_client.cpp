@@ -11,6 +11,7 @@
 #include <iomanip>
 #include <sstream>
 #include <thread>
+#include <utility>
 
 // Logging hooks. Production-linked from pulse_strobe.cpp (LoggingTools); the
 // test target supplies stubs so it doesn't pull Boost.Log.
@@ -48,13 +49,41 @@ struct PicoStrobeClient::Impl {
     int fd = -1;
     int gpio_handle = -1;
 
+    GpioWriteFn gpio_writer;
+
+    // -1 means nothing has been pushed yet, so the first SelectClubProfile of
+    // either profile always writes.
+    int active_profile = -1;
+
+    struct StagedConfig {
+        bool valid = false;
+        float pulse_width_us = 0.0f;
+        std::vector<float> intervals_ms;
+    };
+    StagedConfig driver;
+    StagedConfig putter;
+
     bool WriteLine(const std::string& line);
     bool ReadLineWithTimeout(std::string& out, int timeout_ms);
 };
 
+namespace {
+int DefaultGpioWrite(int handle, int gpio, int level) {
+#if PICO_HAS_LGPIO
+    return lgGpioWrite(handle, gpio, level);
+#else
+    (void)handle;
+    (void)gpio;
+    (void)level;
+    return 0;
+#endif
+}
+}  // namespace
+
 PicoStrobeClient::PicoStrobeClient(int lggpio_chip_handle)
     : impl_(std::make_unique<Impl>()) {
     impl_->gpio_handle = lggpio_chip_handle;
+    impl_->gpio_writer = &DefaultGpioWrite;
 }
 
 PicoStrobeClient::~PicoStrobeClient() {
@@ -150,25 +179,51 @@ bool PicoStrobeClient::CamPulse(uint32_t microseconds) {
 bool PicoStrobeClient::FireWithShutter() {
     if (!IsOpen()) return false;
 
-    if (impl_->gpio_handle < 0) {
+    if (impl_->gpio_handle < 0 || !impl_->gpio_writer) {
         // No gpio chip handle (tests, dev builds): fall back to USB-CDC FIRE.
         return impl_->WriteLine("FIRE");
     }
 
-#if PICO_HAS_LGPIO
     // Fast path: pulse BCM 26 HIGH then LOW. Pico GP9 IRQ catches the rising edge.
-    lgGpioWrite(impl_->gpio_handle, kPicoFirePin, 1);
+    impl_->gpio_writer(impl_->gpio_handle, kPicoFirePin, 1);
     // Few-microsecond busy-loop: lgGpioWrite already takes microseconds, but a
     // short hold guarantees the rising edge is visible even with USB-CDC slack.
     for (int spin = 0; spin < 50; ++spin) {
         asm volatile("" : : : "memory");
     }
-    lgGpioWrite(impl_->gpio_handle, kPicoFirePin, 0);
+    impl_->gpio_writer(impl_->gpio_handle, kPicoFirePin, 0);
     return true;
-#else
-    (void)kPicoFirePin;
-    return impl_->WriteLine("FIRE");
-#endif
+}
+
+void PicoStrobeClient::SetGpioWriterForTest(GpioWriteFn writer) {
+    if (impl_) impl_->gpio_writer = std::move(writer);
+}
+
+void PicoStrobeClient::StageClubProfile(ClubProfile profile,
+                                        float pulse_width_us,
+                                        const std::vector<float>& intervals_ms) {
+    if (!impl_) return;
+    Impl::StagedConfig& slot =
+        (profile == ClubProfile::kPutter) ? impl_->putter : impl_->driver;
+    slot.valid = true;
+    slot.pulse_width_us = pulse_width_us;
+    slot.intervals_ms = intervals_ms;
+}
+
+bool PicoStrobeClient::SelectClubProfile(ClubProfile profile) {
+    if (!IsOpen()) return false;
+    if (impl_->active_profile == static_cast<int>(profile)) return true;
+
+    const Impl::StagedConfig& slot =
+        (profile == ClubProfile::kPutter) ? impl_->putter : impl_->driver;
+    if (!slot.valid) {
+        PicoLogWarn("PicoStrobeClient::SelectClubProfile: requested profile not staged");
+        return false;
+    }
+
+    if (!SendPulseConfig(slot.pulse_width_us, slot.intervals_ms)) return false;
+    impl_->active_profile = static_cast<int>(profile);
+    return true;
 }
 
 bool PicoStrobeClient::HoldOn() {
