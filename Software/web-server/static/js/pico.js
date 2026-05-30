@@ -1,6 +1,12 @@
 const STREAM_STALE_MS = 3000;
 const RMS_STREAM_MIN_FW = [0, 5, 0];
-const PULSE_WIDTH_US_MAX = 500;  // mirrors the firmware/server cap (STROBE_MAX_PULSE_WIDTH_US)
+const NOISE_FLOOR_EASE = 0.25;
+const AXIS_EASE = 0.2;
+const AXIS_HEADROOM = 1.4;
+const SET_ABOVE_NOISE_FACTOR = 1.5;
+const SLIDER_RANGE_FACTOR = 3;
+const THIN_MARGIN_RATIO = 1.25;
+const MARGIN_CLASS = 'text-[11px]';
 
 function parseFwVersion(fw) {
     if (typeof fw !== 'string') return null;
@@ -26,6 +32,13 @@ function formatThousands(value) {
     return String(Math.round(v));
 }
 
+function marginTier(threshold, floor) {
+    if (!floor || !threshold) return 'unknown';
+    if (threshold < floor) return 'below';
+    if (threshold / floor < THIN_MARGIN_RATIO) return 'thin';
+    return 'ok';
+}
+
 class PicoController {
     constructor() {
         this.statusInterval = null;
@@ -42,6 +55,10 @@ class PicoController {
         this.flashInProgress = false;
         this.userTouchedThreshold = false;
         this.toastTimer = null;
+        this.noiseFloor = 0;
+        this.axisTop = 0;
+        this.lastEventCount = null;
+        this.triggerFlashUntil = 0;
 
         this.init();
         this.setupPageCleanup();
@@ -98,9 +115,7 @@ class PicoController {
             this.drawRms();
         });
         thresholdSlider.addEventListener('change', () => this.saveThreshold());
-
-        document.getElementById('pico-pulse-width-save').addEventListener('click', () => this.savePulseWidth());
-        document.getElementById('pico-pulse-intervals-save').addEventListener('click', () => this.savePulseIntervals());
+        document.getElementById('pico-threshold-auto').addEventListener('click', () => this.applyAutoThreshold());
 
         document.getElementById('pico-rms-toggle').addEventListener('click', () => this.toggleRmsStream());
         document.getElementById('pico-rms-hz').addEventListener('change', () => this.restartRmsStream());
@@ -143,7 +158,14 @@ class PicoController {
         document.getElementById('pico-board').textContent = data.board || '--';
         document.getElementById('pico-device').textContent = data.device || '/dev/ttyACM0';
         document.getElementById('pico-vbus').textContent = (data.vbus === 1 || data.vbus === true) ? 'present' : 'absent';
-        document.getElementById('pico-event-count').textContent = data.event_count ?? '--';
+        const eventCount = typeof data.event_count === 'number' ? data.event_count : null;
+        document.getElementById('pico-event-count').textContent = eventCount ?? '--';
+        if (eventCount !== null) {
+            if (this.lastEventCount !== null && eventCount > this.lastEventCount) {
+                this.flashTrigger();
+            }
+            this.lastEventCount = eventCount;
+        }
 
         const armed = data.armed === 1 || data.armed === true;
         const toggle = document.getElementById('pico-armed-toggle');
@@ -154,7 +176,7 @@ class PicoController {
         if (!this.userTouchedThreshold
             && document.activeElement !== thresholdInput
             && typeof data.threshold === 'number') {
-            this.ensureSliderRange(data.threshold);
+            this.syncSliderRange(data.threshold);
             thresholdInput.value = data.threshold;
             this.updateThresholdReadout(data.threshold);
             this.drawRms();
@@ -164,33 +186,54 @@ class PicoController {
         if (document.activeElement !== minInput && typeof data.min_inter_shot_ms === 'number') {
             minInput.value = data.min_inter_shot_ms;
         }
-
-        this.renderPulseFields(data);
     }
 
     updateThresholdReadout(value) {
         const slider = document.getElementById('pico-threshold');
-        document.getElementById('pico-threshold-value').textContent = value;
-        slider.setAttribute('aria-valuetext', `${value} raw RMS`);
+        const v = Number(value) || 0;
+        document.getElementById('pico-threshold-value').textContent = v.toLocaleString();
+        slider.setAttribute('aria-valuetext', `${v} raw RMS, ${this.marginPhrase(v)}`);
+        this.updateMarginReadout(v);
     }
 
-    renderPulseFields(data) {
-        const widthInput = document.getElementById('pico-pulse-width');
-        if (document.activeElement !== widthInput && typeof data.pulse_us === 'number') {
-            widthInput.value = data.pulse_us;
-        }
+    marginPhrase(threshold) {
+        if (!threshold) return 'not set';
+        if (!this.noiseFloor) return 'noise floor not measured';
+        const ratio = threshold / this.noiseFloor;
+        const tier = marginTier(threshold, this.noiseFloor);
+        if (tier === 'below') return `below noise floor (${ratio.toFixed(2)}×)`;
+        if (tier === 'thin') return `thin margin, ${ratio.toFixed(1)}× noise floor`;
+        return `${ratio.toFixed(1)}× above noise floor`;
+    }
 
-        const intervalsInput = document.getElementById('pico-pulse-intervals');
-        if (document.activeElement !== intervalsInput && Array.isArray(data.intervals)) {
-            intervalsInput.value = data.intervals.join(', ');
+    updateMarginReadout(threshold) {
+        const el = document.getElementById('pico-threshold-margin');
+        if (!el) return;
+        const floorText = this.noiseFloor ? formatThousands(this.noiseFloor) : '--';
+        const tier = marginTier(threshold, this.noiseFloor);
+        if (tier === 'unknown') {
+            el.textContent = threshold
+                ? `noise floor ${floorText} · no live signal`
+                : `noise floor ${floorText} · not set`;
+            el.className = `${MARGIN_CLASS} text-warning`;
+            return;
         }
+        const ratio = threshold / this.noiseFloor;
+        if (tier === 'below') {
+            el.textContent = `noise ${floorText} · below floor (${ratio.toFixed(2)}×)`;
+            el.className = `${MARGIN_CLASS} text-error`;
+        } else if (tier === 'thin') {
+            el.textContent = `noise ${floorText} · thin margin (${ratio.toFixed(1)}×)`;
+            el.className = `${MARGIN_CLASS} text-warning`;
+        } else {
+            el.textContent = `noise ${floorText} · ${ratio.toFixed(1)}× margin`;
+            el.className = `${MARGIN_CLASS} opacity-70`;
+        }
+    }
 
-        const current = document.getElementById('pico-pulse-current');
-        const widthText = typeof data.pulse_us === 'number' ? `${data.pulse_us} µs` : '--';
-        const intervalsText = Array.isArray(data.intervals) && data.intervals.length
-            ? data.intervals.join(', ') + ' ms'
-            : '--';
-        current.textContent = `current: width ${widthText}, intervals ${intervalsText}`;
+    updateAutoButton() {
+        const btn = document.getElementById('pico-threshold-auto');
+        if (btn) btn.disabled = !(this.noiseFloor > 0);
     }
 
     renderDisconnected(_data) {
@@ -241,28 +284,6 @@ class PicoController {
             return;
         }
         await this.postConfig({ min_inter_shot_ms: value });
-    }
-
-    async savePulseWidth() {
-        const value = Number(document.getElementById('pico-pulse-width').value);
-        if (!(value > 0) || value > PULSE_WIDTH_US_MAX) {
-            this.flashMessage(`Pulse width must be greater than 0 and at most ${PULSE_WIDTH_US_MAX} us`, 'error');
-            return;
-        }
-        await this.postConfig({ pulse_width_us: value });
-    }
-
-    async savePulseIntervals() {
-        const raw = document.getElementById('pico-pulse-intervals').value;
-        const intervals = raw.split(',')
-            .map((part) => part.trim())
-            .filter((part) => part.length)
-            .map((part) => Number(part));
-        if (!intervals.length || intervals.some((v) => !(v > 0))) {
-            this.flashMessage('Intervals must be a comma-separated list of positive numbers', 'error');
-            return;
-        }
-        await this.postConfig({ pulse_intervals: intervals });
     }
 
     async postConfig(payload) {
@@ -400,21 +421,70 @@ class PicoController {
             this.rmsSamples.shift();
         }
         if (sample.value > this.rmsPeak) this.rmsPeak = sample.value;
-        document.getElementById('pico-rms-latest').textContent = sample.value;
-        document.getElementById('pico-rms-peak').textContent = this.rmsPeak;
-        this.ensureSliderRange(this.rmsPeak);
+        document.getElementById('pico-rms-latest').textContent = sample.value.toLocaleString();
+        document.getElementById('pico-rms-peak').textContent = this.rmsPeak.toLocaleString();
+
+        this.updateNoiseFloor();
+        this.updateAxis();
+        this.syncSliderRange();
+        this.updateAutoButton();
+        this.updateMarginReadout(Number(document.getElementById('pico-threshold').value) || 0);
         this.drawRms();
     }
 
-    ensureSliderRange(observedValue) {
+    updateNoiseFloor() {
+        const n = this.rmsSamples.length;
+        if (!n) return;
+        const sorted = this.rmsSamples.map((s) => s.value).sort((a, b) => a - b);
+        const median = sorted[Math.floor(n / 2)];
+        // Median rides through the room hum and ignores the odd strike; easing
+        // keeps the floor from jittering the axis and slider every frame.
+        this.noiseFloor = this.noiseFloor
+            ? this.noiseFloor + (median - this.noiseFloor) * NOISE_FLOOR_EASE
+            : median;
+    }
+
+    updateAxis() {
+        const threshold = Number(document.getElementById('pico-threshold').value) || 0;
+        const target = Math.max(Math.max(threshold, this.noiseFloor * 1.15) * AXIS_HEADROOM, 1000);
+        this.axisTop = this.axisTop ? this.axisTop + (target - this.axisTop) * AXIS_EASE : target;
+    }
+
+    syncSliderRange(mustFit = 0) {
         const slider = document.getElementById('pico-threshold');
-        const target = Math.max(100000, Math.ceil(observedValue * 2 / 10000) * 10000);
+        const threshold = Number(slider.value) || 0;
+        const target = Math.max(this.noiseFloor * SLIDER_RANGE_FACTOR, threshold * 1.25, mustFit * 1.1, 100000);
+        const targetMax = Math.ceil(target / 100000) * 100000;
         const currentMax = Number(slider.max) || 100000;
-        if (target > currentMax) {
-            slider.max = String(target);
-            slider.step = String(Math.max(1000, Math.floor(target / 200)));
-            document.getElementById('pico-threshold-max').textContent = formatThousands(target);
+        const idle = !this.userTouchedThreshold && document.activeElement !== slider;
+        if (targetMax > currentMax || (idle && currentMax > targetMax * 1.6)) {
+            slider.max = String(targetMax);
+            slider.step = String(Math.max(1000, Math.round(targetMax / 200 / 1000) * 1000));
+            document.getElementById('pico-threshold-max').textContent = formatThousands(targetMax);
         }
+    }
+
+    applyAutoThreshold() {
+        if (!(this.noiseFloor > 0)) return;
+        const slider = document.getElementById('pico-threshold');
+        this.userTouchedThreshold = true;
+        const target = Math.round(this.noiseFloor * SET_ABOVE_NOISE_FACTOR);
+        this.syncSliderRange(target);
+        slider.value = target;
+        // Read the slider back so the readout and the committed POST agree with
+        // the value the range input snapped to its step.
+        const committed = Number(slider.value);
+        this.updateThresholdReadout(committed);
+        this.updateAxis();
+        this.drawRms();
+        this.saveThreshold();
+    }
+
+    flashTrigger() {
+        this.triggerFlashUntil = Date.now() + 1000;
+        this.flashMessage('Shot detected', 'success');
+        this.drawRms();
+        setTimeout(() => this.drawRms(), 1050);
     }
 
     resizeCanvas() {
@@ -438,29 +508,54 @@ class PicoController {
         const topPad = 6;
         const bottomPad = 18;
         const usableH = h - topPad - bottomPad;
+        const hasData = this.rmsSamples.length > 0;
 
-        const thresholdValue = Number(document.getElementById('pico-threshold').value) || 0;
-        const sampleMax = this.rmsSamples.length ? Math.max(...this.rmsSamples.map((s) => s.value)) : 0;
-        // Y scale tracks samples, not threshold, so the slider visibly moves the line.
-        const peak = Math.max(1, sampleMax * 1.1, this.rmsPeak * 0.4);
+        const threshold = Number(document.getElementById('pico-threshold').value) || 0;
+        // Ceiling is pinned to the floor and the threshold, never to the loudest
+        // sample, so a strike clips at the top instead of crushing the noise band.
+        const top = Math.max(this.axisTop, threshold * 1.15, this.noiseFloor * 1.3, 1000);
+        const yOf = (v) => topPad + (1 - Math.min(Math.max(v, 0), top) / top) * usableH;
 
-        if (thresholdValue > 0) {
-            const clamped = Math.min(thresholdValue, peak);
-            const y = topPad + (1 - clamped / peak) * usableH;
-            this.ctx.strokeStyle = '#f97316';
-            this.ctx.lineWidth = thresholdValue > peak ? 2 : 1;
-            this.ctx.setLineDash([4, 4]);
+        this.ctx.font = '10px ui-monospace, monospace';
+
+        if (threshold > 0 && this.noiseFloor > 0) {
+            const yThreshold = yOf(threshold);
+            const yFloor = yOf(this.noiseFloor);
+            const tier = marginTier(threshold, this.noiseFloor);
+            this.ctx.fillStyle = tier === 'below'
+                ? 'rgba(239, 68, 68, 0.14)'
+                : tier === 'thin'
+                    ? 'rgba(245, 158, 11, 0.14)'
+                    : 'rgba(34, 197, 94, 0.12)';
+            this.ctx.fillRect(0, Math.min(yThreshold, yFloor), w, Math.abs(yFloor - yThreshold));
+        }
+
+        if (this.noiseFloor > 0) {
+            const yFloor = yOf(this.noiseFloor);
+            this.ctx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
+            this.ctx.lineWidth = 1;
             this.ctx.beginPath();
-            this.ctx.moveTo(0, y);
-            this.ctx.lineTo(w, y);
+            this.ctx.moveTo(0, yFloor);
+            this.ctx.lineTo(w, yFloor);
+            this.ctx.stroke();
+            this.ctx.fillStyle = 'rgba(148, 163, 184, 0.85)';
+            this.ctx.textAlign = 'left';
+            this.ctx.fillText('noise ' + formatThousands(this.noiseFloor), 4, Math.min(yFloor + 11, h - bottomPad));
+        }
+
+        if (threshold > 0) {
+            const yThreshold = yOf(threshold);
+            this.ctx.strokeStyle = '#f97316';
+            this.ctx.lineWidth = 1.5;
+            this.ctx.setLineDash([5, 4]);
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, yThreshold);
+            this.ctx.lineTo(w, yThreshold);
             this.ctx.stroke();
             this.ctx.setLineDash([]);
-
             this.ctx.fillStyle = '#f97316';
-            this.ctx.font = '10px ui-monospace, monospace';
             this.ctx.textAlign = 'right';
-            const label = thresholdValue > peak ? `> ${formatThousands(peak)}` : formatThousands(thresholdValue);
-            this.ctx.fillText(label, w - 4, Math.max(y - 3, 10));
+            this.ctx.fillText(formatThousands(threshold), w - 4, Math.max(yThreshold - 4, 10));
         }
 
         if (this.rmsSamples.length >= 2) {
@@ -470,22 +565,41 @@ class PicoController {
             this.ctx.beginPath();
             values.forEach((v, i) => {
                 const x = (i / (this.rmsCapacity - 1)) * w;
-                const y = topPad + (1 - Math.min(v, peak) / peak) * usableH;
+                const y = yOf(v);
                 if (i === 0) this.ctx.moveTo(x, y); else this.ctx.lineTo(x, y);
             });
             this.ctx.stroke();
+
+            this.ctx.fillStyle = '#ef4444';
+            values.forEach((v, i) => {
+                if (v <= top) return;
+                const x = (i / (this.rmsCapacity - 1)) * w;
+                this.ctx.beginPath();
+                this.ctx.moveTo(x, topPad);
+                this.ctx.lineTo(x - 3, topPad + 5);
+                this.ctx.lineTo(x + 3, topPad + 5);
+                this.ctx.closePath();
+                this.ctx.fill();
+            });
         }
 
+        this.ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+        this.ctx.textAlign = 'left';
+        if (hasData) this.ctx.fillText(formatThousands(top), 4, topPad + 8);
         const hz = Number(document.getElementById('pico-rms-hz').value) || 20;
         const windowSec = this.rmsCapacity / hz;
-        this.ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
-        this.ctx.font = '10px ui-monospace, monospace';
-        this.ctx.textAlign = 'left';
         this.ctx.fillText('-' + windowSec.toFixed(1) + 's', 4, h - 4);
         this.ctx.textAlign = 'right';
         this.ctx.fillText('now', w - 4, h - 4);
-        this.ctx.textAlign = 'left';
-        this.ctx.fillText(formatThousands(peak), 4, topPad + 8);
+
+        if (this.triggerFlashUntil > Date.now()) {
+            this.ctx.fillStyle = 'rgba(34, 197, 94, 0.18)';
+            this.ctx.fillRect(0, 0, w, h);
+            this.ctx.fillStyle = '#22c55e';
+            this.ctx.font = '12px ui-monospace, monospace';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('SHOT DETECTED', w / 2, h / 2);
+        }
     }
 
     async flashFromUpload() {
