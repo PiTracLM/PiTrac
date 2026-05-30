@@ -49,7 +49,7 @@ include(pico_sdk_import.cmake)
 
 project(pitrac_pico
   LANGUAGES C CXX ASM
-  VERSION 0.1.0
+  VERSION 0.6.0
   DESCRIPTION "PiTrac strobe driver + acoustic impact detection firmware"
 )
 

@@ -70,7 +70,7 @@ echo STATUS > /dev/ttyACM0               # via picocom or similar
 Expected `SELFTEST` line shape:
 
 ```
-SELFTEST vsys_mv=0 vbus=1 mic_rms=12 armed=0 fw=0.5.0
+SELFTEST vsys_mv=0 vbus=1 mic_rms=12 armed=0 fw=0.6.0
 ```
 
 - `vsys_mv=0` on Pico W is normal (VSYS sense path is not wired).

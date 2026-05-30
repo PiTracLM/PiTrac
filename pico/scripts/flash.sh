@@ -22,12 +22,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-UF2="${1:-${PROJECT_ROOT}/build/pitrac_pico.uf2}"
+# Default to the production pico_w UF2 staged by build-all.sh. Pass a path to
+# flash a different board variant (e.g. firmware/pitrac_pico.uf2).
+UF2="${1:-${PROJECT_ROOT}/firmware/pitrac_pico_w.uf2}"
 
 if [[ ! -f "$UF2" ]]; then
   echo "error: $UF2 not found. Build first:"
-  echo "    cd $PROJECT_ROOT && mkdir -p build && cd build"
-  echo "    cmake -DPICO_BOARD=pico -G Ninja .. && ninja"
+  echo "    cd $PROJECT_ROOT && bash scripts/build-all.sh"
   exit 1
 fi
 
@@ -52,7 +53,7 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
   MOUNT="/Volumes/RPI-RP2"
 elif [[ "$(uname -s)" == "Linux" ]]; then
   # Common udisks2 mount paths
-  for candidate in /media/$USER/RPI-RP2 /run/media/$USER/RPI-RP2 /mnt/RPI-RP2; do
+  for candidate in "/media/$USER/RPI-RP2" "/run/media/$USER/RPI-RP2" /mnt/RPI-RP2; do
     if [[ -d "$candidate" ]]; then
       MOUNT="$candidate"
       break

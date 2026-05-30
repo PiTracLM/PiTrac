@@ -13,15 +13,16 @@
 ;      that here in PIO; the consumer handles it.
 ;
 ; Pin mapping (configured by C-side helper before sm_init):
-;   sideset(0) = BCLK   — driven by PIO, toggling at sysclk/(2*div) Hz
+;   sideset(0) = BCLK   — driven by PIO, toggling at sysclk/(4*div) Hz
 ;   sideset(1) = LRCLK  — driven by PIO, toggles once per 32-bit slot
 ;   IN base    = DIN    — sampled by PIO, latched on BCLK falling edge
 ;
-; To reach 3.072 MHz BCLK at 125 MHz sysclk:
-;   one BCLK period = 2 PIO cycles (one HIGH, one LOW)
-;   so we need PIO clk = 6.144 MHz → divisor = 125e6 / 6.144e6 ≈ 20.345
-;   Use sm_config_set_clkdiv with fractional clkdiv — we don't need bit-exact
-;   sample rate; the DSP is sample-clock-agnostic at the percent level.
+; Clkdiv: the BCLK-high state carries a [1] delay, so a full BCLK period is
+; 4 PIO cycles, and a stereo frame works out to 260 PIO cycles per sample (see
+; the c-sdk helper below for the full count). At 48 kHz that's a 12.48 MHz PIO
+; clock → divisor = 125e6 / 12.48e6 ≈ 10.02 on stock 125 MHz sysclk. We use
+; fractional clkdiv — no need for a bit-exact sample rate, the DSP is
+; sample-clock-agnostic at the percent level.
 ;
 ; Each loop iteration produces one 32-bit word and pushes it to RX FIFO.
 ; LRCLK low = left slot, LRCLK high = right slot. With SEL=GND, the SPH0645
