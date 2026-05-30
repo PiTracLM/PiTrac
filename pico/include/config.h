@@ -246,7 +246,7 @@
 #define STROBE_MAX_HOLD_MS  200u
 
 /* Firmware version string — surfaced on the boot LOG line. */
-#define PITRAC_PICO_FW_VERSION "0.5.0"
+#define PITRAC_PICO_FW_VERSION "0.6.0"
 
 /* Upper bound on the EVENT RMS streaming rate (samples per second). The web
  * UI's mic visualiser doesn't need anything faster than this; capping it keeps
@@ -258,8 +258,9 @@
  * a few hundred µs minimum; 1 ms is a safe default. */
 #define CAM_XTR_DEFAULT_SETUP_US 1000
 
-/* Default intervals (ms) between consecutive pulse rising edges — matches
- * the kFastPulseIntervals vector in the main C++ pipeline. */
+/* Default intervals (ms) — each entry is the gap after pulse N (LOW time
+ * before the next pulse), matching the kFastPulseIntervals vector in the
+ * main C++ pipeline. */
 #define STROBE_DEFAULT_INTERVALS_MS    { 0.7f, 1.8f, 3.0f, 2.2f, 3.0f, 7.1f, 4.0f, 0.0f }
 #define STROBE_DEFAULT_INTERVAL_COUNT  8
 

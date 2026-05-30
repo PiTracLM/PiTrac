@@ -32,7 +32,8 @@ bool strobe_init(void);
 /* Re-compile the strobe waveform with new tunables. Stashes the result in
  * an internal RAM buffer; the next strobe_fire() will use this pattern.
  *
- *   intervals_ms : array of inter-pulse intervals (rising-edge to rising-edge).
+ *   intervals_ms : array of inter-pulse gaps — entry N is the LOW time after
+ *                  pulse N, not the rising-edge-to-rising-edge period.
  *                  Length = `count`. A trailing 0.0 means "no pulse after this
  *                  one" — terminator, not a tight back-to-back pulse.
  *   count        : number of intervals (max STROBE_MAX_PULSES).

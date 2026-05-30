@@ -13,15 +13,18 @@ fi
 cd "$PICO_DIR"
 mkdir -p firmware
 
+# nproc on Linux, sysctl on macOS; fall back to 4 if neither answers.
+JOBS="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+
 for board in pico pico_w pico2 pico2_w; do
     build_dir="build-${board}"
     echo "==> ${board}"
     PICO_SDK_PATH="$SDK_PATH" cmake -B "$build_dir" -DPICO_BOARD="$board" \
         > "$build_dir.configure.log" 2>&1 || { tail -20 "$build_dir.configure.log"; exit 1; }
-    PICO_SDK_PATH="$SDK_PATH" cmake --build "$build_dir" -j 4 \
+    PICO_SDK_PATH="$SDK_PATH" cmake --build "$build_dir" -j "$JOBS" \
         > "$build_dir.build.log" 2>&1 || { tail -30 "$build_dir.build.log"; exit 1; }
     cp "$build_dir/pitrac_pico.uf2" "firmware/pitrac_${board}.uf2"
-    rm -f "$build_dir.configure.log" "$build_dir.build.log"
+    rm -rf "$build_dir" "$build_dir.configure.log" "$build_dir.build.log"
     size=$(stat -f%z "firmware/pitrac_${board}.uf2" 2>/dev/null || stat -c%s "firmware/pitrac_${board}.uf2")
     echo "    firmware/pitrac_${board}.uf2 (${size} bytes)"
 done
