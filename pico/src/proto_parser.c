@@ -145,14 +145,34 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
             return true;
         }
         if (strcmp(key, "PULSE_INTERVALS") == 0) {
+            /* Empty list is a false ACK — downstream would silently re-apply
+             * whatever intervals it already has, and the host would never know
+             * the CFG was ignored. Reject it the same way PULSE_WIDTH_US=0 is. */
+            if (*val == '\0') {
+                out->kind = CMD_INVALID;
+                return false;
+            }
             out->kind = CMD_CFG_INTERVALS;
             uint8_t n = 0;
             char *tok = val;
-            while (*tok && n < STROBE_MAX_PULSES) {
+            while (*tok) {
+                /* Reject, don't truncate — silent truncation is as bad as the
+                 * empty-list false ACK: host thinks its 33-entry payload landed. */
+                if (n >= STROBE_MAX_PULSES) {
+                    out->kind = CMD_INVALID;
+                    return false;
+                }
                 char *next = strchr(tok, ',');
                 if (next) *next = '\0';
                 float v;
                 if (!parse_float(tok, &v)) {
+                    out->kind = CMD_INVALID;
+                    return false;
+                }
+                /* Symmetric with the PULSE_WIDTH_US bounds check above.
+                 * Negative intervals don't make physical sense; values above
+                 * STROBE_MAX_INTERVAL_MS would push DMA wait past the watchdog. */
+                if (v < 0.0f || v > STROBE_MAX_INTERVAL_MS) {
                     out->kind = CMD_INVALID;
                     return false;
                 }
