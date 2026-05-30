@@ -84,10 +84,10 @@ class TestProbe:
 # --------------------------------------------------------------------- status
 
 class TestStatus:
-    """`status()` keeps the fd open across calls; reuses for back-to-back polls."""
+    """`status()` opens the shared owner per transaction and parses the reply."""
 
     @patch("pico_manager.serial")
-    def test_status_reuses_handle(self, mock_serial_mod):
+    def test_status_opens_and_closes_per_call(self, mock_serial_mod):
         ser = mock_serial_mod.Serial.return_value
         ser.read.side_effect = [
             b"STATUS armed=1 threshold=8000\n", b"",
@@ -98,9 +98,11 @@ class TestStatus:
         first = asyncio.run(mgr.status())
         second = asyncio.run(mgr.status())
 
-        mock_serial_mod.Serial.assert_called_once()
         assert first["armed"] == 1
         assert second["armed"] == 0
+        # No borrow outstanding once both polls finish — the owner closed it.
+        assert mgr.serial_owner.handle is None
+        assert ser.close.call_count == 2
 
 
 # --------------------------------------------------------------------- selftest
@@ -189,6 +191,98 @@ class TestSetters:
         writes = [c.args[0] for c in ser.write.call_args_list]
         assert any(w == b"CFG MIN_INTER_SHOT_MS=20\n" for w in writes)
 
+    @patch("pico_manager.serial")
+    def test_set_pulse_width_emits_cfg_and_confirms_echo(self, mock_serial_mod):
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [b"STATUS armed=0 pulse_us=12.00\n", b""]
+
+        mgr = _build(mock_serial_mod)
+        data = asyncio.run(mgr.set_pulse_width_us(12))
+
+        writes = [c.args[0] for c in ser.write.call_args_list]
+        assert b"CFG PULSE_WIDTH_US=12\n" in writes
+        assert data["ok"] is True
+        assert data["pulse_us"] == 12
+
+    @patch("pico_manager.serial")
+    def test_set_pulse_width_reports_not_ok_when_echo_mismatch(self, mock_serial_mod):
+        # Firmware clamped/rejected the request: STATUS echoes a different width.
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [b"STATUS armed=0 pulse_us=8.68\n", b""]
+
+        mgr = _build(mock_serial_mod)
+        data = asyncio.run(mgr.set_pulse_width_us(12))
+
+        assert data["ok"] is False
+        assert "error" in data
+
+    @patch("pico_manager.serial")
+    def test_set_pulse_width_accepts_float(self, mock_serial_mod):
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [b"STATUS armed=0 pulse_us=8.68\n", b""]
+
+        mgr = _build(mock_serial_mod)
+        data = asyncio.run(mgr.set_pulse_width_us(8.68))
+
+        writes = [c.args[0] for c in ser.write.call_args_list]
+        assert b"CFG PULSE_WIDTH_US=8.68\n" in writes
+        assert data["ok"] is True
+
+    @patch("pico_manager.serial")
+    def test_set_pulse_width_rejects_out_of_range(self, mock_serial_mod):
+        mgr = _build(mock_serial_mod)
+        with pytest.raises(ValueError):
+            asyncio.run(mgr.set_pulse_width_us(0))
+        with pytest.raises(ValueError):
+            asyncio.run(mgr.set_pulse_width_us(501))
+
+    @patch("pico_manager.serial")
+    def test_set_pulse_intervals_emits_cfg(self, mock_serial_mod):
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [b"STATUS armed=0 intervals=0.70,1.80,0.50\n", b""]
+
+        mgr = _build(mock_serial_mod)
+        data = asyncio.run(mgr.set_pulse_intervals([0.70, 1.80, 0.50]))
+
+        writes = [c.args[0] for c in ser.write.call_args_list]
+        assert b"CFG PULSE_INTERVALS=0.7,1.8,0.5\n" in writes
+        assert data["ok"] is True
+        assert data["intervals"] == [0.70, 1.80, 0.50]
+
+    @patch("pico_manager.serial")
+    def test_set_pulse_intervals_rejects_repeated_ratio(self, mock_serial_mod):
+        # 1.0,2.0,4.0 has consecutive ratios 2.0 then 2.0 — ambiguous, must reject.
+        mgr = _build(mock_serial_mod)
+        with pytest.raises(ValueError, match="ratio"):
+            asyncio.run(mgr.set_pulse_intervals([1.0, 2.0, 4.0]))
+
+    @patch("pico_manager.serial")
+    def test_set_pulse_intervals_rejects_empty_and_overlong(self, mock_serial_mod):
+        mgr = _build(mock_serial_mod)
+        with pytest.raises(ValueError):
+            asyncio.run(mgr.set_pulse_intervals([]))
+        with pytest.raises(ValueError, match="too many"):
+            asyncio.run(mgr.set_pulse_intervals([0.1 * (i + 1) for i in range(40)]))
+
+    @patch("pico_manager.serial")
+    def test_set_pulse_intervals_rejects_interval_above_firmware_ceiling(self, mock_serial_mod):
+        # Firmware rejects any interval > STROBE_MAX_INTERVAL_MS (1000 ms).
+        mgr = _build(mock_serial_mod)
+        with pytest.raises(ValueError, match="firmware max"):
+            asyncio.run(mgr.set_pulse_intervals([1.0, 1500.0]))
+
+    @patch("pico_manager.serial")
+    def test_set_pulse_intervals_reports_not_ok_when_echo_mismatch(self, mock_serial_mod):
+        # Firmware rejected the list (WP-C): STATUS echoes the OLD intervals.
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [b"STATUS armed=0 intervals=0.70,1.80\n", b""]
+
+        mgr = _build(mock_serial_mod)
+        data = asyncio.run(mgr.set_pulse_intervals([0.50, 1.30, 2.20]))
+
+        assert data["ok"] is False
+        assert "intervals" in data
+
 
 # --------------------------------------------------------------------- RMS stream
 
@@ -249,7 +343,8 @@ class TestRmsStream:
 # --------------------------------------------------------------------- lock sharing
 
 class TestSharedLock:
-    """PicoManager.status() awaits when the calibration manager holds the lock."""
+    """The shared lock serializes transactions across both managers, and the
+    RMS stream must not hold it for its whole lifetime."""
 
     @patch("pico_manager.serial")
     def test_status_awaits_until_held_lock_releases(self, mock_serial_mod):
@@ -278,6 +373,132 @@ class TestSharedLock:
         data = asyncio.run(drive())
         assert data["present"] is True
         assert data["armed"] == 0
+
+    @patch("pico_manager.serial")
+    def test_rms_stream_does_not_hold_lock_across_reads(self, mock_serial_mod):
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [
+            b"EVENT RMS value=7 timestamp=10\n",
+            b"", b"", b"", b"", b"", b"", b"", b"", b"",
+        ]
+
+        async def drive():
+            lock = asyncio.Lock()
+            from pico_manager import PicoManager
+
+            cm = MagicMock()
+            cm.get_config.return_value = None
+            mgr = PicoManager(cm, lock)
+
+            stream = await mgr.start_rms_stream(hz=10)
+            first = await stream.__anext__()
+
+            # With the stream parked on an empty read, a status() must be able
+            # to grab the lock and complete — the stream releases between reads.
+            ser.read.side_effect = [b"STATUS armed=1\n", b""]
+            status_data = await asyncio.wait_for(mgr.status(), timeout=1.0)
+
+            await mgr.stop_rms_stream()
+            await stream.aclose()
+            return first, status_data
+
+        first, status_data = asyncio.run(drive())
+        assert first == {"value": 7, "timestamp": 10}
+        assert status_data["armed"] == 1
+
+    @patch("pico_manager.serial")
+    def test_status_oserror_does_not_close_handle_under_live_stream(self, mock_serial_mod):
+        # A mid-stream transaction error must release its own borrow only; the
+        # RMS stream still holds a borrow, so the shared fd must stay open.
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [
+            b"EVENT RMS value=7 timestamp=10\n",
+            b"", b"", b"", b"", b"", b"", b"", b"", b"",
+        ]
+
+        async def drive():
+            lock = asyncio.Lock()
+            from pico_manager import PicoManager
+
+            cm = MagicMock()
+            cm.get_config.return_value = None
+            mgr = PicoManager(cm, lock)
+
+            stream = await mgr.start_rms_stream(hz=10)
+            first = await stream.__anext__()
+
+            # status() blows up reading STATUS while the stream is parked.
+            ser.reset_input_buffer.side_effect = OSError("device dropped")
+            status_data = await asyncio.wait_for(mgr.status(), timeout=1.0)
+
+            handle_after = mgr.serial_owner.handle
+            close_calls = ser.close.call_count
+
+            ser.reset_input_buffer.side_effect = None
+            await mgr.stop_rms_stream()
+            await stream.aclose()
+            return first, status_data, handle_after, close_calls
+
+        first, status_data, handle_after, close_calls = asyncio.run(drive())
+        assert first == {"value": 7, "timestamp": 10}
+        assert status_data["present"] is False
+        # The stream's borrow kept the port open through the failed transaction.
+        assert handle_after is not None
+        assert close_calls == 0
+
+    @patch("pico_manager.serial")
+    def test_rms_stream_ends_gracefully_on_read_error(self, mock_serial_mod):
+        # A device error mid-stream should stop the generator and release the
+        # borrow in finally, not raise out of the SSE generator.
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [
+            b"EVENT RMS value=5 timestamp=10\n",
+            OSError("device dropped"),
+        ]
+
+        async def drive():
+            mgr = _build(mock_serial_mod)
+            stream = await mgr.start_rms_stream(hz=10)
+            samples = [evt async for evt in stream]
+            return mgr, samples
+
+        mgr, samples = asyncio.run(drive())
+        assert samples == [{"value": 5, "timestamp": 10}]
+        assert mgr.serial_owner.handle is None
+
+    @patch("strobe_calibration_manager.serial")
+    @patch("strobe_calibration_manager.spidev")
+    @patch("strobe_calibration_manager.DigitalOutputDevice")
+    @patch("pico_manager.serial")
+    def test_both_managers_share_one_serial_owner(
+        self, mock_pico_serial, mock_led_cls, mock_spidev_mod, mock_strobe_serial, monkeypatch
+    ):
+        """Calibration and a /api/pico call must serialize through the same
+        owner so neither holds a conflicting exclusive fd on /dev/ttyACM0."""
+        monkeypatch.setenv("PITRAC_PICO_ENABLED", "required")
+        mock_spidev_mod.SpiDev.side_effect = [MagicMock(), MagicMock()]
+
+        from pico_manager import PicoManager
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        cm = MagicMock()
+        cm.get_config.return_value = None
+        lock = asyncio.Lock()
+
+        pico = PicoManager(cm, lock)
+        strobe = StrobeCalibrationManager(cm, lock, serial_owner=pico.serial_owner)
+
+        # Calibration borrows the shared owner instead of opening its own fd.
+        strobe._open_hardware()
+        assert strobe._serial is pico.serial_owner.handle
+        mock_strobe_serial.Serial.assert_not_called()
+
+        strobe._close_hardware()
+        # Owner closed by the borrow's release; status() can reopen cleanly.
+        ser = mock_pico_serial.Serial.return_value
+        ser.read.side_effect = [b"STATUS armed=0\n", b""]
+        data = asyncio.run(pico.status())
+        assert data["present"] is True
 
 
 # --------------------------------------------------------------------- flash
@@ -343,3 +564,87 @@ class TestFlash:
         mgr = _build(mock_serial_mod)
         with pytest.raises(RuntimeError, match="picotool"):
             asyncio.run(mgr.flash(str(uf2)))
+
+
+# ------------------------------------------------------------------ detect/bundled
+
+class TestDetectTarget:
+    def _exec_returning(self, text: bytes):
+        proc = MagicMock()
+
+        async def _communicate():
+            return (text, b"")
+
+        proc.communicate = _communicate
+        return proc
+
+    @patch("pico_manager.serial")
+    @patch("pico_manager.asyncio.create_subprocess_exec")
+    def test_detect_rp2350_maps_to_pico2_w(self, mock_exec, mock_serial_mod):
+        proc = self._exec_returning(b"Program Information\n type: RP2350\n")
+
+        async def _exec(*a, **k):
+            return proc
+
+        mock_exec.side_effect = _exec
+        mgr = _build(mock_serial_mod)
+        assert asyncio.run(mgr._detect_target(None)) == "pico2_w"
+
+    @patch("pico_manager.serial")
+    @patch("pico_manager.asyncio.create_subprocess_exec")
+    def test_detect_rp2040_maps_to_pico_w(self, mock_exec, mock_serial_mod):
+        proc = self._exec_returning(b"chip: RP2040 rev B2\n")
+
+        async def _exec(*a, **k):
+            return proc
+
+        mock_exec.side_effect = _exec
+        mgr = _build(mock_serial_mod)
+        assert asyncio.run(mgr._detect_target(None)) == "pico_w"
+
+    @patch("pico_manager.serial")
+    @patch("pico_manager.asyncio.create_subprocess_exec")
+    def test_detect_no_match_raises(self, mock_exec, mock_serial_mod):
+        proc = self._exec_returning(b"no device connected\n")
+
+        async def _exec(*a, **k):
+            return proc
+
+        mock_exec.side_effect = _exec
+        mgr = _build(mock_serial_mod)
+        with pytest.raises(RuntimeError, match="detect"):
+            asyncio.run(mgr._detect_target(None))
+
+
+class TestFlashBundled:
+    @patch("pico_manager.serial")
+    def test_unknown_target_rejected(self, mock_serial_mod, tmp_path):
+        mgr = _build(mock_serial_mod)
+        with pytest.raises(ValueError, match="target"):
+            asyncio.run(mgr.flash_bundled(str(tmp_path), target="../../etc/passwd"))
+
+    @patch("pico_manager.serial")
+    def test_missing_bundled_file_raises(self, mock_serial_mod, tmp_path):
+        mgr = _build(mock_serial_mod)
+        with pytest.raises(RuntimeError, match="no bundled firmware"):
+            asyncio.run(mgr.flash_bundled(str(tmp_path), target="pico_w"))
+
+
+# ------------------------------------------------------------------ uf2 validation
+
+class TestUf2Validation:
+    def test_accepts_valid_magic(self):
+        from pico_manager import is_valid_uf2
+
+        block = b"\x55\x46\x32\x0a" + b"\x00" * 508
+        assert is_valid_uf2(block) is True
+
+    def test_rejects_bad_magic(self):
+        from pico_manager import is_valid_uf2
+
+        assert is_valid_uf2(b"not a uf2 file at all............") is False
+
+    def test_rejects_too_short(self):
+        from pico_manager import is_valid_uf2
+
+        assert is_valid_uf2(b"\x55\x46\x32\x0a") is False

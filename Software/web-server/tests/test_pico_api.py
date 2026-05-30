@@ -88,6 +88,34 @@ class TestConfigEndpoint:
         response = client.post("/api/pico/config", json={"threshold": "abc"})
         assert response.status_code == 400
 
+    def test_set_pulse_width_dispatches(self, server_instance, client):
+        server_instance.pico_manager.set_pulse_width_us = AsyncMock(
+            return_value={"ok": True, "pulse_us": 12}
+        )
+        response = client.post("/api/pico/config", json={"pulse_width_us": 12})
+        assert response.status_code == 200
+        server_instance.pico_manager.set_pulse_width_us.assert_awaited_once_with(12)
+
+    def test_set_pulse_intervals_dispatches(self, server_instance, client):
+        server_instance.pico_manager.set_pulse_intervals = AsyncMock(
+            return_value={"ok": True, "intervals": [0.7, 1.8]}
+        )
+        response = client.post(
+            "/api/pico/config", json={"pulse_intervals": [0.7, 1.8]}
+        )
+        assert response.status_code == 200
+        server_instance.pico_manager.set_pulse_intervals.assert_awaited_once_with([0.7, 1.8])
+
+    def test_pulse_intervals_bad_ratio_returns_400(self, server_instance, client):
+        async def _raise(_value):
+            raise ValueError("consecutive ratio repeats")
+
+        server_instance.pico_manager.set_pulse_intervals = AsyncMock(side_effect=_raise)
+        response = client.post(
+            "/api/pico/config", json={"pulse_intervals": [1.0, 2.0, 4.0]}
+        )
+        assert response.status_code == 400
+
 
 class TestRmsStreamEndpoint:
     def test_rms_stream_emits_sse_lines(self, server_instance, client):
@@ -125,9 +153,10 @@ class TestFlashEndpoint:
 
         server_instance.pico_manager.flash = fake_flash
 
+        valid_uf2 = b"\x55\x46\x32\x0a" + b"\x00" * 508
         response = client.post(
             "/api/pico/flash",
-            files={"uf2": ("fake.uf2", b"FAKE-DATA", "application/octet-stream")},
+            files={"uf2": ("fake.uf2", valid_uf2, "application/octet-stream")},
         )
         assert response.status_code == 200
         body = response.text
@@ -141,11 +170,48 @@ class TestFlashEndpoint:
 
         server_instance.pico_manager.flash = fake_flash
 
+        valid_uf2 = b"\x55\x46\x32\x0a" + b"\x00" * 508
         response = client.post(
             "/api/pico/flash",
-            files={"uf2": ("x.uf2", b"X", "application/octet-stream")},
+            files={"uf2": ("x.uf2", valid_uf2, "application/octet-stream")},
         )
         assert response.status_code == 200
         assert "ERROR" in response.text
+
+    def test_flash_rejects_non_uf2_extension(self, server_instance, client):
+        called = False
+
+        async def fake_flash(path, on_progress=None):
+            nonlocal called
+            called = True
+            return {"ok": True, "uf2": path}
+
+        server_instance.pico_manager.flash = fake_flash
+
+        response = client.post(
+            "/api/pico/flash",
+            files={"uf2": ("malware.bin", b"\x55\x46\x32\x0a" + b"\x00" * 508,
+                           "application/octet-stream")},
+        )
+        assert response.status_code == 400
+        assert called is False
+
+    def test_flash_rejects_bad_magic(self, server_instance, client):
+        called = False
+
+        async def fake_flash(path, on_progress=None):
+            nonlocal called
+            called = True
+            return {"ok": True, "uf2": path}
+
+        server_instance.pico_manager.flash = fake_flash
+
+        response = client.post(
+            "/api/pico/flash",
+            files={"uf2": ("fw.uf2", b"this is not a uf2 payload at all",
+                           "application/octet-stream")},
+        )
+        assert response.status_code == 400
+        assert called is False
 
 
