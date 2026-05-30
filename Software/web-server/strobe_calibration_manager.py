@@ -105,12 +105,17 @@ class StrobeCalibrationManager:
     # Config key for persisting the result
     DAC_CONFIG_KEY = "gs_config.strobing.kDAC_setting"
 
-    def __init__(self, config_manager, pico_lock: Optional[asyncio.Lock] = None):
+    def __init__(self, config_manager, pico_lock: Optional[asyncio.Lock] = None,
+                 serial_owner=None):
         self.config_manager = config_manager
         # Shared across both managers so concurrent /api/calibration and
         # /api/pico requests don't fight over /dev/ttyACM0. Constructed on
         # demand if none was injected — keeps the existing test wiring valid.
         self._pico_lock = pico_lock or asyncio.Lock()
+        # The single /dev/ttyACM0 holder shared with PicoManager. When present
+        # we borrow its handle instead of opening our own exclusive fd, so a
+        # mic-page visit no longer poisons the next calibration's serial open.
+        self._serial_owner = serial_owner
 
         self._spi_dac = None
         self._spi_adc = None
@@ -154,7 +159,10 @@ class StrobeCalibrationManager:
             device = _pico_setting(self.config_manager, "gs_config.pico.device",
                                    "PITRAC_PICO_DEVICE", "/dev/ttyACM0")
             try:
-                self._serial = serial.Serial(device, 115200, timeout=2, exclusive=True)
+                if self._serial_owner is not None:
+                    self._serial = self._serial_owner.open()
+                else:
+                    self._serial = serial.Serial(device, 115200, timeout=2, exclusive=True)
                 self._diag_pin = None
                 logger.info(
                     "Strobe calibration: Pico bridge OPEN on %s (gate=%s)",
@@ -199,10 +207,16 @@ class StrobeCalibrationManager:
                     self._serial.flush()
                 except Exception:
                     logger.debug("Error restoring Pico state on close", exc_info=True)
-            try:
-                self._serial.close()
-            except Exception:
-                logger.debug("Error closing serial", exc_info=True)
+            if self._serial_owner is not None:
+                # Hand the borrow back; the owner closes the fd once no other
+                # component holds it. Closing it ourselves would yank the port
+                # out from under a concurrent mic stream.
+                self._serial_owner.release()
+            else:
+                try:
+                    self._serial.close()
+                except Exception:
+                    logger.debug("Error closing serial", exc_info=True)
             self._serial = None
 
         for name, resource in [("diag", self._diag_pin),

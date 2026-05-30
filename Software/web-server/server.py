@@ -29,7 +29,13 @@ from constants import (
 from managers import ConnectionManager, ShotDataStore
 from models import ShotData
 from parsers import ShotDataParser
-from pico_manager import PicoManager
+from pico_manager import (
+    MAX_UF2_BYTES,
+    UF2_MAGIC,
+    UF2_MIN_BYTES,
+    UPLOAD_CHUNK_BYTES,
+    PicoManager,
+)
 from pitrac_manager import PiTracProcessManager
 from strobe_calibration_manager import StrobeCalibrationManager
 from testing_tools_manager import TestingToolsManager
@@ -191,10 +197,11 @@ class PiTracServer:
         self.calibration_manager = CalibrationManager(self.config_manager)
         self.testing_manager = TestingToolsManager(self.config_manager)
         self.pico_lock = asyncio.Lock()
-        self.strobe_calibration_manager = StrobeCalibrationManager(
-            self.config_manager, self.pico_lock
-        )
         self.pico_manager = PicoManager(self.config_manager, self.pico_lock)
+        self.strobe_calibration_manager = StrobeCalibrationManager(
+            self.config_manager, self.pico_lock,
+            serial_owner=self.pico_manager.serial_owner,
+        )
         self.update_manager = UpdateManager()
         self.update_manager.set_broadcast_callback(self.connection_manager.broadcast)
         self.shutdown_flag = False
@@ -1245,6 +1252,20 @@ class PiTracServer:
                     )
                 except (TypeError, ValueError) as exc:
                     errors["min_inter_shot_ms"] = str(exc)
+            if "pulse_width_us" in body:
+                try:
+                    applied["pulse_width_us"] = await self.pico_manager.set_pulse_width_us(
+                        int(body["pulse_width_us"])
+                    )
+                except (TypeError, ValueError) as exc:
+                    errors["pulse_width_us"] = str(exc)
+            if "pulse_intervals" in body:
+                try:
+                    applied["pulse_intervals"] = await self.pico_manager.set_pulse_intervals(
+                        body["pulse_intervals"]
+                    )
+                except (TypeError, ValueError) as exc:
+                    errors["pulse_intervals"] = str(exc)
             if errors:
                 return JSONResponse(
                     status_code=400, content={"ok": False, "errors": errors, "applied": applied}
@@ -1275,11 +1296,42 @@ class PiTracServer:
             )
 
         @self.app.post("/api/pico/flash")
-        async def pico_flash(uf2: UploadFile = File(...)) -> StreamingResponse:
+        async def pico_flash(uf2: UploadFile = File(...)) -> Response:
+            if not (uf2.filename or "").lower().endswith(".uf2"):
+                return JSONResponse(
+                    status_code=400,
+                    content={"ok": False, "error": "upload must be a .uf2 file"},
+                )
+
             tmp_dir = Path("/tmp")
             tmp_path = tmp_dir / f"pico_upload_{int(asyncio.get_event_loop().time() * 1000)}.uf2"
-            data = await uf2.read()
-            tmp_path.write_bytes(data)
+
+            # Stream to disk in chunks with a hard cap so a runaway upload can't
+            # exhaust memory or fill /tmp; validate the UF2 magic before flashing.
+            size = 0
+            head = b""
+            try:
+                with tmp_path.open("wb") as fh:
+                    while True:
+                        chunk = await uf2.read(UPLOAD_CHUNK_BYTES)
+                        if not chunk:
+                            break
+                        size += len(chunk)
+                        if size > MAX_UF2_BYTES:
+                            raise ValueError("upload exceeds firmware size limit")
+                        if len(head) < 4:
+                            head += chunk[: 4 - len(head)]
+                        fh.write(chunk)
+                if size < UF2_MIN_BYTES or head[:4] != UF2_MAGIC:
+                    raise ValueError("file is not a valid UF2 image")
+            except ValueError as exc:
+                tmp_path.unlink(missing_ok=True)
+                return JSONResponse(status_code=400, content={"ok": False, "error": str(exc)})
+            except Exception as exc:
+                tmp_path.unlink(missing_ok=True)
+                logger.error("Pico upload failed: %s", exc)
+                return JSONResponse(status_code=500, content={"ok": False, "error": str(exc)})
+
             try:
                 self.config_manager.set_config("gs_config.pico.last_uf2_path", str(tmp_path))
             except Exception:
@@ -1297,9 +1349,12 @@ class PiTracServer:
                 except Exception as exc:
                     queue.put_nowait(f"ERROR: {exc}")
                 finally:
+                    tmp_path.unlink(missing_ok=True)
                     queue.put_nowait(None)
 
-            asyncio.create_task(run_flash())
+            task = asyncio.create_task(run_flash())
+            self.background_tasks.add(task)
+            task.add_done_callback(self.background_tasks.discard)
 
             async def progress_stream():
                 while True:
