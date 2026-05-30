@@ -5,12 +5,17 @@
 {% block content %}
 <div class="flex flex-col gap-4">
 
+    {# -- Transient save/error toast, kept out of the connection badge -- #}
+    <div id="pico-toast" class="toast toast-top toast-end z-50 hidden" role="status" aria-live="polite">
+        <div id="pico-toast-msg" class="alert"></div>
+    </div>
+
     {# -- Status banner -- #}
     <div class="card bg-base-200 border border-base-300 shadow-sm">
         <div class="card-body p-3 flex-row gap-4 items-center flex-wrap">
             <i data-lucide="cpu" class="icon-md text-primary"></i>
             <span class="font-semibold">Pico</span>
-            <span id="pico-conn-state" class="badge badge-warning">Connecting...</span>
+            <span id="pico-conn-state" class="badge badge-warning" role="status" aria-live="polite">Connecting...</span>
             <span class="text-sm opacity-60">fw <span id="pico-fw">--</span></span>
             <span class="text-sm opacity-60">board <span id="pico-board" class="mono">--</span></span>
             <span class="text-sm opacity-60">device <span id="pico-device" class="mono">/dev/ttyACM0</span></span>
@@ -43,10 +48,11 @@
 
                     <div class="form-control">
                         <div class="flex items-baseline justify-between pb-1">
-                            <span class="label-text text-xs opacity-60">Threshold (raw RMS)</span>
-                            <span id="pico-threshold-value" class="text-xs mono font-semibold">0</span>
+                            <span id="pico-threshold-label" class="label-text text-xs opacity-60">Threshold (raw RMS)</span>
+                            <span id="pico-threshold-value" class="text-xs mono font-semibold" aria-live="polite">0</span>
                         </div>
-                        <input id="pico-threshold" type="range" min="0" max="100000" step="1000" value="0" class="range range-primary range-sm" />
+                        <input id="pico-threshold" type="range" min="0" max="100000" step="1000" value="0" class="range range-primary range-sm"
+                               aria-labelledby="pico-threshold-label" aria-valuetext="0" />
                         <div class="flex justify-between text-[10px] opacity-50 mt-1 mono">
                             <span>0</span>
                             <span id="pico-threshold-max">100k</span>
@@ -71,14 +77,15 @@
                         </select>
                     </label>
 
-                    <div class="text-xs opacity-60 mt-1">
+                    <div class="text-xs opacity-60 mt-1" role="status" aria-live="polite">
                         Latest: <span id="pico-rms-latest" class="mono font-semibold">--</span>
                         &nbsp;Peak: <span id="pico-rms-peak" class="mono font-semibold">--</span>
                     </div>
                 </div>
 
                 <div class="flex flex-col gap-2">
-                    <canvas id="pico-rms-canvas" class="w-full bg-base-300 rounded-md" height="120"></canvas>
+                    <canvas id="pico-rms-canvas" class="w-full bg-base-300 rounded-md" height="120"
+                            role="img" aria-label="Live mic RMS energy plotted against the detection threshold. Numeric latest and peak values are shown above."></canvas>
                     <div class="flex items-center justify-between text-xs opacity-60">
                         <span id="pico-rms-hint">Connecting to stream...</span>
                         <button id="pico-rms-toggle" class="btn btn-ghost btn-xs gap-1">
@@ -88,6 +95,36 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    {# -- Strobe pulse shaping: width + interval vector -- #}
+    <div class="card bg-base-200 border border-base-300 shadow-sm">
+        <div class="card-body p-4 sm:p-6">
+            <h2 class="card-title text-primary">Strobe pulse</h2>
+            <p class="text-sm opacity-60">
+                Pulse width drives the per-flash LED on-time. The interval vector spaces the strobe sequence; consecutive gaps must have unique ratios so the trace stays decodable. The firmware re-validates and the saved values reflect what it echoed back.
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+                <label class="form-control">
+                    <span class="label-text text-xs opacity-60 pb-1">Pulse width (µs)</span>
+                    <div class="join">
+                        <input id="pico-pulse-width" type="number" class="input input-bordered input-sm join-item flex-1 mono" min="1" max="500" step="1" />
+                        <button id="pico-pulse-width-save" class="btn btn-primary btn-sm join-item">Save</button>
+                    </div>
+                </label>
+
+                <label class="form-control">
+                    <span class="label-text text-xs opacity-60 pb-1">Intervals (ms, comma-separated)</span>
+                    <div class="join">
+                        <input id="pico-pulse-intervals" type="text" class="input input-bordered input-sm join-item flex-1 mono" placeholder="e.g. 1, 2, 4, 8" />
+                        <button id="pico-pulse-intervals-save" class="btn btn-primary btn-sm join-item">Save</button>
+                    </div>
+                </label>
+            </div>
+
+            <p id="pico-pulse-current" class="text-xs opacity-50 mt-2 mono" role="status" aria-live="polite">--</p>
         </div>
     </div>
 

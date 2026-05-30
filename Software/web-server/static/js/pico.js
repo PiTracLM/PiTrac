@@ -1,4 +1,23 @@
 const STREAM_STALE_MS = 3000;
+const RMS_STREAM_MIN_FW = [0, 5, 0];
+const PULSE_WIDTH_US_MAX = 500;  // mirrors the firmware/server cap (STROBE_MAX_PULSE_WIDTH_US)
+
+function parseFwVersion(fw) {
+    if (typeof fw !== 'string') return null;
+    const match = fw.match(/(\d+)\.(\d+)\.(\d+)/);
+    if (!match) return null;
+    return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+function fwAtLeast(fw, minimum) {
+    const parsed = parseFwVersion(fw);
+    if (!parsed) return false;
+    for (let i = 0; i < minimum.length; i++) {
+        if (parsed[i] > minimum[i]) return true;
+        if (parsed[i] < minimum[i]) return false;
+    }
+    return true;
+}
 
 function formatThousands(value) {
     const v = Number(value) || 0;
@@ -22,6 +41,7 @@ class PicoController {
         this.lastStatus = null;
         this.flashInProgress = false;
         this.userTouchedThreshold = false;
+        this.toastTimer = null;
 
         this.init();
         this.setupPageCleanup();
@@ -74,10 +94,13 @@ class PicoController {
         const thresholdSlider = document.getElementById('pico-threshold');
         thresholdSlider.addEventListener('input', () => {
             this.userTouchedThreshold = true;
-            document.getElementById('pico-threshold-value').textContent = thresholdSlider.value;
+            this.updateThresholdReadout(thresholdSlider.value);
             this.drawRms();
         });
         thresholdSlider.addEventListener('change', () => this.saveThreshold());
+
+        document.getElementById('pico-pulse-width-save').addEventListener('click', () => this.savePulseWidth());
+        document.getElementById('pico-pulse-intervals-save').addEventListener('click', () => this.savePulseIntervals());
 
         document.getElementById('pico-rms-toggle').addEventListener('click', () => this.toggleRmsStream());
         document.getElementById('pico-rms-hz').addEventListener('change', () => this.restartRmsStream());
@@ -133,7 +156,7 @@ class PicoController {
             && typeof data.threshold === 'number') {
             this.ensureSliderRange(data.threshold);
             thresholdInput.value = data.threshold;
-            document.getElementById('pico-threshold-value').textContent = data.threshold;
+            this.updateThresholdReadout(data.threshold);
             this.drawRms();
         }
 
@@ -141,6 +164,33 @@ class PicoController {
         if (document.activeElement !== minInput && typeof data.min_inter_shot_ms === 'number') {
             minInput.value = data.min_inter_shot_ms;
         }
+
+        this.renderPulseFields(data);
+    }
+
+    updateThresholdReadout(value) {
+        const slider = document.getElementById('pico-threshold');
+        document.getElementById('pico-threshold-value').textContent = value;
+        slider.setAttribute('aria-valuetext', `${value} raw RMS`);
+    }
+
+    renderPulseFields(data) {
+        const widthInput = document.getElementById('pico-pulse-width');
+        if (document.activeElement !== widthInput && typeof data.pulse_us === 'number') {
+            widthInput.value = data.pulse_us;
+        }
+
+        const intervalsInput = document.getElementById('pico-pulse-intervals');
+        if (document.activeElement !== intervalsInput && Array.isArray(data.intervals)) {
+            intervalsInput.value = data.intervals.join(', ');
+        }
+
+        const current = document.getElementById('pico-pulse-current');
+        const widthText = typeof data.pulse_us === 'number' ? `${data.pulse_us} µs` : '--';
+        const intervalsText = Array.isArray(data.intervals) && data.intervals.length
+            ? data.intervals.join(', ') + ' ms'
+            : '--';
+        current.textContent = `current: width ${widthText}, intervals ${intervalsText}`;
     }
 
     renderDisconnected(_data) {
@@ -178,7 +228,10 @@ class PicoController {
             this.flashMessage('Threshold must be a non-negative integer', 'error');
             return;
         }
-        await this.postConfig({ threshold: value });
+        const ok = await this.postConfig({ threshold: value });
+        // Once the slider value is committed to the Pico, drop the latch so a
+        // later server-side change can re-sync the control.
+        if (ok) this.userTouchedThreshold = false;
     }
 
     async saveMinInterShot() {
@@ -188,6 +241,28 @@ class PicoController {
             return;
         }
         await this.postConfig({ min_inter_shot_ms: value });
+    }
+
+    async savePulseWidth() {
+        const value = Number(document.getElementById('pico-pulse-width').value);
+        if (!(value > 0) || value > PULSE_WIDTH_US_MAX) {
+            this.flashMessage(`Pulse width must be greater than 0 and at most ${PULSE_WIDTH_US_MAX} us`, 'error');
+            return;
+        }
+        await this.postConfig({ pulse_width_us: value });
+    }
+
+    async savePulseIntervals() {
+        const raw = document.getElementById('pico-pulse-intervals').value;
+        const intervals = raw.split(',')
+            .map((part) => part.trim())
+            .filter((part) => part.length)
+            .map((part) => Number(part));
+        if (!intervals.length || intervals.some((v) => !(v > 0))) {
+            this.flashMessage('Intervals must be a comma-separated list of positive numbers', 'error');
+            return;
+        }
+        await this.postConfig({ pulse_intervals: intervals });
     }
 
     async postConfig(payload) {
@@ -201,12 +276,33 @@ class PicoController {
             if (!resp.ok) {
                 const detail = data.errors ? Object.values(data.errors).join('; ') : (data.error || 'config rejected');
                 this.flashMessage(detail, 'error');
-                return;
+                return false;
+            }
+            // The endpoint returns HTTP 200 even when the firmware echo check
+            // fails, so surface any per-field reject carried in `applied`.
+            const rejected = this.collectAppliedRejects(data.applied);
+            if (rejected) {
+                this.flashMessage(rejected, 'error');
+                return false;
             }
             this.flashMessage('Saved', 'success');
+            return true;
         } catch (err) {
             this.flashMessage(err.message, 'error');
+            return false;
         }
+    }
+
+    collectAppliedRejects(applied) {
+        if (!applied || typeof applied !== 'object') return null;
+        const messages = [];
+        Object.keys(applied).forEach((key) => {
+            const result = applied[key];
+            if (result && typeof result === 'object' && result.ok === false) {
+                messages.push(result.error || `${key} rejected by firmware`);
+            }
+        });
+        return messages.length ? messages.join('; ') : null;
     }
 
     startRmsStream() {
@@ -284,8 +380,8 @@ class PicoController {
         const age = Date.now() - this.rmsLastEventAt;
         if (age < STREAM_STALE_MS) return;
         const fw = this.lastStatus && this.lastStatus.fw;
-        if (fw && fw !== '0.5.0' && !fw.startsWith('0.5') && !fw.startsWith('1.')) {
-            this.setRmsHint(`No events. Pico fw=${fw} predates CFG STREAM_RMS - flash 0.5.0 via the Firmware card below.`);
+        if (parseFwVersion(fw) && !fwAtLeast(fw, RMS_STREAM_MIN_FW)) {
+            this.setRmsHint(`No events. Pico fw=${fw} predates CFG STREAM_RMS - flash 0.5.0 or newer via the Firmware card below.`);
         } else {
             this.setRmsHint('No events. Check Pico mic wiring or USB-CDC link.');
         }
@@ -454,14 +550,16 @@ class PicoController {
     }
 
     flashMessage(text, type) {
-        const badge = document.getElementById('pico-conn-state');
-        const prev = { text: badge.textContent, cls: badge.className };
-        badge.textContent = text;
-        badge.className = `badge ${type === 'error' ? 'badge-error' : 'badge-success'}`;
-        setTimeout(() => {
-            badge.textContent = prev.text;
-            badge.className = prev.cls;
-        }, 1500);
+        const toast = document.getElementById('pico-toast');
+        const msg = document.getElementById('pico-toast-msg');
+        if (!toast || !msg) return;
+        msg.textContent = text;
+        msg.className = `alert ${type === 'error' ? 'alert-error' : 'alert-success'}`;
+        toast.classList.remove('hidden');
+        if (this.toastTimer) clearTimeout(this.toastTimer);
+        this.toastTimer = setTimeout(() => {
+            toast.classList.add('hidden');
+        }, 2500);
     }
 }
 
