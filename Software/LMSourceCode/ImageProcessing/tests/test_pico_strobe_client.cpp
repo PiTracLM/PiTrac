@@ -129,6 +129,63 @@ BOOST_AUTO_TEST_CASE(read_status_parses_firmware_reply) {
     BOOST_CHECK_EQUAL(host_in, "STATUS\n");
 }
 
+// Writes the canned STATUS reply after a short delay so the client's own
+// writes land first, mirroring read_status_parses_firmware_reply.
+static std::thread RespondStatus(int host_fd, const std::string& line) {
+    return std::thread([host_fd, line]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        ::write(host_fd, line.c_str(), line.size());
+    });
+}
+
+BOOST_AUTO_TEST_CASE(arm_succeeds_when_firmware_echoes_armed) {
+    SocketPair pair;
+    PicoStrobeClient client;
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    std::thread responder = RespondStatus(pair.host, "STATUS armed=1 threshold=4096 fw=0.6.1\n");
+    bool ok = client.Arm();
+    responder.join();
+
+    BOOST_CHECK(ok);
+    std::string host_in = DrainHost(pair.host, 10);
+    BOOST_CHECK(host_in.find("CFG ARMED=1\n") != std::string::npos);
+    BOOST_CHECK(host_in.find("STATUS\n") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(arm_fails_when_firmware_refuses) {
+    SocketPair pair;
+    PicoStrobeClient client;
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    // Firmware ignored the arm (room too loud) — STATUS still reports armed=0.
+    std::thread responder = RespondStatus(pair.host, "STATUS armed=0 threshold=4096 fw=0.6.1\n");
+    bool ok = client.Arm();
+    responder.join();
+
+    BOOST_CHECK(!ok);
+}
+
+BOOST_AUTO_TEST_CASE(disarm_succeeds_when_firmware_echoes_disarmed) {
+    SocketPair pair;
+    PicoStrobeClient client;
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    std::thread responder = RespondStatus(pair.host, "STATUS armed=0 threshold=4096 fw=0.6.1\n");
+    bool ok = client.Disarm();
+    responder.join();
+
+    BOOST_CHECK(ok);
+    std::string host_in = DrainHost(pair.host, 10);
+    BOOST_CHECK(host_in.find("CFG ARMED=0\n") != std::string::npos);
+}
+
 BOOST_AUTO_TEST_CASE(read_status_rejects_unrecognised_reply) {
     SocketPair pair;
     PicoStrobeClient client;

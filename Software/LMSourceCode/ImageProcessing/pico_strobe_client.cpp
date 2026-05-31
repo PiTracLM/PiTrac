@@ -236,6 +236,27 @@ bool PicoStrobeClient::HoldOff() {
     return impl_->WriteLine("CFG STROBE_HOLD=0");
 }
 
+bool PicoStrobeClient::Arm() {
+    if (!IsOpen()) return false;
+    if (!impl_->WriteLine("CFG ARMED=1")) return false;
+    PicoStatus st;
+    if (!ReadStatus(st)) return false;
+    if (!st.armed) {
+        PicoLogWarn("PicoStrobeClient::Arm: firmware refused arm "
+                    "(room louder than threshold/quiet-factor?)");
+        return false;
+    }
+    return true;
+}
+
+bool PicoStrobeClient::Disarm() {
+    if (!IsOpen()) return false;
+    if (!impl_->WriteLine("CFG ARMED=0")) return false;
+    PicoStatus st;
+    if (!ReadStatus(st)) return false;
+    return !st.armed;
+}
+
 bool PicoStrobeClient::ReadStatus(PicoStatus& out) {
     if (!IsOpen()) return false;
     if (!impl_->WriteLine("STATUS")) return false;
