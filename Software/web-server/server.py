@@ -1252,6 +1252,13 @@ class PiTracServer:
                     )
                 except (TypeError, ValueError) as exc:
                     errors["min_inter_shot_ms"] = str(exc)
+            if "decay_confirm_ms" in body:
+                try:
+                    applied["decay_confirm_ms"] = await self.pico_manager.set_decay_confirm(
+                        int(body["decay_confirm_ms"])
+                    )
+                except (TypeError, ValueError) as exc:
+                    errors["decay_confirm_ms"] = str(exc)
             if "pulse_width_us" in body:
                 try:
                     applied["pulse_width_us"] = await self.pico_manager.set_pulse_width_us(

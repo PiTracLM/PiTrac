@@ -708,3 +708,56 @@ class TestLmRunningGuard:
 
         assert data["present"] is True
         mock_serial_mod.Serial.assert_called_once()
+
+
+# ----------------------------------------------------------- DSP config persistence
+
+class TestDspPersistence:
+    """Tuned threshold / decay-confirm persist to config so the LM can re-push
+    them to a power-cycled Pico, and decay-confirm validates + echo-checks."""
+
+    @staticmethod
+    def _mgr(serial_mock):
+        from pico_manager import PicoManager
+
+        cm = MagicMock()
+        cm.get_config.side_effect = lambda key=None: None
+        return PicoManager(cm, asyncio.Lock()), cm
+
+    @patch("pico_manager.serial")
+    def test_set_threshold_persists_on_accept(self, mock_serial_mod):
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [b"STATUS armed=0 threshold=8000\n", b""]
+        mgr, cm = self._mgr(mock_serial_mod)
+        asyncio.run(mgr.set_threshold(8000))
+        cm.set_config.assert_any_call("gs_config.pico.mic_threshold", 8000)
+
+    @patch("pico_manager.serial")
+    def test_set_decay_confirm_sends_cfg_and_persists(self, mock_serial_mod):
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [b"STATUS armed=0 decay_confirm_ms=3\n", b""]
+        mgr, cm = self._mgr(mock_serial_mod)
+        result = asyncio.run(mgr.set_decay_confirm(3))
+        writes = [c.args[0] for c in ser.write.call_args_list]
+        assert b"CFG DECAY_CONFIRM_MS=3\n" in writes
+        assert result.get("decay_confirm_ms") == 3
+        cm.set_config.assert_any_call("gs_config.pico.decay_confirm_ms", 3)
+
+    @patch("pico_manager.serial")
+    def test_set_decay_confirm_rejects_out_of_range(self, mock_serial_mod):
+        mgr, _ = self._mgr(mock_serial_mod)
+        with pytest.raises(ValueError):
+            asyncio.run(mgr.set_decay_confirm(0))
+        with pytest.raises(ValueError):
+            asyncio.run(mgr.set_decay_confirm(201))
+
+    @patch("pico_manager.serial")
+    def test_set_decay_confirm_not_persisted_on_echo_mismatch(self, mock_serial_mod):
+        ser = mock_serial_mod.Serial.return_value
+        # firmware reports a different window than requested (e.g. clamped) -> not ok
+        ser.read.side_effect = [b"STATUS armed=0 decay_confirm_ms=5\n", b""]
+        mgr, cm = self._mgr(mock_serial_mod)
+        result = asyncio.run(mgr.set_decay_confirm(3))
+        assert result.get("ok") is False
+        keys_persisted = [c.args[0] for c in cm.set_config.call_args_list]
+        assert "gs_config.pico.decay_confirm_ms" not in keys_persisted

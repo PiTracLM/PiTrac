@@ -142,6 +142,21 @@ class PiTracProcessManager:
                 if value is not None and value != "":
                     env[env_var] = str(value)
 
+            # Pico mic-DSP tuning is set live via /pico and persisted to config (it's
+            # not a formal env setting); export it so the LM re-pushes it to a
+            # power-cycled Pico on connect -- self-recovery without opening /pico.
+            for cfg_key, env_var in (
+                ("gs_config.pico.mic_threshold", "PITRAC_PICO_MIC_THRESHOLD"),
+                ("gs_config.pico.decay_confirm_ms", "PITRAC_PICO_DECAY_CONFIRM_MS"),
+            ):
+                node = merged_config
+                for part in cfg_key.split("."):
+                    node = node.get(part) if isinstance(node, dict) else None
+                    if node is None:
+                        break
+                if node is not None and node != "":
+                    env[env_var] = str(node)
+
             Path(env["PITRAC_BASE_IMAGE_LOGGING_DIR"]).mkdir(parents=True, exist_ok=True)
             Path(env["PITRAC_WEBSERVER_SHARE_DIR"]).mkdir(parents=True, exist_ok=True)
 
