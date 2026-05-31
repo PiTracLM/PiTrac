@@ -197,7 +197,7 @@ class PiTracServer:
         self.calibration_manager = CalibrationManager(self.config_manager)
         self.testing_manager = TestingToolsManager(self.config_manager)
         self.pico_lock = asyncio.Lock()
-        self.pico_manager = PicoManager(self.config_manager, self.pico_lock)
+        self.pico_manager = PicoManager(self.config_manager, self.pico_lock, pitrac_manager=self.pitrac_manager)
         self.strobe_calibration_manager = StrobeCalibrationManager(
             self.config_manager, self.pico_lock,
             serial_owner=self.pico_manager.serial_owner,

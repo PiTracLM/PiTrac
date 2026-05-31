@@ -101,11 +101,15 @@ class PicoManager:
         config_manager: Any,
         lock: asyncio.Lock,
         serial_owner: Optional[PicoSerialOwner] = None,
+        pitrac_manager: Optional[Any] = None,
     ):
         self._config_manager = config_manager
         self._lock = lock
         self.serial_owner = serial_owner or PicoSerialOwner(self._device_path)
         self._stream_active = False
+        # While pitrac_lm runs it owns /dev/ttyACM0 (its own PicoStrobeClient
+        # arms the Pico), so the /pico background pollers must stand down.
+        self._pitrac_manager = pitrac_manager
 
     def _device_path(self) -> str:
         if self._config_manager is None:
@@ -117,6 +121,15 @@ class PicoManager:
         except Exception:
             pass
         return DEFAULT_DEVICE
+
+    def _lm_is_running(self) -> bool:
+        """True when pitrac_lm holds the serial port; the web then defers to it."""
+        if self._pitrac_manager is None:
+            return False
+        try:
+            return bool(self._pitrac_manager.is_running())
+        except Exception:
+            return False
 
     def close(self) -> None:
         self.serial_owner.close()
@@ -199,6 +212,8 @@ class PicoManager:
             return await asyncio.to_thread(self._status_sync)
 
     def _status_sync(self) -> Dict[str, Any]:
+        if self._lm_is_running():
+            return {"present": False, "error": "pitrac_lm is running; the Pico is owned by the launch monitor"}
         try:
             ser = self.serial_owner.open()
         except (RuntimeError, OSError) as exc:
@@ -334,6 +349,11 @@ class PicoManager:
         # churn, but the lock is only held around each read/write — between
         # reads other transactions (status, threshold tuning, calibration) can
         # grab the lock and tune the very mic this chart is displaying.
+        if self._lm_is_running():
+            # pitrac_lm owns the port while it runs; yield nothing so the stream
+            # closes cleanly instead of fighting the LM for /dev/ttyACM0.
+            logger.info("RMS stream not started: pitrac_lm is running")
+            return
         async with self._lock:
             ser = await asyncio.to_thread(self.serial_owner.open)
             try:

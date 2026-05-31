@@ -407,3 +407,28 @@ class TestPiTracProcessManagerIntegration:
             assert "error" in result.get("message", "").lower() or "failed" in result.get("message", "").lower()
 
         manager.process = None
+
+
+class TestPicoEnvExport:
+    """gs_config.pico.enabled has to reach pitrac_lm as the PITRAC_PICO_ENABLED
+    env var so the C++ side knows whether to use the Pico (auto/required/legacy).
+    That happens generically: start() exports every setting marked
+    passedVia=environment. This guards the config wiring that makes it work."""
+
+    def _settings(self):
+        import json
+        from pathlib import Path
+
+        path = Path(__file__).resolve().parent.parent / "configurations.json"
+        with open(path) as f:
+            return json.load(f)["settings"]
+
+    def test_pico_enabled_is_exported_to_environment(self):
+        entry = self._settings()["gs_config.pico.enabled"]
+        assert entry["passedVia"] == "environment"
+        assert entry["envVariable"] == "PITRAC_PICO_ENABLED"
+
+    def test_pico_device_is_exported_to_environment(self):
+        entry = self._settings()["gs_config.pico.device"]
+        assert entry["passedVia"] == "environment"
+        assert entry["envVariable"] == "PITRAC_PICO_DEVICE"
