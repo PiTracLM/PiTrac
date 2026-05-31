@@ -181,6 +181,18 @@ class TestSetters:
         assert b"CFG ARMED=0\n" in writes
 
     @patch("pico_manager.serial")
+    def test_set_armed_surfaces_firmware_refusal(self, mock_serial_mod):
+        ser = mock_serial_mod.Serial.return_value
+        # Firmware refuses the arm (room too loud) — STATUS still reports armed=0.
+        ser.read.side_effect = [b"STATUS armed=0 threshold=4096\n", b""]
+
+        mgr = _build(mock_serial_mod)
+        result = asyncio.run(mgr.set_armed(True))
+
+        assert result["ok"] is False
+        assert "raise the threshold" in result["error"]
+
+    @patch("pico_manager.serial")
     def test_set_min_inter_shot_clamps_to_floor(self, mock_serial_mod):
         ser = mock_serial_mod.Serial.return_value
         ser.read.side_effect = [b"STATUS armed=0 min_inter_shot_ms=20\n", b""]
