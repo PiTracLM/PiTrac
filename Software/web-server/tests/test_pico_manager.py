@@ -660,3 +660,51 @@ class TestUf2Validation:
         from pico_manager import is_valid_uf2
 
         assert is_valid_uf2(b"\x55\x46\x32\x0a") is False
+
+
+# ----------------------------------------------------------------- LM ownership
+
+class TestLmRunningGuard:
+    """While pitrac_lm runs it owns /dev/ttyACM0 (its own PicoStrobeClient arms
+    the Pico), so the /pico background pollers must defer and never open the port."""
+
+    @staticmethod
+    def _build_with_lm(*, lm_running):
+        from pico_manager import PicoManager
+
+        cm = MagicMock()
+        cm.get_config.side_effect = lambda key: None
+        lm = MagicMock()
+        lm.is_running.return_value = lm_running
+        return PicoManager(cm, asyncio.Lock(), pitrac_manager=lm)
+
+    @patch("pico_manager.serial")
+    def test_status_defers_to_lm_without_opening_port(self, mock_serial_mod):
+        mgr = self._build_with_lm(lm_running=True)
+        data = asyncio.run(mgr.status())
+
+        assert data["present"] is False
+        assert "pitrac_lm" in data["error"]
+        mock_serial_mod.Serial.assert_not_called()
+
+    @patch("pico_manager.serial")
+    def test_rms_stream_yields_nothing_while_lm_running(self, mock_serial_mod):
+        async def drive():
+            mgr = self._build_with_lm(lm_running=True)
+            stream = await mgr.start_rms_stream(hz=10)
+            return [evt async for evt in stream]
+
+        samples = asyncio.run(drive())
+        assert samples == []
+        mock_serial_mod.Serial.assert_not_called()
+
+    @patch("pico_manager.serial")
+    def test_status_opens_port_when_lm_idle(self, mock_serial_mod):
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [b"STATUS armed=0 threshold=4096\n", b""]
+
+        mgr = self._build_with_lm(lm_running=False)
+        data = asyncio.run(mgr.status())
+
+        assert data["present"] is True
+        mock_serial_mod.Serial.assert_called_once()
