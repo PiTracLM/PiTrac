@@ -281,6 +281,12 @@ uint64_t PicoStrobeClient::LastEventCount() {
 
 bool PicoStrobeClient::ReadStatus(PicoStatus& out) {
     if (!IsOpen()) return false;
+    // Drop stale/unsolicited bytes (a boot banner, a prior CFG's LOG ack, a partial
+    // line) before asking, so the first read after a fresh CDC connect returns THIS
+    // STATUS reply rather than a leftover line -- otherwise the echo-verify in
+    // Arm/SetMicThreshold/etc. false-negatives on the first contact. Mirrors the
+    // Python side's reset_input_buffer(); a no-op (harmless) on the test socket fd.
+    if (impl_->fd >= 0) { ::tcflush(impl_->fd, TCIFLUSH); }
     if (!impl_->WriteLine("STATUS")) return false;
 
     std::string line;
