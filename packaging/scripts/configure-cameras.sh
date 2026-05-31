@@ -213,10 +213,12 @@ arm_boost=1"
         config_block="$config_block
 
 # Dual camera configuration (single-pi system)
-# Camera 0: internal trigger, Camera 1: external trigger
+# Camera 0: free-running, Camera 1: trigger mode set at runtime via sysfs
+# Using always-on (instead of sync-sink) keeps the 1.8V regulator powered for
+# external triggering while allowing runtime trigger mode switching without reboot.
 [all]
 dtoverlay=imx296,cam0
-dtoverlay=imx296,sync-sink"
+dtoverlay=imx296,always-on"
     elif [[ "$num_cameras" -eq 1 ]]; then
         config_block="$config_block
 
@@ -268,6 +270,23 @@ dtoverlay=vc_mipi_imx296"
     mv "$temp_file" "$config_path"
 
     log_success "config.txt configuration complete"
+
+    # Ensure i2c-dev kernel module loads on boot so /dev/i2c-* nodes appear.
+    # raspi-config does this when you enable I2C, but our installer bypasses raspi-config.
+    # Check both /etc/modules (raspi-config) and /etc/modules-load.d/ (systemd).
+    local needs_i2c_dev=true
+    if grep -qs "^i2c[-_]dev" /etc/modules 2>/dev/null; then
+        needs_i2c_dev=false
+        log_info "i2c-dev already in /etc/modules (likely via raspi-config)"
+    elif [[ -d /etc/modules-load.d ]] && grep -rqs "^i2c[-_]dev" /etc/modules-load.d/; then
+        needs_i2c_dev=false
+        log_info "i2c-dev already in /etc/modules-load.d/"
+    fi
+
+    if [[ "$needs_i2c_dev" == "true" ]] && [[ -d /etc/modules-load.d ]]; then
+        log_info "Adding i2c-dev to /etc/modules-load.d/pitrac.conf"
+        echo "i2c-dev" >> /etc/modules-load.d/pitrac.conf
+    fi
 
     log_warn "IMPORTANT: System must be rebooted for camera configuration changes to take effect"
 }

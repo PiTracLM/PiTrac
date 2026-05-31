@@ -23,12 +23,13 @@ class ConfigurationManager:
 
     def __init__(self):
         self._lock = RLock()
+        self._metadata_cache = None
 
         self._raw_metadata = self._load_raw_metadata()
         sys_paths = self._raw_metadata.get("systemPaths", {})
 
         def expand_path(path_str: str) -> Path:
-            return Path(path_str.replace("~", str(Path.home())))
+            return Path(path_str).expanduser()
 
         # Configuration paths for three-tier system
         self.user_settings_path = expand_path(
@@ -73,6 +74,7 @@ class ConfigurationManager:
     def reload(self) -> None:
         """Reload configuration from metadata, calibration data, and user settings"""
         with self._lock:
+            self._metadata_cache = None
             self.user_settings = self._load_json(self.user_settings_path)
             self.calibration_data = self._load_json(self.calibration_data_path)
             # Build merged config from metadata defaults + calibration + user overrides
@@ -107,17 +109,19 @@ class ConfigurationManager:
 
             data_copy = copy.deepcopy(data)
 
+            lock_path = path.with_suffix(".lock")
             temp_path = path.with_suffix(".tmp")
-            with open(temp_path, "w") as f:
-                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            with open(lock_path, "w") as lock_f:
+                fcntl.flock(lock_f.fileno(), fcntl.LOCK_EX)
                 try:
-                    json.dump(data_copy, f, indent=2, sort_keys=True)
-                    f.flush()
-                    os.fsync(f.fileno())
+                    with open(temp_path, "w") as f:
+                        json.dump(data_copy, f, indent=2, sort_keys=True)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    temp_path.replace(path)
                 finally:
-                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                    fcntl.flock(lock_f.fileno(), fcntl.LOCK_UN)
 
-            temp_path.replace(path)
             logger.info(f"Saved configuration to {path}")
             return True
 
@@ -374,6 +378,32 @@ class ConfigurationManager:
 
         return result
 
+    def set_calibration_batch(self, updates: Dict[str, Any]) -> Tuple[bool, str]:
+        """Atomic multi-key write to calibration data. All keys must be calibration fields."""
+        if not updates:
+            return True, "No updates"
+
+        with self._lock:
+            for key in updates:
+                if not self._is_calibration_field(key):
+                    return False, f"Key {key} is not a calibration field"
+
+            calibration_copy = copy.deepcopy(self.calibration_data)
+            for key, value in updates.items():
+                if not self._set_in_dict(calibration_copy, key, value):
+                    return False, f"Failed to set {key}"
+
+            if not self._save_json(self.calibration_data_path, calibration_copy):
+                return False, "Failed to save calibration data"
+
+            self.calibration_data = calibration_copy
+            self._rebuild_merged_config()
+
+            for key, value in updates.items():
+                self._notify_callbacks(key, value)
+
+        return True, f"Saved {len(updates)} calibration values"
+
     def _set_in_dict(self, d: Dict[str, Any], key: str, value: Any) -> bool:
         """Set value in nested dictionary using dot notation"""
         parts = key.split(".")
@@ -433,37 +463,38 @@ class ConfigurationManager:
 
     def reset_all(self) -> Tuple[bool, str]:
         """Reset all user settings to defaults"""
+        with self._lock:
+            if self._save_json(self.user_settings_path, {}):
+                self.user_settings = {}
+                self._rebuild_merged_config()
+                return True, "Reset all settings to defaults"
 
-        self.user_settings = {}
-
-        if self._save_json(self.user_settings_path, self.user_settings):
-            self.reload()
-            return True, "Reset all settings to defaults"
-
-        return False, "Failed to reset configuration"
+            return False, "Failed to reset configuration"
 
     def get_diff(self) -> Dict[str, Any]:
         """Get differences between user settings and defaults
 
         Returns:
-            Dictionary showing what's different from defaults
+            Dictionary showing what's different from defaults, with source indicator
         """
-        diff = {}
+        with self._lock:
+            diff = {}
 
-        def compare_nested(user: Dict, default: Dict, path: str = "") -> None:
-            for key, value in user.items():
-                current_path = f"{path}.{key}" if path else key
+            def compare_nested(overrides: Dict, default: Dict, source: str, path: str = "") -> None:
+                for key, value in overrides.items():
+                    current_path = f"{path}.{key}" if path else key
 
-                if key not in default:
-                    diff[current_path] = {"user": value, "default": None}
-                elif isinstance(value, dict) and isinstance(default.get(key), dict):
-                    compare_nested(value, default[key], current_path)
-                elif value != default.get(key):
-                    diff[current_path] = {"user": value, "default": default[key]}
+                    if key not in default:
+                        diff[current_path] = {"user": value, "default": None, "source": source}
+                    elif isinstance(value, dict) and isinstance(default.get(key), dict):
+                        compare_nested(value, default[key], source, current_path)
+                    elif value != default.get(key):
+                        diff[current_path] = {"user": value, "default": default[key], "source": source}
 
-        default_config = self.get_all_defaults_with_metadata()
-        compare_nested(self.user_settings, default_config)
-        return diff
+            default_config = self.get_all_defaults_with_metadata()
+            compare_nested(self.user_settings, default_config, "user")
+            compare_nested(self.calibration_data, default_config, "calibration")
+            return diff
 
     def validate_config(self, key: str, value: Any) -> Tuple[bool, str]:
         """Validate configuration value
@@ -646,7 +677,7 @@ class ConfigurationManager:
 
         model_dirs = []
         for path_str in model_search_paths:
-            path = Path(path_str.replace("~", str(Path.home())))
+            path = Path(path_str).expanduser()
             model_dirs.append(path)
 
         for base_dir in model_dirs:
@@ -668,6 +699,9 @@ class ConfigurationManager:
         """
         Load configuration metadata from configurations.json
         """
+        if self._metadata_cache is not None:
+            return self._metadata_cache
+
         try:
             config_path = os.path.join(os.path.dirname(__file__), "configurations.json")
             with open(config_path, "r") as f:
@@ -679,9 +713,10 @@ class ConfigurationManager:
                     if model_key in metadata["settings"]:
                         metadata["settings"][model_key]["options"] = model_options
 
+            self._metadata_cache = metadata
             return metadata
         except Exception as e:
-            print(f"Error loading configurations.json: {e}")
+            logger.error(f"Error loading configurations.json: {e}")
             return {"settings": {}}
 
     def get_cli_parameters(self) -> List[Dict[str, Any]]:
@@ -835,19 +870,40 @@ class ConfigurationManager:
                 if not isinstance(import_data, dict):
                     return False, "Import data must be a dictionary"
 
+                new_user = None
+                new_cal = None
+
                 if "user_settings" in import_data:
-                    new_user_settings = import_data["user_settings"]
-                    if isinstance(new_user_settings, dict):
-                        self.user_settings = copy.deepcopy(new_user_settings)
-                        if not self._save_json(self.user_settings_path, self.user_settings):
-                            return False, "Failed to save imported user settings"
+                    val = import_data["user_settings"]
+                    if isinstance(val, dict):
+                        new_user = copy.deepcopy(val)
 
                 if "calibration_data" in import_data:
-                    new_calibration_data = import_data["calibration_data"]
-                    if isinstance(new_calibration_data, dict):
-                        self.calibration_data = copy.deepcopy(new_calibration_data)
-                        if not self._save_json(self.calibration_data_path, self.calibration_data):
-                            return False, "Failed to save imported calibration data"
+                    val = import_data["calibration_data"]
+                    if isinstance(val, dict):
+                        new_cal = copy.deepcopy(val)
+
+                # Snapshot originals for rollback
+                orig_user = copy.deepcopy(self.user_settings)
+                orig_cal = copy.deepcopy(self.calibration_data)
+
+                if new_user is not None:
+                    if not self._save_json(self.user_settings_path, new_user):
+                        return False, "Failed to save imported user settings"
+
+                if new_cal is not None:
+                    if not self._save_json(self.calibration_data_path, new_cal):
+                        # Roll back user_settings file if it was already written
+                        if new_user is not None:
+                            if not self._save_json(self.user_settings_path, orig_user):
+                                logger.error("Failed to roll back user_settings after calibration save failure")
+                        return False, "Failed to save imported calibration data"
+
+                # Both saves succeeded, update in-memory state
+                if new_user is not None:
+                    self.user_settings = new_user
+                if new_cal is not None:
+                    self.calibration_data = new_cal
 
                 self._rebuild_merged_config()
 

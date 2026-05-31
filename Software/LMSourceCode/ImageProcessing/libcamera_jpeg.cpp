@@ -47,6 +47,20 @@ using namespace std::placeholders;
 using libcamera::Stream;
 namespace gs = golf_sim;
 
+void SetImx296TriggerModeViaI2C(int mode) {
+	if (mode != 0 && mode != 1) {
+		GS_LOG_MSG(error, "Invalid trigger mode: " + std::to_string(mode) + " (must be 0 or 1)");
+		return;
+	}
+	const std::string cmd = "$PITRAC_ROOT/ImageProcessing/CameraTools/imx296_trigger 4 " + std::to_string(mode);
+	int rc = system(cmd.c_str());
+	if (rc != 0) {
+		GS_LOG_MSG(warning, "imx296_trigger 4 " + std::to_string(mode) + " failed (rc=" + std::to_string(rc) + ")");
+		return;
+	}
+	GS_LOG_TRACE_MSG(trace, "Set IMX296 trigger mode via I2C: " + std::to_string(mode));
+}
+
 enum FlightCameraState {
 	kUninitialized,
 	kWaitingForFirstPrimingPulseGroup,
@@ -89,6 +103,10 @@ void SetExternalTrigger(bool& flag) {
 // Calls StartCamera at entry and StopCamera when the final image arrives.
 bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_priming_pulses)
 {
+	struct TriggerModeResetGuard {
+		~TriggerModeResetGuard() { SetImx296TriggerModeViaI2C(0); }
+	} trigger_reset_guard;
+
 	app.StartCamera();
 	GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop: camera started, waiting for triggers");
 
@@ -212,11 +230,49 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 
 		case kWaitingForFinalImageTrigger: {
 
-			GS_LOG_TRACE_MSG(trace, "Received Final Image Trigger - Image will be de-queued after next (flush) trigger.");
-			// Create a completed request to make sure that the buffer(s) get re-used.
-			CompletedRequestPtr& completed_request = std::get<CompletedRequestPtr>(msg.payload);
+			GS_LOG_TRACE_MSG(trace, "Received Final Image Trigger - capturing strobed image.");
+			app.StopCamera();
 
-			state = kWaitingForFinalImageFlush;
+			Stream* stream = app.ViewfinderStream();
+
+			if (stream == nullptr) {
+				GS_LOG_MSG(error, "Got a null stream");
+				return_status = false;
+				state = kFinalImageReceived;
+				break;
+			}
+
+			StreamInfo info = app.GetStreamInfo(stream);
+
+			CompletedRequestPtr& payload = std::get<CompletedRequestPtr>(msg.payload);
+			libcamera::FrameBuffer *buffer = payload->buffers[stream];
+			BufferReadSync r(&app, buffer);
+
+			const std::vector<libcamera::Span<uint8_t>> mem = r.Get();
+
+			uint32_t* image = (uint32_t*)mem[0].data();
+
+			if (image == nullptr) {
+				GS_LOG_MSG(error, "Got a null image");
+				return_status = false;
+				state = kFinalImageReceived;
+				break;
+			}
+
+			GS_LOG_TRACE_MSG(trace, "About to create Mat frame.  Info.height, width = " + std::to_string(info.height) +
+								", " + std::to_string(info.width) + ". Stride = " + std::to_string(info.stride));
+
+			cv::Mat frame = cv::Mat(info.height, info.width, CV_8UC3, image, info.stride);
+
+			GS_LOG_TRACE_MSG(trace, "Created Mat frame");
+
+			returnImg = frame.clone();
+
+			GS_LOG_TRACE_MSG(trace, "Returning (Final, Strobed) Viewfinder captured image");
+
+			return_status = true;
+
+			state = kFinalImageReceived;
 			break;
 		}
 

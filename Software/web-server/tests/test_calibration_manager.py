@@ -605,6 +605,35 @@ class TestErrorHandling:
         assert any("Permission denied" in err or "Wait failed" in err for err in result["errors"])
 
 
+class TestWaitForCalibrationCompletion:
+    """Test wait_for_calibration_completion logic"""
+
+    @pytest.mark.asyncio
+    async def test_process_exits_first_api_cancelled(self):
+        """When process exits before API callback, cancelled api_task yields safe defaults"""
+        mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
+        manager = CalibrationManager(mock_config_manager)
+
+        mock_process = AsyncMock()
+        mock_process.wait = AsyncMock(return_value=0)
+        mock_process.returncode = 0
+
+        async def slow_api(*args, **kwargs):
+            await asyncio.sleep(999)
+
+        with patch.object(manager, "wait_for_calibration_fields", side_effect=slow_api):
+            result = await manager.wait_for_calibration_completion(
+                mock_process, "test-session", timeout=5
+            )
+
+        assert result["completed"] is True
+        assert result["method"] == "process"
+        assert result["focal_length_received"] is False
+        assert result["angles_received"] is False
+
+
 class TestRealCalibrationWorkflows:
     """Test actual calibration workflows with minimal mocking"""
 
@@ -985,3 +1014,247 @@ class TestConfigurationHandling:
                 mock_config_manager.reload.assert_called_once()
 
             asyncio.run(run_test())
+
+
+class TestSaveDistortionResults:
+    """Tests for _save_distortion_results: shape assertions + atomic write."""
+
+    @pytest.fixture
+    def manager(self):
+        cfg = Mock()
+        cfg.get_cli_parameters = Mock(return_value=[])
+        cfg.register_callback = Mock()
+        cfg.set_calibration_batch = Mock(return_value=(True, "ok"))
+        return CalibrationManager(cfg)
+
+    def test_saves_via_atomic_batch(self, manager):
+        import numpy as np
+        K = np.array([[1833.0, 0.0, 728.0], [0.0, 1833.0, 544.0], [0.0, 0.0, 1.0]])
+        d = np.array([-0.51, 0.34, -0.002, 0.002, -0.13])
+        manager._save_distortion_results("camera1", K, d, rms_error=0.42)
+        manager.config_manager.set_calibration_batch.assert_called_once()
+        updates = manager.config_manager.set_calibration_batch.call_args[0][0]
+        assert "gs_config.cameras.kCamera1CalibrationMatrix" in updates
+        assert "gs_config.cameras.kCamera1DistortionVector" in updates
+        assert updates["gs_config.cameras.kCamera1DistortionVector"] == d.tolist()
+
+    def test_routes_to_correct_camera_keys(self, manager):
+        import numpy as np
+        K = np.eye(3)
+        d = np.zeros(5)
+        manager._save_distortion_results("camera2", K, d, rms_error=0.1)
+        updates = manager.config_manager.set_calibration_batch.call_args[0][0]
+        assert "gs_config.cameras.kCamera2CalibrationMatrix" in updates
+        assert "gs_config.cameras.kCamera2DistortionVector" in updates
+
+    def test_rejects_non_3x3_matrix(self, manager):
+        import numpy as np
+        bad_K = np.eye(4)  # 4x4 instead of 3x3
+        d = np.zeros(5)
+        with pytest.raises(RuntimeError, match="3.3"):
+            manager._save_distortion_results("camera1", bad_K, d, rms_error=0.1)
+        manager.config_manager.set_calibration_batch.assert_not_called()
+
+    def test_rejects_wrong_distortion_length(self, manager):
+        import numpy as np
+        K = np.eye(3)
+        bad_d = np.zeros(8)  # rational model would be 8 — would corrupt C++ consumer
+        with pytest.raises(RuntimeError, match="5"):
+            manager._save_distortion_results("camera1", K, bad_d, rms_error=0.1)
+        manager.config_manager.set_calibration_batch.assert_not_called()
+
+    def test_propagates_save_failure(self, manager):
+        import numpy as np
+        manager.config_manager.set_calibration_batch.return_value = (False, "disk full")
+        with pytest.raises(RuntimeError, match="disk full"):
+            manager._save_distortion_results("camera1", np.eye(3), np.zeros(5), 0.1)
+
+
+class TestSharedFrameAndCaptureBackend:
+    """Tests for the shared frame buffer + capture backend selector."""
+
+    @pytest.fixture
+    def manager(self):
+        cfg = Mock()
+        cfg.get_cli_parameters = Mock(return_value=[])
+        cfg.register_callback = Mock()
+        return CalibrationManager(cfg)
+
+    def test_shared_frame_set_get_clear(self, manager):
+        import numpy as np
+        frame = np.zeros((100, 100, 3), dtype=np.uint8)
+        manager.set_shared_frame(0, frame)
+        assert manager._shared_frames[0] is frame
+        manager.clear_shared_frame(0)
+        assert 0 not in manager._shared_frames
+
+    def test_clear_shared_frame_missing_is_safe(self, manager):
+        manager.clear_shared_frame(99)  # should not raise
+
+    def test_capture_backend_detected_at_init(self, manager):
+        assert manager._capture_backend in ("rpicam", "webcam")
+
+    def test_capture_image_uses_shared_frame_when_available(self, manager, tmp_path):
+        import numpy as np
+        frame = np.full((10, 10, 3), 128, dtype=np.uint8)
+        manager.set_shared_frame(0, frame)
+        out = tmp_path / "shot.png"
+
+        async def go():
+            return await manager._capture_image(0, out, gain=1.0)
+
+        result = asyncio.run(go())
+        assert result is not None
+        assert out.exists()  # cv2.imwrite was called via shared-frame path
+
+
+class TestStopDistortionCalibrationFlag:
+    """Stop signal for the distortion capture loop."""
+
+    @pytest.fixture
+    def manager(self):
+        cfg = Mock()
+        cfg.get_cli_parameters = Mock(return_value=[])
+        cfg.register_callback = Mock()
+        return CalibrationManager(cfg)
+
+    def test_stop_signals_distortion_camera(self, manager):
+        manager.calibration_status["camera1"]["status"] = "distortion_calibrating"
+
+        async def go():
+            return await manager.stop_calibration(camera="camera1")
+
+        result = asyncio.run(go())
+        assert manager.calibration_status["camera1"]["status"] == "stopping"
+        assert result["status"] == "stopping"
+        assert "camera1" in result["cameras"]
+
+    def test_stop_all_signals_both_distortion_cameras(self, manager):
+        manager.calibration_status["camera1"]["status"] = "distortion_calibrating"
+        manager.calibration_status["camera2"]["status"] = "distortion_calibrating"
+
+        async def go():
+            return await manager.stop_calibration()
+
+        result = asyncio.run(go())
+        assert manager.calibration_status["camera1"]["status"] == "stopping"
+        assert manager.calibration_status["camera2"]["status"] == "stopping"
+        assert result["status"] == "stopping"
+        assert set(result["cameras"]) == {"camera1", "camera2"}
+
+
+class TestTriggerModeSwitching:
+    """Ref-counted trigger mode switching for Camera 2 (IMX296)."""
+
+    @pytest.fixture
+    def manager(self):
+        cfg = Mock()
+        cfg.get_cli_parameters = Mock(return_value=[])
+        cfg.register_callback = Mock()
+        return CalibrationManager(cfg)
+
+    def test_set_trigger_mode_rejects_invalid_mode(self, manager):
+        assert manager._set_trigger_mode(2) is False
+        assert manager._set_trigger_mode(-1) is False
+
+    @patch("calibration_manager.subprocess.run")
+    def test_set_trigger_mode_success(self, mock_run, manager):
+        mock_run.return_value = Mock(returncode=0, stderr="")
+        assert manager._set_trigger_mode(0) is True
+        args, kwargs = mock_run.call_args
+        assert args[0][-2:] == ["4", "0"]
+        assert kwargs["timeout"] == 5
+        assert kwargs["capture_output"] is True
+
+    @patch("calibration_manager.subprocess.run")
+    def test_set_trigger_mode_returns_false_on_nonzero_rc(self, mock_run, manager):
+        mock_run.return_value = Mock(returncode=1, stderr="permission denied")
+        assert manager._set_trigger_mode(1) is False
+
+    @patch("calibration_manager.subprocess.run")
+    def test_set_trigger_mode_returns_false_on_missing_binary(self, mock_run, manager):
+        mock_run.side_effect = FileNotFoundError("no such file")
+        assert manager._set_trigger_mode(0) is False
+
+    @patch("calibration_manager.subprocess.run")
+    def test_set_trigger_mode_returns_false_on_timeout(self, mock_run, manager):
+        import subprocess as _sp
+        mock_run.side_effect = _sp.TimeoutExpired(cmd="x", timeout=5)
+        assert manager._set_trigger_mode(1) is False
+
+    def test_request_release_ignore_non_camera2(self, manager):
+        async def go():
+            await manager.request_free_running(0)
+            await manager.release_free_running(0)
+        asyncio.run(go())
+        assert manager._free_running_refs == 0
+
+    @patch.object(CalibrationManager, "_set_trigger_mode")
+    def test_request_first_call_sets_mode_zero_and_increments(self, mock_set, manager):
+        mock_set.return_value = True
+
+        async def go():
+            await manager.request_free_running(1)
+
+        asyncio.run(go())
+        mock_set.assert_called_once_with(0)
+        assert manager._free_running_refs == 1
+
+    @patch.object(CalibrationManager, "_set_trigger_mode")
+    def test_request_subsequent_calls_skip_hardware(self, mock_set, manager):
+        mock_set.return_value = True
+
+        async def go():
+            await manager.request_free_running(1)
+            await manager.request_free_running(1)
+            await manager.request_free_running(1)
+
+        asyncio.run(go())
+        mock_set.assert_called_once_with(0)
+        assert manager._free_running_refs == 3
+
+    @patch.object(CalibrationManager, "_set_trigger_mode")
+    def test_request_does_not_increment_on_hardware_failure(self, mock_set, manager):
+        mock_set.return_value = False
+
+        async def go():
+            await manager.request_free_running(1)
+
+        asyncio.run(go())
+        assert manager._free_running_refs == 0
+
+    @patch.object(CalibrationManager, "_set_trigger_mode")
+    def test_release_at_zero_warns_and_no_hardware_call(self, mock_set, manager):
+        async def go():
+            await manager.release_free_running(1)
+
+        asyncio.run(go())
+        mock_set.assert_not_called()
+        assert manager._free_running_refs == 0
+
+    @patch.object(CalibrationManager, "_set_trigger_mode")
+    def test_release_decrements_without_hardware_until_zero(self, mock_set, manager):
+        mock_set.return_value = True
+
+        async def go():
+            await manager.request_free_running(1)
+            await manager.request_free_running(1)
+            mock_set.reset_mock()
+            await manager.release_free_running(1)
+
+        asyncio.run(go())
+        mock_set.assert_not_called()
+        assert manager._free_running_refs == 1
+
+    @patch.object(CalibrationManager, "_set_trigger_mode")
+    def test_release_transition_to_zero_restores_external_trigger(self, mock_set, manager):
+        mock_set.return_value = True
+
+        async def go():
+            await manager.request_free_running(1)
+            mock_set.reset_mock()
+            await manager.release_free_running(1)
+
+        asyncio.run(go())
+        mock_set.assert_called_once_with(1)
+        assert manager._free_running_refs == 0

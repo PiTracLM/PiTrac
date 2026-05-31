@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "_macros.html" import result_item, status_row %}
+
+{% block title %}System Update - PiTrac{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/update.css">
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-4">
+
+    <!-- Main update section -->
+    <div class="card bg-base-200 border border-base-300 shadow-sm">
+        <div class="card-body p-6 update-section">
+            <h2 class="flex items-center gap-2 text-xl font-semibold text-primary mb-4">
+                <i data-lucide="refresh-cw" class="icon-menu"></i>
+                System Update
+            </h2>
+
+            <!-- Status grid -->
+            <div class="status-card grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6" id="statusCard">
+                {{ status_row("Current Branch", "currentBranch") }}
+                {{ status_row("Current Commit", "currentHash", extra_class="mono") }}
+                {{ status_row("Last Build", "lastBuild") }}
+                {{ status_row("Last Check", "lastCheck") }}
+                <div id="warningRow" style="display: none;">
+                    {{ status_row("Warning", "warningText", extra_class="text-warning warning-text") }}
+                </div>
+            </div>
+
+            <!-- Branch selector + action buttons -->
+            <div class="flex flex-wrap items-end gap-4 branch-controls">
+                <div class="flex flex-col gap-1.5 min-w-[200px] max-sm:w-full branch-selector">
+                    <label for="branchSelect" class="text-xs font-semibold uppercase tracking-wide opacity-60">Branch</label>
+                    <select id="branchSelect" class="select select-sm select-bordered w-full" onchange="onBranchChange()">
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+                <div class="flex flex-wrap gap-3 update-actions max-sm:flex-col max-sm:w-full">
+                    <button class="btn btn-sm btn-ghost action-btn" id="checkBtn" onclick="checkForUpdates()">
+                        <i data-lucide="rotate-cw" class="icon-sm"></i>
+                        <span>Check for Updates</span>
+                    </button>
+                    <button class="btn btn-sm btn-primary action-btn primary" id="updateBtn" onclick="startUpdate(false)" disabled>
+                        <i data-lucide="download" class="icon-sm"></i>
+                        <span>Update &amp; Rebuild</span>
+                    </button>
+                    <button class="btn btn-sm btn-primary action-btn primary" id="switchBtn" onclick="switchBranch()" style="display: none;">
+                        <i data-lucide="git-branch" class="icon-sm"></i>
+                        <span>Switch Branch &amp; Rebuild</span>
+                    </button>
+                    <button class="btn btn-sm btn-error action-btn danger" id="cancelBtn" onclick="cancelUpdate()" style="display: none;">
+                        <i data-lucide="square" class="icon-sm"></i>
+                        <span>Cancel</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Available commits -->
+    <div class="card bg-base-200 border border-base-300 shadow-sm commits-section" id="commitsSection" style="display: none;">
+        <div class="card-body p-6">
+            <h3 class="text-lg font-semibold text-primary mb-3">
+                <span id="commitCount">0</span> new commits available
+            </h3>
+            <div class="commit-list flex flex-col gap-2" id="commitList"></div>
+        </div>
+    </div>
+
+    <!-- Build log -->
+    <div class="card bg-base-200 border border-base-300 shadow-sm log-section" id="logSection" style="display: none;">
+        <div class="card-body p-6">
+            <div class="flex items-center justify-between mb-3 log-header">
+                <h3 class="text-lg font-semibold text-primary">Build Output</h3>
+                <button class="btn btn-sm btn-ghost action-btn small" onclick="clearLog()">Clear</button>
+            </div>
+            <div class="build-log" id="buildLog"></div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/update.js"></script>
+{% endblock %}

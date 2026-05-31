@@ -1,0 +1,115 @@
+/* PiTrac theme overrides for daisyUI */
+
+html[data-theme="dark"] {
+    color-scheme: dark;
+    --color-base-100: #0d0d14;
+    --color-base-200: #1a1a24;
+    --color-base-300: #2a2a38;
+    --color-base-content: #e8e8f0;
+    --color-primary: #667eea;
+    --color-primary-content: #ffffff;
+    --color-secondary: #764ba2;
+    --color-secondary-content: #ffffff;
+    --color-accent: #7c6eea;
+    --color-accent-content: #ffffff;
+    --color-neutral: #1e1e2a;
+    --color-neutral-content: #a0a0b8;
+    --color-info: #4299e1;
+    --color-info-content: #ffffff;
+    --color-success: #48bb78;
+    --color-success-content: #ffffff;
+    --color-warning: #ed8936;
+    --color-warning-content: #1a1a24;
+    --color-error: #f56565;
+    --color-error-content: #ffffff;
+}
+
+html[data-theme="light"] {
+    color-scheme: light;
+    --color-base-100: #ffffff;
+    --color-base-200: #f5f7fa;
+    --color-base-300: #e2e8f0;
+    --color-base-content: #1a202c;
+    --color-primary: #667eea;
+    --color-primary-content: #ffffff;
+    --color-secondary: #764ba2;
+    --color-secondary-content: #ffffff;
+    --color-accent: #7c6eea;
+    --color-accent-content: #ffffff;
+    --color-neutral: #eef0f4;
+    --color-neutral-content: #4a5568;
+    --color-info: #4299e1;
+    --color-info-content: #ffffff;
+    --color-success: #48bb78;
+    --color-success-content: #ffffff;
+    --color-warning: #ed8936;
+    --color-warning-content: #1a202c;
+    --color-error: #f56565;
+    --color-error-content: #ffffff;
+}
+
+/* Lucide icon sizing */
+.lucide { width: 20px; height: 20px; vertical-align: middle; }
+.lucide.icon-sm { width: 16px; height: 16px; }
+.lucide.icon-md { width: 24px; height: 24px; }
+.lucide.icon-lg { width: 48px; height: 48px; }
+.lucide.icon-menu { width: 20px; height: 20px; }
+
+/* Golf ball status dots — can't do this with daisyUI */
+.status-dot {
+    width: 0.75rem;
+    height: 0.75rem;
+    background-color: oklch(70% 0.14 160);
+    mask: url('/static/golf_ball.svg') center / contain no-repeat;
+    -webkit-mask: url('/static/golf_ball.svg') center / contain no-repeat;
+    filter: drop-shadow(0 0 3px oklch(70% 0.14 160));
+    transition: all 0.3s;
+    cursor: help;
+}
+
+.status-dot.disconnected {
+    background-color: oklch(65% 0.19 25);
+    filter: drop-shadow(0 0 3px oklch(65% 0.19 25));
+    animation: pulse 2s infinite;
+}
+
+/* Logo invert for dark mode */
+.header-logo {
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+:root:not([data-theme="light"]) .header-logo {
+    filter: invert(1) drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+/* Active theme button highlight */
+.theme-btn.active {
+    background: linear-gradient(135deg, oklch(59% 0.17 270), oklch(47% 0.17 300));
+    color: white !important;
+    border-color: transparent;
+}
+
+/* Control button color overrides — daisyUI btn-success/error/warning handle most of it,
+   but we keep these classes for JS compatibility */
+.control-btn.loading { animation: pulse 1s infinite; }
+.control-btn svg { width: 16px; height: 16px; }
+
+/* Animations */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bounce {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.animate-fade-in { animation: fadeIn 0.4s ease-out; }
+
+/* Mono text helper */
+.mono { font-family: ui-monospace, monospace; }

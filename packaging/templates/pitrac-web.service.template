@@ -20,7 +20,7 @@ Environment="HOME=@PITRAC_HOME@"
 Environment="USER=@PITRAC_USER@"
 Environment="PATH=/usr/bin:/usr/local/bin"
 Environment="PYTHONPATH=/usr/lib/pitrac/web-server"
-ExecStart=/usr/bin/python3 /usr/lib/pitrac/web-server/main.py
+ExecStart=/usr/lib/pitrac/web-server/.venv/bin/python /usr/lib/pitrac/web-server/main.py
 Restart=always
 RestartSec=10
 StandardOutput=journal

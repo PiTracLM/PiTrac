@@ -183,9 +183,9 @@
   "validationRules": {
     "gain": {
       "type": "range",
-      "min": 0.5,
+      "min": 0.1,
       "max": 16.0,
-      "errorMessage": "Gain must be between 0.5 and 16.0"
+      "errorMessage": "Gain must be between 0.1 and 16.0"
     },
     "port": {
       "type": "range",
@@ -563,7 +563,7 @@
       "displayName": "Camera 1 Gain",
       "description": "Brightness/gain setting for Camera 1",
       "type": "number",
-      "min": 0.5,
+      "min": 0.1,
       "max": 16.0,
       "step": 0.1,
       "default": 6.0,
@@ -580,7 +580,7 @@
         "system.mode": "single"
       },
       "type": "number",
-      "min": 0.5,
+      "min": 0.1,
       "max": 16.0,
       "step": 0.1,
       "default": 3.0,
@@ -833,6 +833,16 @@
       "min": 5,
       "max": 60,
       "default": 15,
+      "requiresRestart": true,
+      "passedVia": "json"
+    },
+    "gs_config.strobing.kCameraRequiresFlushPulse": {
+      "category": "Strobing",
+      "subcategory": "advanced",
+      "displayName": "Camera Requires Flush Pulse",
+      "description": "Send an extra trigger pulse after the shutter pulse to flush the ball-hit frame out of the sensor. Required for some IMX296 boards (e.g. Pi GS) where one trigger only advances the capture FSM. Leave off for InnoMaker — it produces the second frame event natively.",
+      "type": "boolean",
+      "default": false,
       "requiresRestart": true,
       "passedVia": "json"
     },

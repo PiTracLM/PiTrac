@@ -3,12 +3,12 @@
 # Takes numPics pictures, each about 1 second apart
 # Before running, make sure the system is setup to NOT require
 # external triggering (particularly for camera 2).
-# If running in single-pi mode, the  /boot/firmware/config.txt
-# file should have the following lines commented out:
-#        dtoverlay=imx296,cam0
-#        dtoverlay=imx296,sync-sink
 #
-# In addition, if using camera 2, the IR filter must be removed because
+# If the config.txt overlay uses always-on (not sync-sink), just run:
+#   sudo /usr/lib/pitrac/ImageProcessing/CameraTools/setCameraTriggerInternal.sh
+# to switch to free-running mode. No reboot needed.
+#
+# If using camera 2, the IR filter must be removed because
 # there will be no strobing.
 #
 

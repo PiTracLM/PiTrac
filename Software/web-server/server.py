@@ -2,13 +2,14 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from fastapi import FastAPI, File, Request, UploadFile, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -25,15 +26,156 @@ from parsers import ShotDataParser
 from pitrac_manager import PiTracProcessManager
 from strobe_calibration_manager import StrobeCalibrationManager
 from testing_tools_manager import TestingToolsManager
+from update_manager import UpdateManager
 
 logger = logging.getLogger(__name__)
+
+CHARUCO_SQUARES_X = 8
+CHARUCO_SQUARES_Y = 11
+CHARUCO_SQUARE_LENGTH = 0.023
+CHARUCO_MARKER_LENGTH = 0.017
+
+# Locked to defeat AE/AWB/tuning drift across calibration frames (sub-pixel
+# corner bias). Tuning file matches production rcPi5GS.sh; shutter is shorter
+# than production (11 vs 20 ms) to limit hand-tremor blur.
+RPICAM_TUNING_FILE = "/usr/share/libcamera/ipa/rpi/pisp/imx296_noir.json"
+RPICAM_CAL_SHUTTER_US = 11000
+RPICAM_CAL_GAIN = 1.3
+
+
+class RpicamVideoStream:
+    """cv2.VideoCapture-compatible wrapper around rpicam-vid for Pi CSI cameras."""
+
+    _MAX_BUF = 10 * 1024 * 1024  # 10 MB — far larger than any single JPEG frame
+
+    def __init__(self, camera_index: int, width: int, height: int):
+        import cv2
+        import numpy as np
+        self._cv2 = cv2
+        self._np = np
+        self._width = width
+        self._height = height
+        self._actual_width: Optional[int] = None
+        self._actual_height: Optional[int] = None
+        self._buf = bytearray()
+        self._proc = subprocess.Popen(
+            [
+                "rpicam-vid", "--camera", str(camera_index),
+                "--width", str(width), "--height", str(height),
+                "--framerate", "15",
+                "--codec", "mjpeg", "--quality", "100", "--output", "-",
+                "--timeout", "0", "--nopreview",
+                "--shutter", str(RPICAM_CAL_SHUTTER_US),
+                "--gain", str(RPICAM_CAL_GAIN),
+                "--awbgains", "1.0,1.0",
+                "--denoise", "cdn_off",
+                "--tuning-file", RPICAM_TUNING_FILE,
+            ],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        )
+        self._opened = self._proc.poll() is None
+
+    def isOpened(self) -> bool:
+        return self._opened and self._proc.poll() is None
+
+    def read(self):
+        """Read one JPEG frame, decode to BGR numpy array."""
+        CHUNK = 65536
+        while self.isOpened():
+            data = self._proc.stdout.read(CHUNK)
+            if not data:
+                self._opened = False
+                return False, None
+            self._buf.extend(data)
+
+            # Guard against unbounded growth from a corrupted stream
+            if len(self._buf) > self._MAX_BUF:
+                self._buf.clear()
+                continue
+
+            # Scan for a complete JPEG (SOI 0xFFD8 … EOI 0xFFD9)
+            start = self._buf.find(b'\xff\xd8')
+            if start < 0:
+                self._buf.clear()
+                continue
+            end = self._buf.find(b'\xff\xd9', start + 2)
+            if end < 0:
+                continue
+            jpeg = bytes(self._buf[start:end + 2])
+            del self._buf[:end + 2]
+            frame = self._cv2.imdecode(
+                self._np.frombuffer(jpeg, self._np.uint8), self._cv2.IMREAD_COLOR)
+            if frame is not None:
+                if self._actual_width is None:
+                    self._actual_height, self._actual_width = frame.shape[:2]
+                return True, frame
+        return False, None
+
+    def set(self, prop_id, value):
+        pass  # resolution is fixed at construction
+
+    def get(self, prop_id):
+        import cv2
+        if prop_id == cv2.CAP_PROP_FRAME_WIDTH:
+            return float(self._actual_width or self._width)
+        if prop_id == cv2.CAP_PROP_FRAME_HEIGHT:
+            return float(self._actual_height or self._height)
+        return 0.0
+
+    def release(self):
+        if self._proc and self._proc.poll() is None:
+            self._proc.terminate()
+            try:
+                self._proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                self._proc.kill()
+        if self._proc and self._proc.stderr:
+            try:
+                err = self._proc.stderr.read()
+                if err:
+                    logger.debug(f"rpicam-vid stderr: {err.decode(errors='replace').strip()}")
+            except Exception:
+                pass
+        self._opened = False
+
+    def __del__(self):
+        self.release()
+
+
+def open_camera(camera_index: int, width: int = 1280, height: int = 720):
+    """Open a camera, falling back to rpicam-vid for Pi CSI cameras."""
+    import cv2
+    cap = cv2.VideoCapture(camera_index)
+    if cap.isOpened():
+        # Validate with a test read — some V4L2 nodes report open but can't capture
+        ret, frame = cap.read()
+        if ret and frame is not None:
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+            return cap
+        logger.info(f"cv2.VideoCapture({camera_index}) opened but test read failed")
+        cap.release()
+
+    if shutil.which("rpicam-vid"):
+        logger.info(f"cv2.VideoCapture({camera_index}) unusable, trying rpicam-vid")
+        stream = RpicamVideoStream(camera_index, width, height)
+        if stream.isOpened():
+            ret, frame = stream.read()
+            if ret and frame is not None:
+                return stream
+            logger.info(f"rpicam-vid started but no frames for camera {camera_index}")
+        stream.release()
+
+    return None
 
 
 class PiTracServer:
 
+    _BASE_DIR = Path(__file__).resolve().parent
+
     def __init__(self):
         self.app = FastAPI(title="PiTrac Dashboard")
-        self.templates = Jinja2Templates(directory="templates")
+        self.templates = Jinja2Templates(directory=str(self._BASE_DIR / "templates"))
         self.connection_manager = ConnectionManager()
         self.shot_store = ShotDataStore()
         self.parser = ShotDataParser()
@@ -42,25 +184,34 @@ class PiTracServer:
         self.calibration_manager = CalibrationManager(self.config_manager)
         self.testing_manager = TestingToolsManager(self.config_manager)
         self.strobe_calibration_manager = StrobeCalibrationManager(self.config_manager)
+        self.update_manager = UpdateManager()
+        self.update_manager.set_broadcast_callback(self.connection_manager.broadcast)
         self.shutdown_flag = False
         self.background_tasks: set[asyncio.Task] = set()
+        self._active_cameras: Dict[int, str] = {}  # camera_index -> endpoint name
         IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
-        self.app.mount("/static", StaticFiles(directory="static"), name="static")
+        self.app.mount("/static", StaticFiles(directory=str(self._BASE_DIR / "static")), name="static")
         self.app.mount("/images", StaticFiles(directory=str(IMAGES_DIR)), name="images")
 
         self._setup_routes()
 
-        self.app.add_event_handler("startup", self.startup_event)
-        self.app.add_event_handler("shutdown", self.shutdown_event)
+        @self.app.on_event("startup")
+        async def _startup():
+            await self.startup_event()
+
+        @self.app.on_event("shutdown")
+        async def _shutdown():
+            await self.shutdown_event()
 
     def _setup_routes(self) -> None:
 
         @self.app.get("/", response_class=HTMLResponse)
         async def dashboard(request: Request) -> Response:
             return self.templates.TemplateResponse(
+                request,
                 "dashboard.html",
-                {"request": request, "shot": self.shot_store.get().to_dict()},
+                context={"shot": self.shot_store.get().to_dict()},
             )
 
         @self.app.websocket("/ws")
@@ -189,14 +340,17 @@ class PiTracServer:
         @self.app.get("/config", response_class=HTMLResponse)
         async def config_page(request: Request) -> Response:
             """Serve configuration UI page"""
-            return self.templates.TemplateResponse("config.html", {"request": request})
+            return self.templates.TemplateResponse(request, "config.html")
 
         @self.app.get("/api/config")
-        async def get_config(key: Optional[str] = None) -> Dict[str, Any]:
+        async def get_config(key: Optional[str] = None):
             """Get merged configuration or specific key"""
             config = self.config_manager.get_config(key)
             if config is None and key:
-                return {"error": f"Configuration key '{key}' not found"}
+                return JSONResponse(
+                    status_code=404,
+                    content={"error": f"Configuration key '{key}' not found"},
+                )
             return {"data": config}
 
         @self.app.get("/api/config/defaults")
@@ -205,7 +359,10 @@ class PiTracServer:
             if key:
                 config = self.config_manager.get_default(key)
                 if config is None:
-                    return {"error": f"Configuration key '{key}' not found"}
+                    return JSONResponse(
+                        status_code=404,
+                        content={"error": f"Configuration key '{key}' not found"}
+                    )
                 return {"data": config}
             else:
                 config = self.config_manager.get_all_defaults_with_metadata()
@@ -233,27 +390,34 @@ class PiTracServer:
             return {"data": self.config_manager.get_diff()}
 
         @self.app.put("/api/config/{key:path}")
-        async def update_config(key: str, request: Request) -> Dict[str, Any]:
+        async def update_config(key: str, request: Request):
             """Update a configuration value"""
             try:
                 body = await request.json()
                 value = body.get("value")
 
+                # Check that the key exists in metadata
+                metadata = self.config_manager.load_configurations_metadata()
+                settings_metadata = metadata.get("settings", {})
+                if key not in settings_metadata:
+                    return JSONResponse(
+                        status_code=400,
+                        content={"error": "Unknown configuration key"},
+                    )
+
                 # Validate the value
                 is_valid, error_msg = self.config_manager.validate_config(key, value)
                 if not is_valid:
-                    return {"error": error_msg}
+                    return JSONResponse(status_code=400, content={"error": error_msg})
 
                 # Set the value
                 success, message, requires_restart = self.config_manager.set_config(key, value)
 
-                # Rebuild the generated .json file in case the thing that was changed is
-                # in the calibration.json or user_settings.json file and needs to be merged.
-
-                generated_config_path = self.config_manager.generate_golf_sim_config()
-                logger.info(f"Generated config file at: {generated_config_path}")
-
                 if success:
+                    # Rebuild the generated config so the C++ process picks up changes
+                    generated_config_path = self.config_manager.generate_golf_sim_config()
+                    logger.info(f"Generated config file at: {generated_config_path}")
+
                     # Broadcast update to WebSocket clients
                     await self.connection_manager.broadcast(
                         {
@@ -270,27 +434,34 @@ class PiTracServer:
                         "requires_restart": requires_restart,
                     }
                 else:
-                    return {"error": message}
+                    return JSONResponse(status_code=500, content={"error": message})
 
             except Exception as e:
                 logger.error(f"Failed to update config: {e}")
-                return {"error": str(e)}
+                return JSONResponse(status_code=500, content={"error": str(e)})
 
         @self.app.post("/api/config/reset")
-        async def reset_config() -> Dict[str, Any]:
+        async def reset_config():
             """Reset all user settings to defaults"""
             success, message = self.config_manager.reset_all()
 
             if success:
+                self.config_manager.generate_golf_sim_config()
                 await self.connection_manager.broadcast({"type": "config_reset"})
+                return {"success": True, "message": message}
 
-            return {"success": success, "message": message}
+            return JSONResponse(status_code=500, content={"error": message})
 
         @self.app.post("/api/config/reload")
-        async def reload_config() -> Dict[str, str]:
+        async def reload_config():
             """Reload configuration from disk"""
-            self.config_manager.reload()
-            return {"status": "Configuration reloaded"}
+            try:
+                self.config_manager.reload()
+                self.config_manager.generate_golf_sim_config()
+                return {"status": "Configuration reloaded"}
+            except Exception as e:
+                logger.error(f"Failed to reload config: {e}")
+                return JSONResponse(status_code=500, content={"error": str(e)})
 
         @self.app.get("/api/config/export")
         async def export_config() -> Dict[str, Any]:
@@ -298,19 +469,21 @@ class PiTracServer:
             return self.config_manager.export_config()
 
         @self.app.post("/api/config/import")
-        async def import_config(request: Request) -> Dict[str, Any]:
+        async def import_config(request: Request):
             """Import configuration from exported data"""
             try:
                 config_data = await request.json()
                 success, message = self.config_manager.import_config(config_data)
 
                 if success:
+                    self.config_manager.generate_golf_sim_config()
                     await self.connection_manager.broadcast({"type": "config_import"})
+                    return {"success": True, "message": message}
 
-                return {"success": success, "message": message}
+                return JSONResponse(status_code=400, content={"error": message})
             except Exception as e:
                 logger.error(f"Failed to import config: {e}")
-                return {"error": str(e)}
+                return JSONResponse(status_code=500, content={"error": str(e)})
 
         # PiTrac process management endpoints
         @self.app.post("/api/pitrac/start")
@@ -348,7 +521,7 @@ class PiTracServer:
         @self.app.get("/calibration", response_class=HTMLResponse)
         async def calibration_page(request: Request) -> Response:
             """Serve calibration UI page"""
-            return self.templates.TemplateResponse("calibration.html", {"request": request})
+            return self.templates.TemplateResponse(request, "calibration.html")
 
         @self.app.get("/api/calibration/status")
         async def calibration_status() -> Dict[str, Any]:
@@ -406,6 +579,331 @@ class PiTracServer:
                 return {"status": "error", "message": "Server still starting up, please retry in a moment"}
             return await self.calibration_manager.capture_still_image(camera)
 
+        @self.app.get("/api/calibration/charuco-board")
+        async def generate_charuco_board() -> Response:
+            try:
+                import cv2
+                import numpy as np
+            except ImportError as e:
+                return Response(
+                    content=json.dumps({"status": "error", "message": str(e)}),
+                    media_type="application/json",
+                    status_code=500,
+                )
+
+            # Match the board used by run_distortion_calibration
+            aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+            board = cv2.aruco.CharucoBoard(
+                (CHARUCO_SQUARES_X, CHARUCO_SQUARES_Y),
+                CHARUCO_SQUARE_LENGTH, CHARUCO_MARKER_LENGTH, aruco_dict,
+            )
+
+            DPI = 300
+            px_per_mm = DPI / 25.4
+            square_px = round(CHARUCO_SQUARE_LENGTH * 1000 * px_per_mm)
+            board_w = CHARUCO_SQUARES_X * square_px
+            board_h = CHARUCO_SQUARES_Y * square_px
+            board_img = board.generateImage((board_w, board_h), marginSize=0)
+
+            a4_w, a4_h = round(210 * px_per_mm), round(297 * px_per_mm)
+            page = np.full((a4_h, a4_w), 255, dtype=np.uint8)
+            x_off = (a4_w - board_w) // 2
+            y_off = (a4_h - board_h) // 2
+            page[y_off:y_off + board_h, x_off:x_off + board_w] = board_img
+
+            success, png_bytes = cv2.imencode(".png", page)
+            if not success:
+                return Response(
+                    content=json.dumps({"status": "error", "message": "Failed to encode image"}),
+                    media_type="application/json",
+                    status_code=500,
+                )
+
+            return Response(
+                content=png_bytes.tobytes(),
+                media_type="image/png",
+                headers={"Content-Disposition": "inline; filename=charuco_board_8x11.png"},
+            )
+
+        @self.app.websocket("/ws/distortion-feed")
+        async def distortion_camera_feed(websocket: WebSocket) -> None:
+            await websocket.accept()
+            cap = None
+            camera_index = None
+            try:
+                import cv2
+                import numpy as np
+                from charuco_detector import CompatibleCharucoDetector
+
+                data = await websocket.receive_json()
+                camera = data.get("camera", "camera1")
+                camera_index = 0 if camera == "camera1" else 1
+
+                if camera_index in self._active_cameras:
+                    await websocket.send_json({
+                        "error": f"Camera {camera_index} is already in use "
+                                 f"by {self._active_cameras[camera_index]}"
+                    })
+                    await websocket.close()
+                    return
+
+                detector = CompatibleCharucoDetector(
+                    squares_x=CHARUCO_SQUARES_X, squares_y=CHARUCO_SQUARES_Y,
+                    square_length=CHARUCO_SQUARE_LENGTH, marker_length=CHARUCO_MARKER_LENGTH,
+                )
+
+                await self.calibration_manager.request_free_running(camera_index)
+
+                cap = await asyncio.to_thread(open_camera, camera_index, 1456, 1088)
+                if cap is None:
+                    await self.calibration_manager.release_free_running(camera_index)
+                    await websocket.send_json({"error": f"Cannot open camera {camera_index}"})
+                    await websocket.close()
+                    return
+
+                self._active_cameras[camera_index] = "distortion-feed"
+
+                # Read actual resolution after first frame (accurate for rpicam-vid)
+                ret, first_frame = await asyncio.to_thread(cap.read)
+                if ret and first_frame is not None:
+                    actual_h, actual_w = first_frame.shape[:2]
+                    logger.info(f"Distortion feed camera resolution: {actual_w}x{actual_h}")
+                else:
+                    actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                    actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+                STREAM_WIDTH = 960
+
+                frame = first_frame
+                while True:
+                    if frame is None:
+                        ret, frame = await asyncio.to_thread(cap.read)
+                        if not ret:
+                            await asyncio.sleep(0.1)
+                            frame = None
+                            continue
+
+                    self.calibration_manager.set_shared_frame(camera_index, frame.copy())
+
+                    scale = STREAM_WIDTH / frame.shape[1]
+                    display = cv2.resize(frame, (STREAM_WIDTH, int(frame.shape[0] * scale)))
+
+                    gray = cv2.cvtColor(display, cv2.COLOR_BGR2GRAY)
+                    corners, ids, marker_corners, marker_ids = detector.detect_charuco_corners(gray)
+
+                    if marker_corners and len(marker_corners) > 0:
+                        cv2.aruco.drawDetectedMarkers(display, marker_corners, marker_ids)
+                    if corners is not None and len(corners) > 0:
+                        cv2.aruco.drawDetectedCornersCharuco(display, corners, ids)
+                        quality = detector.assess_image_quality(gray, corners)
+                        await websocket.send_json({
+                            "type": "metrics",
+                            "corners": int(quality["num_corners"]),
+                            "blur": int(round(float(quality["blur_score"]))),
+                            "is_good": bool(quality["is_good"]),
+                        })
+                    else:
+                        await websocket.send_json({
+                            "type": "metrics",
+                            "corners": 0,
+                            "blur": 0,
+                            "is_good": False,
+                        })
+
+                    # Draw coverage grid overlay (single blend pass)
+                    status = self.calibration_manager.calibration_status.get(camera, {})
+                    cov = status.get("coverage")
+                    if cov and cov.get("grid"):
+                        dh, dw = display.shape[:2]
+                        grid = cov["grid"]
+                        rows, cols = len(grid), len(grid[0])
+                        if any(grid[r][c] > 0 for r in range(rows) for c in range(cols)):
+                            overlay = display.copy()
+                            for r in range(rows):
+                                for c in range(cols):
+                                    if grid[r][c] > 0:
+                                        x1 = int(c * dw / cols)
+                                        y1 = int(r * dh / rows)
+                                        x2 = int((c + 1) * dw / cols)
+                                        y2 = int((r + 1) * dh / rows)
+                                        cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 180, 0), -1)
+                            cv2.addWeighted(overlay, 0.15, display, 0.85, 0, display)
+
+                    _, jpg = cv2.imencode(".jpg", display, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                    await websocket.send_bytes(jpg.tobytes())
+                    await asyncio.sleep(0.066)  # ~15 fps
+                    frame = None  # read next frame on next iteration
+
+            except WebSocketDisconnect:
+                logger.debug("Distortion feed WebSocket disconnected")
+            except Exception as e:
+                logger.error(f"Distortion feed error: {e}")
+                try:
+                    await websocket.close()
+                except Exception:
+                    pass
+            finally:
+                if cap is not None:
+                    await asyncio.to_thread(cap.release)
+                if camera_index is not None:
+                    self._active_cameras.pop(camera_index, None)
+                    self.calibration_manager.clear_shared_frame(camera_index)
+                    await self.calibration_manager.release_free_running(camera_index)
+
+        @self.app.websocket("/ws/undistort-preview")
+        async def undistort_preview_feed(websocket: WebSocket) -> None:
+            await websocket.accept()
+            cap = None
+            camera_index = None
+            listener = None
+            try:
+                import cv2
+                import numpy as np
+
+                data = await websocket.receive_json()
+                camera = data.get("camera", "camera1")
+                camera_index = 0 if camera == "camera1" else 1
+
+                # Load calibration data
+                camera_num = "1" if camera == "camera1" else "2"
+                matrix_key = f"gs_config.cameras.kCamera{camera_num}CalibrationMatrix"
+                dist_key = f"gs_config.cameras.kCamera{camera_num}DistortionVector"
+                matrix_data = self.config_manager.get_config(matrix_key)
+                dist_data = self.config_manager.get_config(dist_key)
+
+                if matrix_data is None or dist_data is None:
+                    await websocket.send_json({"error": "No calibration data found for this camera"})
+                    await websocket.close()
+                    return
+
+                camera_matrix = np.array(matrix_data, dtype=np.float64)
+                dist_coeffs = np.array(dist_data, dtype=np.float64)
+
+                if camera_index in self._active_cameras:
+                    await websocket.send_json({
+                        "error": f"Camera {camera_index} is already in use "
+                                 f"by {self._active_cameras[camera_index]}"
+                    })
+                    await websocket.close()
+                    return
+
+                await self.calibration_manager.request_free_running(camera_index)
+
+                cap = await asyncio.to_thread(open_camera, camera_index, 1456, 1088)
+                if cap is None:
+                    await self.calibration_manager.release_free_running(camera_index)
+                    await websocket.send_json({"error": f"Cannot open camera {camera_index}"})
+                    await websocket.close()
+                    return
+
+                self._active_cameras[camera_index] = "undistort-preview"
+
+                # Read actual resolution and precompute undistort maps
+                ret, first_frame = await asyncio.to_thread(cap.read)
+                if not ret:
+                    await websocket.send_json({"error": "Could not read from camera"})
+                    await websocket.close()
+                    return
+                h, w = first_frame.shape[:2]
+                new_matrix, roi = cv2.getOptimalNewCameraMatrix(
+                    camera_matrix, dist_coeffs, (w, h), 1, (w, h)
+                )
+                map1, map2 = cv2.initUndistortRectifyMap(
+                    camera_matrix, dist_coeffs, None, new_matrix, (w, h), cv2.CV_16SC2
+                )
+
+                mode = "side_by_side"  # or "raw" or "undistorted"
+
+                # Listen for mode toggles in a background task
+                mode_holder = {"mode": mode}
+
+                async def listen_for_mode():
+                    try:
+                        while True:
+                            msg = await websocket.receive_json()
+                            mode_holder["mode"] = msg.get("mode", mode_holder["mode"])
+                    except (WebSocketDisconnect, asyncio.CancelledError):
+                        pass
+                    except Exception as e:
+                        logger.debug(f"Mode listener error: {e}")
+
+                listener = asyncio.create_task(listen_for_mode())
+
+                while True:
+                    ret, frame = await asyncio.to_thread(cap.read)
+                    if not ret:
+                        await asyncio.sleep(0.1)
+                        continue
+
+                    mode = mode_holder["mode"]
+
+                    if mode == "raw":
+                        cv2.putText(frame, "RAW", (10, 30),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                        output = frame
+                    elif mode == "undistorted":
+                        output = cv2.remap(frame, map1, map2, cv2.INTER_LINEAR)
+                        cv2.putText(output, "UNDISTORTED", (10, 30),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                    else:
+                        undistorted = cv2.remap(frame, map1, map2, cv2.INTER_LINEAR)
+                        # Scale both to half size for side-by-side (preserve aspect ratio)
+                        half_w = w // 2
+                        half_h = h // 2
+                        left = cv2.resize(frame, (half_w, half_h))
+                        right = cv2.resize(undistorted, (half_w, half_h))
+                        cv2.putText(left, "RAW", (10, 30),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                        cv2.putText(right, "UNDISTORTED", (10, 30),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        output = np.hstack([left, right])
+
+                    _, jpg = cv2.imencode(".jpg", output, [cv2.IMWRITE_JPEG_QUALITY, 75])
+                    await websocket.send_bytes(jpg.tobytes())
+                    await asyncio.sleep(0.066)  # ~15 fps
+
+            except WebSocketDisconnect:
+                logger.debug("Undistort preview WebSocket disconnected")
+            except Exception as e:
+                logger.error(f"Undistort preview error: {e}")
+                try:
+                    await websocket.close()
+                except Exception:
+                    pass
+            finally:
+                if listener is not None:
+                    listener.cancel()
+                if cap is not None:
+                    await asyncio.to_thread(cap.release)
+                if camera_index is not None:
+                    self._active_cameras.pop(camera_index, None)
+                    await self.calibration_manager.release_free_running(camera_index)
+
+        @self.app.post("/api/calibration/distortion/{camera}")
+        async def run_distortion_calibration(camera: str, request: Request) -> Dict[str, Any]:
+            """Start automated lens distortion calibration using ChArUco board"""
+            if camera not in ["camera1", "camera2"]:
+                return {"status": "error", "message": "Invalid camera"}
+            if self.calibration_manager.loop is None:
+                return {"status": "error", "message": "Server still starting up, please retry in a moment"}
+            if self.pitrac_manager.is_running():
+                return {"status": "error", "message": "Stop PiTrac before running distortion calibration"}
+
+            target_images = 40
+            try:
+                body = await request.json()
+                target_images = body.get("target_images", 40)
+            except Exception:
+                pass  # No body or invalid JSON is fine, use default
+
+            task = asyncio.create_task(
+                self.calibration_manager.run_distortion_calibration(camera, target_images)
+            )
+            self.background_tasks.add(task)
+            task.add_done_callback(self.background_tasks.discard)
+
+            return {"status": "started", "message": f"Distortion calibration started for {camera}"}
+
         @self.app.post("/api/calibration/stop")
         async def stop_calibration() -> Dict[str, Any]:
             """Stop any running calibration process"""
@@ -414,7 +912,7 @@ class PiTracServer:
         @self.app.get("/testing", response_class=HTMLResponse)
         async def testing_page(request: Request) -> Response:
             """Serve testing tools UI page"""
-            return self.templates.TemplateResponse("testing.html", {"request": request})
+            return self.templates.TemplateResponse(request, "testing.html")
 
         @self.app.get("/api/testing/tools")
         async def get_testing_tools() -> Dict[str, Any]:
@@ -605,10 +1103,47 @@ class PiTracServer:
                 "lens_types": detector.get_lens_types(),
             }
 
+        @self.app.get("/update", response_class=HTMLResponse)
+        async def update_page(request: Request) -> Response:
+            return self.templates.TemplateResponse(request, "update.html")
+
+        @self.app.get("/api/update/branches")
+        async def get_branches() -> Dict[str, Any]:
+            return await self.update_manager.get_branches()
+
+        @self.app.get("/api/update/check")
+        async def check_for_updates() -> Dict[str, Any]:
+            return await self.update_manager.check_for_updates()
+
+        @self.app.post("/api/update/start")
+        async def start_update(request: Request) -> Dict[str, Any]:
+            content_type = request.headers.get("content-type", "")
+            body = await request.json() if "application/json" in content_type else {}
+            force = bool(body.get("force", False))
+            branch = body.get("branch")
+            if branch is not None:
+                branch = str(branch)
+            result = await self.update_manager.start_update(force=force, branch=branch)
+
+            task = self.update_manager.get_update_task()
+            if task:
+                self.background_tasks.add(task)
+                task.add_done_callback(self.background_tasks.discard)
+
+            return result
+
+        @self.app.post("/api/update/cancel")
+        async def cancel_update() -> Dict[str, Any]:
+            return await self.update_manager.cancel_update()
+
+        @self.app.get("/api/update/status")
+        async def update_status() -> Dict[str, Any]:
+            return self.update_manager.get_status()
+
         @self.app.get("/logs", response_class=HTMLResponse)
         async def logs_page(request: Request) -> Response:
             """Serve logs viewer page"""
-            return self.templates.TemplateResponse("logs.html", {"request": request})
+            return self.templates.TemplateResponse(request, "logs.html")
 
         @self.app.websocket("/ws/logs")
         async def websocket_logs(websocket: WebSocket) -> None:

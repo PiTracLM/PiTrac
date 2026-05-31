@@ -1,0 +1,29 @@
+{# Reusable UI macros — import with {% from "_macros.html" import ... %} #}
+
+{% macro pitrac_btn(action, icon, label, suffix, extra_class="") %}
+<button id="pitrac-{{ action }}-btn-{{ suffix }}"
+        class="btn btn-sm gap-1 control-btn {{ action }}-btn {{ extra_class }}"
+        onclick="controlPiTrac('{{ action }}')"
+        title="{{ label }} PiTrac">
+    <i data-lucide="{{ icon }}" class="icon-sm"></i>
+    <span class="btn-text">{{ label }}</span>
+</button>
+{% endmacro %}
+
+{% macro nav_item(href, icon, label) %}
+<li><a href="{{ href }}" class="gap-3"><i data-lucide="{{ icon }}" class="icon-menu"></i> {{ label }}</a></li>
+{% endmacro %}
+
+{% macro status_row(label, id, value="--", extra_class="") %}
+<div class="flex justify-between items-center py-2 border-b border-base-300 last:border-0">
+    <span class="text-sm opacity-60">{{ label }}</span>
+    <span class="text-sm font-medium {{ extra_class }}" id="{{ id }}">{{ value }}</span>
+</div>
+{% endmacro %}
+
+{% macro result_item(label, id, value="--") %}
+<div class="flex justify-between py-1.5 border-b border-base-300 last:border-0">
+    <span class="text-sm opacity-60">{{ label }}</span>
+    <span class="text-sm font-medium" id="{{ id }}">{{ value }}</span>
+</div>
+{% endmacro %}

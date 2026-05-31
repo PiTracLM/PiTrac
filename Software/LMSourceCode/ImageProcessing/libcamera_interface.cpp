@@ -16,6 +16,8 @@
 
 #include <chrono>
 
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include <opencv2/calib3d/calib3d.hpp>
 
@@ -500,52 +502,48 @@ bool DiscoverCameraLocation(const GsCameraNumber camera_number, int& media_numbe
         return false;
     }
 
-    const std::string kOutputFileName = "/tmp/pi_cam_location.txt";
+    const std::string uid_suffix = "_" + std::to_string(getuid());
+    const std::string kOutputFileName = "/tmp/pi_cam_location" + uid_suffix + ".txt";
+    const std::string kMediaFileName = "/tmp/discover_media" + uid_suffix + ".txt";
+    const std::string kDeviceFileName = "/tmp/discover_device" + uid_suffix + ".txt";
+    const std::string kResultFileName = "/tmp/discover_result" + uid_suffix + ".txt";
+    const std::string script_name = "/tmp/pi_cam_location" + uid_suffix + ".sh";
 
     std::string s;
 
     s += "#!/bin/bash\n";
-    s += "rm -f /tmp/discover_media.txt /tmp/discover_device.txt /tmp/discover_result.txt " + kOutputFileName + "\n";
+    s += "rm -f " + kMediaFileName + " " + kDeviceFileName + " " + kResultFileName + " " + kOutputFileName + "\n";
     s += "for ((m = 0; m <= 5; ++m))\n";
     s += "    do\n";
-    s += "        rm -f /tmp/discover_result.txt\n";
-    s += "        media-ctl -d \"/dev/media$m\" --print-dot | grep imx > /tmp/discover_media.txt\n";
-    s += "        awk -F\"imx296 \" '{print $2}' < /tmp/discover_media.txt | cut -d- -f1 > /tmp/discover_device.txt\n";
-    s += "        echo -n -e \"$m \" > /tmp/discover_result.txt\n";
-    s += "        cat /tmp/discover_device.txt >> /tmp/discover_result.txt\n";
+    s += "        rm -f " + kResultFileName + "\n";
+    s += "        media-ctl -d \"/dev/media$m\" --print-dot | grep imx > " + kMediaFileName + "\n";
+    s += "        awk -F\"imx296 \" '{print $2}' < " + kMediaFileName + " | cut -d- -f1 > " + kDeviceFileName + "\n";
+    s += "        echo -n -e \"$m \" > " + kResultFileName + "\n";
+    s += "        cat " + kDeviceFileName + " >> " + kResultFileName + "\n";
 
-    s += "       if  grep imx /tmp/discover_media.txt > /dev/null;  then  cat /tmp/discover_result.txt >> " + kOutputFileName + ";  fi\n";
+    s += "       if  grep imx " + kMediaFileName + " > /dev/null;  then  cat " + kResultFileName + " >> " + kOutputFileName + ";  fi\n";
     s += "            done\n";
 
-    s += "            rm -f /tmp/discover_media.txt /tmp/discover_device.txt /tmp/discover_result.txt\n";
+    s += "            rm -f " + kMediaFileName + " " + kDeviceFileName + " " + kResultFileName + "\n";
 
-    const std::string script_name = "/tmp/pi_cam_location.sh";
+    unlink(script_name.c_str());
 
-	// Ensure that we can write to the output file if it was already created
-    std::string script_command = "sudo rm -f " + script_name;
-    system(script_command.c_str());
-    
-    // Write the script out to file to run.  
-    // Otherwise, system() would try to run the script as a sh script,
-    // not a bash script
-    std::ofstream script_file(script_name); // Open file for reading
+    std::ofstream script_file(script_name);
 
     if (!script_file.is_open()) {
         GS_LOG_TRACE_MSG(error, "DiscoverCameraLocation - failed to open script file " + script_name);
         return false;
     }
 
-    // Write the script to the file
-    script_file << s << std::endl; 
+    script_file << s << std::endl;
     script_file.close();
 
-    // At least currently, we need to make the script file executable before calling it
-    script_command = "sudo chmod 777 " + script_name;
-    system(script_command.c_str());
+    if (chmod(script_name.c_str(), S_IRWXU) != 0) {
+        GS_LOG_TRACE_MSG(error, "DiscoverCameraLocation - chmod failed on " + script_name);
+        return false;
+    }
 
-    script_command = script_name;
-
-    int cmdResult = system(script_command.c_str());
+    int cmdResult = system(script_name.c_str());
 
     if (cmdResult != 0) {
         GS_LOG_TRACE_MSG(error, "system(DiscoverCameraLocation) failed.  Return value was: " + std::to_string(cmdResult));
@@ -1029,8 +1027,8 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
 
     LibcameraJpegApp* app = lci::libcamera_app_[hardware_camera_index];
 
-    if (app != nullptr || lci::libcamera_configuration_[hardware_camera_index] == lci::CameraConfiguration::kStillPicture) {
-        return lci::libcamera_app_[camera_number];
+    if (app != nullptr && lci::libcamera_configuration_[hardware_camera_index] == lci::CameraConfiguration::kStillPicture) {
+        return app;
     }
 
     if (app != nullptr) {
@@ -1491,24 +1489,8 @@ bool PerformCameraSystemStartup() {
 
     SetLibCameraLoggingOff();
 
-    // Setup the Pi Camera to be internally or externally triggered as appropriate
-
-    SystemMode mode = GolfSimOptions::GetCommandLineOptions().system_mode_;
-
-    switch (mode) {
-
-        case SystemMode::kCamera1:
-        case SystemMode::kCamera1TestStandalone:
-        case SystemMode::kTestSpin: {
-            // Camera triggering is configured via firmware config.txt dtoverlays,
-            // not programmatically. Nothing to do here.
-        }
-        break;
-
-        case SystemMode::kTest:
-        default:
-            break;
-    }
+    // Defensive reset in case a prior crashed run left the sensor in external trigger.
+    SetImx296TriggerModeViaI2C(0);
 
     return true;
 }

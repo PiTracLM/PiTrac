@@ -1,0 +1,119 @@
+/* Update page — only styles daisyUI/Tailwind can't handle */
+
+/* Loading dots animation on action buttons (JS toggles .loading) */
+.action-btn.loading span::after {
+    content: "...";
+    animation: dots 1.5s steps(3, end) infinite;
+}
+
+@keyframes dots {
+    0% { content: ""; }
+    33% { content: "."; }
+    66% { content: ".."; }
+    100% { content: "..."; }
+}
+
+/* Commit list items (built dynamically by JS) */
+.commit-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--color-base-100);
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+}
+
+.commit-hash {
+    font-family: ui-monospace, monospace;
+    font-size: 0.8125rem;
+    color: var(--color-primary);
+    flex-shrink: 0;
+}
+
+.commit-message {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.commit-meta {
+    font-size: 0.75rem;
+    opacity: 0.5;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* Terminal-style build log */
+.build-log {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-y: auto;
+    max-height: 400px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+[data-theme="dark"] .build-log {
+    background: #0d1117;
+    border: 1px solid oklch(15% 0.008 275);
+}
+
+.log-line {
+    margin: 0;
+    padding: 0.125rem 0.5rem;
+}
+
+.log-line.error { color: #f48771; }
+.log-line.update { color: #9cdcfe; }
+.log-line.git { color: #b5cea8; }
+.log-line.build { color: #d4d4d4; }
+
+/* Update banner (JS creates this dynamically) */
+.update-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.375rem;
+    margin-bottom: 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.update-banner.info {
+    background: rgba(66, 153, 225, 0.1);
+    color: var(--color-info);
+    border: 1px solid rgba(66, 153, 225, 0.2);
+}
+
+.update-banner.success {
+    background: rgba(72, 187, 120, 0.1);
+    color: var(--color-success);
+    border: 1px solid rgba(72, 187, 120, 0.2);
+}
+
+.update-banner.error {
+    background: rgba(245, 101, 101, 0.1);
+    color: var(--color-error);
+    border: 1px solid rgba(245, 101, 101, 0.2);
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+    .commit-item {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .commit-meta {
+        align-self: flex-start;
+    }
+}

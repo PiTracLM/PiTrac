@@ -1,72 +1,24 @@
-/* Testing Tools Page Styles */
+/* Testing page — only styles daisyUI/Tailwind can't handle */
 
-/* Main content wrapper */
-.main-content {
-    padding: 2rem;
-    max-width: 1400px;
-    margin: 0 auto;
-}
-
-.testing-container {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 2rem;
-}
-
-/* Tool Categories */
-.tool-categories {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-}
-
-.tool-category {
-    background: var(--bg-card);
-    border-radius: 12px;
-    padding: 2rem;
-    box-shadow: var(--shadow-md);
-}
-
-.category-title {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 0 0 1.5rem 0;
-    color: var(--primary);
-    font-size: 1.25rem;
-    font-weight: 600;
-}
-
-.category-title svg {
-    flex-shrink: 0;
-}
-
-/* Tool Grid */
-.tool-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1rem;
-}
-
-/* Tool Card */
+/* Tool cards (built dynamically by JS) */
 .tool-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    background: var(--color-base-100);
+    border: 1px solid var(--color-base-300);
     border-radius: 0.5rem;
     padding: 1rem;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
     position: relative;
 }
 
 .tool-card:hover {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-    border-color: var(--primary-hover);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-color: var(--color-primary);
 }
 
 .tool-card.running {
-    border-color: var(--warning);
-    background: var(--bg-hover);
+    border-color: var(--color-warning);
+    background: var(--color-base-200);
 }
 
 .tool-card.running::before {
@@ -76,11 +28,10 @@
     right: 0.5rem;
     width: 0.5rem;
     height: 0.5rem;
-    background: var(--warning);
+    background: var(--color-warning);
     border-radius: 50%;
     animation: pulse 2s infinite;
 }
-
 
 .tool-header {
     display: flex;
@@ -93,11 +44,10 @@
     margin: 0;
     font-size: 1rem;
     font-weight: 600;
-    color: var(--text-primary);
 }
 
 .sudo-badge {
-    background: var(--error);
+    background: var(--color-error);
     color: white;
     padding: 0.125rem 0.375rem;
     border-radius: 0.25rem;
@@ -108,7 +58,7 @@
 
 .tool-description {
     margin: 0 0 1rem 0;
-    color: var(--text-secondary);
+    opacity: 0.6;
     font-size: 0.875rem;
     line-height: 1.4;
 }
@@ -120,52 +70,41 @@
 
 .tool-actions .btn {
     flex: 1;
+}
+
+/* JS creates stop buttons with .btn-danger (not daisyUI's btn-error) */
+.btn-danger {
+    background: var(--color-error);
+    color: white;
+    border: none;
     padding: 0.5rem 1rem;
+    border-radius: var(--radius-field, 0.25rem);
     font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
 }
 
-/* Output Panel */
-.output-panel {
-    background: var(--bg-card);
-    border-radius: 12px;
-    padding: 2rem;
-    box-shadow: var(--shadow-md);
-    display: flex;
-    flex-direction: column;
-    max-height: 600px;
+.btn-danger:hover {
+    opacity: 0.85;
 }
 
-.output-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.output-header h3 {
-    margin: 0;
-    color: var(--text-primary);
-    font-size: 1.125rem;
-}
-
+/* Terminal-style output panel */
 .output-content {
-    flex: 1;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 0.5rem;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.8125rem;
+    line-height: 1.5;
     padding: 1rem;
-    overflow-y: auto;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 0.875rem;
-    min-height: 300px;
+    border-radius: 0.5rem;
+}
+
+[data-theme="dark"] .output-content {
+    background: #0d1117;
+    border: 1px solid oklch(15% 0.008 275);
 }
 
 .output-placeholder {
-    color: var(--text-muted);
-    text-align: center;
-    padding: 2rem;
     font-family: inherit;
 }
 
@@ -178,63 +117,26 @@
 }
 
 .output-line.info {
-    background: var(--info-bg);
-    color: var(--info);
+    background: rgba(59, 130, 246, 0.08);
+    color: #9cdcfe;
 }
 
 .output-line.success {
-    background: var(--success-bg);
-    color: var(--success);
+    background: rgba(34, 197, 94, 0.08);
+    color: #b5cea8;
 }
 
 .output-line.warning {
-    background: var(--warning-bg);
-    color: var(--warning);
+    background: rgba(251, 146, 60, 0.08);
+    color: #dcdcaa;
 }
 
 .output-line.error {
-    background: var(--error-bg);
-    color: var(--error);
+    background: rgba(239, 68, 68, 0.08);
+    color: #f48771;
 }
 
-/* Modal Styles */
-.modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-}
-
-.modal-content {
-    background: var(--bg-card);
-    border-radius: 0.75rem;
-    padding: 2rem;
-    max-width: 90%;
-    max-height: 90%;
-    overflow: auto;
-    position: relative;
-}
-
-.modal-close {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: var(--text-secondary);
-    transition: color 0.3s ease;
-}
-
-.modal-close:hover {
-    color: var(--text-primary);
-}
-
+/* Image result shown inside the modal */
 .image-result {
     display: flex;
     flex-direction: column;
@@ -243,7 +145,7 @@
 
 .image-result img {
     border-radius: 0.5rem;
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 .image-actions {
@@ -252,145 +154,43 @@
     gap: 1rem;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-    .tool-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .testing-container {
-        gap: 1rem;
-    }
-    
-    .tool-category {
-        padding: 1rem;
-    }
-    
-    .output-panel {
-        padding: 1rem;
-    }
-    
-    .modal-content {
-        padding: 1rem;
-        margin: 1rem;
-    }
-}
-
-/* Dark Theme Adjustments */
-:root[data-theme="dark"] {
-    --info-bg: rgba(59, 130, 246, 0.1);
-    --success-bg: rgba(34, 197, 94, 0.1);
-    --warning-bg: rgba(251, 146, 60, 0.1);
-    --error-bg: rgba(239, 68, 68, 0.1);
-}
-
-:root[data-theme="light"] {
-    --info-bg: rgba(59, 130, 246, 0.05);
-    --success-bg: rgba(34, 197, 94, 0.05);
-    --warning-bg: rgba(251, 146, 60, 0.05);
-    --error-bg: rgba(239, 68, 68, 0.05);
-}
-
-/* Image Upload Styles */
-.image-upload-container {
+/* Div-based modal (JS controls via display: block/none, not <dialog>) */
+#testModal {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
     display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    align-items: center;
-}
-
-.upload-area {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
     justify-content: center;
-    gap: 1rem;
-    width: 100%;
-    max-width: 600px;
-    min-height: 200px;
-    border: 2px dashed var(--border-color);
-    border-radius: 0.75rem;
-    padding: 2rem;
+    align-items: center;
+}
+
+#testModal .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: -1;
     cursor: pointer;
-    transition: all 0.3s ease;
-    background: var(--bg-secondary);
 }
 
-.upload-area:hover {
-    border-color: var(--primary);
-    background: var(--bg-hover);
+#testModal .modal-box {
+    background: var(--color-base-200);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    max-height: 90vh;
+    overflow: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
 }
 
+/* Upload drag-over state (JS toggles this) */
 .upload-area.drag-over {
-    border-color: var(--primary);
-    background: var(--primary-bg);
+    border-color: var(--color-primary) !important;
+    background: color-mix(in oklch, var(--color-primary) 8%, transparent) !important;
     transform: scale(1.02);
 }
 
-.upload-area svg {
-    color: var(--text-muted);
-    transition: color 0.3s ease;
-}
-
-.upload-area:hover svg {
-    color: var(--primary);
-}
-
-.upload-area p {
-    margin: 0;
-    color: var(--text-primary);
-    font-weight: 500;
-}
-
-.upload-hint {
-    font-size: 0.875rem;
-    color: var(--text-muted) !important;
-}
-
-#imagePreview {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1rem;
-    width: 100%;
-    max-width: 600px;
-}
-
-#imagePreview img {
-    width: 100%;
-    height: auto;
-    border-radius: 0.5rem;
-    box-shadow: var(--shadow-md);
-}
-
-.image-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-    padding: 0.75rem;
-    background: var(--bg-secondary);
-    border-radius: 0.5rem;
-    border: 1px solid var(--border-color);
-}
-
-.image-info span {
-    color: var(--text-primary);
-    font-weight: 500;
-    font-size: 0.875rem;
-}
-
-.btn-lg {
-    padding: 0.75rem 2rem;
-    font-size: 1rem;
-    font-weight: 600;
-}
-
-@keyframes pulse {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.5;
+/* Mobile */
+@media (max-width: 768px) {
+    .tool-grid {
+        grid-template-columns: 1fr !important;
     }
 }

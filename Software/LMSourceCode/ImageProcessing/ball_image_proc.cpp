@@ -218,7 +218,6 @@ namespace golf_sim {
     int BallImageProc::kModelInputWidth = 736;
     int BallImageProc::kModelInputHeight = 544;
     int BallImageProc::kInferenceThreads = 4;
-
     // NCNN detector
     std::unique_ptr<NCNNDetector> BallImageProc::ncnn_detector_;
     std::atomic<bool> BallImageProc::ncnn_detector_initialized_{false};

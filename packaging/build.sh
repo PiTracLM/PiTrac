@@ -237,6 +237,8 @@ build_dev() {
         exit 1
     fi
 
+    pin_libcamera_workaround
+
     log_info "Regenerating pitrac CLI tool..."
     if [[ -f "$SCRIPT_DIR/generate.sh" ]]; then
         cd "$SCRIPT_DIR"
@@ -254,25 +256,19 @@ build_dev() {
 
     # Build tools
     for pkg in build-essential meson ninja-build pkg-config git; do
-        if ! dpkg -l | grep -q "^ii  $pkg"; then
-            missing_deps+=("$pkg")
-        fi
+        pkg_installed "$pkg" || missing_deps+=("$pkg")
     done
 
     # Boost libraries (dev packages pull in correct runtime versions automatically)
     for pkg in libboost-dev libboost-all-dev libyaml-cpp-dev; do
-        if ! dpkg -l | grep -q "^ii  $pkg"; then
-            missing_deps+=("$pkg")
-        fi
+        pkg_installed "$pkg" || missing_deps+=("$pkg")
     done
 
-    # Core libraries (libcamera-dev pulls in correct runtime version)
+    # libapr1/libaprutil1 → *t64 in Trixie (time_t transition); -dev keeps the old names.
     for pkg in libcamera-dev libcamera-tools libfmt-dev libssl-dev \
                libmsgpack-cxx-dev liblgpio-dev \
-               libapr1 libaprutil1 libapr1-dev libaprutil1-dev; do
-        if ! dpkg -l | grep -q "^ii  $pkg"; then
-            missing_deps+=("$pkg")
-        fi
+               libapr1t64 libaprutil1t64 libapr1-dev libaprutil1-dev; do
+        pkg_installed "$pkg" || missing_deps+=("$pkg")
     done
 
     # ========================================================================
@@ -291,10 +287,10 @@ build_dev() {
     #   2. Let apt install system lgpio packages
     #   3. extract_all_dependencies() will skip custom lgpio if system exists
     # ========================================================================
-    if ! dpkg -l | grep -qE "^ii\s+(liblgpio1|liblgpio-dev)"; then
-        log_info "lgpio not installed - will use custom package from deps-artifacts"
-    else
+    if pkg_installed liblgpio1 || pkg_installed liblgpio-dev; then
         log_info "System lgpio packages detected - will use those instead of custom"
+    else
+        log_info "lgpio not installed - will use custom package from deps-artifacts"
     fi
     
     if ! command -v rpicam-hello &> /dev/null && ! command -v libcamera-hello &> /dev/null; then
@@ -310,43 +306,31 @@ build_dev() {
     # OpenCV runtime dependencies (using -dev packages to handle version differences)
     # Note: GTK3 changed from libgtk-3-0 to libgtk-3-0t64 in Trixie
     for pkg in libgtk-3-dev libtbb-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libopenexr-dev; do
-        if ! dpkg -l | grep -q "^ii  $pkg"; then
-            missing_deps+=("$pkg")
-        fi
+        pkg_installed "$pkg" || missing_deps+=("$pkg")
     done
 
     # FFmpeg development libraries
     for pkg in libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libavdevice-dev; do
-        if ! dpkg -l | grep -q "^ii  $pkg"; then
-            missing_deps+=("$pkg")
-        fi
+        pkg_installed "$pkg" || missing_deps+=("$pkg")
     done
 
     # Image libraries
     for pkg in libexif-dev libjpeg-dev libtiff-dev libpng-dev; do
-        if ! dpkg -l | grep -q "^ii  $pkg"; then
-            missing_deps+=("$pkg")
-        fi
+        pkg_installed "$pkg" || missing_deps+=("$pkg")
     done
 
     # Display/GUI libraries
     for pkg in libdrm-dev libx11-dev libxext-dev libepoxy-dev qtbase5-dev qt5-qmake; do
-        if ! dpkg -l | grep -q "^ii  $pkg"; then
-            missing_deps+=("$pkg")
-        fi
+        pkg_installed "$pkg" || missing_deps+=("$pkg")
     done
 
     # Python runtime dependencies
     for pkg in python3 python3-pip python3-yaml python3-opencv python3-numpy; do
-        if ! dpkg -l | grep -q "^ii  $pkg"; then
-            missing_deps+=("$pkg")
-        fi
+        pkg_installed "$pkg" || missing_deps+=("$pkg")
     done
 
     # Configuration parsing tools
-    if ! dpkg -l | grep -q "^ii  yq"; then
-        missing_deps+=("yq")
-    fi
+    pkg_installed yq || missing_deps+=("yq")
 
 
     # ========================================================================
@@ -368,7 +352,9 @@ build_dev() {
             log_success "Changed MODULES=dep to MODULES=most"
 
             # If initramfs-tools is in a broken state, try to fix it now
-            if dpkg -l | grep -E "^[a-z]F\s+initramfs-tools"; then
+            local initramfs_abbrev
+            initramfs_abbrev=$(dpkg-query -W -f='${db:Status-Abbrev}' initramfs-tools 2>/dev/null || true)
+            if [[ "$initramfs_abbrev" =~ ^[a-z]F ]]; then
                 log_info "Attempting to repair initramfs-tools package..."
                 if dpkg --configure initramfs-tools 2>&1 | tee /tmp/initramfs-fix.log; then
                     log_success "initramfs-tools repaired successfully"
@@ -390,7 +376,9 @@ build_dev() {
 
     # Fix any remaining broken packages
     log_info "Checking for broken package states..."
-    if dpkg -l | grep -qE "^[a-z][^i]"; then
+    local pkg_abbrevs
+    pkg_abbrevs=$(dpkg-query -W -f='${db:Status-Abbrev}\n' 2>/dev/null || true)
+    if grep -qE '^[a-z][^i]' <<< "$pkg_abbrevs"; then
         log_warn "Found packages in broken state, attempting repair..."
         # Try normal configure first (now that initramfs.conf is fixed)
         if ! dpkg --configure -a 2>&1; then
@@ -409,7 +397,9 @@ build_dev() {
         # Remove custom lgpio package if it exists to avoid conflicts with system packages
         # System packages (libcamera-dev, etc.) may pull in liblgpio-dev from repos
         # Our custom package has version 0.2.2-1 but system has 0.2.2-1~rpt1
-        if dpkg -l | grep -qE "^ii\s+liblgpio1\s+0\.2\.2-1\s"; then
+        local lgpio_version
+        lgpio_version=$(dpkg-query -W -f='${Version}' liblgpio1 2>/dev/null || true)
+        if [[ "$lgpio_version" == "0.2.2-1" ]]; then
             log_warn "Removing custom liblgpio1 package to avoid apt conflicts..."
             log_info "System lgpio packages will be used instead (from repos)"
             dpkg --remove --force-depends liblgpio1 2>/dev/null || true
@@ -482,7 +472,7 @@ build_dev() {
     if [[ -f "build/build.ninja" ]]; then
         if grep -q "/opt/opencv" build/build.ninja 2>/dev/null; then
             # Check if DEB packages are installed (they use /usr/, not /opt/)
-            if dpkg -l 2>/dev/null | grep -qE "^ii\s+(libopencv4\.(11|12|13))\s"; then
+            if pkg_installed libopencv4.11 || pkg_installed libopencv4.12 || pkg_installed libopencv4.13; then
                 log_warn "Detected build directory with /opt/ paths but DEB packages use /usr/"
                 log_warn "This causes linker failures - cached paths are stale"
                 log_info "Automatically cleaning build directory for compatibility..."
@@ -570,8 +560,10 @@ build_dev() {
         cp "$calib_dir/checkerboard.png" /usr/share/pitrac/calibration/ 2>/dev/null || true
     fi
 
-    # Create calibration wizard
-    cat > /usr/lib/pitrac/calibration-wizard << 'EOF'
+    local wizard_path=/usr/lib/pitrac/calibration-wizard
+    local wizard_tmp
+    wizard_tmp=$(mktemp)
+    cat > "$wizard_tmp" << 'EOF'
 #!/bin/bash
 if [[ -f /usr/share/pitrac/calibration/CameraCalibration.py ]]; then
     cd /usr/share/pitrac/calibration
@@ -581,10 +573,24 @@ else
     exit 1
 fi
 EOF
-    chmod 755 /usr/lib/pitrac/calibration-wizard
+    if ! cmp -s "$wizard_tmp" "$wizard_path" 2>/dev/null; then
+        install -m 755 "$wizard_tmp" "$wizard_path"
+    fi
+    rm -f "$wizard_tmp"
 
     # Create base directory for models and other system files
     mkdir -p /etc/pitrac
+
+    # Record build environment so the web server can find the repo and run updates
+    log_info "Writing build environment to /etc/pitrac/environment..."
+    cat > /etc/pitrac/environment << ENVEOF
+# Written by build.sh dev — used by the web server for self-update
+PITRAC_REPO_ROOT=$REPO_ROOT
+PITRAC_BUILD_SCRIPT=$SCRIPT_DIR/build.sh
+PITRAC_BUILD_USER=${SUDO_USER:-$(whoami)}
+PITRAC_LAST_BUILD=$(date -Iseconds)
+ENVEOF
+    chmod 644 /etc/pitrac/environment
 
     # ActiveMQ removed — results sent via HTTP POST from C++ to Python web server
 
@@ -677,17 +683,33 @@ EOF
     # Add back from PostINT for hardening
     usermod -a -G video,gpio,i2c,spi,dialout "$INSTALL_USER" 2>/dev/null || true
 
+    # Allow the web server user to run build.sh dev via sudo without a password
+    # This enables UI-triggered updates (git pull + rebuild) and calibration runs
+    # of pitrac_lm (which the web server invokes via `sudo -E`).
+    log_info "Configuring sudoers for web-triggered actions..."
+    cat > /etc/sudoers.d/pitrac-update << SUDOEOF
+# Allow PiTrac web server to run build.sh dev for self-updates
+$INSTALL_USER ALL=(root) NOPASSWD: $SCRIPT_DIR/build.sh dev, $SCRIPT_DIR/build.sh dev force
+$INSTALL_USER ALL=(root) NOPASSWD: SETENV: /usr/lib/pitrac/pitrac_lm
+SUDOEOF
+    chmod 440 /etc/sudoers.d/pitrac-update
+    # Validate the sudoers file
+    if visudo -c -f /etc/sudoers.d/pitrac-update 2>/dev/null; then
+        log_success "Sudoers entry installed for user: $INSTALL_USER"
+    else
+        log_error "Invalid sudoers file — removing to avoid lockout"
+        rm -f /etc/sudoers.d/pitrac-update
+    fi
+
     # Install Python web server (always update)
     log_info "Installing/Updating PiTrac web server..."
     WEB_SERVER_DIR="$REPO_ROOT/Software/web-server"
     if [[ -d "$WEB_SERVER_DIR" ]]; then
         update_web_server() {
-            log_info "Cleaning previous web server installation..."
-            rm -rf /usr/lib/pitrac/web-server
+            log_info "Syncing web server files..."
             mkdir -p /usr/lib/pitrac/web-server
-
-            log_info "Copying latest web server files..."
-            cp -r "$WEB_SERVER_DIR"/* /usr/lib/pitrac/web-server/
+            rsync -a --checksum --delete \
+                "$WEB_SERVER_DIR"/ /usr/lib/pitrac/web-server/
 
             install_python_dependencies "/usr/lib/pitrac/web-server"
 

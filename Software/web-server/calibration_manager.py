@@ -6,12 +6,16 @@ Handles all calibration operations including:
 - Manual calibration
 - Auto calibration
 - Still image capture
+- Lens distortion calibration (ChArUco)
 - Calibration data persistence
 """
 
 import asyncio
+import json
 import logging
 import os
+import shutil
+import subprocess
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -22,6 +26,17 @@ logger = logging.getLogger(__name__)
 CAMERA1_CALIBRATION_TIMEOUT = 40.0  # Camera1 has faster hardware detection
 CAMERA2_CALIBRATION_TIMEOUT = 140.0  # Camera2 needs background process initialization
 CAMERA2_BACKGROUND_INIT_WAIT = 4.0  # Time to wait for background process to initialize
+
+DISTORTION_DEFAULT_TARGET_IMAGES = 40  # Hagemann 2021: 40+ images for sub-0.2% std_fx/fx
+DISTORTION_MAX_ATTEMPTS_MULTIPLIER = 5  # max_attempts = target * this
+DISTORTION_CAPTURE_INTERVAL = 2.0  # seconds between captures
+DISTORTION_CAPTURE_TIMEOUT = 10.0  # timeout for rpicam-still
+
+RPICAM_TUNING_FILE = "/usr/share/libcamera/ipa/rpi/pisp/imx296_noir.json"
+RPICAM_CAL_SHUTTER_US = 11000
+
+IMX296_TRIGGER_BINARY = "/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_trigger"
+IMX296_I2C_BUS = "4"
 
 
 class CalibrationManager:
@@ -52,6 +67,65 @@ class CalibrationManager:
         self._pending_updates: List[tuple[str, Any]] = []
 
         self.config_manager.register_callback("gs_config.cameras.kCamera", self._on_calibration_update)
+
+        self._capture_backend = self._detect_capture_backend()
+
+        # Shared frame buffer: the live-feed WebSocket writes here so the
+        # calibration loop can grab frames without opening a second VideoCapture.
+        # Keys: camera_index (int) -> latest BGR numpy frame
+        self._shared_frames: Dict[int, Any] = {}
+
+        # Reference count for Camera 2 free-running mode requests.
+        # When >0, trigger_mode is set to 0 (free-running) so rpicam-still
+        # and cv2.VideoCapture can capture without external triggers.
+        self._free_running_refs = 0
+        self._trigger_mode_lock = asyncio.Lock()
+
+    def _set_trigger_mode(self, mode: int) -> bool:
+        """Set IMX296 trigger mode (0=free-running, 1=external). Returns True on success."""
+        if mode not in (0, 1):
+            logger.error(f"Invalid trigger_mode: {mode}")
+            return False
+        try:
+            result = subprocess.run(
+                [IMX296_TRIGGER_BINARY, IMX296_I2C_BUS, str(mode)],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
+            logger.warning(f"Could not invoke imx296_trigger: {e}")
+            return False
+        if result.returncode != 0:
+            logger.warning(
+                f"imx296_trigger {IMX296_I2C_BUS} {mode} failed "
+                f"(rc={result.returncode}): {result.stderr.strip()}"
+            )
+            return False
+        logger.debug(f"Set IMX296 trigger_mode={mode} via I2C")
+        return True
+
+    async def request_free_running(self, camera_index: int) -> None:
+        """Request Camera 2 be in free-running mode (ref-counted)."""
+        if camera_index != 1:
+            return
+        async with self._trigger_mode_lock:
+            # Increment only on hardware success: refcount must mirror physical state.
+            if self._free_running_refs == 0 and not self._set_trigger_mode(0):
+                return
+            self._free_running_refs += 1
+
+    async def release_free_running(self, camera_index: int) -> None:
+        """Release a free-running request for Camera 2 (ref-counted)."""
+        if camera_index != 1:
+            return
+        async with self._trigger_mode_lock:
+            if self._free_running_refs <= 0:
+                logger.warning("release_free_running called with refcount already at 0")
+                return
+            self._free_running_refs -= 1
+            if self._free_running_refs == 0:
+                self._set_trigger_mode(1)
 
     def _on_calibration_update(self, key: str, value: Any) -> None:
         """
@@ -261,11 +335,10 @@ class CalibrationManager:
                 exit_code = process_task.result()
                 logger.info(f"Session {session_id}: Process exited with code {exit_code}")
 
-                api_result = (
-                    api_task.result()
-                    if api_task.done()
-                    else {"focal_length_received": False, "angles_received": False, "completed": False}
-                )
+                if api_task.done() and not api_task.cancelled():
+                    api_result = api_task.result()
+                else:
+                    api_result = {"focal_length_received": False, "angles_received": False, "completed": False}
 
                 return {
                     "completed": exit_code == 0,
@@ -454,9 +527,10 @@ class CalibrationManager:
             if camera in self.current_processes:
                 raise Exception(f"A calibration process is already running for {camera}")
 
+            log_fh = open(log_file, "w")
             try:
                 process = await asyncio.create_subprocess_exec(
-                    *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env=env
+                    *cmd, stdout=log_fh, stderr=asyncio.subprocess.STDOUT, env=env
                 )
 
                 self.current_processes[camera] = process
@@ -467,21 +541,30 @@ class CalibrationManager:
                 async with self._calibration_lock:
                     self._active_calibrations.pop(session_id, None)
                 raise
+            finally:
+                log_fh.close()
 
         try:
             completion_result = await self.wait_for_calibration_completion(process, session_id, timeout=timeout)
 
             logger.info(f"{camera}: Completion result: {completion_result}")
 
-            output = ""
-            try:
-                if process.stdout and not process.stdout.at_eof():
-                    remaining_output = await asyncio.wait_for(process.stdout.read(), timeout=2.0)
-                    output = remaining_output.decode() if remaining_output else ""
-            except Exception as e:
-                logger.debug(f"Could not read remaining output: {e}")
+            if process.returncode is None:
+                try:
+                    process.terminate()
+                    await asyncio.wait_for(process.wait(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    process.kill()
+                    await process.wait()
+                except ProcessLookupError:
+                    pass
 
-            # Check if output contains failure messages even if exit code was 0
+            try:
+                with open(log_file, "r") as f:
+                    output = f.read()
+            except OSError:
+                output = ""
+
             if output and self._check_calibration_failed(output):
                 logger.warning(
                     f"{camera}: Detected calibration failure in output despite exit code {process.returncode}"
@@ -489,11 +572,11 @@ class CalibrationManager:
                 completion_result["completed"] = False
                 completion_result["method"] = "output_parse"
 
-            with open(log_file, "w") as f:
+            with open(log_file, "a") as f:
+                f.write(f"\n--- Completion ---\n")
                 f.write(f"Completion method: {completion_result['method']}\n")
                 f.write(f"API success: {completion_result['api_success']}\n")
                 f.write(f"Process exit code: {completion_result['process_exit_code']}\n")
-                f.write(f"\n--- Output ---\n{output}")
 
             if completion_result["completed"]:
                 self.calibration_status[camera]["status"] = "completed"
@@ -683,20 +766,24 @@ class CalibrationManager:
     def get_calibration_data(self) -> Dict[str, Any]:
         """Get current calibration data from config
 
-        Returns calibration data including focal length and camera angles.
-        The angles are stored as arrays [angle1, angle2] representing
-        the camera's orientation angles.
+        Returns calibration data including focal length, camera angles,
+        and distortion calibration (matrix + distortion vector).
         """
         config = self.config_manager.get_config()
+        cameras = config.get("gs_config", {}).get("cameras", {})
 
         return {
             "camera1": {
-                "focal_length": config.get("gs_config", {}).get("cameras", {}).get("kCamera1FocalLength"),
-                "angles": config.get("gs_config", {}).get("cameras", {}).get("kCamera1Angles"),
+                "focal_length": cameras.get("kCamera1FocalLength"),
+                "angles": cameras.get("kCamera1Angles"),
+                "calibration_matrix": cameras.get("kCamera1CalibrationMatrix"),
+                "distortion_vector": cameras.get("kCamera1DistortionVector"),
             },
             "camera2": {
-                "focal_length": config.get("gs_config", {}).get("cameras", {}).get("kCamera2FocalLength"),
-                "angles": config.get("gs_config", {}).get("cameras", {}).get("kCamera2Angles"),
+                "focal_length": cameras.get("kCamera2FocalLength"),
+                "angles": cameras.get("kCamera2Angles"),
+                "calibration_matrix": cameras.get("kCamera2CalibrationMatrix"),
+                "distortion_vector": cameras.get("kCamera2DistortionVector"),
             },
         }
 
@@ -938,8 +1025,542 @@ class CalibrationManager:
 
         return False
 
+    async def run_distortion_calibration(
+        self, camera: str, target_images: int = DISTORTION_DEFAULT_TARGET_IMAGES
+    ) -> Dict[str, Any]:
+        """
+        Run lens distortion calibration using ChArUco board detection.
+
+        Captures images via rpicam-still, detects ChArUco corners with quality
+        validation, tracks spatial coverage, and runs OpenCV calibration with
+        iterative outlier rejection.
+
+        Args:
+            camera: "camera1" or "camera2"
+            target_images: Number of good images to collect (default 40)
+
+        Returns:
+            Dict with calibration results or error
+        """
+        if camera not in ["camera1", "camera2"]:
+            return {"status": "error", "message": "Invalid camera"}
+
+        if self.calibration_status[camera]["status"] in ["distortion_calibrating", "calibrating"]:
+            return {"status": "error", "message": "Calibration already running for this camera"}
+
+        try:
+            import cv2
+            import numpy as np
+            from charuco_detector import CompatibleCharucoDetector, CoverageTracker
+        except ImportError as e:
+            logger.error(f"Missing dependency for distortion calibration: {e}")
+            return {"status": "error", "message": f"Missing dependency: {e}"}
+
+        detector = CompatibleCharucoDetector(
+            squares_x=8, squares_y=11,
+            square_length=0.023, marker_length=0.017
+        )
+
+        image_dir = Path.home() / "LM_Shares" / "Images" / "distortion_calibration"
+        image_dir.mkdir(parents=True, exist_ok=True)
+
+        log_file = self.log_dir / (
+            f"distortion_calibration_{camera}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+        )
+        log_lines = []
+
+        def log_msg(msg: str) -> None:
+            log_lines.append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+            logger.info(f"Distortion({camera}): {msg}")
+
+        def friendly_rejection(reasons: str) -> str:
+            r = reasons.lower()
+            if "blurry" in r:
+                return "Too blurry -- hold the board steadier or improve lighting"
+            if "too small" in r or "coverage" in r:
+                return "Board is too far away -- move it closer to the camera"
+            if "edge" in r or "margin" in r:
+                return "Board is partially out of frame -- move it inward"
+            if "corners" in r or "insufficient" in r:
+                return "Board not fully visible -- make sure the full pattern is in frame and well-lit"
+            return reasons
+
+        self.calibration_status[camera] = {
+            "status": "distortion_calibrating",
+            "message": "Starting distortion calibration...",
+            "progress": 0,
+            "last_run": datetime.now().isoformat(),
+            "images_captured": 0,
+            "images_rejected": 0,
+            "target_images": target_images,
+            "coverage": None,
+        }
+
+        camera_index = 0 if camera == "camera1" else 1
+        await self.request_free_running(camera_index)
+
+        config = self.config_manager.get_config()
+        slot_key = "slot1" if camera == "camera1" else "slot2"
+        slot_config = config.get("cameras", {}).get(slot_key, {})
+        gain_key = "kCamera1Gain" if camera == "camera1" else "kCamera2Gain"
+        camera_gain = self.config_manager.get_config(f"gs_config.cameras.{gain_key}")
+        if camera_gain is None:
+            camera_gain = 6.0
+
+        all_corners = []
+        all_ids = []
+        sample_params = []
+        good_count = 0
+        rejected_count = 0
+        tilted_count = 0
+        max_attempts = target_images * DISTORTION_MAX_ATTEMPTS_MULTIPLIER
+        image_size = None
+        coverage_tracker = None
+
+        log_msg(f"Target: {target_images} images, camera index: {camera_index}")
+
+        min_pixel_coverage = 0.80   # 10×10 pixel grid; reachable in ~40 frames per coupon-collector
+        min_tilt_fraction = 0.40
+        size_bin_min_samples = 3
+        size_bin_edges = (0.10, 0.16)  # standard ball-tracking distance gives ~0.12 = medium
+        size_bins = {"small": 0, "medium": 0, "large": 0}
+
+        def bin_for(size: float) -> str:
+            if size < size_bin_edges[0]:
+                return "small"
+            if size < size_bin_edges[1]:
+                return "medium"
+            return "large"
+
+        try:
+            for attempt in range(max_attempts):
+                pixel_cov = (
+                    coverage_tracker.get_pixel_coverage_fraction()
+                    if coverage_tracker else 0.0
+                )
+                coverage_ok = pixel_cov >= min_pixel_coverage
+                tilt_ok = good_count > 0 and (tilted_count / good_count) >= min_tilt_fraction
+                size_ok = all(n >= size_bin_min_samples for n in size_bins.values())
+
+                if good_count >= target_images and coverage_ok and tilt_ok and size_ok:
+                    break
+
+                # Check if calibration was stopped
+                if self.calibration_status[camera]["status"] != "distortion_calibrating":
+                    log_msg("Calibration stopped by user")
+                    return {"status": "stopped", "message": "Calibration stopped"}
+
+                hint = ""
+                short_bin = next((b for b, n in size_bins.items() if n < size_bin_min_samples), None)
+                if not coverage_ok and coverage_tracker:
+                    suggested = coverage_tracker.get_suggested_region()
+                    hint = f"Move the board toward the {suggested} of the frame."
+                elif short_bin == "small":
+                    hint = "Hold the board farther from the camera for a few shots."
+                elif short_bin == "large":
+                    hint = "Bring the board closer to the camera for a few shots."
+                elif short_bin == "medium":
+                    hint = "Try the board at mid-range distance."
+                elif not tilt_ok:
+                    hint = "Tilt the board at an angle for the next few shots."
+                else:
+                    hint = "Hold the board steady and visible."
+
+                image_progress = min(good_count / target_images, 1.0)
+                cov_progress = min(pixel_cov / min_pixel_coverage, 1.0)
+                tilt_prog = min((tilted_count / good_count) / min_tilt_fraction, 1.0) if good_count > 0 else 0
+                size_prog = min(
+                    sum(min(n, size_bin_min_samples) for n in size_bins.values()) /
+                    (size_bin_min_samples * 3), 1.0
+                )
+                progress = int(
+                    (image_progress * 0.35 + cov_progress * 0.35 + tilt_prog * 0.15 + size_prog * 0.15) * 80
+                )
+
+                self.calibration_status[camera]["progress"] = progress
+                self.calibration_status[camera]["hint"] = hint
+                self.calibration_status[camera]["tilt_fraction"] = tilted_count / good_count if good_count > 0 else 0
+                self.calibration_status[camera]["pixel_coverage"] = pixel_cov
+                self.calibration_status[camera]["size_bins"] = dict(size_bins)
+
+                if good_count >= target_images and not (coverage_ok and tilt_ok and size_ok):
+                    self.calibration_status[camera]["message"] = (
+                        f"All {target_images} images captured -- collecting a few more for better accuracy."
+                    )
+                else:
+                    self.calibration_status[camera]["message"] = (
+                        f"Captured {good_count} of {target_images} images"
+                    )
+
+                image_path = image_dir / f"calib_{good_count + 1:02d}.png"
+                img = await self._capture_image(
+                    camera_index, image_path, camera_gain)
+
+                if img is None:
+                    rejected_count += 1
+                    log_msg(f"Attempt {attempt + 1}: Capture failed")
+                    await asyncio.sleep(DISTORTION_CAPTURE_INTERVAL)
+                    continue
+
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if len(img.shape) == 3 else img
+                if image_size is None:
+                    image_size = (gray.shape[1], gray.shape[0])
+                    coverage_tracker = CoverageTracker(image_size[0], image_size[1])
+
+                corners, ids, _, _ = detector.detect_charuco_corners(gray)
+                quality = detector.assess_image_quality(gray, corners)
+
+                if not quality["is_good"]:
+                    rejected_count += 1
+                    reasons = ", ".join(quality["reasons"])
+                    log_msg(f"Attempt {attempt + 1}: Rejected - {reasons}")
+                    self.calibration_status[camera]["message"] = (
+                        f"Skipped: {friendly_rejection(reasons)}"
+                    )
+                    self.calibration_status[camera]["images_rejected"] = rejected_count
+                    await asyncio.sleep(DISTORTION_CAPTURE_INTERVAL)
+                    continue
+
+                params = detector.compute_image_params(corners, image_size)
+                if params is None:
+                    rejected_count += 1
+                    log_msg(f"Attempt {attempt + 1}: Could not compute image parameters")
+                    await asyncio.sleep(DISTORTION_CAPTURE_INTERVAL)
+                    continue
+                if not detector.is_good_sample(params, sample_params):
+                    rejected_count += 1
+                    log_msg(f"Attempt {attempt + 1}: Too similar to existing sample")
+                    self.calibration_status[camera]["message"] = (
+                        "Skipped: board position too similar -- move it to a new area"
+                    )
+                    self.calibration_status[camera]["images_rejected"] = rejected_count
+                    await asyncio.sleep(DISTORTION_CAPTURE_INTERVAL)
+                    continue
+
+                if quality["tilt_score"] > 0.20:
+                    tilted_count += 1
+
+                size_bucket = bin_for(quality["coverage"])
+                size_bins[size_bucket] += 1
+
+                all_corners.append(corners)
+                all_ids.append(ids)
+                sample_params.append(params)
+                good_count += 1
+
+                coverage_tracker.update(corners)
+                coverage_data = coverage_tracker.to_dict()
+                self.calibration_status[camera]["coverage"] = coverage_data
+                self.calibration_status[camera]["images_captured"] = good_count
+                self.calibration_status[camera]["images_rejected"] = rejected_count
+                self.calibration_status[camera]["size_bins"] = dict(size_bins)
+
+                tilt_label = "tilted" if quality["tilt_score"] > 0.20 else "flat"
+                log_msg(
+                    f"Image {good_count}/{target_images} accepted "
+                    f"(sharpness: {quality['blur_score']:.0f}, "
+                    f"tilt: {tilt_label}, "
+                    f"size: {size_bucket} ({quality['coverage']:.0%}), "
+                    f"pixel coverage: {coverage_data['pixel_coverage']:.0%})"
+                )
+
+                # Positive feedback with coaching hint
+                if good_count < target_images and coverage_tracker:
+                    suggested = coverage_tracker.get_suggested_region()
+                    self.calibration_status[camera]["message"] = (
+                        f"Got it! ({good_count}/{target_images}) -- Try the {suggested} area next."
+                    )
+
+                await asyncio.sleep(DISTORTION_CAPTURE_INTERVAL)
+
+            if good_count < 3:
+                msg = "Could not capture enough usable images. Check lighting and board visibility."
+                log_msg(f"FAILED: Only captured {good_count} good images (need at least 3)")
+                self.calibration_status[camera]["status"] = "failed"
+                self.calibration_status[camera]["message"] = msg
+                self._write_distortion_log(log_file, log_lines)
+                return {"status": "failed", "message": msg, "log_file": str(log_file)}
+
+            # Log if coverage/tilt conditions were not fully met
+            tilt_fraction = tilted_count / good_count if good_count > 0 else 0
+            if not (coverage_ok and tilt_ok):
+                unmet = []
+                if not coverage_ok and coverage_tracker:
+                    unmet.append(f"coverage ({coverage_tracker.get_coverage_fraction():.0%})")
+                if not tilt_ok:
+                    unmet.append(f"tilt diversity ({tilt_fraction:.0%})")
+                log_msg(f"Proceeding with calibration despite unmet conditions: {', '.join(unmet)}")
+
+            # Run calibration with outlier rejection
+            self.calibration_status[camera]["message"] = "Processing calibration..."
+            self.calibration_status[camera]["progress"] = 85
+            log_msg(f"Running calibration on {good_count} images...")
+
+            # k3 is non-trivial on this lens (~-0.13); fixing it biases k1/k2.
+            rms, camera_matrix, dist_coeffs, rejected_indices, diagnostics = \
+                detector.calibrate_with_filtering(
+                    all_corners, all_ids, image_size,
+                    coverage_tracker=coverage_tracker,
+                    fix_k3=False)
+
+            if rejected_indices:
+                log_msg(f"Filtering removed {len(rejected_indices)} frame(s)")
+
+            log_msg(f"Calibration RMS error: {rms:.4f} pixels")
+            log_msg(
+                f"Per-view error: median {diagnostics['per_view_median']:.4f}px, "
+                f"max {diagnostics['per_view_max']:.4f}px")
+            log_msg(
+                f"Parameter uncertainty: fx=±{diagnostics['std_fx']:.2f}px, "
+                f"fy=±{diagnostics['std_fy']:.2f}px, "
+                f"cx=±{diagnostics['std_cx']:.2f}px, "
+                f"cy=±{diagnostics['std_cy']:.2f}px")
+            # >5 px std on fx/fy means the pose set didn't constrain intrinsics.
+            if max(diagnostics['std_fx'], diagnostics['std_fy']) > 5.0:
+                log_msg(
+                    "Warning: high focal-length uncertainty — capture more poses "
+                    "with varied board distance and tilt.")
+
+            if rms > 0.7:
+                log_msg(f"Warning: RMS error ({rms:.4f}) is above target (0.7). "
+                        "Consider recalibrating with more diverse board positions.")
+
+            if rms > 1.2:
+                msg = (f"Calibration quality too low (RMS {rms:.2f}px). "
+                       "Try again with the board in more varied positions and angles.")
+                log_msg(f"REJECTED: {msg}")
+                self.calibration_status[camera]["status"] = "failed"
+                self.calibration_status[camera]["message"] = msg
+                self._write_distortion_log(log_file, log_lines)
+                return {"status": "failed", "message": msg, "rms_error": float(rms),
+                        "log_file": str(log_file)}
+
+            self.calibration_status[camera]["message"] = "Saving calibration results..."
+            self.calibration_status[camera]["progress"] = 95
+
+            self._save_distortion_results(camera, camera_matrix, dist_coeffs, rms)
+            log_msg("Calibration results saved to configuration")
+
+            quality_label = (
+                "Excellent" if rms < 0.4 else
+                "Good" if rms < 0.6 else
+                "Acceptable" if rms <= 0.9 else
+                "Poor"
+            )
+            self.calibration_status[camera]["status"] = "completed"
+            self.calibration_status[camera]["message"] = (
+                f"Calibration complete -- accuracy: {quality_label} (error: {rms:.2f}px)"
+            )
+            self.calibration_status[camera]["progress"] = 100
+
+            self._write_distortion_log(log_file, log_lines)
+
+            return {
+                "status": "success",
+                "camera_matrix": camera_matrix.tolist(),
+                "dist_coeffs": dist_coeffs.flatten().tolist(),
+                "rms_error": float(rms),
+                "images_used": good_count - len(rejected_indices),
+                "images_rejected": rejected_count + len(rejected_indices),
+                "coverage": coverage_tracker.to_dict() if coverage_tracker else None,
+                "tilt_diversity": tilt_fraction,
+                "log_file": str(log_file),
+            }
+
+        except Exception as e:
+            logger.error(f"Distortion calibration failed: {e}", exc_info=True)
+            log_msg(f"ERROR: {e}")
+            self.calibration_status[camera]["status"] = "error"
+            self.calibration_status[camera]["message"] = str(e)
+            self._write_distortion_log(log_file, log_lines)
+            return {"status": "error", "message": str(e), "log_file": str(log_file)}
+        finally:
+            await self.release_free_running(camera_index)
+
+    def _detect_capture_backend(self) -> str:
+        """Auto-detect whether to use rpicam-still (Pi) or cv2.VideoCapture (webcam)."""
+        if shutil.which("rpicam-still"):
+            logger.info("Capture backend: rpicam-still")
+            return "rpicam"
+        logger.info("Capture backend: webcam (rpicam-still not found)")
+        return "webcam"
+
+    async def _capture_image(
+        self, camera_index: int, output_path: Path, gain: float
+    ) -> Optional[Any]:
+        import cv2
+
+        # Prefer the shared frame from the live feed — avoids conflicting with
+        # rpicam-vid which holds exclusive libcamera access to the camera.
+        frame = self._shared_frames.get(camera_index)
+        if frame is not None:
+            frame = frame.copy()
+            cv2.imwrite(str(output_path), frame)
+            return frame
+
+        if self._capture_backend == "rpicam":
+            return await self._capture_rpicam_image(camera_index, output_path, gain)
+        return await self._capture_webcam_image(camera_index, output_path)
+
+    def set_shared_frame(self, camera_index: int, frame) -> None:
+        self._shared_frames[camera_index] = frame
+
+    def clear_shared_frame(self, camera_index: int) -> None:
+        self._shared_frames.pop(camera_index, None)
+
+    async def _capture_webcam_image(
+        self, camera_index: int, output_path: Path
+    ) -> Optional[Any]:
+        import cv2
+
+        # Use shared frame from the live feed if available
+        frame = self._shared_frames.get(camera_index)
+        if frame is not None:
+            logger.debug(f"Using shared frame for camera {camera_index}: shape={frame.shape}")
+            frame = frame.copy()
+            cv2.imwrite(str(output_path), frame)
+            return frame
+        logger.debug(f"No shared frame for camera {camera_index}, keys={list(self._shared_frames.keys())}")
+
+        # No live feed — open camera directly at max resolution
+        def _grab():
+            cap = cv2.VideoCapture(camera_index)
+            if not cap.isOpened():
+                logger.warning(f"Could not open webcam at index {camera_index}")
+                return None
+            try:
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 3840)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160)
+                # Grab a few frames to let auto-exposure settle
+                for _ in range(5):
+                    cap.read()
+                ret, frame = cap.read()
+                if not ret or frame is None:
+                    logger.warning("Webcam read() returned no frame")
+                    return None
+                cv2.imwrite(str(output_path), frame)
+                return frame
+            finally:
+                cap.release()
+
+        try:
+            loop = asyncio.get_running_loop()
+            return await asyncio.wait_for(
+                loop.run_in_executor(None, _grab),
+                timeout=DISTORTION_CAPTURE_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            logger.warning("Webcam capture timed out")
+            return None
+        except Exception as e:
+            logger.error(f"Webcam capture error: {e}")
+            return None
+
+    async def _capture_rpicam_image(
+        self, camera_index: int, output_path: Path, gain: float
+    ) -> Optional[Any]:
+        cmd = [
+            "rpicam-still",
+            "--camera", str(camera_index),
+            "-o", str(output_path),
+            "--gain", str(gain),
+            "--timeout", "1",
+            "--nopreview",
+            "--encoding", "png",
+            "--shutter", str(RPICAM_CAL_SHUTTER_US),
+            "--awbgains", "1.0,1.0",
+            "--denoise", "cdn_off",
+            "--tuning-file", RPICAM_TUNING_FILE,
+        ]
+
+        process = None
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(), timeout=DISTORTION_CAPTURE_TIMEOUT)
+
+            if process.returncode != 0:
+                logger.warning(f"rpicam-still failed (rc={process.returncode}): {stderr.decode()}")
+                return None
+
+            if not output_path.exists():
+                logger.warning(f"rpicam-still produced no output file: {output_path}")
+                return None
+
+            import cv2
+            img = cv2.imread(str(output_path))
+            if img is None:
+                logger.warning(f"Failed to read captured image: {output_path}")
+            return img
+
+        except asyncio.TimeoutError:
+            logger.warning("rpicam-still capture timed out")
+            return None
+        except FileNotFoundError:
+            logger.error("rpicam-still not found - is this running on a Raspberry Pi?")
+            return None
+        except Exception as e:
+            logger.error(f"Error capturing image: {e}")
+            return None
+        finally:
+            if process is not None and process.returncode is None:
+                try:
+                    process.terminate()
+                    await asyncio.wait_for(process.wait(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    process.kill()
+                    await process.wait()
+                except ProcessLookupError:
+                    pass
+
+    def _save_distortion_results(
+        self, camera: str, camera_matrix, dist_coeffs, rms_error: float
+    ) -> None:
+        """Atomically save camera matrix + distortion vector. C++ hardcodes 3×3 / 5-element."""
+        camera_num = "1" if camera == "camera1" else "2"
+        matrix_key = f"gs_config.cameras.kCamera{camera_num}CalibrationMatrix"
+        distortion_key = f"gs_config.cameras.kCamera{camera_num}DistortionVector"
+
+        matrix_list = camera_matrix.tolist()
+        dist_list = dist_coeffs.flatten().tolist()
+
+        if len(matrix_list) != 3 or any(len(row) != 3 for row in matrix_list):
+            raise RuntimeError(
+                f"Refusing to save: camera matrix shape is not 3×3 "
+                f"(got {len(matrix_list)} rows). C++ consumer expects 3×3."
+            )
+        if len(dist_list) != 5:
+            raise RuntimeError(
+                f"Refusing to save: distortion vector has {len(dist_list)} "
+                "elements, C++ consumer expects exactly 5."
+            )
+
+        success, message = self.config_manager.set_calibration_batch({
+            matrix_key: matrix_list,
+            distortion_key: dist_list,
+        })
+        if not success:
+            raise RuntimeError(f"Failed to save calibration: {message}")
+
+        logger.info(f"Distortion calibration saved for {camera} (RMS={rms_error:.4f})")
+
+    def _write_distortion_log(self, log_file: Path, log_lines: List[str]) -> None:
+        """Write distortion calibration log to file."""
+        try:
+            with open(log_file, "w") as f:
+                f.write("\n".join(log_lines))
+        except Exception as e:
+            logger.error(f"Failed to write distortion log: {e}")
+
     async def stop_calibration(self, camera: Optional[str] = None) -> Dict[str, Any]:
         """Stop running calibration process(es)
+
+        Handles both ball-based calibration (process termination) and
+        distortion calibration (status flag to break capture loop).
 
         Args:
             camera: Specific camera to stop, or None to stop all
@@ -947,6 +1568,22 @@ class CalibrationManager:
         Returns:
             Dict with stop status
         """
+        # Signal distortion calibration to stop via status flag
+        distortion_stopped = []
+        if camera:
+            if self.calibration_status[camera]["status"] == "distortion_calibrating":
+                self.calibration_status[camera]["status"] = "stopping"
+                self.calibration_status[camera]["message"] = "Stopping..."
+                distortion_stopped.append(camera)
+                logger.info(f"Signaled distortion calibration stop for {camera}")
+        else:
+            for cam in ["camera1", "camera2"]:
+                if self.calibration_status[cam]["status"] == "distortion_calibrating":
+                    self.calibration_status[cam]["status"] = "stopping"
+                    self.calibration_status[cam]["message"] = "Stopping..."
+                    distortion_stopped.append(cam)
+                    logger.info(f"Signaled distortion calibration stop for {cam}")
+
         async with self._process_lock:
             if camera:
                 if camera in self.current_processes:
@@ -959,9 +1596,13 @@ class CalibrationManager:
                     except Exception as e:
                         logger.error(f"Failed to stop calibration for {camera}: {e}")
                         return {"status": "error", "message": str(e), "camera": camera}
+                if distortion_stopped:
+                    return {"status": "stopping", "cameras": distortion_stopped}
                 return {"status": "not_running", "camera": camera}
             else:
                 if not self.current_processes:
+                    if distortion_stopped:
+                        return {"status": "stopping", "cameras": distortion_stopped}
                     return {"status": "not_running"}
 
                 stopped_cameras = []

@@ -151,6 +151,14 @@ class TestPiTracProcessManager:
 
         assert manager.get_pid() is None
 
+    def test_get_pid_when_poll_raises(self, manager):
+        """Test get_pid returns None when process.poll() raises OSError"""
+        mock_process = Mock()
+        mock_process.poll.side_effect = OSError("device error")
+        manager.process = mock_process
+
+        assert manager.get_pid() is None
+
 
 
 

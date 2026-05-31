@@ -1,245 +1,110 @@
-/* Calibration Page Styles - extends dashboard.css theme system */
+/* Calibration page */
 
-/* Main content wrapper */
-.main-content {
-    padding: 2rem;
-    max-width: 1400px;
-    margin: 0 auto;
+/* ---- Camera selection cards ---- */
+.camera-option input:checked + .card {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 12px oklch(59% 0.17 270 / 0.3);
 }
 
-/* Status Bar */
-.status-bar {
-    display: flex;
-    gap: 2rem;
-    background: var(--bg-card);
-    padding: 1rem;
-    border-radius: 8px;
-    margin-bottom: 2rem;
-    box-shadow: var(--shadow-sm);
-}
-
-.status-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.status-label {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-}
-
-.status-value {
-    color: var(--text-primary);
-    font-weight: 600;
-}
-
-/* Calibration Wizard */
-.calibration-wizard {
-    background: var(--bg-card);
-    border-radius: 12px;
-    padding: 2rem;
-    margin-bottom: 2rem;
-    box-shadow: var(--shadow-md);
-}
-
-/* Wizard Steps */
+/* ---- Wizard steps ---- */
 .wizard-steps {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 3rem;
     position: relative;
+    z-index: 0;
 }
 
-.wizard-steps::before {
-    content: '';
+/* Connecting line behind the circles */
+.wizard-line {
     position: absolute;
     top: 20px;
     left: 10%;
     right: 10%;
     height: 2px;
-    background: var(--border-color);
+    background: var(--color-base-300);
     z-index: 0;
 }
 
-.step {
+.wizard-steps .step {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.5rem;
-    position: relative;
     z-index: 1;
+    flex: 1;
 }
 
-.step-number {
+.step-circle {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: var(--border-color);
-    color: var(--text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: bold;
-    transition: all 0.3s ease;
-}
-
-.step.active .step-number {
-    background: var(--accent-primary);
-    color: white;
-    box-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
-}
-
-.step.completed .step-number {
-    background: var(--success);
-    color: white;
+    font-weight: 700;
+    font-size: 0.9rem;
+    background: var(--color-base-300);
+    color: var(--color-base-content);
+    border: 2px solid var(--color-base-300);
+    transition: all 0.3s;
 }
 
 .step-label {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-}
-
-.step.active .step-label {
-    color: var(--text-primary);
+    font-size: 0.75rem;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.6;
+    transition: all 0.3s;
 }
 
-/* Wizard Content */
-.wizard-content {
-    animation: fadeIn 0.3s ease;
+.wizard-steps .step.active .step-circle {
+    background: var(--color-primary);
+    color: var(--color-primary-content);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 12px rgba(102, 126, 234, 0.4);
 }
 
-
-.wizard-content h2 {
-    color: var(--text-primary);
-    margin-bottom: 1.5rem;
+.wizard-steps .step.active .step-label {
+    opacity: 1;
+    color: var(--color-primary);
 }
 
-/* Setup Instructions */
-.setup-instructions {
-    background: var(--bg-hover);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
+.wizard-steps .step.completed .step-circle {
+    background: var(--color-success);
+    color: var(--color-primary-content);
+    border-color: var(--color-success);
 }
 
-.setup-instructions h3 {
-    color: var(--text-primary);
-    margin-bottom: 1rem;
+.wizard-steps .step.completed .step-label {
+    opacity: 0.7;
 }
 
-.setup-instructions ol {
-    margin: 0;
-    padding-left: 1.5rem;
-    color: var(--text-primary);
-}
-
-.setup-instructions li {
-    margin-bottom: 0.5rem;
-}
-
-/* Camera Selection */
-.camera-selection {
-    margin-bottom: 2rem;
-}
-
-.camera-selection h3 {
-    color: var(--text-primary);
-    margin-bottom: 1rem;
-}
-
-.camera-options {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-}
-
-.camera-option {
-    cursor: pointer;
-}
-
-.camera-option input {
-    display: none;
-}
-
-.camera-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 1.5rem;
-    background: var(--bg-hover);
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    transition: all 0.3s ease;
-}
-
-.camera-option input:checked + .camera-card {
-    border-color: var(--accent-primary);
-    background: var(--bg-hover);
-    box-shadow: var(--shadow-md);
-}
-
-.camera-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-}
-
-.camera-icon {
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
-    font-weight: bold;
-    color: var(--text-primary);
-}
-
-.camera-name {
-    font-weight: 600;
-    color: var(--text-primary);
+/* ---- Progress bars ---- */
+div.progress-bar {
+    display: block;
+    width: 100%;
+    height: 10px;
+    background: var(--color-base-300);
+    border-radius: 9999px;
+    overflow: hidden;
     margin-bottom: 0.25rem;
 }
 
-.camera-desc {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
+div.progress-bar > .progress-fill {
+    display: block;
+    height: 100%;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+    border-radius: 9999px;
+    transition: width 0.3s ease;
+    width: 0%;
 }
 
-/* Verification Panel */
-.verification-panel {
-    margin-bottom: 2rem;
-}
-
-.camera-views {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2rem;
-    margin-bottom: 2rem;
-}
-
-@media (max-width: 768px) {
-    .camera-views {
-        grid-template-columns: 1fr;
-    }
-}
-
-.camera-view {
-    background: var(--bg-hover);
-    border-radius: 8px;
-    padding: 1.5rem;
-    border: 1px solid var(--border-color);
-}
-
-.camera-view h3 {
-    color: var(--text-primary);
-    margin-bottom: 1rem;
-}
-
+/* ---- Camera preview ---- */
 .camera-preview {
     width: 100%;
     height: 300px;
     background: #000;
-    border-radius: 8px;
-    margin-bottom: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 0.75rem;
     position: relative;
     overflow: hidden;
 }
@@ -256,447 +121,108 @@
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: var(--text-secondary);
+    opacity: 0.5;
 }
 
-.camera-placeholder span {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-}
-
-.camera-controls {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-}
-
+/* ---- Ball status ---- */
 .ball-status {
     padding: 0.75rem;
-    border-radius: 4px;
-    font-size: 0.9rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
 }
 
 .ball-status.success {
-    background: rgba(72, 187, 120, 0.2);
-    border: 1px solid var(--success);
-    color: var(--success);
+    background: oklch(70% 0.14 160 / 0.15);
+    border: 1px solid oklch(70% 0.14 160);
+    color: oklch(70% 0.14 160);
 }
 
 .ball-status.error {
-    background: rgba(245, 101, 101, 0.2);
-    border: 1px solid var(--error);
-    color: var(--error);
+    background: oklch(65% 0.19 25 / 0.15);
+    border: 1px solid oklch(65% 0.19 25);
+    color: oklch(65% 0.19 25);
 }
 
-/* Calibration Options */
-.method-cards {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2rem;
-    margin-top: 1.5rem;
-}
-
-@media (max-width: 768px) {
-    .method-cards {
-        grid-template-columns: 1fr;
-    }
-}
-
-.method-card {
-    background: var(--bg-hover);
-    border: 2px solid var(--border-color);
-    border-radius: 12px;
-    padding: 2rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.method-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--accent-primary);
-}
-
-.method-icon {
-    font-size: 2rem;
-    margin-bottom: 1rem;
-    font-weight: bold;
-    color: var(--accent-primary);
-}
-
-.method-card h4 {
-    color: var(--text-primary);
-    margin-bottom: 1rem;
-}
-
-.method-card p {
-    color: var(--text-secondary);
-    margin-bottom: 1.5rem;
-    font-size: 0.9rem;
-}
-
-/* Calibration Progress */
-.calibration-progress {
-    background: var(--bg-hover);
-    border-radius: 8px;
-    padding: 2rem;
-    margin-top: 2rem;
-    border: 1px solid var(--border-color);
-}
-
-.progress-cameras {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2rem;
-    margin: 2rem 0;
-}
-
-.progress-camera h4 {
-    color: var(--text-primary);
-    margin-bottom: 1rem;
-}
-
-.progress-bar {
-    height: 8px;
-    background: var(--border-color);
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 0.5rem;
-}
-
-.progress-fill {
-    height: 100%;
-    background: var(--accent-gradient);
-    border-radius: 4px;
-    transition: width 0.3s ease;
-    width: 0%;
-}
-
-.progress-status {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-}
-
+/* ---- Completion details ---- */
 .completion-details {
-    margin-top: 0.5rem;
-    font-size: 0.75rem;
-    color: var(--success);
+    color: oklch(70% 0.14 160);
     line-height: 1.4;
 }
 
-.calibration-log {
-    margin-top: 2rem;
-}
-
-.calibration-log h4 {
-    color: var(--text-primary);
-    margin-bottom: 1rem;
-}
-
+/* ---- Terminal log ---- */
 .log-content {
     background: #000;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border: 1px solid var(--color-base-300, oklch(15% 0.008 275));
+    border-radius: 0.25rem;
     padding: 1rem;
     height: 200px;
     overflow-y: auto;
-    font-family: monospace;
+    font-family: ui-monospace, monospace;
     font-size: 0.85rem;
     color: #0f0;
 }
 
-.calibration-controls {
-    display: flex;
-    justify-content: center;
-    margin-top: 2rem;
-}
-
-/* Results */
-.calibration-results {
-    text-align: center;
-}
-
-.success-icon {
-    font-size: 3rem;
-    margin-bottom: 2rem;
-    color: var(--success);
-    font-weight: bold;
-}
-
-.results-summary h3 {
-    color: var(--text-primary);
-    margin-bottom: 2rem;
-}
-
-.result-cards {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2rem;
-    margin-bottom: 3rem;
-}
-
-.result-card {
-    background: var(--bg-hover);
-    border-radius: 8px;
-    padding: 1.5rem;
-    border: 1px solid var(--border-color);
-}
-
-.result-card h4 {
-    color: var(--accent-primary);
-    margin-bottom: 1.5rem;
-}
-
-.result-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.result-item:last-child {
-    border-bottom: none;
-}
-
-.result-label {
-    color: var(--text-secondary);
-}
-
-.result-value {
-    color: var(--text-primary);
-    font-weight: 600;
-}
-
-/* Next Steps */
-.next-steps {
-    background: var(--bg-hover);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-    text-align: left;
-}
-
-.next-steps h3 {
-    color: var(--text-primary);
-    margin-bottom: 1rem;
-}
-
-.next-steps ol {
-    margin: 0;
-    padding-left: 1.5rem;
-    color: var(--text-primary);
-}
-
-/* Wizard Actions */
-.wizard-actions {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 2rem;
-    padding-top: 2rem;
-    border-top: 1px solid var(--border-color);
-}
-
-.wizard-actions button:only-child {
-    margin-left: auto;
-}
-
-/* Current Calibration Data */
-.current-calibration {
-    background: var(--bg-card);
-    border-radius: 12px;
-    padding: 2rem;
-    box-shadow: var(--shadow-md);
-}
-
-.current-calibration h3 {
-    color: var(--text-primary);
-    margin-bottom: 1.5rem;
-}
-
+/* ---- Calibration data grid ---- */
 .calibration-data-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
+    gap: 0.75rem;
 }
 
 .calibration-data-item {
-    background: var(--bg-hover);
-    padding: 1rem;
-    border-radius: 8px;
+    background: var(--color-base-300, oklch(15% 0.008 275));
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--color-base-300, oklch(15% 0.008 275));
 }
 
 .calibration-data-label {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
+    opacity: 0.6;
+    font-size: 0.875rem;
 }
 
 .calibration-data-value {
-    color: var(--text-primary);
     font-weight: 600;
-    font-family: monospace;
+    font-family: ui-monospace, monospace;
 }
 
-.btn-primary:disabled {
-    background: var(--border-color);
-    cursor: not-allowed;
-    transform: none;
+/* ---- Distortion coverage grid (ChArUco) ---- */
+.coverage-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 3px;
+    width: 180px;
+    height: 120px;
 }
 
-[data-theme="dark"] .btn-secondary {
-    background: var(--border-color);
-    color: var(--text-primary);
+.coverage-cell {
+    background: var(--color-base-300);
+    border-radius: 2px;
+    transition: background 0.3s;
 }
 
-[data-theme="dark"] .btn-secondary:hover {
-    background: var(--text-secondary);
+.coverage-cell[data-count="1"] {
+    background: color-mix(in oklch, var(--color-success) 35%, var(--color-base-300));
 }
 
-/* Alerts */
-.alert {
-    padding: 1rem;
-    border-radius: 6px;
-    margin-bottom: 1rem;
+.coverage-cell[data-count="2"] {
+    background: color-mix(in oklch, var(--color-success) 65%, var(--color-base-300));
 }
 
-.alert-info {
-    background: var(--bg-hover);
-    border: 1px solid var(--info);
-    color: var(--info);
+.coverage-cell[data-count="3"] {
+    background: var(--color-success);
 }
 
-.alert-success {
-    background: rgba(72, 187, 120, 0.1);
-    border: 1px solid var(--success);
-    color: var(--success);
+/* ---- Light theme ---- */
+[data-theme="light"] .calibration-data-item {
+    background: var(--color-base-200);
+    border-color: var(--color-base-300);
 }
 
-.alert-error {
-    background: rgba(245, 101, 101, 0.1);
-    border: 1px solid var(--error);
-    color: var(--error);
-}
-
-/* Strobe Calibration */
-.strobe-calibration {
-    background: var(--bg-card);
-    border-radius: 12px;
-    padding: 2rem;
-    margin-bottom: 2rem;
-    box-shadow: var(--shadow-md);
-}
-
-.strobe-header {
-    margin-bottom: 1.5rem;
-}
-
-.strobe-header h3 {
-    color: var(--text-primary);
-    margin-bottom: 1rem;
-}
-
-.strobe-status-bar {
-    display: flex;
-    gap: 2rem;
-    background: var(--bg-hover);
-    padding: 0.75rem 1rem;
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
-}
-
-.strobe-controls {
-    margin-bottom: 1.5rem;
-}
-
-.strobe-control-row {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-.strobe-label {
-    color: var(--text-secondary);
-    font-weight: 600;
-    min-width: 80px;
-}
-
-.strobe-select {
-    padding: 0.5rem 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background: var(--bg-hover);
-    color: var(--text-primary);
-    font-size: 0.95rem;
-    cursor: pointer;
-}
-
-.strobe-calibration .progress-bar {
-    margin-bottom: 0.5rem;
-}
-
-.strobe-calibration h4 {
-    color: var(--text-primary);
-    margin-bottom: 1rem;
-}
-
-#strobe-result-area .result-card {
-    border-width: 2px;
-    border-style: solid;
-    border-color: var(--border-color);
-    transition: border-color 0.3s ease;
-}
-
-#strobe-diagnostics-area {
-    margin-top: 1.5rem;
-}
-
-#strobe-diagnostics-area h4 {
-    color: var(--text-primary);
-    margin-bottom: 1rem;
-}
-
-#strobe-diagnostics-warning {
-    margin-top: 1rem;
-}
-
-/* Mobile Responsive */
-@media (max-width: 768px) {
-    .main-content {
-        padding: 1rem;
-    }
-
-    .calibration-wizard {
-        padding: 1rem;
-    }
-
-    .wizard-steps {
-        margin-bottom: 2rem;
-    }
-
-    .step-label {
-        font-size: 0.8rem;
-    }
-
-    .camera-options {
-        grid-template-columns: 1fr;
-    }
-
-    .result-cards {
-        grid-template-columns: 1fr;
-    }
-
-    .strobe-status-bar {
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-
-    .strobe-control-row {
-        flex-wrap: wrap;
-    }
+[data-theme="light"] .log-content {
+    border-color: var(--color-base-300);
 }

@@ -8,6 +8,7 @@ import asyncio
 import gc
 import logging
 import os
+import subprocess
 import time
 from typing import Any, Dict, Optional
 
@@ -92,6 +93,8 @@ class StrobeCalibrationManager:
         if DigitalOutputDevice is None:
             raise RuntimeError("gpiozero library not available -- not running on a Raspberry Pi?")
 
+        saved_cwd = os.getcwd()
+
         self._spi_dac = spidev.SpiDev()
         self._spi_dac.open(self.SPI_BUS, self.SPI_DAC_DEVICE)
         self._spi_dac.max_speed_hz = self.SPI_MAX_SPEED_HZ
@@ -103,6 +106,8 @@ class StrobeCalibrationManager:
         self._spi_adc.mode = 0
 
         self._diag_pin = DigitalOutputDevice(self.DIAG_GPIO_PIN)
+
+        os.chdir(saved_cwd)
 
     def _close_hardware(self):
         for name, resource in [("diag", self._diag_pin),
@@ -121,6 +126,19 @@ class StrobeCalibrationManager:
         self._diag_pin = None
         self._spi_dac = None
         self._spi_adc = None
+
+        # gpiozero leaves GPIO10 in GPIO mode after close(); restore SPI0 MOSI.
+        try:
+            result = subprocess.run(
+                ["pinctrl", "set", str(self.DIAG_GPIO_PIN), "a0"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if result.returncode != 0:
+                logger.warning("pinctrl restore SPI0 MOSI: %s", result.stderr.strip())
+        except FileNotFoundError:
+            logger.warning("pinctrl not found — reboot required to restore SPI0")
+        except Exception:
+            logger.warning("Failed to restore SPI0 MOSI", exc_info=True)
 
     # ------------------------------------------------------------------
     # DAC / ADC primitives

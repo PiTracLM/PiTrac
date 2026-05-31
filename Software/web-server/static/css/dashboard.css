@@ -1,261 +1,134 @@
-/* Dashboard-specific styles */
+/* Dashboard — custom styles that daisyUI/Tailwind can't cover */
 
-/* ===== Dashboard Layout ===== */
-.dashboard-layout {
-    display: grid;
-    grid-template-columns: minmax(320px, 1fr) minmax(400px, 1.2fr);
-    gap: 1rem;
-    align-items: stretch;
+/* Left accent border on all metric cards */
+.metric-card {
+    border-left: 3px solid var(--color-primary);
 }
 
-/* ===== Status Strip ===== */
+/* Metric value pop animation on update */
+.metric-number.updated {
+    animation: metricPop 0.5s ease-out;
+    color: var(--color-primary);
+}
+
+@keyframes metricPop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.06); }
+    100% { transform: scale(1); }
+}
+
+/* Status strip — accent left border changes per state */
 .status-strip {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.625rem 1rem;
-    background: var(--bg-card);
-    border-radius: 0.75rem;
-    border: 1px solid var(--border-color);
-    border-left: 3px solid var(--text-muted);
-    box-shadow: var(--shadow-sm);
-    transition: all 0.3s ease;
-    min-height: 0;
-}
-
-.status-strip-icon {
-    width: 36px;
-    height: 36px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.status-strip-icon .ball-icon {
-    width: 100%;
-    height: 100%;
-    background-color: var(--text-muted);
-    -webkit-mask-image: url('/static/golf_ball.svg');
-    -webkit-mask-size: contain;
-    -webkit-mask-repeat: no-repeat;
-    -webkit-mask-position: center;
-    mask-image: url('/static/golf_ball.svg');
-    mask-size: contain;
-    mask-repeat: no-repeat;
-    mask-position: center;
+    border-left: 3px solid color-mix(in oklch, var(--color-base-content) 30%, transparent);
     transition: all 0.3s ease;
 }
 
-.status-strip-content {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+/* Golf ball mask icon in the status strip */
+.status-strip .ball-icon {
+    background-color: color-mix(in oklch, var(--color-base-content) 30%, transparent);
+    mask: url('/static/golf_ball.svg') center / contain no-repeat;
+    -webkit-mask: url('/static/golf_ball.svg') center / contain no-repeat;
+    transition: all 0.3s ease;
 }
 
-.status-strip-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    white-space: nowrap;
-}
-
-.status-strip-separator {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    user-select: none;
-}
-
+/* Status strip message — in CSS because JS resets className */
 .status-strip-message {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
+    font-size: 0.875rem;
+    color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.status-strip-actions {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.status-strip .btn-reset {
-    padding: 0.35rem 0.85rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    border: 1px solid var(--border-color);
-    border-radius: 0.375rem;
-    background: var(--bg-elevated);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.status-strip .btn-reset:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-    border-color: var(--accent-primary);
-}
-
-/* Status Strip States */
-.status-strip.initializing {
-    border-left-color: var(--info);
-}
+/* Status strip states */
+.status-strip.initializing { border-left-color: var(--color-info); }
 .status-strip.initializing .ball-icon {
-    background-color: var(--info);
+    background-color: var(--color-info);
     animation: pulse 2s infinite;
 }
 
-.status-strip.waiting {
-    border-left-color: var(--warning);
-}
+.status-strip.waiting { border-left-color: var(--color-warning); }
 .status-strip.waiting .ball-icon {
-    background-color: var(--warning);
+    background-color: var(--color-warning);
     animation: pulse 2s infinite;
 }
 
-.status-strip.stabilizing {
-    border-left-color: #fbbf24;
-}
+.status-strip.stabilizing { border-left-color: #fbbf24; }
 .status-strip.stabilizing .ball-icon {
     background-color: #fbbf24;
     animation: bounce 1s infinite;
 }
 
 .status-strip.ready {
-    border-left-color: var(--success);
-    background: linear-gradient(90deg, rgba(72, 187, 120, 0.06) 0%, var(--bg-card) 40%);
+    border-left-color: var(--color-success);
+    background: linear-gradient(90deg, color-mix(in oklch, var(--color-success) 6%, transparent) 0%, transparent 40%);
 }
 .status-strip.ready .ball-icon {
-    background-color: var(--success);
+    background-color: var(--color-success);
     transform: scale(1.05);
 }
-.status-strip.ready .status-strip-title {
-    color: var(--success);
+.status-strip.ready #status-strip-title {
+    color: var(--color-success);
 }
 
-.status-strip.hit {
-    border-left-color: var(--accent-primary);
-}
+.status-strip.hit { border-left-color: var(--color-primary); }
 .status-strip.hit .ball-icon {
-    background-color: var(--accent-primary);
+    background-color: var(--color-primary);
     animation: none;
 }
 
-.status-strip.error {
-    border-left-color: var(--error);
-}
+.status-strip.error { border-left-color: var(--color-error); }
 .status-strip.error .ball-icon {
-    background-color: var(--error);
+    background-color: var(--color-error);
 }
 
-/* ===== Metrics Panel ===== */
-.metrics-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-/* ===== Metric Cards — shared ===== */
-.metric-card {
-    background: var(--bg-card);
-    border-radius: 0.75rem;
-    padding: 1.5rem 1.5rem;
-    border: 1px solid var(--border-color);
-    border-left: 3px solid var(--accent-primary);
-    box-shadow: var(--shadow-sm);
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.metric-card:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-}
-
-.metric-label {
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
-    margin-bottom: 0.4rem;
-}
-
-.metric-number {
-    font-size: clamp(2.5rem, 5vw, 3.25rem);
-    font-weight: 700;
-    color: var(--text-primary);
-    line-height: 1.1;
-    font-variant-numeric: tabular-nums;
-    transition: color 0.3s ease;
-}
-
-.metric-unit {
-    font-size: clamp(1rem, 1.8vw, 1.25rem);
-    font-weight: 400;
-    color: var(--text-muted);
-    margin-left: 0.25rem;
-}
-
-.metric-number.updated {
-    animation: metricPop 0.5s ease-out;
-    color: var(--accent-primary);
-}
-
-@keyframes metricPop {
-    0% { transform: scale(1); }
-    40% { transform: scale(1.06); }
-    100% { transform: scale(1); }
-}
-
-/* ===== Hero Card (Ball Speed) ===== */
-.metric-card.hero {
-    background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-elevated) 100%);
-}
-
-.metric-card.hero .metric-number {
-    font-size: clamp(3.25rem, 7vw, 4.5rem);
-}
-
-.metric-card.hero .metric-label {
-    font-size: 0.9rem;
-}
-
-/* ===== 2x2 Sub-Grid ===== */
-.metrics-sub-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-}
-
-/* ===== Image Panel ===== */
-.image-panel {
-    background: var(--bg-card);
-    border-radius: 0.75rem;
-    border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
+/* Image panel inner — in CSS because JS resets className directly */
 .image-panel-inner {
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 1rem;
-    position: relative;
+    min-height: 300px;
 }
 
+/* Empty state — centered with a ring around the golf ball */
+.image-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    padding: 3rem 2rem;
+    text-align: center;
+    width: 100%;
+}
+
+.empty-icon {
+    width: 4rem;
+    height: 4rem;
+    padding: 1rem;
+    box-sizing: content-box;
+    background-color: color-mix(in oklch, var(--color-base-content) 20%, transparent);
+    mask: url('/static/golf_ball.svg') center / contain no-repeat;
+    -webkit-mask: url('/static/golf_ball.svg') center / contain no-repeat;
+    border-radius: 9999px;
+}
+
+/* Ring behind the golf ball icon */
+.image-empty-state .empty-icon {
+    outline: 2px dashed color-mix(in oklch, var(--color-base-content) 12%, transparent);
+    outline-offset: 8px;
+}
+
+.empty-text {
+    font-size: 0.875rem;
+    color: color-mix(in oklch, var(--color-base-content) 40%, transparent);
+    max-width: 240px;
+    line-height: 1.5;
+}
+
+/* Shot image styling (injected by JS) */
 .shot-image {
     width: 100%;
     height: auto;
@@ -265,155 +138,15 @@
     cursor: pointer;
     transition: opacity 0.3s ease;
 }
+.shot-image:hover { opacity: 0.92; }
 
-.shot-image:hover {
-    opacity: 0.92;
-}
-
-/* When multiple images, use a grid inside the panel */
-.image-panel-inner.multi-image {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-    align-items: start;
-}
-
-.image-panel-inner.multi-image .shot-image {
-    max-height: 50vh;
-}
-
-/* ===== Empty State ===== */
-.image-empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    padding: 3rem 2rem;
-    text-align: center;
-    width: 100%;
-}
-
-.image-empty-state .empty-icon {
-    width: 64px;
-    height: 64px;
-    background-color: var(--text-muted);
-    opacity: 0.25;
-    -webkit-mask-image: url('/static/golf_ball.svg');
-    -webkit-mask-size: contain;
-    -webkit-mask-repeat: no-repeat;
-    -webkit-mask-position: center;
-    mask-image: url('/static/golf_ball.svg');
-    mask-size: contain;
-    mask-repeat: no-repeat;
-    mask-position: center;
-}
-
-.image-empty-state .empty-text {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    max-width: 220px;
-    line-height: 1.5;
-}
-
-/* ===== Responsive: Tablet (768-1023px) ===== */
-@media (min-width: 768px) and (max-width: 1023px) {
-    .dashboard-layout {
-        grid-template-columns: minmax(280px, 1fr) minmax(300px, 1.1fr);
-        gap: 0.75rem;
-    }
-
-    .metric-card {
-        padding: 1rem;
-    }
-
-    .metric-card.hero .metric-number {
-        font-size: clamp(2.25rem, 5vw, 3rem);
-    }
-
-    .image-panel {
-        min-height: 350px;
-    }
-}
-
-/* ===== Responsive: Mobile (< 768px) ===== */
 @media (max-width: 767px) {
-    .dashboard-layout {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-    }
-
-    .status-strip {
-        flex-wrap: wrap;
-    }
-
-    .status-strip-content {
-        flex-direction: column;
-        gap: 0.125rem;
-    }
-
-    .status-strip-separator {
-        display: none;
-    }
-
-    .metric-card.hero .metric-number {
-        font-size: 2.5rem;
-    }
-
-    .metrics-sub-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 0.625rem;
-    }
-
-    .metric-card {
-        padding: 0.875rem;
-    }
-
-    .metric-number {
-        font-size: 1.75rem;
-    }
-
-    .image-panel {
-        min-height: 280px;
-    }
-
-    .image-panel-inner.multi-image {
-        grid-template-columns: 1fr;
-    }
+    .status-strip-separator { display: none; }
+    .metric-number { font-size: 1.75rem !important; }
+    .metric-card.hero .metric-number { font-size: 2.5rem !important; }
 }
 
-/* ===== Responsive: Small mobile ===== */
-@media (max-width: 380px) {
-    .status-strip-icon {
-        width: 28px;
-        height: 28px;
-    }
-
-    .metrics-sub-grid {
-        gap: 0.5rem;
-    }
-
-    .metric-card {
-        padding: 0.75rem;
-    }
-}
-
-/* ===== Large Desktop (>= 1400px) ===== */
 @media (min-width: 1400px) {
-    .metric-card.hero .metric-number {
-        font-size: 5rem;
-    }
-
-    .metric-number {
-        font-size: 3.5rem;
-    }
-
-    .metric-label {
-        font-size: 0.9rem;
-    }
-
-    .metric-unit {
-        font-size: 1.35rem;
-    }
+    .metric-card.hero .metric-number { font-size: 5rem !important; }
+    .metric-number { font-size: 3.5rem !important; }
 }

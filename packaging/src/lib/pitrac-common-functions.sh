@@ -15,6 +15,12 @@ log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 log_success() { echo -e "${GREEN}[✓]${NC} $*"; }
 
+# Avoid `dpkg -l | grep -q`: under pipefail, grep -q closes the pipe on match,
+# dpkg gets SIGPIPE, and pipefail makes installed packages look missing.
+pkg_installed() {
+    [[ "$(dpkg-query -W -f='${db:Status-Status}' "$1" 2>/dev/null)" == "installed" ]]
+}
+
 # Detect Raspberry Pi model
 detect_pi_model() {
     if grep -q "Raspberry Pi.*5" /proc/cpuinfo 2>/dev/null; then
@@ -24,6 +30,63 @@ detect_pi_model() {
     else
         echo "unknown"
     fi
+}
+
+# libcamera 0.7.1+rpt20260429 null-derefs in registerCamera() when rpi_apps.yaml
+# has a non-zero camera_timeout_value_ms — loadPipelineConfiguration calls
+# ipa_->setCameraTimeout.disconnect() before loadIPA() initializes ipa_. Pin
+# libcamera and the matching rpicam-apps (1.12.0 hard-depends on broken
+# libcamera) until a fixed libcamera ships upstream.
+LIBCAMERA_PIN_VERSION="0.7.0+rpt20260205-1"
+LIBCAMERA_PIN_PKGS=(libcamera0.7 libcamera-dev libcamera-ipa libcamera-tools libcamera-v4l2)
+RPICAM_APPS_PIN_VERSION="1.11.1-1"
+RPICAM_APPS_PIN_ARM64=(librpicam-app1 rpicam-apps-core rpicam-apps-encoder rpicam-apps-opencv-postprocess rpicam-apps-preview)
+RPICAM_APPS_PIN_ALL=(rpicam-apps rpicam-apps-lite)
+
+pin_libcamera_workaround() {
+    local libcam rpicam held
+    libcam=$(dpkg-query -W -f='${Version}' libcamera0.7 2>/dev/null || true)
+    rpicam=$(dpkg-query -W -f='${Version}' rpicam-apps-core 2>/dev/null || true)
+    held=$(apt-mark showhold 2>/dev/null || true)
+    if [[ "$libcam" == "$LIBCAMERA_PIN_VERSION" ]] \
+            && [[ "$rpicam" == "$RPICAM_APPS_PIN_VERSION" ]] \
+            && grep -qx libcamera0.7 <<<"$held" \
+            && grep -qx rpicam-apps-core <<<"$held"; then
+        log_info "libcamera + rpicam-apps already pinned"
+        return 0
+    fi
+
+    log_info "Pinning libcamera $LIBCAMERA_PIN_VERSION + rpicam-apps $RPICAM_APPS_PIN_VERSION"
+
+    (
+        tmpdir=$(mktemp -d -t pitrac-libcam-pin.XXXXXX)
+        trap 'rm -rf "$tmpdir"' EXIT
+
+        libcam_pool="https://archive.raspberrypi.com/debian/pool/main/libc/libcamera"
+        rpicam_pool="https://archive.raspberrypi.com/debian/pool/main/r/rpicam-apps"
+        debs=() hold=()
+
+        for pkg in "${LIBCAMERA_PIN_PKGS[@]}"; do
+            deb="${pkg}_${LIBCAMERA_PIN_VERSION}_arm64.deb"
+            curl -fsSL -o "$tmpdir/$deb" "$libcam_pool/$deb"
+            debs+=("$tmpdir/$deb"); hold+=("$pkg")
+        done
+
+        for pkg in "${RPICAM_APPS_PIN_ARM64[@]}"; do
+            deb="${pkg}_${RPICAM_APPS_PIN_VERSION}_arm64.deb"
+            curl -fsSL -o "$tmpdir/$deb" "$rpicam_pool/$deb"
+            debs+=("$tmpdir/$deb"); hold+=("$pkg")
+        done
+
+        for pkg in "${RPICAM_APPS_PIN_ALL[@]}"; do
+            deb="${pkg}_${RPICAM_APPS_PIN_VERSION}_all.deb"
+            curl -fsSL -o "$tmpdir/$deb" "$rpicam_pool/$deb"
+            debs+=("$tmpdir/$deb"); hold+=("$pkg")
+        done
+
+        INITRD=No apt-get install -y --allow-downgrades "${debs[@]}"
+        apt-mark hold "${hold[@]}" >/dev/null
+    )
 }
 
 # Apply Boost C++20 compatibility fix
@@ -223,32 +286,30 @@ install_test_images() {
     log_info "Installing test images..."
 
     local test_images_dir="$repo_root/Software/LMSourceCode/Images"
-    if [[ -d "$test_images_dir" ]]; then
-        mkdir -p "$dest_dir"
-
-        if [[ -f "$test_images_dir/gs_log_img__log_ball_final_found_ball_img.png" ]]; then
-            cp "$test_images_dir/gs_log_img__log_ball_final_found_ball_img.png" \
-               "$dest_dir/teed-ball.png"
-        fi
-        if [[ -f "$test_images_dir/log_cam2_last_strobed_img.png" ]]; then
-            cp "$test_images_dir/log_cam2_last_strobed_img.png" \
-               "$dest_dir/strobed.png"
-        fi
-
-        for img in "$test_images_dir"/*.png "$test_images_dir"/*.jpg "$test_images_dir"/*.jpeg; do
-            if [[ -f "$img" ]]; then
-                local basename=$(basename "$img")
-                if [[ "$basename" != "gs_log_img__log_ball_final_found_ball_img.png" ]] && \
-                   [[ "$basename" != "log_cam2_last_strobed_img.png" ]]; then
-                    cp "$img" "$dest_dir/"
-                fi
-            fi
-        done
-
-        log_success "Test images installed"
-    else
+    if [[ ! -d "$test_images_dir" ]]; then
         log_warn "Test images directory not found: $test_images_dir"
+        return
     fi
+
+    mkdir -p "$dest_dir"
+
+    install_renamed_image() {
+        local src="$1" dst="$2"
+        if [[ -f "$src" ]] && ! cmp -s "$src" "$dst" 2>/dev/null; then
+            cp "$src" "$dst"
+        fi
+    }
+    install_renamed_image "$test_images_dir/gs_log_img__log_ball_final_found_ball_img.png" "$dest_dir/teed-ball.png"
+    install_renamed_image "$test_images_dir/log_cam2_last_strobed_img.png" "$dest_dir/strobed.png"
+
+    rsync -a --checksum \
+        --exclude='gs_log_img__log_ball_final_found_ball_img.png' \
+        --exclude='log_cam2_last_strobed_img.png' \
+        --include='*.png' --include='*.jpg' --include='*.jpeg' \
+        --exclude='*' \
+        "$test_images_dir/" "$dest_dir/"
+
+    log_success "Test images installed"
 }
 
 install_test_suites() {
@@ -258,25 +319,20 @@ install_test_suites() {
     log_info "Installing test suites for automated testing..."
 
     local testing_dir="$repo_root/Software/LMSourceCode/Testing"
-    if [[ -d "$testing_dir" ]]; then
-        mkdir -p "$dest_dir"
-
-        if [[ -d "$testing_dir/TestSuite_2025_02_07" ]]; then
-            log_info "  Copying TestSuite_2025_02_07..."
-            cp -r "$testing_dir/TestSuite_2025_02_07" "$dest_dir/"
-            log_success "  TestSuite_2025_02_07 installed"
-        fi
-
-        if [[ -d "$testing_dir/Left-Handed-Shots" ]]; then
-            log_info "  Copying Left-Handed-Shots test suite..."
-            cp -r "$testing_dir/Left-Handed-Shots" "$dest_dir/"
-            log_success "  Left-Handed-Shots test suite installed"
-        fi
-
-        log_success "Test suites installed to $dest_dir"
-    else
+    if [[ ! -d "$testing_dir" ]]; then
         log_warn "Testing directory not found: $testing_dir"
+        return
     fi
+
+    mkdir -p "$dest_dir"
+
+    for suite in TestSuite_2025_02_07 Left-Handed-Shots; do
+        local src="$testing_dir/$suite"
+        [[ -d "$src" ]] || continue
+        rsync -a --checksum "$src/" "$dest_dir/$suite/"
+    done
+
+    log_success "Test suites installed to $dest_dir"
 }
 
 install_models() {
@@ -286,77 +342,67 @@ install_models() {
     log_info "Installing models for AI detection..."
 
     local models_dir="$repo_root/Software/LMSourceCode/ml_models"
-    if [[ -d "$models_dir" ]]; then
-        # Install to system location /etc/pitrac/models/
-        local system_models_dir="/etc/pitrac/models"
-
-        # Remove old models to prevent accumulation of outdated models
-        if [[ -d "$system_models_dir" ]]; then
-            log_info "Cleaning up old models in $system_models_dir..."
-            rm -rf "$system_models_dir"/*
-        fi
-
-        mkdir -p "$system_models_dir"
-
-        local models_found=0
-
-        # Install ncnn models (param + bin files directly in model dirs)
-        for param_file in "$models_dir"/*/best.ncnn.param; do
-            if [[ -f "$param_file" ]]; then
-                local model_name=$(basename "$(dirname "$param_file")")
-                local bin_file="$(dirname "$param_file")/best.ncnn.bin"
-                mkdir -p "$system_models_dir/$model_name"
-                cp "$param_file" "$system_models_dir/$model_name/"
-                [[ -f "$bin_file" ]] && cp "$bin_file" "$system_models_dir/$model_name/"
-                log_info "  Installed model: $model_name/best.ncnn.{param,bin}"
-                models_found=$((models_found + 1))
-            fi
-        done
-
-        if [[ $models_found -gt 0 ]]; then
-            # Set proper permissions - models should be readable by all users
-            chmod -R a+r "$system_models_dir" 2>/dev/null || true
-            find "$system_models_dir" -type d -exec chmod 755 {} \; 2>/dev/null || true
-            log_success "Installed $models_found model(s) to $system_models_dir"
-        else
-            log_warn "No models found in $models_dir"
-        fi
-    else
+    if [[ ! -d "$models_dir" ]]; then
         log_warn "Models directory not found: $models_dir"
+        return
+    fi
+
+    local system_models_dir="/etc/pitrac/models"
+    mkdir -p "$system_models_dir"
+
+    rsync -a --checksum --delete --prune-empty-dirs \
+        --include='*/' \
+        --include='best.ncnn.param' \
+        --include='best.ncnn.bin' \
+        --exclude='*' \
+        "$models_dir/" "$system_models_dir/"
+
+    local models_found
+    models_found=$(find "$system_models_dir" -name 'best.ncnn.param' -type f | wc -l)
+
+    if [[ $models_found -gt 0 ]]; then
+        chmod -R a+r "$system_models_dir" 2>/dev/null || true
+        find "$system_models_dir" -type d -exec chmod 755 {} \; 2>/dev/null || true
+        log_success "Installed $models_found model(s) to $system_models_dir"
+    else
+        log_warn "No models found in $models_dir"
     fi
 }
 
 install_camera_tools() {
     local dest_dir="${1:-/usr/lib/pitrac}"
     local repo_root="${2:-${REPO_ROOT:-/opt/PiTrac}}"
-    
+
     log_info "Installing camera tools..."
-    
+
     local camera_tools_dir="$repo_root/Software/LMSourceCode/ImageProcessing/CameraTools"
     local imaging_dir="$repo_root/Software/LMSourceCode/ImageProcessing"
-    
-    if [[ -d "$camera_tools_dir" ]]; then
-        mkdir -p "$dest_dir/ImageProcessing/CameraTools"
-        cp -r "$camera_tools_dir"/* "$dest_dir/ImageProcessing/CameraTools/"
-        
-        # Install Pi-specific IMX296 NOIR sensor files
-        for sensor_file in "imx296_noir.json.PI_4_FOR_VC4_DIRECTORY" "imx296_noir.json.PI_5_FOR_PISP_DIRECTORY"; do
-            if [[ -f "$imaging_dir/$sensor_file" ]]; then
-                cp "$imaging_dir/$sensor_file" "$dest_dir/ImageProcessing/CameraTools/"
-                chmod 644 "$dest_dir/ImageProcessing/CameraTools/$sensor_file"
-                log_info "Installed sensor file: $sensor_file"
-            fi
-        done
-        
-        find "$dest_dir/ImageProcessing/CameraTools" -name "*.sh" -type f -exec chmod 755 {} \;
-        if [[ -f "$dest_dir/ImageProcessing/CameraTools/imx296_trigger" ]]; then
-            chmod 755 "$dest_dir/ImageProcessing/CameraTools/imx296_trigger"
-        fi
-        
-        log_success "Camera tools installed"
-    else
+
+    if [[ ! -d "$camera_tools_dir" ]]; then
         log_warn "Camera tools not found: $camera_tools_dir"
+        return
     fi
+
+    local tools_dest="$dest_dir/ImageProcessing/CameraTools"
+    mkdir -p "$tools_dest"
+    rsync -a --checksum "$camera_tools_dir/" "$tools_dest/"
+
+    for sensor_file in "imx296_noir.json.PI_4_FOR_VC4_DIRECTORY" "imx296_noir.json.PI_5_FOR_PISP_DIRECTORY"; do
+        local src="$imaging_dir/$sensor_file"
+        local dst="$tools_dest/$sensor_file"
+        if [[ -f "$src" ]] && ! cmp -s "$src" "$dst" 2>/dev/null; then
+            cp "$src" "$dst"
+            chmod 644 "$dst"
+            log_info "Installed sensor file: $sensor_file"
+        fi
+    done
+
+    find "$tools_dest" -name "*.sh" -type f -exec chmod 755 {} \;
+    if [[ -f "$tools_dest/imx296_trigger" ]]; then
+        chmod 755 "$tools_dest/imx296_trigger"
+    fi
+
+    log_success "Camera tools installed"
 }
 
 create_pitrac_directories() {
@@ -428,53 +474,39 @@ set_config_permissions() {
     fi
 }
 
+# Use a venv so pip doesn't fight Debian's apt-managed dist-packages.
+# --system-site-packages keeps apt's cv2/numpy/gpiozero visible.
 install_python_dependencies() {
     local web_server_dir="${1:-/usr/lib/pitrac/web-server}"
-    
-    if [[ ! -d "$web_server_dir" ]]; then
-        log_warn "Web server directory not found: $web_server_dir"
-        return 1
-    fi
-    
-    if [[ ! -f "$web_server_dir/requirements.txt" ]]; then
-        log_warn "Requirements file not found: $web_server_dir/requirements.txt"
-        return 1
-    fi
-    
-    log_info "Installing Python dependencies for web server..."
+    local venv_dir="$web_server_dir/.venv"
+    local req_file="$web_server_dir/requirements.txt"
 
-    # gpiozero (in requirements.txt) needs these system GPIO backends on Raspberry Pi OS.
-    # They're not available on PyPI so we install them via apt.
-    for pkg in python3-lgpio python3-rpi-lgpio; do
-        if ! dpkg -l | grep -q "^ii  $pkg"; then
-            log_info "Installing system GPIO backend: $pkg"
-            INITRD=No apt-get install -y "$pkg" 2>/dev/null || log_warn "Could not install $pkg"
+    if [[ ! -f "$req_file" ]]; then
+        log_warn "Requirements file not found: $req_file"
+        return 1
+    fi
+
+    local sudo=""
+    [[ $EUID -ne 0 ]] && sudo="sudo"
+
+    for pkg in python3-venv python3-lgpio python3-rpi-lgpio; do
+        if ! pkg_installed "$pkg"; then
+            log_info "Installing system package: $pkg"
+            $sudo env INITRD=No apt-get install -y "$pkg"
         fi
     done
 
-    if [[ $EUID -eq 0 ]]; then
-        if pip3 install -r "$web_server_dir/requirements.txt" --break-system-packages --ignore-installed 2>/dev/null; then
-            log_success "Python dependencies installed successfully"
-        elif pip3 install -r "$web_server_dir/requirements.txt" --ignore-installed 2>/dev/null; then
-            log_success "Python dependencies installed successfully"
-        else
-            log_error "Failed to install Python dependencies"
-            log_info "Try manually: pip3 install -r $web_server_dir/requirements.txt --break-system-packages --ignore-installed"
-            return 1
-        fi
-    else
-        if sudo pip3 install -r "$web_server_dir/requirements.txt" --break-system-packages --ignore-installed 2>/dev/null; then
-            log_success "Python dependencies installed successfully"
-        elif sudo pip3 install -r "$web_server_dir/requirements.txt" --ignore-installed 2>/dev/null; then
-            log_success "Python dependencies installed successfully"
-        else
-            log_error "Failed to install Python dependencies"
-            log_info "Try manually: sudo pip3 install -r $web_server_dir/requirements.txt --break-system-packages --ignore-installed"
-            return 1
-        fi
+    # Recreate if the interpreter is missing or broken.
+    if ! "$venv_dir/bin/python" -c '' 2>/dev/null; then
+        log_info "Creating web-server venv at $venv_dir"
+        $sudo rm -rf "$venv_dir"
+        $sudo python3 -m venv --system-site-packages "$venv_dir"
     fi
-    
-    return 0
+
+    log_info "Installing web-server requirements into venv"
+    $sudo "$venv_dir/bin/pip" install --requirement "$req_file"
+
+    log_success "Web-server venv ready"
 }
 
 install_service_from_template() {
@@ -555,37 +587,42 @@ install_service_from_template() {
         -e "s|@PITRAC_HOME@|$escaped_home|g" \
         "$template_file" > "$temp_service"
     
-    if [[ -f "$target_file" ]]; then
-        local backup_file="${target_file}.bak.$(date +%s)"
-        log_info "Backing up existing service to $backup_file"
-        if [[ -w "$target_file" ]]; then
-            cp "$target_file" "$backup_file"
-        else
-            sudo cp "$target_file" "$backup_file"
+    if [[ -f "$target_file" ]] && cmp -s "$temp_service" "$target_file"; then
+        log_info "$service_name service file is up to date"
+        rm -f "$temp_service"
+    else
+        if [[ -f "$target_file" ]]; then
+            local backup_file="${target_file}.bak.$(date +%s)"
+            log_info "Backing up existing service to $backup_file"
+            if [[ -w "$target_file" ]]; then
+                cp "$target_file" "$backup_file"
+            else
+                sudo cp "$target_file" "$backup_file"
+            fi
         fi
-    fi
-    
-    log_info "Installing service file to $target_file"
-    if [[ -w "/etc/systemd/system" ]]; then
-        install -m 644 "$temp_service" "$target_file"
-    else
-        sudo install -m 644 "$temp_service" "$target_file"
-    fi
-    
-    if [[ -w "/etc/systemd/system" ]]; then
-        find /etc/systemd/system -name "${service_name}.service.bak.*" -type f 2>/dev/null | \
-            sort -r | tail -n +4 | xargs -r rm -f
-    else
-        sudo find /etc/systemd/system -name "${service_name}.service.bak.*" -type f 2>/dev/null | \
-            sort -r | tail -n +4 | xargs -r sudo rm -f
-    fi
-    
-    log_info "Reloading systemd daemon..."
-    if command -v systemctl &>/dev/null; then
-        if [[ $EUID -eq 0 ]]; then
-            systemctl daemon-reload
+
+        log_info "Installing service file to $target_file"
+        if [[ -w "/etc/systemd/system" ]]; then
+            install -m 644 "$temp_service" "$target_file"
         else
-            sudo systemctl daemon-reload
+            sudo install -m 644 "$temp_service" "$target_file"
+        fi
+
+        if [[ -w "/etc/systemd/system" ]]; then
+            find /etc/systemd/system -name "${service_name}.service.bak.*" -type f 2>/dev/null | \
+                sort -r | tail -n +4 | xargs -r rm -f
+        else
+            sudo find /etc/systemd/system -name "${service_name}.service.bak.*" -type f 2>/dev/null | \
+                sort -r | tail -n +4 | xargs -r sudo rm -f
+        fi
+
+        log_info "Reloading systemd daemon..."
+        if command -v systemctl &>/dev/null; then
+            if [[ $EUID -eq 0 ]]; then
+                systemctl daemon-reload
+            else
+                sudo systemctl daemon-reload
+            fi
         fi
     fi
     
@@ -715,14 +752,15 @@ install_dependencies_from_apt() {
         "libncnn-dev"             # ncnn inference framework (static lib + headers)
     )
 
-    # Check which packages are available
     log_info "Verifying package availability..."
     local available_packages=()
     local missing_packages=()
+    local to_install=()
 
     for pkg in "${packages[@]}"; do
         if apt-cache show "$pkg" &>/dev/null; then
             available_packages+=("$pkg")
+            pkg_installed "$pkg" || to_install+=("$pkg")
         else
             missing_packages+=("$pkg")
         fi
@@ -737,14 +775,16 @@ install_dependencies_from_apt() {
         return 1
     fi
 
-    # Install available packages
-    log_info "Installing packages: ${available_packages[*]}"
-    if ! INITRD=No apt-get install -y "${available_packages[@]}"; then
-        log_error "Failed to install packages from APT repository"
-        return 1
+    if [ ${#to_install[@]} -eq 0 ]; then
+        log_info "All ${#available_packages[@]} PiTrac packages already installed"
+    else
+        log_info "Installing packages: ${to_install[*]}"
+        if ! INITRD=No apt-get install -y "${to_install[@]}"; then
+            log_error "Failed to install packages from APT repository"
+            return 1
+        fi
+        log_success "Installed ${#to_install[@]} package(s) from APT repository"
     fi
-
-    log_success "Installed ${#available_packages[@]} packages from APT repository"
 
     # Update library cache
     ldconfig
