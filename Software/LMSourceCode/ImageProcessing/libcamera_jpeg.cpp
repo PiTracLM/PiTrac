@@ -212,6 +212,17 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 		RPiCamApp::Msg msg = app.Wait();
 		if (msg.type == RPiCamApp::MsgType::Timeout)
 		{
+			if (pico_mode) {
+				// Pico single-pulse mode: a timeout means the FSM cancelled the wait
+				// (no strike / shot over). Tear down cleanly and let the run loop
+				// re-arm. Restarting the camera here (the legacy recovery) churns
+				// StopCamera+Configure+StartCamera against the FSM restart and aborts
+				// the process (std::terminate from a joinable thread torn down mid-reconfigure).
+				GS_LOG_TRACE_MSG(trace, "cam2 Pico mode: timeout/cancel -- exiting capture loop cleanly.");
+				app.StopCamera();
+				return_status = false;
+				break;
+			}
 			GS_LOG_MSG(error, "ERROR: Device timeout detected, attempting a restart!!!");
 			app.StopCamera();
 			uint flags = RPiCamApp::FLAG_STILL_RGB;
