@@ -83,10 +83,10 @@ void g_state_runtime_init(void) {
 /* Forward decl — defined further down with the rest of the IO helpers. */
 static void emit_log(const char *msg);
 
-/* STATUS line worst case: ~208-char prefix + STROBE_MAX_PULSES intervals at up
- * to ~9 chars each ("-1000.00,") + '\n' + '\0'. 512 covers it with headroom so
- * the interval CSV never truncates at max count. */
-#define STATUS_LINE_BUF_SIZE  512
+/* STATUS line worst case: ~232-char prefix (incl. event_count) + STROBE_MAX_PULSES
+ * intervals at up to ~9 chars each ("-1000.00,") + '\n' + '\0'. 640 covers it with
+ * headroom so the interval CSV never truncates at max count. */
+#define STATUS_LINE_BUF_SIZE  640
 
 /* Read VSYS via the on-board ÷3 divider on ADC3 / GPIO 29. The Pico's
  * reference is 3.3 V; ADC is 12-bit (4096 codes). Multiply by 3 to recover
@@ -133,12 +133,13 @@ int proto_format_status(const pitrac_state_t *st, char *buf, int buflen) {
     int n = snprintf(buf, buflen,
         "STATUS armed=%d threshold=%ld pulse_us=%.2f min_inter_shot_ms=%lu "
         "pre_trigger_delay_ms=%lu decay_confirm_ms=%lu strobe_hold=%d "
-        "vsys_mv=%lu vbus=%d fw=%s board=%s intervals=",
+        "event_count=%lu vsys_mv=%lu vbus=%d fw=%s board=%s intervals=",
         (int)st->armed, (long)st->mic_threshold, (double)st->pulse_width_us,
         (unsigned long)st->min_inter_shot_ms,
         (unsigned long)st->pre_trigger_delay_ms,
         (unsigned long)impact_detect_get_decay_confirm_ms(),
         (int)strobe_is_held(),
+        (unsigned long)st->event_count,
         (unsigned long)read_vsys_mv(),
         (int)vbus_present(),
         PITRAC_PICO_FW_VERSION,

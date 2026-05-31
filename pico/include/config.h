@@ -246,7 +246,7 @@
 #define STROBE_MAX_HOLD_MS  200u
 
 /* Firmware version string — surfaced on the boot LOG line. */
-#define PITRAC_PICO_FW_VERSION "0.6.0"
+#define PITRAC_PICO_FW_VERSION "0.6.1"
 
 /* Upper bound on the EVENT RMS streaming rate (samples per second). The web
  * UI's mic visualiser doesn't need anything faster than this; capping it keeps
