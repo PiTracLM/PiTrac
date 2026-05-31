@@ -35,6 +35,9 @@ public:
     void start();
     void stop();
     void arm();
+    // Abort an in-flight capture (unblock app.Wait()) without stopping the
+    // thread or the sim. Used by the FSM on a cam2 timeout to recover cam2.
+    void cancel_capture();
     bool wait_until_ready(int timeout_ms = 10000);
 
 private:

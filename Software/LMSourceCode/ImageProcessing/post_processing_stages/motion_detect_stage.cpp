@@ -285,8 +285,12 @@ bool MotionDetectStage::Process(CompletedRequestPtr& completed_request)
 		// TBD - ** Immediately ** pulse the output - we want to do this with as little latency
 		// as possible, because otherwise the ball will fly past the camera 2 FoV
 		if (gs::GolfSimOptions::GetCommandLineOptions().system_mode_ != gs::kCamera1TestStandalone) {
-			gs::PulseStrobe::SendExternalTrigger();
-			GS_LOG_MSG(trace, "---> SendExternalTrigger");
+			// In Pico mode the Pico drives the cam2 trigger on the acoustic strike;
+			// camera1 here is stability-only, so don't fire the legacy trigger.
+			if (!gs::PulseStrobe::IsPicoActive()) {
+				gs::PulseStrobe::SendExternalTrigger();
+				GS_LOG_MSG(trace, "---> SendExternalTrigger");
+			}
 		}
 		else {
 			// Camera2 image is captured by the in-process Camera2Thread
