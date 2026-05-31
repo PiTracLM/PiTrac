@@ -644,6 +644,28 @@ namespace golf_sim {
 			pico_client_->StageClubProfile(PicoStrobeClient::ClubProfile::kPutter,
 				putter_pulse_us, pulse_intervals_slow_ms_);
 			pico_client_->SelectClubProfile(PicoStrobeClient::ClubProfile::kDriver);
+
+			// Push the operator's persisted DSP tuning so a power-cycled Pico self-recovers
+			// instead of arming on the compiled defaults (which may not clear the arm-quiet
+			// gate for this room). Values arrive via the LM env from gs_config.pico.*.
+			if (const char* thr = std::getenv("PITRAC_PICO_MIC_THRESHOLD"); thr && *thr) {
+				try {
+					if (!pico_client_->SetMicThreshold(std::stoi(thr))) {
+						GS_LOG_MSG(warning, "Pico did not accept persisted mic threshold " + std::string(thr));
+					}
+				} catch (const std::exception&) {
+					GS_LOG_MSG(warning, "ignoring malformed PITRAC_PICO_MIC_THRESHOLD=" + std::string(thr));
+				}
+			}
+			if (const char* dc = std::getenv("PITRAC_PICO_DECAY_CONFIRM_MS"); dc && *dc) {
+				try {
+					if (!pico_client_->SetDecayConfirm(static_cast<uint32_t>(std::stoul(dc)))) {
+						GS_LOG_MSG(warning, "Pico did not accept persisted decay_confirm_ms " + std::string(dc));
+					}
+				} catch (const std::exception&) {
+					GS_LOG_MSG(warning, "ignoring malformed PITRAC_PICO_DECAY_CONFIRM_MS=" + std::string(dc));
+				}
+			}
 		}
 
 		// Pre-compute the pulse sequences to save time later
