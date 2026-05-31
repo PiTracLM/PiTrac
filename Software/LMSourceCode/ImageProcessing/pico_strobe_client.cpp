@@ -257,6 +257,12 @@ bool PicoStrobeClient::Disarm() {
     return !st.armed;
 }
 
+uint64_t PicoStrobeClient::LastEventCount() {
+    PicoStatus st;
+    if (!ReadStatus(st)) return 0;
+    return st.event_count;
+}
+
 bool PicoStrobeClient::ReadStatus(PicoStatus& out) {
     if (!IsOpen()) return false;
     if (!impl_->WriteLine("STATUS")) return false;
@@ -285,6 +291,8 @@ bool PicoStrobeClient::ReadStatus(PicoStatus& out) {
                 out.pulse_width_us = std::stof(val);
             } else if (key == "min_inter_shot_ms") {
                 out.min_inter_shot_ms = static_cast<uint32_t>(std::stoul(val));
+            } else if (key == "event_count") {
+                out.event_count = static_cast<uint64_t>(std::stoull(val));
             } else if (key == "strobe_hold") {
                 out.strobe_hold = ParseBoolDigit(val);
             } else if (key == "fw") {

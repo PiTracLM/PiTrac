@@ -186,6 +186,57 @@ BOOST_AUTO_TEST_CASE(disarm_succeeds_when_firmware_echoes_disarmed) {
     BOOST_CHECK(host_in.find("CFG ARMED=0\n") != std::string::npos);
 }
 
+BOOST_AUTO_TEST_CASE(read_status_parses_event_count) {
+    SocketPair pair;
+    PicoStrobeClient client;
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    std::thread responder = RespondStatus(
+        pair.host,
+        "STATUS armed=1 threshold=4096 pulse_us=8.68 min_inter_shot_ms=200 "
+        "event_count=123456789 fw=0.6.1\n");
+    PicoStatus status;
+    bool ok = client.ReadStatus(status);
+    responder.join();
+
+    BOOST_REQUIRE(ok);
+    BOOST_CHECK_EQUAL(status.event_count, 123456789ull);
+}
+
+BOOST_AUTO_TEST_CASE(last_event_count_returns_parsed_value) {
+    SocketPair pair;
+    PicoStrobeClient client;
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    std::thread responder = RespondStatus(pair.host, "STATUS armed=1 threshold=4096 event_count=42 fw=0.6.1\n");
+    uint64_t count = client.LastEventCount();
+    responder.join();
+
+    BOOST_CHECK_EQUAL(count, 42ull);
+    // LastEventCount must query live, so a STATUS line should have gone out.
+    std::string host_in = DrainHost(pair.host, 10);
+    BOOST_CHECK(host_in.find("STATUS\n") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(last_event_count_zero_when_status_fails) {
+    SocketPair pair;
+    PicoStrobeClient client;
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    // Garbage reply -> ReadStatus rejects it -> LastEventCount falls back to 0.
+    std::thread responder = RespondStatus(pair.host, "Hello from some other CDC device\n");
+    uint64_t count = client.LastEventCount();
+    responder.join();
+
+    BOOST_CHECK_EQUAL(count, 0ull);
+}
+
 BOOST_AUTO_TEST_CASE(read_status_rejects_unrecognised_reply) {
     SocketPair pair;
     PicoStrobeClient client;
