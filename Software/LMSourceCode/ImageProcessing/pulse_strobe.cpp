@@ -84,7 +84,19 @@ namespace golf_sim {
 	}
 
 	bool PulseStrobe::ArmPicoForShot() {
-		return pico_client_ && pico_client_->Arm();
+		if (!pico_client_) return false;
+		// Select the club's strobe pattern before arming so the autonomous fire uses
+		// the putter vector on putts, not the driver default. This is the per-shot
+		// select the legacy SendCameraStrobeTriggerAndShutter path does -- which is
+		// gated off in Pico mode, so it has to happen here.
+		const PicoStrobeClient::ClubProfile profile =
+			(GolfSimClubs::GetCurrentClubType() == GolfSimClubs::GsClubType::kPutter)
+				? PicoStrobeClient::ClubProfile::kPutter
+				: PicoStrobeClient::ClubProfile::kDriver;
+		if (!pico_client_->SelectClubProfile(profile)) {
+			GS_LOG_MSG(warning, "Pico club-profile select failed; arming on the previously-active strobe pattern");
+		}
+		return pico_client_->Arm();
 	}
 
 	bool PulseStrobe::DisarmPico() {
