@@ -100,4 +100,7 @@ Dev/scripts/__pycache__
 packaging/pitrac
 
 # FreeCAD backup files
-*.FCBak 
+*.FCBak
+
+# Node.js (root-level tooling)
+node_modules/

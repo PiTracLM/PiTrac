@@ -249,16 +249,7 @@
     <ClCompile Include="gs_automated_testing.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Camera\build\CMakeFiles\4.0.2\CompilerIdCXX\CMakeCXXCompilerId.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Camera\build\CMakeFiles\4.0.2\CompilerIdC\CMakeCCompilerId.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="configuration_manager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ImageAnalysis\infrastructure\opencv_image_analyzer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gs_calibration.cpp">
@@ -488,37 +479,7 @@
     <ClInclude Include="gs_format_lib.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Camera\camera_platform.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Camera\domain\camera_domain.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Camera\infrastructure\unix\libcamera_unix_impl.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Camera\tests\test_utilities.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="configuration_manager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImageAnalysis\application\image_analysis_service.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImageAnalysis\domain\analysis_results.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImageAnalysis\domain\interfaces.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImageAnalysis\domain\value_objects.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImageAnalysis\infrastructure\ml_image_analyzer.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImageAnalysis\infrastructure\opencv_image_analyzer.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gs_calibration.h">

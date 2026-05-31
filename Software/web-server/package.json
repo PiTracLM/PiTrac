@@ -4,6 +4,7 @@
     "lint:fix": "eslint static/**/*.js --fix"
   },
   "devDependencies": {
-    "eslint": "^9.35.0"
+    "eslint": "^9.35.0",
+    "eslint-config-prettier": "^10.1.0"
   }
 }

@@ -53,7 +53,7 @@ update_config_txt_param() {
         sed -i "s|${pattern}.*|${new_line}|" "$config_path"
     else
         log_info "  Adding new: ${new_line}"
-        echo "${new_line}" >> "$config_path"
+        echo "${new_line}" >>"$config_path"
     fi
 }
 
@@ -81,37 +81,37 @@ insert_in_config_section() {
         while IFS= read -r line; do
             if [[ "$line" =~ ^\[.*\]$ ]]; then
                 if [[ "$inserted" == "false" ]]; then
-                    echo "$content" >> "$temp_file"
+                    echo "$content" >>"$temp_file"
                     inserted=true
                 fi
                 in_section=true
             fi
-            echo "$line" >> "$temp_file"
-        done < "$config_path"
+            echo "$line" >>"$temp_file"
+        done <"$config_path"
 
         if [[ "$inserted" == "false" ]]; then
-            echo "$content" >> "$temp_file"
+            echo "$content" >>"$temp_file"
         fi
     else
         local in_target_section=false
         local content_inserted=false
 
         while IFS= read -r line; do
-            echo "$line" >> "$temp_file"
+            echo "$line" >>"$temp_file"
 
             if [[ "$line" == "[$section]" ]]; then
                 in_target_section=true
             elif [[ "$line" =~ ^\[.*\]$ ]]; then
                 if [[ "$in_target_section" == "true" ]] && [[ "$content_inserted" == "false" ]]; then
-                    echo "$content" >> "$temp_file"
+                    echo "$content" >>"$temp_file"
                     content_inserted=true
                 fi
                 in_target_section=false
             fi
-        done < "$config_path"
+        done <"$config_path"
 
         if [[ "$in_target_section" == "true" ]] && [[ "$content_inserted" == "false" ]]; then
-            echo "$content" >> "$temp_file"
+            echo "$content" >>"$temp_file"
         fi
     fi
 
@@ -247,24 +247,24 @@ dtoverlay=vc_mipi_imx296"
 
         if [[ "$inserted" == "false" ]]; then
             if [[ "$line" =~ ^\[.*\]$ ]]; then
-                echo "" >> "$temp_file"
-                echo "$config_block" >> "$temp_file"
-                echo "" >> "$temp_file"
+                echo "" >>"$temp_file"
+                echo "$config_block" >>"$temp_file"
+                echo "" >>"$temp_file"
                 inserted=true
             elif [[ "$line_count" -gt 10 ]] && [[ ! "$line" =~ ^# ]] && [[ -n "$line" ]]; then
-                echo "" >> "$temp_file"
-                echo "$config_block" >> "$temp_file"
-                echo "" >> "$temp_file"
+                echo "" >>"$temp_file"
+                echo "$config_block" >>"$temp_file"
+                echo "" >>"$temp_file"
                 inserted=true
             fi
         fi
 
-        echo "$line" >> "$temp_file"
-    done < "$config_path"
+        echo "$line" >>"$temp_file"
+    done <"$config_path"
 
     if [[ "$inserted" == "false" ]]; then
-        echo "" >> "$temp_file"
-        echo "$config_block" >> "$temp_file"
+        echo "" >>"$temp_file"
+        echo "$config_block" >>"$temp_file"
     fi
 
     mv "$temp_file" "$config_path"
@@ -359,7 +359,7 @@ main() {
     log_info "PiTrac Camera Configuration"
     log_info "============================"
 
-    if ! command -v python3 &> /dev/null; then
+    if ! command -v python3 &>/dev/null; then
         log_warn "Python3 not found - skipping camera configuration"
         log_info "Camera configuration requires Python3 to be installed"
         exit 0

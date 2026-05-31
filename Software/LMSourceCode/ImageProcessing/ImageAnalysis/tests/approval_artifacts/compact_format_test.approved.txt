@@ -1,1 +1,0 @@
-Ball:NO State:0 Conf:0.10 Pos:(56,54,55)

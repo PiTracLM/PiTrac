@@ -1,0 +1,54 @@
+# Build artifacts
+build/
+builddir/
+out/
+dist/
+target/
+node_modules/
+
+# C++ (use clang-format instead)
+*.cpp
+*.h
+*.hpp
+*.c
+
+# Shell scripts (use shfmt instead)
+*.sh
+
+# Minified / vendored
+*.min.js
+*.min.css
+
+# Binary and ML artifacts
+*.pt
+*.onnx
+*.deb
+*.so
+*.o
+
+# Hardware / CAD files
+Hardware/
+3D Printed Parts/
+*.kicad_pcb
+*.kicad_sch
+*.FCBak
+
+
+# Generated coverage
+htmlcov/
+.coverage
+
+# Packaging artifacts
+packaging/deps-artifacts/
+packaging/pitrac
+
+# Python caches
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Vendor / env
+vendor/
+venv/
+.venv/
