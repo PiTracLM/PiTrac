@@ -16,6 +16,7 @@
 #include <lgpio.h>
 #include <unistd.h>
 #include <thread>
+#include <chrono>
 #include <math.h>
 #include <sys/time.h>
 #include <signal.h>
@@ -96,7 +97,22 @@ namespace golf_sim {
 		if (!pico_client_->SelectClubProfile(profile)) {
 			GS_LOG_MSG(warning, "Pico club-profile select failed; arming on the previously-active strobe pattern");
 		}
-		return pico_client_->Arm();
+		// The firmware refuses to arm while the room is momentarily louder than
+		// threshold/4 (arm-quiet gate). Right after the ball is placed the player is
+		// still settling, so the first attempt often catches a transient. Retry over a
+		// couple of seconds to catch a quiet window -- this lets the threshold be set
+		// low enough to actually DETECT the (relatively quiet) strike yet still arm.
+		constexpr int kArmAttempts = 12;
+		for (int attempt = 0; attempt < kArmAttempts; ++attempt) {
+			if (pico_client_->Arm()) {
+				if (attempt > 0) {
+					GS_LOG_MSG(info, "Pico armed after " + std::to_string(attempt + 1) + " attempt(s) (waited for a quiet window).");
+				}
+				return true;
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(250));
+		}
+		return false;
 	}
 
 	bool PulseStrobe::DisarmPico() {
