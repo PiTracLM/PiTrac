@@ -257,6 +257,69 @@ BOOST_AUTO_TEST_CASE(read_status_rejects_unrecognised_reply) {
     BOOST_CHECK(!ok);
 }
 
+BOOST_AUTO_TEST_CASE(set_mic_threshold_verifies_echo) {
+    SocketPair pair;
+    PicoStrobeClient client;
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    std::thread responder = RespondStatus(pair.host, "STATUS armed=0 threshold=8000 fw=0.6.1\n");
+    bool ok = client.SetMicThreshold(8000);
+    responder.join();
+
+    BOOST_CHECK(ok);
+    std::string host_in = DrainHost(pair.host, 10);
+    BOOST_CHECK(host_in.find("CFG MIC_THRESHOLD=8000\n") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(set_mic_threshold_fails_on_echo_mismatch) {
+    SocketPair pair;
+    PicoStrobeClient client;
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    // Firmware reports a different threshold than requested -> not accepted.
+    std::thread responder = RespondStatus(pair.host, "STATUS armed=0 threshold=4096 fw=0.6.1\n");
+    bool ok = client.SetMicThreshold(8000);
+    responder.join();
+
+    BOOST_CHECK(!ok);
+}
+
+BOOST_AUTO_TEST_CASE(set_decay_confirm_verifies_echo) {
+    SocketPair pair;
+    PicoStrobeClient client;
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    std::thread responder = RespondStatus(pair.host, "STATUS armed=0 threshold=4096 decay_confirm_ms=3 fw=0.6.1\n");
+    bool ok = client.SetDecayConfirm(3);
+    responder.join();
+
+    BOOST_CHECK(ok);
+    std::string host_in = DrainHost(pair.host, 10);
+    BOOST_CHECK(host_in.find("CFG DECAY_CONFIRM_MS=3\n") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(read_status_parses_decay_confirm) {
+    SocketPair pair;
+    PicoStrobeClient client;
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    std::thread responder = RespondStatus(pair.host, "STATUS armed=0 threshold=4096 decay_confirm_ms=12 fw=0.6.1\n");
+    PicoStatus status;
+    bool ok = client.ReadStatus(status);
+    responder.join();
+
+    BOOST_REQUIRE(ok);
+    BOOST_CHECK_EQUAL(status.decay_confirm_ms, 12u);
+}
+
 BOOST_AUTO_TEST_CASE(send_pulse_config_writes_both_lines) {
     SocketPair pair;
     PicoStrobeClient client;
