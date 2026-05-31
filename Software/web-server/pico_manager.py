@@ -259,7 +259,24 @@ class PicoManager:
         return await self._send_cfg(f"MIC_THRESHOLD={value}")
 
     async def set_armed(self, armed: bool) -> Dict[str, Any]:
-        return await self._send_cfg(f"ARMED={1 if armed else 0}")
+        """Arm/disarm the detector, confirming the firmware actually took it.
+
+        The firmware refuses CFG ARMED=1 when the room is louder than
+        mic_threshold / DSP_ARM_QUIET_FACTOR (it logs "arm refused (room too
+        loud)"), so a bare ACK can leave the page showing armed while the device
+        stays disarmed. Check the STATUS echo and surface the refusal instead.
+        """
+        want = 1 if armed else 0
+        result = await self._send_cfg(f"ARMED={want}")
+        echoed = result.get("armed")
+        if echoed is not None and echoed != want:
+            result["ok"] = False
+            result.setdefault(
+                "error",
+                "arm refused — raise the threshold (room too loud relative to it)"
+                if want else "firmware did not disarm",
+            )
+        return result
 
     async def set_min_inter_shot(self, ms: int) -> Dict[str, Any]:
         if not isinstance(ms, int):
