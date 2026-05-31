@@ -35,6 +35,8 @@
 
 namespace golf_sim {
 
+	std::atomic<bool> PulseStrobe::cam2_ready_for_final_trigger_{false};
+
 	std::vector<float>  PulseStrobe::pulse_intervals_fast_ms_;
 	int PulseStrobe::number_bits_for_fast_on_pulse_ = 0;
 
@@ -76,6 +78,23 @@ namespace golf_sim {
 	void PicoLogWarn(const std::string& msg) {
 		GS_LOG_MSG(warning, msg);
 	}
+
+	bool PulseStrobe::IsPicoActive() {
+		return pico_client_ && pico_client_->IsOpen();
+	}
+
+	bool PulseStrobe::ArmPicoForShot() {
+		return pico_client_ && pico_client_->Arm();
+	}
+
+	bool PulseStrobe::DisarmPico() {
+		return pico_client_ && pico_client_->Disarm();
+	}
+
+	uint64_t PulseStrobe::PicoEventCount() {
+		return pico_client_ ? pico_client_->LastEventCount() : 0;
+	}
+
 	int PulseStrobe::kPuttingStrobeDelayMs = 0;
 
 	long PulseStrobe::kCam2SetupPeriodMilliseconds = 2000;
@@ -530,12 +549,16 @@ namespace golf_sim {
 								GS_LOG_MSG(error, "PITRAC_PICO_ENABLED=required but Pico open failed: " + device);
 								return false;
 							}
-							GS_LOG_MSG(warning, "Pico probe succeeded but Open failed; using legacy SPI path");
+							GS_LOG_MSG(warning, "Pico probe succeeded but Open failed: " + device + " -- falling back to legacy strobe. cam2 will NOT trigger if its XTR is wired to the Pico.");
 						} else {
 							GS_LOG_MSG(trace, "PicoStrobeClient open on " + device);
 							// Pulse trains are staged below, once the per-club interval
 							// vectors and on-pulse widths have been loaded from config.
 						}
+					} else if (gate == "auto") {
+						// auto used to fall to legacy SILENTLY on a probe miss, which hid a
+						// mis-wired cam2 trigger for hours. Say it out loud.
+						GS_LOG_MSG(warning, "PITRAC_PICO_ENABLED=auto but no Pico answered on " + device + " -- falling back to legacy strobe. cam2 will NOT trigger if its XTR is wired to the Pico.");
 					}
 				}
 			}
@@ -680,6 +703,14 @@ namespace golf_sim {
 
 #ifdef __unix__  // Ignore in Windows environment
 
+		// In Pico mode the Pico self-fires the strobe + cam2 trigger on the mic
+		// strike, so there is no legacy priming train to send. Skip the SPI open
+		// and the whole 9-state priming machine.
+		if (IsPicoActive()) {
+			GS_LOG_TRACE_MSG(trace, "SendCameraPrimingPulses: Pico active -- skipping legacy priming pulses.");
+			return true;
+		}
+
 		// Re-establish putting delay each time to make it easier to adjust on the fly
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kPuttingStrobeDelayMs", kPuttingStrobeDelayMs);
 
@@ -793,6 +824,14 @@ namespace golf_sim {
 	bool PulseStrobe::SendExternalTrigger() {
 
 #ifdef __unix__  // Ignore in Windows environment
+
+		// In Pico mode the Pico drives the cam2 trigger + strobe autonomously on
+		// the acoustic strike; camera1 motion is stability-only. Never fire the
+		// legacy SPI strobe / BCM trigger from here.
+		if (IsPicoActive()) {
+			GS_LOG_TRACE_MSG(trace, "SendExternalTrigger: Pico active -- skipping legacy trigger.");
+			return true;
+		}
 
 		// GS_LOG_TRACE_MSG(trace, "Sent final camera trigger(s) and strobe pulses.");
 		SendCameraStrobeTriggerAndShutter(lggpio_chip_handle_);

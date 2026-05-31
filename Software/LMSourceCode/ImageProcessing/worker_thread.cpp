@@ -115,7 +115,11 @@ namespace gs = golf_sim;
 				remaining_time_ms = (std::max((long)0, remaining_time_ms - kSleepIncrementMs));
 			}
 
-			callback_function_();
+			// Skip the callback when ExitThread cancelled us, so tearing a timer
+			// down to re-arm it never queues a phantom (timeout) event.
+			if (!exit_timer_) {
+				callback_function_();
+			}
 
 		} while (repeat_timer_ && GolfSimGlobals::golf_sim_running_);
 

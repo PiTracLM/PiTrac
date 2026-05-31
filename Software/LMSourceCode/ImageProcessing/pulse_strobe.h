@@ -9,6 +9,8 @@
 #pragma once
 
 
+#include <atomic>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -60,6 +62,15 @@ namespace golf_sim {
 		static bool SendCameraPrimingPulses(bool use_high_speed);
 		static bool SendExternalTrigger();
 
+		// Pico autonomous-trigger bridge. When the Pico is open it owns the
+		// strobe + cam2 external trigger, so the legacy SPI/BCM fire paths stand
+		// down and the FSM arms-and-waits instead. These forward to pico_client_
+		// (which is protected) so callers outside PulseStrobe don't reach in.
+		static bool IsPicoActive();
+		static bool ArmPicoForShot();
+		static bool DisarmPico();
+		static uint64_t PicoEventCount();
+
 		// Sends the already-created pulse buffer to the strobes via SPI, and also
 		// opens the shutter while the pulses are sent.
 		// requires the camera_fast_pulse_sequence_ to have already been created by
@@ -88,6 +99,11 @@ namespace golf_sim {
 		static void SendOnOffPulse(long length_us);
 
 		static bool kRecordAllImages;
+
+		// Cleared by cam2's event loop on entry, set true once it exits the
+		// priming/quiesce window. gs_fsm waits on this before arming cam1 so
+		// a fast hit can't fire the trigger while cam2 is still ignoring it.
+		static std::atomic<bool> cam2_ready_for_final_trigger_;
 
 	protected:
 

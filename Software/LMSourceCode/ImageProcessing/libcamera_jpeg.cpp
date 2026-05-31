@@ -107,6 +107,8 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 		~TriggerModeResetGuard() { SetImx296TriggerModeViaI2C(0); }
 	} trigger_reset_guard;
 
+	gs::PulseStrobe::cam2_ready_for_final_trigger_.store(false);
+
 	app.StartCamera();
 	GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop: camera started, waiting for triggers");
 
@@ -130,8 +132,12 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	std::chrono::steady_clock::time_point timeOfFirstTrigger = std::chrono::steady_clock::now();
 
 	// These flags manage state while the sequence of external shutter pulses are
-	// processed.
-	FlightCameraState state = kWaitingForFirstPrimingPulseGroup;
+	// processed. In Pico autonomous mode the armed Pico fires a single GP15
+	// trigger coincident with the strobe -- there is no priming train to
+	// quiesce through, so jump straight to the final-image state and capture
+	// the one frame the Pico produces.
+	const bool pico_mode = gs::PulseStrobe::IsPicoActive();
+	FlightCameraState state = pico_mode ? kWaitingForFinalImageTrigger : kWaitingForFirstPrimingPulseGroup;
 
 	// Check here, once, to see if we are going to expect to produce a pre-image for later subtraction
 	golf_sim::GolfSimConfiguration::SetConstant("gs_config.ball_exposure_selection.kUsePreImageSubtraction", 
@@ -184,6 +190,16 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	} pulse_guard{pulse_sender};
 
 	bool return_status = true;
+
+	if (pico_mode) {
+		// cam2 is externally triggered now; give the InnoMaker trigger setup a
+		// moment to take, then let gs_fsm arm the Pico (it waits on this flag).
+		if (camera_model == gs::CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(gs::PulseStrobe::kPauseToSetUpInnoMakerExternalTriggerMilliseconds));
+		}
+		gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
+		GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop: Pico mode -- armed for a single autonomous trigger.");
+	}
 
 	for (;state != kFinalImageReceived;)
 	{
@@ -384,6 +400,7 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 						GS_LOG_TRACE_MSG(trace, "Priming period complete.  Ready for Final Image Trigger (before flush).");
 						state = kWaitingForFinalImageTrigger;
 					}
+					gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
 				}
 				else {
 					GS_LOG_TRACE_MSG(trace, "Priming period complete.  Ready for Pre-image Trigger.");
@@ -432,6 +449,7 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 
 			// TBD - If using second priming group, use state = kWaitingForSecondPrimingPulseGroup;
 			state = kWaitingForFinalImageTrigger;
+			gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
 			break;
 		}
 
@@ -469,6 +487,7 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 			else {
 				GS_LOG_TRACE_MSG(trace, "		Priming period complete.  Ready for Trigger.");
 				state = kWaitingForFinalImageTrigger;
+				gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
 			}
 			break;
 		}

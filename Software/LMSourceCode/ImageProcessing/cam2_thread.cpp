@@ -148,6 +148,17 @@ void Camera2Thread::stop() {
     }
 }
 
+void Camera2Thread::cancel_capture() {
+    // Unblock a capture stuck in app.Wait() (e.g. a cam2 timeout) WITHOUT
+    // tearing down the thread or the sim -- StopCamera + PostQuit makes
+    // cam2_run_event_loop return false, and the run loop then waits to be
+    // armed again for the next shot.
+    if (app_) {
+        app_->StopCamera();
+        app_->PostQuit();
+    }
+}
+
 void Camera2Thread::arm() {
     {
         std::lock_guard<std::mutex> lock(mutex_);

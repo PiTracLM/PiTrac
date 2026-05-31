@@ -49,6 +49,11 @@ namespace golf_sim {
 
     static long kMaxCam2ImageReceivedTimeMs = 2000;
 
+    // In Pico mode the LM arms and then waits for the player to actually swing,
+    // so the cam2 wait has to outlast the firmware arm window (~10s). Legacy uses
+    // the short value above because there the timer only starts after the hit.
+    static long kMaxPicoStrikeWaitTimeMs = 12000;
+
     const int kWaitForBallPauseMs = 500;
     const int kEventLoopPauseMs = 5000;
     const int kBallStabilizationTime = 1; // seconds
@@ -63,6 +68,10 @@ namespace golf_sim {
 
     TimedCallbackThread* BallStabilizationCheckTimerThread = nullptr;
     TimedCallbackThread* ReceivedCam2ImageCheckTimerThread = nullptr;
+
+    // Pico strike counter sampled when we arm, compared on a cam2 timeout to tell
+    // "Pico never fired" from "Pico fired but cam2 dropped the frame".
+    static uint64_t g_pico_event_count_at_arm = 0;
 
 
     void queueBallStabilizationCheck() {
@@ -109,12 +118,22 @@ namespace golf_sim {
 
     void setupCam2ImageReceivedCheckTimer() {
 
-        GS_LOG_TRACE_MSG(trace, "setupCam2ImageReceivedCheckTimer - Setting call back for " + std::to_string(kMaxCam2ImageReceivedTimeMs) + " milliseconds.");
+        // Pico mode waits across the player's swing, so use the longer window.
+        // TimedCallbackThread takes milliseconds, so pass the value straight in --
+        // the old "* 1000" turned 2s into ~33min and is why a stuck capture parked.
+        const long timeout_ms = PulseStrobe::IsPicoActive() ? kMaxPicoStrikeWaitTimeMs : kMaxCam2ImageReceivedTimeMs;
 
-        if (ReceivedCam2ImageCheckTimerThread == nullptr) {
-            ReceivedCam2ImageCheckTimerThread = new TimedCallbackThread("setupCam2ImageReceivedCheckTimerThread", kMaxCam2ImageReceivedTimeMs * 1000, queueCam2ImageReceivedCheck);
-            ReceivedCam2ImageCheckTimerThread->CreateThread();
+        GS_LOG_TRACE_MSG(trace, "setupCam2ImageReceivedCheckTimer - Setting call back for " + std::to_string(timeout_ms) + " milliseconds.");
+
+        // The timer is one-shot, so tear down any prior (already-fired) instance and
+        // build a fresh one -- otherwise only the first shot of a session is guarded.
+        if (ReceivedCam2ImageCheckTimerThread != nullptr) {
+            ReceivedCam2ImageCheckTimerThread->ExitThread();
+            delete ReceivedCam2ImageCheckTimerThread;
+            ReceivedCam2ImageCheckTimerThread = nullptr;
         }
+        ReceivedCam2ImageCheckTimerThread = new TimedCallbackThread("setupCam2ImageReceivedCheckTimerThread", timeout_ms, queueCam2ImageReceivedCheck);
+        ReceivedCam2ImageCheckTimerThread->CreateThread();
     }
 
 
@@ -289,6 +308,11 @@ namespace golf_sim {
         // Whatever happens, this is a new shot with a new shot number
         GsSimInterface::IncrementShotCounter();
 
+        // Clear the cam2-ready flag for this shot before re-arming, so the
+        // quiesce wait below blocks on cam2's fresh signal rather than the
+        // stale true left over from the previous shot.
+        PulseStrobe::cam2_ready_for_final_trigger_.store(false);
+
         // Arm Camera2 thread to start waiting for the external trigger
         g_cam2_thread.arm();
 
@@ -298,6 +322,36 @@ namespace golf_sim {
         bool use_fast_speed = (GolfSimClubs::GetCurrentClubType() == GolfSimClubs::GsClubType::kDriver);
         if (!PulseStrobe::SendCameraPrimingPulses(use_fast_speed)) {
             GS_LOG_MSG(error, "FAILED to PulseStrobe::SendCameraPrimingPulses");
+        }
+
+        // Wait for cam2 to exit its priming/quiesce window before we arm. Otherwise
+        // a fast hit (or the Pico's autonomous fire) can land while cam2 is still
+        // rejecting triggers, producing a black final frame.
+        {
+            constexpr int kCam2ReadyTimeoutMs = 3000;
+            const auto wait_deadline = std::chrono::steady_clock::now()
+                                       + std::chrono::milliseconds(kCam2ReadyTimeoutMs);
+            while (!PulseStrobe::cam2_ready_for_final_trigger_.load() &&
+                   std::chrono::steady_clock::now() < wait_deadline) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            }
+            if (!PulseStrobe::cam2_ready_for_final_trigger_.load()) {
+                GS_LOG_MSG(warning, "cam2 not ready for trigger after " +
+                           std::to_string(kCam2ReadyTimeoutMs) +
+                           " ms -- arming anyway. A fast hit could be dropped.");
+            }
+        }
+
+        // In Pico mode, arm the autonomous acoustic trigger now that cam2 is ready.
+        // The Pico fires the strobe + cam2 trigger itself on the next mic strike;
+        // legacy mode skips this (ArmPicoForShot is a no-op without a Pico).
+        if (PulseStrobe::IsPicoActive()) {
+            // Sample the strike counter before arming -- a disarmed Pico cannot
+            // fire, so this is a stable baseline for the timeout diagnostic.
+            g_pico_event_count_at_arm = PulseStrobe::PicoEventCount();
+            if (!PulseStrobe::ArmPicoForShot()) {
+                GS_LOG_MSG(error, "failed to arm pico for autonomous trigger (room too loud, or port busy?)");
+            }
         }
 
         // Log the pertinent images for debugging & analysis
@@ -388,15 +442,23 @@ namespace golf_sim {
         // Let the monitor interface know what's happening
         GsUISystem::SendIPCStatusMessage(GsIPCResultType::kBallPlacedAndReadyForHit);
 
-        if (!WatchForHitAndTrigger(waitingForBallHit.cam1_ball_, image, ball_hit)) {
-            GS_LOG_MSG(error, "Failed to WatchForHitAndTrigger.  Restarting GolfSim FSM.");
-            GolfSimEventElement restartEvent{ new GolfSimEvent::Restart{ } };
-            GolfSimEventQueue::QueueEvent(restartEvent);
-            return state::InitializingCamera1System{};
+        if (PulseStrobe::IsPicoActive()) {
+            // Pico mode: the armed Pico fires the strobe + cam2 trigger on the
+            // acoustic strike, so the hit IS the arrival of the cam2 frame. Skip
+            // camera1 motion detection (stability-only here) and just wait.
+            GS_LOG_MSG(info, "============= PICO ARMED - WAITING FOR ACOUSTIC STRIKE ===============\n");
         }
+        else {
+            if (!WatchForHitAndTrigger(waitingForBallHit.cam1_ball_, image, ball_hit)) {
+                GS_LOG_MSG(error, "Failed to WatchForHitAndTrigger.  Restarting GolfSim FSM.");
+                GolfSimEventElement restartEvent{ new GolfSimEvent::Restart{ } };
+                GolfSimEventQueue::QueueEvent(restartEvent);
+                return state::InitializingCamera1System{};
+            }
 
-        // TBD - Consider case where we did NOT get a ball hit indication for some reason
-        GS_LOG_MSG(info, "============= BALL HIT ===============\n");
+            // TBD - Consider case where we did NOT get a ball hit indication for some reason
+            GS_LOG_MSG(info, "============= BALL HIT ===============\n");
+        }
 
         // Make sure we do something sensible if we don't receive an image from the camera 2
         // system in a reasonable amount of time.
@@ -422,6 +484,12 @@ namespace golf_sim {
     GolfSimState onEvent(const state::BallHitNowWaitingForCam2Image& BallHitNowWaitingForCam2Image,
         const GolfSimEvent::Camera2ImageReceived& cam2ImageReceived) {
         GS_LOG_MSG(debug, "GolfSim state transition: BallHitNowWaitingForCam2Image - Received Camera2ImageReceived ");
+
+        // The frame arrived, so this shot is done -- disarm the Pico (the firmware
+        // arm-timeout is only a backstop). No-op in legacy mode.
+        if (PulseStrobe::IsPicoActive()) {
+            PulseStrobe::DisarmPico();
+        }
 
         // TBD - Perform state transition processing here
         // Most importantly, all of the hit analysis!
@@ -508,6 +576,25 @@ namespace golf_sim {
         GS_LOG_MSG(debug, "GolfSim state transition: BallHitNowWaitingForCam2Image - Received CheckForCam2ImageReceived - Will restart ");
 
         GS_LOG_MSG(error, "BallHitNowWaitingForCam2Image - Timed out waiting for Cam2Image.  Restarting... ");
+
+        if (PulseStrobe::IsPicoActive()) {
+            // Tell the operator which side failed: did the Pico fire (strike seen,
+            // cam2 dropped the frame) or never fire (no strike / arm window expired)?
+            const uint64_t now_count = PulseStrobe::PicoEventCount();
+            if (now_count > g_pico_event_count_at_arm) {
+                GS_LOG_MSG(error, "pico fired but cam2 dropped the frame (event_count " +
+                           std::to_string(g_pico_event_count_at_arm) + " -> " + std::to_string(now_count) + ")");
+            }
+            else {
+                GS_LOG_MSG(error, "no strike detected before timeout (pico event_count still " +
+                           std::to_string(now_count) + ")");
+            }
+            PulseStrobe::DisarmPico();
+        }
+
+        // Unblock cam2 if it is still parked in app.Wait() so it can be re-armed for
+        // the next shot. (stop() would tear down the whole sim -- deliberately not that.)
+        g_cam2_thread.cancel_capture();
 
         GolfSimEventElement restartEvent{ new GolfSimEvent::Restart{ } };
         GolfSimEventQueue::QueueEvent(restartEvent);
@@ -656,6 +743,7 @@ namespace golf_sim {
         }
 
         GolfSimConfiguration::SetConstant("gs_config.ipc_interface.kMaxCam2ImageReceivedTimeMs", kMaxCam2ImageReceivedTimeMs);
+        GolfSimConfiguration::SetConstant("gs_config.ipc_interface.kMaxPicoStrikeWaitTimeMs", kMaxPicoStrikeWaitTimeMs);
 
         GolfSimConfiguration::SetConstant("gs_config.user_interface.kWebServerCamera2Image", kWebServerCamera2Image);
         GolfSimConfiguration::SetConstant("gs_config.user_interface.kWebServerLastTeedBallImage", kWebServerLastTeedBallImage);        
