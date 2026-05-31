@@ -92,6 +92,24 @@ class PiTracProcessManager:
             (Path.home() / "LM_Shares/Images").mkdir(parents=True, exist_ok=True)
             (Path.home() / "LM_Shares/WebShare").mkdir(parents=True, exist_ok=True)
 
+            # The LM reads its Pico settings from the environment. Mic-DSP tuning is
+            # set live via /pico and persisted to config; exporting it lets the LM
+            # re-push it to a power-cycled Pico on connect without opening /pico.
+            merged_config = self.config_manager.get_config()
+            for cfg_key, env_var in (
+                ("gs_config.pico.enabled", "PITRAC_PICO_ENABLED"),
+                ("gs_config.pico.device", "PITRAC_PICO_DEVICE"),
+                ("gs_config.pico.mic_threshold", "PITRAC_PICO_MIC_THRESHOLD"),
+                ("gs_config.pico.decay_confirm_ms", "PITRAC_PICO_DECAY_CONFIRM_MS"),
+            ):
+                node = merged_config
+                for part in cfg_key.split("."):
+                    node = node.get(part) if isinstance(node, dict) else None
+                    if node is None:
+                        break
+                if node is not None and node != "":
+                    env[env_var] = str(node)
+
             cmd = self._build_command()
 
             self.log_file = run_log_path(self.log_dir, datetime.now())
