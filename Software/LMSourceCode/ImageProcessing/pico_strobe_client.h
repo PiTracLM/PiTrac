@@ -73,6 +73,12 @@ public:
     // Diagnostic readback.
     bool ReadStatus(PicoStatus& out);
 
+    // Live STATUS read that returns just the cumulative strike counter
+    // (event_count). The cam2 timeout path uses it to tell "Pico never fired"
+    // from "Pico fired but cam2 dropped the frame". Returns 0 if the port is
+    // closed or STATUS does not answer.
+    uint64_t LastEventCount();
+
     // Test-only seam: bypass termios and adopt an already-configured fd.
     // Production code must use Open(device_path).
     bool AttachFd(int fd);
