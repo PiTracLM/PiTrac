@@ -60,6 +60,12 @@ public:
     bool CamPulse(uint32_t microseconds);
     bool FireWithShutter();
 
+    // Autonomous mode: arm the on-Pico acoustic trigger so a mic strike fires the
+    // strobe + cam2 XTR on the Pico itself. Verified against the STATUS echo — the
+    // firmware refuses to arm when the room is louder than threshold/quiet-factor.
+    bool Arm();
+    bool Disarm();
+
     // Calibration hold.
     bool HoldOn();
     bool HoldOff();
