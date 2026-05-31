@@ -3,9 +3,10 @@ const RMS_STREAM_MIN_FW = [0, 5, 0];
 const NOISE_FLOOR_EASE = 0.25;
 const AXIS_EASE = 0.2;
 const AXIS_HEADROOM = 1.4;
-const SET_ABOVE_NOISE_FACTOR = 1.5;
-const SLIDER_RANGE_FACTOR = 3;
-const THIN_MARGIN_RATIO = 1.25;
+const SET_ABOVE_NOISE_FACTOR = 4.5;
+const SLIDER_RANGE_FACTOR = 8;
+const ARM_QUIET_FACTOR = 4;  // firmware arm gate: refuses unless threshold >= noise * 4
+const RMS_DROPOUT_RATIO = 0.5;
 const MARGIN_CLASS = 'text-[11px]';
 
 function parseFwVersion(fw) {
@@ -34,8 +35,9 @@ function formatThousands(value) {
 
 function marginTier(threshold, floor) {
     if (!floor || !threshold) return 'unknown';
-    if (threshold < floor) return 'below';
-    if (threshold / floor < THIN_MARGIN_RATIO) return 'thin';
+    const ratio = threshold / floor;
+    if (ratio < ARM_QUIET_FACTOR) return 'noarm';
+    if (ratio < SET_ABOVE_NOISE_FACTOR) return 'tight';
     return 'ok';
 }
 
@@ -201,9 +203,9 @@ class PicoController {
         if (!this.noiseFloor) return 'noise floor not measured';
         const ratio = threshold / this.noiseFloor;
         const tier = marginTier(threshold, this.noiseFloor);
-        if (tier === 'below') return `below noise floor (${ratio.toFixed(2)}×)`;
-        if (tier === 'thin') return `thin margin, ${ratio.toFixed(1)}× noise floor`;
-        return `${ratio.toFixed(1)}× above noise floor`;
+        if (tier === 'noarm') return `${ratio.toFixed(1)}× noise floor, too low to arm`;
+        if (tier === 'tight') return `${ratio.toFixed(1)}× noise floor, armable`;
+        return `${ratio.toFixed(1)}× noise floor, armed-ready`;
     }
 
     updateMarginReadout(threshold) {
@@ -219,14 +221,14 @@ class PicoController {
             return;
         }
         const ratio = threshold / this.noiseFloor;
-        if (tier === 'below') {
-            el.textContent = `noise ${floorText} · below floor (${ratio.toFixed(2)}×)`;
+        if (tier === 'noarm') {
+            el.textContent = `noise ${floorText} · ${ratio.toFixed(1)}× — won't arm (need ${ARM_QUIET_FACTOR}×)`;
             el.className = `${MARGIN_CLASS} text-error`;
-        } else if (tier === 'thin') {
-            el.textContent = `noise ${floorText} · thin margin (${ratio.toFixed(1)}×)`;
+        } else if (tier === 'tight') {
+            el.textContent = `noise ${floorText} · ${ratio.toFixed(1)}× — armable, tight`;
             el.className = `${MARGIN_CLASS} text-warning`;
         } else {
-            el.textContent = `noise ${floorText} · ${ratio.toFixed(1)}× margin`;
+            el.textContent = `noise ${floorText} · ${ratio.toFixed(1)}× — armed-ready`;
             el.className = `${MARGIN_CLASS} opacity-70`;
         }
     }
@@ -416,6 +418,12 @@ class PicoController {
     pushRmsSample(sample) {
         this.rmsLastEventAt = Date.now();
         this.setRmsHint('Streaming');
+        // A CFG write on the shared serial port (saving a threshold, a status
+        // poll) can truncate an EVENT RMS frame into a garbage reading far below
+        // the noise floor. Drop those dropouts so they don't plot as a dive.
+        if (!(sample.value > 0) || (this.noiseFloor > 0 && sample.value < this.noiseFloor * RMS_DROPOUT_RATIO)) {
+            return;
+        }
         this.rmsSamples.push(sample);
         if (this.rmsSamples.length > this.rmsCapacity) {
             this.rmsSamples.shift();
@@ -522,9 +530,9 @@ class PicoController {
             const yThreshold = yOf(threshold);
             const yFloor = yOf(this.noiseFloor);
             const tier = marginTier(threshold, this.noiseFloor);
-            this.ctx.fillStyle = tier === 'below'
+            this.ctx.fillStyle = tier === 'noarm'
                 ? 'rgba(239, 68, 68, 0.14)'
-                : tier === 'thin'
+                : tier === 'tight'
                     ? 'rgba(245, 158, 11, 0.14)'
                     : 'rgba(34, 197, 94, 0.12)';
             this.ctx.fillRect(0, Math.min(yThreshold, yFloor), w, Math.abs(yFloor - yThreshold));
