@@ -742,8 +742,21 @@ namespace golf_sim {
             return false;
         }
 
-        GolfSimConfiguration::SetConstant("gs_config.ipc_interface.kMaxCam2ImageReceivedTimeMs", kMaxCam2ImageReceivedTimeMs);
-        GolfSimConfiguration::SetConstant("gs_config.ipc_interface.kMaxPicoStrikeWaitTimeMs", kMaxPicoStrikeWaitTimeMs);
+        // SetConstant(long) defaults a MISSING tag to 0 (boost get<long>(tag, 0)), and
+        // neither of these keys ships in the config -- so read into a temp and only apply a
+        // real (>0) override. Letting it write 0 here gives a 0 ms cam2 timeout that fires
+        // instantly and spins the FSM in a restart loop (and silently zeroed the legacy 2 s
+        // timeout too -- masked there only because the cam2 frame beats a 0 ms timer).
+        long cam2_image_timeout_ms = kMaxCam2ImageReceivedTimeMs;
+        GolfSimConfiguration::SetConstant("gs_config.ipc_interface.kMaxCam2ImageReceivedTimeMs", cam2_image_timeout_ms);
+        if (cam2_image_timeout_ms > 0) {
+            kMaxCam2ImageReceivedTimeMs = cam2_image_timeout_ms;
+        }
+        long pico_strike_timeout_ms = kMaxPicoStrikeWaitTimeMs;
+        GolfSimConfiguration::SetConstant("gs_config.ipc_interface.kMaxPicoStrikeWaitTimeMs", pico_strike_timeout_ms);
+        if (pico_strike_timeout_ms > 0) {
+            kMaxPicoStrikeWaitTimeMs = pico_strike_timeout_ms;
+        }
 
         GolfSimConfiguration::SetConstant("gs_config.user_interface.kWebServerCamera2Image", kWebServerCamera2Image);
         GolfSimConfiguration::SetConstant("gs_config.user_interface.kWebServerLastTeedBallImage", kWebServerLastTeedBallImage);        
