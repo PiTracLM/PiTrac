@@ -133,6 +133,14 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 
 	gs::PulseStrobe::cam2_ready_for_final_trigger_.store(false);
 
+	// Drop any stale message a prior cancelled capture left in the queue before we start.
+	// A cam2 timeout that fires just after a frame was already captured runs cancel_capture
+	// (StopCamera + PostQuit) while this worker is parked in cv_.wait -- not app.Wait() --
+	// so that Quit is never consumed; it would otherwise be the first thing this fresh
+	// capture's Wait() returns, failing the shot and cascading into the next one. The camera
+	// is stopped here, so there is no legitimate in-flight message to lose.
+	app.DrainMessages();
+
 	app.StartCamera();
 	GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop: camera started, waiting for triggers");
 

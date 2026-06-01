@@ -965,6 +965,11 @@ void RPiCamApp::PostQuit()
 	msg_queue_.Post(Msg(MsgType::Quit));
 }
 
+void RPiCamApp::DrainMessages()
+{
+	msg_queue_.Clear();
+}
+
 libcamera::Stream *RPiCamApp::GetStream(std::string const &name, StreamInfo *info) const
 {
 	auto it = streams_.find(name);
