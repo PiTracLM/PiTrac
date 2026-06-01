@@ -342,17 +342,14 @@ namespace golf_sim {
             }
         }
 
-        // In Pico mode, arm the autonomous acoustic trigger now that cam2 is ready.
-        // The Pico fires the strobe + cam2 trigger itself on the next mic strike;
-        // legacy mode skips this (ArmPicoForShot is a no-op without a Pico).
-        if (PulseStrobe::IsPicoActive()) {
-            // Sample the strike counter before arming -- a disarmed Pico cannot
-            // fire, so this is a stable baseline for the timeout diagnostic.
-            g_pico_event_count_at_arm = PulseStrobe::PicoEventCount();
-            if (!PulseStrobe::ArmPicoForShot()) {
-                GS_LOG_MSG(error, "failed to arm pico for autonomous trigger (room too loud, or port busy?)");
-            }
-        }
+        // NB: in Pico mode the autonomous trigger is armed LATER -- in the
+        // WaitingForBallHit handler, not here. Arming it here (while still inside the
+        // stabilization handler, before BeginWatchingForBallHit is even queued) let the
+        // Pico self-fire so the cam2 frame arrived while the FSM was still in
+        // WaitingForBallHit -- a state with no Camera2ImageReceived handler -- which threw
+        // "Unsupported state transition" and wedged the FSM on "Confirming ball is stable".
+        // cam2 is warmed and waiting now, but with no trigger source until the Pico is
+        // armed it simply blocks, so there is no race in this gap.
 
         // Log the pertinent images for debugging & analysis
         // Add a center dot to the first image to analyze camera off-center
@@ -443,9 +440,32 @@ namespace golf_sim {
         GsUISystem::SendIPCStatusMessage(GsIPCResultType::kBallPlacedAndReadyForHit);
 
         if (PulseStrobe::IsPicoActive()) {
-            // Pico mode: the armed Pico fires the strobe + cam2 trigger on the
-            // acoustic strike, so the hit IS the arrival of the cam2 frame. Skip
-            // camera1 motion detection (stability-only here) and just wait.
+            // Pico mode: the armed Pico fires the strobe + cam2 trigger on the acoustic
+            // strike, so the hit IS the arrival of the cam2 frame. There is no camera1
+            // motion detection here -- just arm and wait.
+            //
+            // Arm HERE, not back in the stabilization handler: this handler returns
+            // BallHitNowWaitingForCam2Image, so by the time the next event is dequeued the
+            // FSM is already in the one state that accepts Camera2ImageReceived. Arming
+            // earlier let the autonomous strike land a cam2 frame while we were still in
+            // WaitingForBallHit (no handler) -> "Unsupported state transition" -> the FSM
+            // wedged on "Confirming ball is stable".
+            //
+            // Sample the strike counter just before arming -- a disarmed Pico cannot fire,
+            // so this is the stable baseline for the cam2-timeout diagnostic.
+            g_pico_event_count_at_arm = PulseStrobe::PicoEventCount();
+            if (!PulseStrobe::ArmPicoForShot()) {
+                // Every attempt hit the firmware arm-quiet gate (room too loud) or the port
+                // was busy. A disarmed Pico will never fire, so this shot could only
+                // dead-end in the 12 s cam2 timeout. Abort cleanly back to waiting-for-ball
+                // with a readable status, and release the warmed-but-now-idle cam2 capture.
+                GS_LOG_MSG(error, "failed to arm pico for autonomous trigger (room too loud, or port busy?) -- aborting shot");
+                GsUISystem::SendIPCErrorStatusMessage("Could not arm the Pico (room too loud?) -- re-place the ball to retry.");
+                g_cam2_thread.cancel_capture();
+                GolfSimEventElement beginWaitingForBallPlaced{ new GolfSimEvent::BeginWaitingForBallPlaced{ } };
+                GolfSimEventQueue::QueueEvent(beginWaitingForBallPlaced);
+                return state::WaitingForBall{ std::chrono::steady_clock::now(), false /* re-send the waiting status */ };
+            }
             GS_LOG_MSG(info, "============= PICO ARMED - WAITING FOR ACOUSTIC STRIKE ===============\n");
         }
         else {
@@ -829,9 +849,21 @@ namespace golf_sim {
                 delete eventElement.e_;
             }
             catch (std::exception& ex) {
-                GS_LOG_TRACE_MSG(trace, "Exception! - " + std::string(ex.what()) + ".  Restarting...");
-                state::InitializingCamera1System state;
-                golfSim.restartSim(state);
+                GS_LOG_MSG(warning, "Exception in FSM handler - " + std::string(ex.what()) + ".  Resetting to Initializing and re-queuing a Restart.");
+                // A handler threw -- almost always the catch-all firing on an out-of-phase
+                // event (e.g. a Camera2ImageReceived that arrived before the FSM reached
+                // BallHitNowWaitingForCam2Image). Reset to Initializing, but we MUST queue a
+                // Restart: Initializing only advances on a Restart event and nothing else
+                // re-queues one, so without this the FSM sits idle forever -- the "stuck on
+                // Confirming ball is stable" hang, since that was the last status we sent.
+                if (PulseStrobe::IsPicoActive()) {
+                    // If we threw mid-shot the Pico may still be armed; a later noise
+                    // transient would self-fire and strand us again. Disarm defensively.
+                    PulseStrobe::DisarmPico();
+                }
+                golfSim.restartSim(state::InitializingCamera1System{});
+                GolfSimEventElement restartEvent{ new GolfSimEvent::Restart{ } };
+                GolfSimEventQueue::QueueEvent(restartEvent);
             }
 
             // If there is another event, we won't pause before processing it in the next loop
