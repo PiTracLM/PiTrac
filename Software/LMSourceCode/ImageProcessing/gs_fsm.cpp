@@ -633,6 +633,18 @@ namespace golf_sim {
     }
 
 
+    // A Camera2ImageReceived arriving in any state OTHER than BallHitNowWaitingForCam2Image
+    // (which has its own handler above) is a stray frame -- a cam2 mis-fire, or a late frame
+    // from a prior shot that landed after a timeout/restart. Drop it and stay put rather than
+    // letting it hit the throwing catch-all and bounce the whole FSM through a reset. (The
+    // armed Pico only fires after BeginWatchingForBallHit has already returned
+    // BallHitNowWaitingForCam2Image, so a real strike frame never lands here.)
+    GolfSimState onEvent(const auto& state, const GolfSimEvent::Camera2ImageReceived& cam2ImageReceived) {
+        GS_LOG_MSG(warning, "Dropping a stray Camera2ImageReceived received outside the hit-wait state (cam2 mis-fire or a late frame from a prior shot).");
+        return state;
+    }
+
+
     // Camera2 FSM states removed — Camera2 now runs as a thread within this process.
     // See cam2_thread.h. The thread is armed by the stabilization handler and queues
     // Camera2ImageReceived events directly into the FSM event queue.
@@ -850,12 +862,15 @@ namespace golf_sim {
             }
             catch (std::exception& ex) {
                 GS_LOG_MSG(warning, "Exception in FSM handler - " + std::string(ex.what()) + ".  Resetting to Initializing and re-queuing a Restart.");
-                // A handler threw -- almost always the catch-all firing on an out-of-phase
-                // event (e.g. a Camera2ImageReceived that arrived before the FSM reached
-                // BallHitNowWaitingForCam2Image). Reset to Initializing, but we MUST queue a
-                // Restart: Initializing only advances on a Restart event and nothing else
-                // re-queues one, so without this the FSM sits idle forever -- the "stuck on
-                // Confirming ball is stable" hang, since that was the last status we sent.
+                // The event that threw never reached the delete below (processEvent threw),
+                // so free it here -- otherwise every reset leaks the offending event.
+                delete eventElement.e_;
+                eventElement.e_ = nullptr;
+                // A handler threw on a genuinely out-of-phase event hitting the catch-all.
+                // Reset to Initializing, but we MUST queue a Restart: Initializing only
+                // advances on a Restart event and nothing else re-queues one, so without this
+                // the FSM sits idle forever -- the "stuck on Confirming ball is stable" hang,
+                // since that was the last status we sent.
                 if (PulseStrobe::IsPicoActive()) {
                     // If we threw mid-shot the Pico may still be armed; a later noise
                     // transient would self-fire and strand us again. Disarm defensively.
