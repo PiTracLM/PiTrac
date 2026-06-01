@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iomanip>
+#include <mutex>
 #include <sstream>
 #include <thread>
 #include <utility>
@@ -50,6 +51,14 @@ struct PicoStrobeClient::Impl {
     int gpio_handle = -1;
 
     GpioWriteFn gpio_writer;
+
+    // Serializes every CDC transaction (a WriteLine plus its STATUS echo read). The FSM
+    // thread (Arm/Disarm/PicoEventCount) and the cam2 thread (CamPulse warm-up) share this
+    // one fd; without serialization their request/response lines interleave and the
+    // echo-verify reads the wrong reply. Recursive because the verified setters (Arm,
+    // Disarm, SetMicThreshold, SelectClubProfile, ...) lock and then call ReadStatus /
+    // SendPulseConfig, which lock again on the same thread.
+    std::recursive_mutex io_mutex;
 
     // -1 means nothing has been pushed yet, so the first SelectClubProfile of
     // either profile always writes.
@@ -103,6 +112,7 @@ bool PicoStrobeClient::Probe(const std::string& device_path) {
 
 bool PicoStrobeClient::Open(const std::string& device_path) {
     if (!impl_) return false;
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (impl_->fd >= 0) Close();
 
     int fd = ::open(device_path.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
@@ -135,7 +145,9 @@ bool PicoStrobeClient::Open(const std::string& device_path) {
 }
 
 void PicoStrobeClient::Close() {
-    if (impl_ && impl_->fd >= 0) {
+    if (!impl_) return;
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
+    if (impl_->fd >= 0) {
         ::close(impl_->fd);
         impl_->fd = -1;
     }
@@ -147,6 +159,7 @@ bool PicoStrobeClient::IsOpen() const {
 
 bool PicoStrobeClient::AttachFd(int fd) {
     if (!impl_) return false;
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (impl_->fd >= 0) ::close(impl_->fd);
     impl_->fd = fd;
     return true;
@@ -154,6 +167,7 @@ bool PicoStrobeClient::AttachFd(int fd) {
 
 bool PicoStrobeClient::SendPulseConfig(float pulse_width_us,
                                       const std::vector<float>& intervals_ms) {
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (!IsOpen()) return false;
 
     std::ostringstream w;
@@ -170,6 +184,7 @@ bool PicoStrobeClient::SendPulseConfig(float pulse_width_us,
 }
 
 bool PicoStrobeClient::CamPulse(uint32_t microseconds) {
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (!IsOpen()) return false;
     std::ostringstream w;
     w << "CAM_PULSE " << microseconds;
@@ -177,6 +192,7 @@ bool PicoStrobeClient::CamPulse(uint32_t microseconds) {
 }
 
 bool PicoStrobeClient::FireWithShutter() {
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (!IsOpen()) return false;
 
     if (impl_->gpio_handle < 0 || !impl_->gpio_writer) {
@@ -203,6 +219,7 @@ void PicoStrobeClient::StageClubProfile(ClubProfile profile,
                                         float pulse_width_us,
                                         const std::vector<float>& intervals_ms) {
     if (!impl_) return;
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     Impl::StagedConfig& slot =
         (profile == ClubProfile::kPutter) ? impl_->putter : impl_->driver;
     slot.valid = true;
@@ -211,6 +228,7 @@ void PicoStrobeClient::StageClubProfile(ClubProfile profile,
 }
 
 bool PicoStrobeClient::SelectClubProfile(ClubProfile profile) {
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (!IsOpen()) return false;
     if (impl_->active_profile == static_cast<int>(profile)) return true;
 
@@ -227,16 +245,19 @@ bool PicoStrobeClient::SelectClubProfile(ClubProfile profile) {
 }
 
 bool PicoStrobeClient::HoldOn() {
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (!IsOpen()) return false;
     return impl_->WriteLine("CFG STROBE_HOLD=1");
 }
 
 bool PicoStrobeClient::HoldOff() {
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (!IsOpen()) return false;
     return impl_->WriteLine("CFG STROBE_HOLD=0");
 }
 
 bool PicoStrobeClient::Arm() {
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (!IsOpen()) return false;
     if (!impl_->WriteLine("CFG ARMED=1")) return false;
     PicoStatus st;
@@ -250,6 +271,7 @@ bool PicoStrobeClient::Arm() {
 }
 
 bool PicoStrobeClient::Disarm() {
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (!IsOpen()) return false;
     if (!impl_->WriteLine("CFG ARMED=0")) return false;
     PicoStatus st;
@@ -258,6 +280,7 @@ bool PicoStrobeClient::Disarm() {
 }
 
 bool PicoStrobeClient::SetMicThreshold(int32_t threshold) {
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (!IsOpen()) return false;
     if (!impl_->WriteLine("CFG MIC_THRESHOLD=" + std::to_string(threshold))) return false;
     PicoStatus st;
@@ -266,6 +289,7 @@ bool PicoStrobeClient::SetMicThreshold(int32_t threshold) {
 }
 
 bool PicoStrobeClient::SetDecayConfirm(uint32_t ms) {
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (!IsOpen()) return false;
     if (!impl_->WriteLine("CFG DECAY_CONFIRM_MS=" + std::to_string(ms))) return false;
     PicoStatus st;
@@ -274,12 +298,14 @@ bool PicoStrobeClient::SetDecayConfirm(uint32_t ms) {
 }
 
 uint64_t PicoStrobeClient::LastEventCount() {
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     PicoStatus st;
     if (!ReadStatus(st)) return 0;
     return st.event_count;
 }
 
 bool PicoStrobeClient::ReadStatus(PicoStatus& out) {
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (!IsOpen()) return false;
     // Drop stale/unsolicited bytes (a boot banner, a prior CFG's LOG ack, a partial
     // line) before asking, so the first read after a fresh CDC connect returns THIS
