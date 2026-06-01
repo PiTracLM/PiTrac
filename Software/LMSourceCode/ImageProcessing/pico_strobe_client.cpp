@@ -289,12 +289,21 @@ bool PicoStrobeClient::ReadStatus(PicoStatus& out) {
     if (impl_->fd >= 0) { ::tcflush(impl_->fd, TCIFLUSH); }
     if (!impl_->WriteLine("STATUS")) return false;
 
-    std::string line;
-    if (!impl_->ReadLineWithTimeout(line, 1000)) return false;
-
-    // Reply must start with "STATUS " to count.
+    // The Pico interleaves unsolicited "LOG ..." acks and "EVENT ..." lines with
+    // its replies. A CFG command sent just before STATUS (Arm, SetMicThreshold,
+    // SetDecayConfirm) reliably lands its "LOG armed" / "LOG threshold updated" ack
+    // AHEAD of the STATUS reply, so reading a single line here false-negatived every
+    // echo-verify -- the arm/threshold "did not accept" warning and the cam2 arm
+    // restart loop. Skip non-STATUS lines until the actual reply arrives, bounded so
+    // a silent port still times out instead of spinning.
     constexpr const char* kPrefix = "STATUS ";
-    if (line.rfind(kPrefix, 0) != 0) return false;
+    std::string line;
+    bool got_status = false;
+    for (int attempt = 0; attempt < 32; ++attempt) {
+        if (!impl_->ReadLineWithTimeout(line, 1000)) return false;
+        if (line.rfind(kPrefix, 0) == 0) { got_status = true; break; }
+    }
+    if (!got_status) return false;
 
     out = PicoStatus{};
     std::istringstream iss(line.substr(std::strlen(kPrefix)));
