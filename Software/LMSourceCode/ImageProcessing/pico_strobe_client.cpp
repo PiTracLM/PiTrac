@@ -72,8 +72,24 @@ struct PicoStrobeClient::Impl {
     StagedConfig driver;
     StagedConfig putter;
 
+    // Bytes pulled off the fd that have not yet been handed back as a complete line.
+    // The Pico multiplexes ONE USB-CDC text stream: solicited replies (STATUS ...,
+    // SELFTEST ...) interleaved with unsolicited async lines (LOG <ack/error>, EVENT
+    // <telemetry>). Linux cdc-acm delivers an undelimited byte stream -- USB packet
+    // boundaries are NOT line boundaries -- so a single read() routinely returns several
+    // lines at once (a CFG's "LOG ..." ack immediately ahead of the "STATUS ..." reply)
+    // and lines can span reads. We MUST buffer here and reassemble; assuming one read()
+    // == one line silently dropped every line past the first newline and stalled the
+    // STATUS demux. Cleared on flush/open/close so it tracks a tcflush of the OS buffer.
+    std::string rx_buf;
+
     bool WriteLine(const std::string& line);
     bool ReadLineWithTimeout(std::string& out, int timeout_ms);
+    // Demux the single channel: return the next SOLICITED reply beginning with `prefix`
+    // within one TOTAL deadline, surfacing (not dropping) any async LOG/EVENT lines that
+    // arrive ahead of it. The firmware emits STATUS only on demand, so the next matching
+    // line is the reply.
+    bool ReadSolicitedReply(const char* prefix, int timeout_ms, std::string& out);
 };
 
 namespace {
@@ -141,6 +157,7 @@ bool PicoStrobeClient::Open(const std::string& device_path) {
     }
 
     impl_->fd = fd;
+    impl_->rx_buf.clear();
     return true;
 }
 
@@ -151,6 +168,7 @@ void PicoStrobeClient::Close() {
         ::close(impl_->fd);
         impl_->fd = -1;
     }
+    impl_->rx_buf.clear();
 }
 
 bool PicoStrobeClient::IsOpen() const {
@@ -162,6 +180,12 @@ bool PicoStrobeClient::AttachFd(int fd) {
     std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (impl_->fd >= 0) ::close(impl_->fd);
     impl_->fd = fd;
+    // Match what Open() produces: a non-blocking fd. ReadLineWithTimeout relies on read()
+    // returning EAGAIN to honour its deadline -- a blocking fd would wedge the demux
+    // waiting for a line that never comes (this seam adopts a raw fd, e.g. a test socket).
+    int fl = ::fcntl(fd, F_GETFL, 0);
+    if (fl >= 0) { ::fcntl(fd, F_SETFL, fl | O_NONBLOCK); }
+    impl_->rx_buf.clear();
     return true;
 }
 
@@ -313,23 +337,19 @@ bool PicoStrobeClient::ReadStatus(PicoStatus& out) {
     // Arm/SetMicThreshold/etc. false-negatives on the first contact. Mirrors the
     // Python side's reset_input_buffer(); a no-op (harmless) on the test socket fd.
     if (impl_->fd >= 0) { ::tcflush(impl_->fd, TCIFLUSH); }
+    impl_->rx_buf.clear();  // tcflush drops the OS input buffer; drop our software one too.
     if (!impl_->WriteLine("STATUS")) return false;
 
-    // The Pico interleaves unsolicited "LOG ..." acks and "EVENT ..." lines with
-    // its replies. A CFG command sent just before STATUS (Arm, SetMicThreshold,
-    // SetDecayConfirm) reliably lands its "LOG armed" / "LOG threshold updated" ack
-    // AHEAD of the STATUS reply, so reading a single line here false-negatived every
-    // echo-verify -- the arm/threshold "did not accept" warning and the cam2 arm
-    // restart loop. Skip non-STATUS lines until the actual reply arrives, bounded so
-    // a silent port still times out instead of spinning.
+    // A CFG command sent just before STATUS (Arm, SetMicThreshold, SetDecayConfirm)
+    // lands its "LOG <ack>" / "LOG error: ..." ahead of the reply, and an EVENT strike
+    // can arrive at any time -- ReadSolicitedReply skips those async lines (logging them
+    // rather than dropping them) and returns the STATUS reply, all under one bounded
+    // deadline. (The old loop polled 32 x 1000ms PER line, so a single dropped/absent
+    // line could stall it ~32s; now it is a single total timeout.)
     constexpr const char* kPrefix = "STATUS ";
+    constexpr int kReplyTimeoutMs = 1500;
     std::string line;
-    bool got_status = false;
-    for (int attempt = 0; attempt < 32; ++attempt) {
-        if (!impl_->ReadLineWithTimeout(line, 1000)) return false;
-        if (line.rfind(kPrefix, 0) == 0) { got_status = true; break; }
-    }
-    if (!got_status) return false;
+    if (!impl_->ReadSolicitedReply(kPrefix, kReplyTimeoutMs, line)) return false;
 
     out = PicoStatus{};
     std::istringstream iss(line.substr(std::strlen(kPrefix)));
@@ -395,30 +415,62 @@ bool PicoStrobeClient::Impl::WriteLine(const std::string& line) {
 
 bool PicoStrobeClient::Impl::ReadLineWithTimeout(std::string& out, int timeout_ms) {
     out.clear();
+
+    // Hand back a line already sitting in rx_buf from a previous read first -- a single
+    // read() can deliver several lines, and the trailing ones must survive to the next
+    // call (the bug this fixes: they were discarded, stalling the STATUS demux).
+    auto take_buffered_line = [&]() -> bool {
+        auto nl = rx_buf.find('\n');
+        if (nl == std::string::npos) return false;
+        out.assign(rx_buf, 0, nl);
+        if (!out.empty() && out.back() == '\r') out.pop_back();
+        rx_buf.erase(0, nl + 1);
+        return true;
+    };
+    if (take_buffered_line()) return true;
     if (fd < 0) return false;
 
     auto deadline = std::chrono::steady_clock::now() +
                     std::chrono::milliseconds(timeout_ms);
     char buf[256];
-    std::string acc;
     while (std::chrono::steady_clock::now() < deadline) {
         ssize_t n = ::read(fd, buf, sizeof(buf));
         if (n > 0) {
-            acc.append(buf, static_cast<size_t>(n));
-            auto nl = acc.find('\n');
-            if (nl != std::string::npos) {
-                out = acc.substr(0, nl);
-                if (!out.empty() && out.back() == '\r') out.pop_back();
-                return true;
-            }
+            rx_buf.append(buf, static_cast<size_t>(n));
+            if (take_buffered_line()) return true;
             continue;
         }
-        if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+        if (n == 0) return false;  // EOF: peer closed the port, no more lines coming.
+        if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
             return false;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
     return false;
+}
+
+bool PicoStrobeClient::Impl::ReadSolicitedReply(const char* prefix, int timeout_ms,
+                                                std::string& out) {
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::milliseconds(timeout_ms);
+    std::string line;
+    for (;;) {
+        const auto now = std::chrono::steady_clock::now();
+        if (now >= deadline) return false;
+        const int remaining = static_cast<int>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count());
+        if (!ReadLineWithTimeout(line, remaining)) return false;
+        if (line.rfind(prefix, 0) == 0) {
+            out = std::move(line);
+            return true;
+        }
+        // Unsolicited async line (LOG ack/error, EVENT strike/telemetry) landed ahead of
+        // the reply. Surface it so it is observable rather than black-holed, then keep
+        // waiting for the solicited reply within the same deadline.
+        if (!line.empty()) {
+            PicoLogTrace("PicoStrobeClient <- (async) " + line);
+        }
+    }
 }
 
 }  // namespace golf_sim

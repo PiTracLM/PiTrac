@@ -155,6 +155,41 @@ BOOST_AUTO_TEST_CASE(arm_succeeds_when_firmware_echoes_armed) {
     BOOST_CHECK(host_in.find("STATUS\n") != std::string::npos);
 }
 
+BOOST_AUTO_TEST_CASE(arm_succeeds_when_log_ack_precedes_status) {
+    // Real firmware emits its "LOG armed" CFG-ack AHEAD of the STATUS reply.
+    // ReadStatus must skip the LOG line and read the STATUS line; otherwise every
+    // arm verify false-negatives and the cam2 capture path restart-loops. Regression.
+    SocketPair pair;
+    PicoStrobeClient client;
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    std::thread responder = RespondStatus(pair.host,
+        "LOG armed\nSTATUS armed=1 threshold=4096 fw=0.6.1\n");
+    bool ok = client.Arm();
+    responder.join();
+
+    BOOST_CHECK(ok);
+}
+
+BOOST_AUTO_TEST_CASE(set_mic_threshold_succeeds_when_log_ack_precedes_status) {
+    // "LOG threshold updated" lands before the STATUS echo; the verify must skip it
+    // and still read threshold=8000 rather than choking on the LOG line.
+    SocketPair pair;
+    PicoStrobeClient client;
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    std::thread responder = RespondStatus(pair.host,
+        "LOG threshold updated\nSTATUS armed=0 threshold=8000 fw=0.6.1\n");
+    bool ok = client.SetMicThreshold(8000);
+    responder.join();
+
+    BOOST_CHECK(ok);
+}
+
 BOOST_AUTO_TEST_CASE(arm_fails_when_firmware_refuses) {
     SocketPair pair;
     PicoStrobeClient client;
