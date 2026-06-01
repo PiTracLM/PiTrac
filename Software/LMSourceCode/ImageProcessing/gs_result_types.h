@@ -8,8 +8,6 @@
 #ifdef __unix__  // Ignore in Windows environment
 
 
-#include <msgpack.hpp>
-
 #include <opencv2/core.hpp>
 #include <opencv2/dnn.hpp>
 #include <opencv2/dnn/all_layers.hpp>
@@ -63,25 +61,9 @@ namespace golf_sim {
         std::vector<std::string> log_messages_;
         std::vector<std::string> image_file_paths_;  // Paths to shot images
 
-        MSGPACK_DEFINE( carry_meters_,
-                        speed_mpers_,
-                        launch_angle_deg_,
-                        side_angle_deg_,
-                        back_spin_rpm_,
-                        side_spin_rpm_,
-                        confidence_,
-                        club_type_,
-                        result_type_,
-                        message_,
-                        log_messages_,
-                        image_file_paths_);
-
     };
 
 }
-// This needs to be placed outside the namespace
-MSGPACK_ADD_ENUM(golf_sim::GolfSimClubs::GsClubType);
-MSGPACK_ADD_ENUM(golf_sim::GsIPCResultType);
 
 
 #endif // #ifdef __unix__  // Ignore in Windows environment

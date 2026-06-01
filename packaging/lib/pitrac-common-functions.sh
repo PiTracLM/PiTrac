@@ -744,7 +744,6 @@ install_dependencies_from_apt() {
     # liblgpio-dev is in the system deps block in build.sh.
     # ========================================================================
     local packages=(
-        "libmsgpack-cxx-dev"      # MessagePack C++ (header-only)
         "libactivemq-cpp"         # ActiveMQ C++ client runtime
         "libactivemq-cpp-dev"     # ActiveMQ C++ client headers
         "libopencv4.13"           # OpenCV runtime (Pi5-optimized build)

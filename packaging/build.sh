@@ -68,11 +68,6 @@ check_artifacts() {
                 missing+=("lgpio")
             fi
         fi
-        if [ ! -f "$ARTIFACT_DIR/libmsgpack-cxx-dev_1:7.0.0-2_all.deb" ]; then
-            if [ ! -f "$ARTIFACT_DIR/msgpack-cxx-7.0.0-arm64.tar.gz" ]; then
-                missing+=("msgpack")
-            fi
-        fi
     else
         # Check for tar.gz packages
         if [ ! -f "$ARTIFACT_DIR/opencv-4.13.0-arm64.tar.gz" ]; then
@@ -80,9 +75,6 @@ check_artifacts() {
         fi
         if [ ! -f "$ARTIFACT_DIR/lgpio-0.2.2-arm64.tar.gz" ]; then
             missing+=("lgpio")
-        fi
-        if [ ! -f "$ARTIFACT_DIR/msgpack-cxx-7.0.0-arm64.tar.gz" ]; then
-            missing+=("msgpack")
         fi
     fi
 
@@ -241,7 +233,7 @@ build_dev() {
 
     # libapr1/libaprutil1 → *t64 in Trixie (time_t transition); -dev keeps the old names.
     for pkg in libcamera-dev libcamera-tools libfmt-dev libssl-dev \
-               libmsgpack-cxx-dev liblgpio-dev \
+               liblgpio-dev \
                libapr1t64 libaprutil1t64 libapr1-dev libaprutil1-dev; do
         pkg_installed "$pkg" || missing_deps+=("$pkg")
     done

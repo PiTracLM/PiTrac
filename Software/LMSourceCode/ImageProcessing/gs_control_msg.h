@@ -11,8 +11,6 @@
 #ifdef __unix__  // Ignore in Windows environment
 
 
-#include <msgpack.hpp>
-
 #include <opencv2/core.hpp>
 #include <opencv2/dnn.hpp>
 #include <opencv2/dnn/all_layers.hpp>
@@ -34,8 +32,6 @@ namespace golf_sim {
         kClubChangeToDriver = 2,
     };
 
-    // This class is mostly designed to compartmentalize the details of (De)serializing
-    // these IPC messages.
     class GsIPCControlMsg {
 
     public:
@@ -51,13 +47,9 @@ namespace golf_sim {
     public:
         GsIPCControlMsgType control_type_ = GsIPCControlMsgType::kUnknown;
 
-        MSGPACK_DEFINE( control_type_ );
-
     };
 
 }
-// This needs to be placed outside the namespace
-MSGPACK_ADD_ENUM(golf_sim::GsIPCControlMsgType);
 
 
 #endif // #ifdef __unix__  // Ignore in Windows environment
