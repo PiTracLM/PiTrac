@@ -98,6 +98,30 @@ void SetExternalTrigger(bool& flag) {
 	}
 }
 
+// In Pico autonomous mode the strike is a single, self-fired XTR trigger -- there
+// is no legacy priming train. The PiGS/InnoMaker IMX296 reads out empty,
+// non-integrating frames for its first several external triggers after trigger
+// mode is (re)enabled; legacy mode hides this by firing-and-ignoring a burst of
+// priming pulses before the real shot. Without that warm-up the lone strike frame
+// comes back all-zero. Warm the sensor the same way: pulse cam2 XTR (no strobe,
+// via the Pico's CAM_PULSE) a handful of times and drain the readout frames so the
+// real strike lands on a sensor that is actually integrating light.
+static void PicoWarmUpSensor(LibcameraJpegApp& app, int pulses, long pulse_width_us) {
+	for (int i = 0; i < pulses && gs::GolfSimGlobals::golf_sim_running_; ++i) {
+		gs::PulseStrobe::SendOnOffPulse(pulse_width_us);  // -> Pico CAM_PULSE: XTR low/high, no strobe
+		RPiCamApp::Msg msg = app.Wait();                  // drain the frame this trigger reads out
+		if (msg.type == RPiCamApp::MsgType::RequestComplete) {
+			// Hold the request only long enough for its buffers to re-queue; the
+			// (cold/black) warm-up frame is intentionally discarded.
+			CompletedRequestPtr& discard = std::get<CompletedRequestPtr>(msg.payload);
+			(void)discard;
+		} else if (msg.type != RPiCamApp::MsgType::Timeout) {
+			break;  // Quit / unexpected -- let the main loop handle it.
+		}
+	}
+	GS_LOG_TRACE_MSG(trace, "Pico warm-up complete (" + std::to_string(pulses) + " XTR pulses).");
+}
+
 // Run the triggered capture event loop on an already-opened camera.
 // The camera must have been opened and configured before calling this.
 // Calls StartCamera at entry and StopCamera when the final image arrives.
@@ -193,12 +217,24 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 
 	if (pico_mode) {
 		// cam2 is externally triggered now; give the InnoMaker trigger setup a
-		// moment to take, then let gs_fsm arm the Pico (it waits on this flag).
+		// moment to take.
 		if (camera_model == gs::CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(gs::PulseStrobe::kPauseToSetUpInnoMakerExternalTriggerMilliseconds));
 		}
+
+		// Warm the GS sensor past its cold-start empty frames BEFORE arming, so the
+		// single self-fired strike frame is actually exposed (see PicoWarmUpSensor).
+		// Reuse the (config-calibrated) legacy priming count, with a floor so a
+		// missing/zeroed kNumberPrimingPulses can never silently skip the warm-up.
+		int warm_up_pulses = gs::PulseStrobe::kNumberPrimingPulses;
+		if (warm_up_pulses < 6) {
+			warm_up_pulses = 6;
+		}
+		PicoWarmUpSensor(app, warm_up_pulses, /*pulse_width_us=*/200);
+
+		// Now let gs_fsm arm the Pico (it waits on this flag).
 		gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
-		GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop: Pico mode -- armed for a single autonomous trigger.");
+		GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop: Pico mode -- sensor warmed, armed for a single autonomous trigger.");
 	}
 
 	for (;state != kFinalImageReceived;)
@@ -256,6 +292,30 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 		switch (state) {
 
 		case kWaitingForFinalImageTrigger: {
+
+			// Pico mode: leftover warm-up / cold triggers read out as an all-zero frame.
+			// Discard such a frame (BEFORE stopping the camera) and keep waiting for the
+			// strobe-lit strike frame -- otherwise we hand the FSM an empty image and
+			// report a bogus "Error" shot.
+			if (pico_mode) {
+				Stream* probe_stream = app.ViewfinderStream();
+				if (probe_stream != nullptr) {
+					StreamInfo probe_info = app.GetStreamInfo(probe_stream);
+					CompletedRequestPtr& probe_payload = std::get<CompletedRequestPtr>(msg.payload);
+					libcamera::FrameBuffer* probe_buffer = probe_payload->buffers[probe_stream];
+					BufferReadSync probe_r(&app, probe_buffer);
+					const std::vector<libcamera::Span<uint8_t>> probe_mem = probe_r.Get();
+					uint32_t* probe_image = (uint32_t*)probe_mem[0].data();
+					if (probe_image != nullptr) {
+						cv::Mat probe_frame(probe_info.height, probe_info.width, CV_8UC3, probe_image, probe_info.stride);
+						const cv::Scalar channel_sums = cv::sum(probe_frame);
+						if (channel_sums[0] == 0.0 && channel_sums[1] == 0.0 && channel_sums[2] == 0.0) {
+							GS_LOG_TRACE_MSG(trace, "Pico: ignoring all-zero (non-strobed) frame; waiting for the lit strike frame.");
+							break;  // stay in this state; buffers re-queue at scope exit
+						}
+					}
+				}
+			}
 
 			GS_LOG_TRACE_MSG(trace, "Received Final Image Trigger - capturing strobed image.");
 			app.StopCamera();
