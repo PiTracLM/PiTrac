@@ -148,6 +148,9 @@ public:
 	Msg Wait();
 	void PostMessage(MsgType &t, MsgPayload &p);
 	void PostQuit();
+	// Drop any queued messages without touching camera/request state. Used to discard a
+	// stale Quit/Timeout left by a cancelled capture before a fresh capture starts.
+	void DrainMessages();
 
 	Stream *GetStream(std::string const &name, StreamInfo *info = nullptr) const;
 	Stream *ViewfinderStream(StreamInfo *info = nullptr) const;
