@@ -1,21 +1,14 @@
 /*
- * proto.h — USB CDC command/event protocol shared between the Pi 5 host and
- * the Pico. The wire format is line-delimited ASCII; this header defines the
- * tokens and a small state struct that the parser fills in. We keep it
- * header-only and inline so a smoke test could include this header from the
- * host side too (e.g. a Python ctypes wrapper or a C utility on the Pi).
+ * proto.h — USB CDC command/event protocol between the Pi 5 host and the Pico.
+ * Line-delimited ASCII; header-only so the host side can include it too.
  *
- * Wire format rules:
- *   - One command per line, terminated by '\n'. '\r' is tolerated and stripped.
- *   - Commands are case-sensitive (KEEP IT SIMPLE — saves an inner loop).
- *   - Numbers parse as standard C strtof / strtol.
- *   - Lists are comma-separated, no spaces. Whitespace inside a value is undefined.
+ * Wire format:
+ *   - One command per line, '\n'-terminated. '\r' tolerated and stripped.
+ *   - Case-sensitive. Numbers via strtof/strtol.
+ *   - Lists comma-separated, no spaces; whitespace inside a value is undefined.
  *
- * Why text instead of binary? Two reasons:
- *   1. Debugging: `picocom /dev/ttyACM0 -b 115200` and you can drive it by hand.
- *   2. Zero parser surface area: no length prefixes to get wrong, no endianness.
- * USB CDC bandwidth is way more than enough — we send maybe a few hundred
- * bytes per shot, not megabytes.
+ * Text not binary: drive it by hand over picocom, and no length-prefix /
+ * endianness footguns. USB CDC bandwidth is ample (~hundreds of bytes/shot).
  */
 
 #ifndef PITRAC_PICO_PROTO_H
@@ -32,8 +25,7 @@ extern "C" {
 
 /* --------------------------------------------------------------- commands -- */
 
-/* Commands the host can send. The parser turns each line into one of these
- * enum values; the dispatcher in core1_usb.c switches on it. */
+/* Host commands; dispatcher in core1_usb.c switches on kind. */
 typedef enum {
     CMD_NONE          = 0,
     CMD_CFG_THRESHOLD,        /* CFG MIC_THRESHOLD=<int>            */
@@ -49,19 +41,19 @@ typedef enum {
     CMD_CFG_STREAM_RMS,       /* CFG STREAM_RMS=<hz> — emit EVENT RMS at this rate; 0 = stop */
     CMD_CAM_PULSE,            /* CAM_PULSE <us>: drive cam2 XTR LOW for N microseconds */
     CMD_FIRE,                 /* FIRE                               */
-    CMD_FIRE_PEAK,            /* FIRE_PEAK - fire train + return peak ADC0 reading
-                               * during the train window. Used for LED current
-                               * calibration sweeps to avoid Python timing slop. */
+    CMD_FIRE_PEAK,            /* FIRE_PEAK - fire train + return peak ADC0 over the
+                               * train window. For LED current calibration sweeps
+                               * (avoids Python timing slop). */
     CMD_STATUS,               /* STATUS                             */
+    CMD_HEARTBEAT,            /* HEARTBEAT — keep-alive: refresh the arm deadline */
     CMD_RESET,                /* RESET                              */
     CMD_BOOTSEL,              /* BOOTSEL — reboot into BOOTSEL mode */
     CMD_SELFTEST,             /* SELFTEST — pulse non-strobe outputs + report */
     CMD_INVALID,              /* parse error — host gets back LOG line */
 } pitrac_cmd_kind_t;
 
-/* Parsed command + payload. Only one of the union members is valid; check
- * `kind`. We avoid heap allocation entirely — interval lists go into the
- * fixed-size float array. */
+/* Parsed command + payload. Only the union member matching `kind` is valid.
+ * No heap — interval lists go into the fixed-size float array. */
 typedef struct {
     pitrac_cmd_kind_t kind;
     union {
@@ -78,9 +70,8 @@ typedef struct {
 
 /* --------------------------------------------------------- runtime state -- */
 
-/* Mirror of the live tunables — read by the DSP and strobe modules. Mutated
- * only from the USB worker; the producers read-modify-write under a critical
- * section (cheap on M0+, single sram-mem-protect access). */
+/* Live tunables read by DSP and strobe. Mutated only from the USB worker;
+ * producers read-modify-write under a critical section. */
 typedef struct {
     /* Detection */
     int32_t  mic_threshold;            /* raw RMS units */
@@ -91,47 +82,48 @@ typedef struct {
     float    intervals_ms[STROBE_MAX_PULSES];
     uint8_t  interval_count;
 
-    /* Auto-disarm: armed clears itself after either a fire or this timeout
-     * expires. Keeps a forgotten ARMED=1 from quietly hot-firing on noise. */
-    uint64_t arm_deadline_us;          /* absolute us at which to auto-disarm */
-    uint32_t arm_timeout_ms;           /* default 10000 (10 s) */
+    /* Arm keep-alive window. Each HEARTBEAT pushes the auto-disarm deadline
+     * (owned by main.c's arm_gate, not stored here) out by this much; a
+     * walked-away host drops the gate within arm_timeout_ms, so a forgotten
+     * ARMED=1 can't hot-fire on noise. core1 writes (CFG ARM_TIMEOUT_MS),
+     * core0 reads on (re)arm. Default 10000 (10 s). */
+    uint32_t arm_timeout_ms;
 
-    /* Camera XTR setup delay between asserting XTR LOW and starting the
-     * strobe DMA. Tunable so we can compensate for slower sensors. */
+    /* Delay between XTR LOW and strobe DMA start; tune up for slower sensors. */
     uint32_t cam_xtr_setup_us;
 
-    /* Cooldown between consecutive fires. Boost-converter recharge + LED
-     * thermal protection. Host can tighten this for calibration sweeps. */
+    /* Cooldown between fires (boost recharge + LED thermal). Host can tighten
+     * for calibration sweeps. */
     uint32_t min_inter_shot_ms;
 
-    /* Delay between FIRE-received and first cam XTR assertion. Matches the
-     * Pi-side kPuttingStrobeDelayMs — lets host insert a "ball settle"
-     * pause without burning userspace sleep cycles. */
+    /* Delay from FIRE received to first cam XTR assert. Matches Pi-side
+     * kPuttingStrobeDelayMs — host "ball settle" pause without a userspace sleep. */
     uint32_t pre_trigger_delay_ms;
 
-    /* Bookkeeping — purely informational, reported by STATUS */
+    /* Informational, reported by STATUS. */
     uint64_t last_event_us;
     int32_t  last_rms;
     uint32_t event_count;
 
-    /* Most-recent FIRE_PEAK result. Updated by core 0 inside strobe_fire_peak;
-     * read by core 1 when emitting the EVENT PEAK reply. The MAILBOX push
-     * acts as the memory barrier between writes here and reads on core 1. */
+    /* Capture DMA re-arms before exhausting its transfer count. Surfaced in
+     * STATUS so the ~6h self-heal is observable; a climbing value is normal. */
+    uint32_t dma_rearm_count;
+
+    /* Latest FIRE_PEAK result. Written by core0 in strobe_fire_peak, read by
+     * core1 for EVENT PEAK; the MAILBOX push is the memory barrier between them. */
     uint16_t last_peak_adc;
     uint32_t last_peak_samples;
 } pitrac_state_t;
 
 /* ------------------------------------------------------------- functions -- */
 
-/* Parse one '\n'-terminated line into `out`. `line` is mutated (NUL inserted
- * at field boundaries) so the caller's buffer must be writable. Returns
- * true on a recognised command; on failure, fills out->kind = CMD_INVALID
- * and returns false. */
+/* Parse one '\n'-terminated line into `out`. `line` is mutated (NULs inserted
+ * at field boundaries) so the caller's buffer must be writable. On failure
+ * sets out->kind = CMD_INVALID and returns false. */
 bool proto_parse_line(char *line, pitrac_cmd_t *out);
 
-/* Format the runtime status into `buf` for emission as a STATUS reply.
- * Output is a single line (no embedded newlines), terminated by '\n', NUL
- * terminated. Returns bytes written excluding the trailing NUL. */
+/* Format STATUS into `buf`: single line, '\n'-terminated, NUL-terminated.
+ * Returns bytes written excluding the trailing NUL. */
 int  proto_format_status(const pitrac_state_t *st, char *buf, int buflen);
 
 #ifdef __cplusplus

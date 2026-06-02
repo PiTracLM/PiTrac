@@ -1,7 +1,5 @@
 #include "sensor.h"
 
-#include <stdio.h>
-
 static bool optical_init(void) {
     return true;
 }
@@ -17,9 +15,7 @@ static int64_t optical_current_level(void) {
 }
 
 static void optical_selftest_append(char *buf, int buflen, int *cursor) {
-    if (*cursor >= buflen) return;
-    int k = snprintf(buf + *cursor, buflen - *cursor, " optical=disabled");
-    if (k > 0) *cursor += k;
+    sensor_selftest_printf(buf, buflen, cursor, " optical=disabled");
 }
 
 const sensor_t g_sensor_optical = {

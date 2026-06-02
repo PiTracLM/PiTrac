@@ -8,8 +8,7 @@
 
 #include "config.h"   /* STROBE_MAX_PULSES, STROBE_MAX_PULSE_WIDTH_US, etc. */
 
-/* Strip CR/LF/whitespace from both ends of `s` (in-place). Returns the
- * trimmed start pointer; the trailing trim adjusts the NUL. */
+/* Trim whitespace both ends in-place; returns the new start pointer. */
 static char *trim(char *s) {
     while (*s && isspace((unsigned char)*s)) s++;
     char *end = s + strlen(s);
@@ -18,9 +17,8 @@ static char *trim(char *s) {
     return s;
 }
 
-/* Prefix-match a command keyword, requiring the next char to be a hard
- * terminator (NUL / space / tab). This prevents "FIREWORKS" from matching
- * "FIRE" : older strncmp(line, "FIRE", 4) accepted any trailing chars. */
+/* Prefix-match a keyword, requiring a hard terminator (NUL/space/tab) next
+ * so "FIREWORKS" can't match "FIRE". */
 static bool match_cmd(const char *line, const char *cmd) {
     size_t n = strlen(cmd);
     if (strncmp(line, cmd, n) != 0) return false;
@@ -28,9 +26,8 @@ static bool match_cmd(const char *line, const char *cmd) {
     return next == '\0' || next == ' ' || next == '\t';
 }
 
-/* Safe integer parse: returns true and writes *out iff the entire string is
- * a valid decimal integer. Rejects empty strings, trailing garbage, and
- * out-of-range (returns ERANGE). */
+/* Strict decimal parse: true only if the whole string is a valid integer.
+ * Rejects empty, trailing garbage, and out-of-range. */
 static bool parse_int(const char *s, long *out) {
     if (!s || !*s) return false;
     char *end = NULL;
@@ -43,7 +40,7 @@ static bool parse_int(const char *s, long *out) {
     return true;
 }
 
-/* Safe float parse: same contract as parse_int. Also rejects non-finite. */
+/* Same contract as parse_int; also rejects non-finite. */
 static bool parse_float(const char *s, float *out) {
     if (!s || !*s) return false;
     char *end = NULL;
@@ -66,9 +63,6 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
         return false;
     }
 
-    /* Quick keyword dispatch. We compare against fixed prefixes; arguments
-     * follow after a space or '='. Strict terminator-checked via match_cmd. */
-
     if (match_cmd(line, "FIRE_PEAK")) {
         out->kind = CMD_FIRE_PEAK;
         return true;
@@ -79,6 +73,10 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
     }
     if (match_cmd(line, "STATUS")) {
         out->kind = CMD_STATUS;
+        return true;
+    }
+    if (match_cmd(line, "HEARTBEAT")) {
+        out->kind = CMD_HEARTBEAT;
         return true;
     }
     if (match_cmd(line, "RESET")) {
@@ -94,8 +92,7 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
         return true;
     }
 
-    /* CAM_PULSE <us>: drive cam2 XTR LOW for N microseconds. Parser is
-     * permissive on range; strobe_cam_pulse clamps to 1..100000. */
+    /* CAM_PULSE <us>: drive cam2 XTR LOW for N us. strobe_cam_pulse clamps to 1..100000. */
     if (match_cmd(line, "CAM_PULSE")) {
         char *arg = line + strlen("CAM_PULSE");
         while (*arg == ' ' || *arg == '\t') ++arg;
@@ -107,10 +104,9 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
         return true;
     }
 
-    /* CFG sub-commands. Format: "CFG <KEY>=<value>" */
+    /* CFG <KEY>=<value> */
     if (match_cmd(line, "CFG")) {
         char *kv = line + 3;
-        /* Skip the separator(s) between CFG and the key. */
         while (*kv == ' ' || *kv == '\t') ++kv;
         char *eq = strchr(kv, '=');
         if (!eq) return false;
@@ -133,8 +129,7 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
             return true;
         }
         if (strcmp(key, "PULSE_WIDTH_US") == 0) {
-            /* Bounds-check at parse time. The dispatcher emits the LOG line
-             * for CMD_INVALID; the parser stays free of side effects. */
+            /* Bounds-check here; dispatcher logs CMD_INVALID, parser stays side-effect free. */
             float v;
             if (!parse_float(val, &v) || v <= 0.0f || v > STROBE_MAX_PULSE_WIDTH_US) {
                 out->kind = CMD_INVALID;
@@ -145,9 +140,7 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
             return true;
         }
         if (strcmp(key, "PULSE_INTERVALS") == 0) {
-            /* Empty list is a false ACK — downstream would silently re-apply
-             * whatever intervals it already has, and the host would never know
-             * the CFG was ignored. Reject it the same way PULSE_WIDTH_US=0 is. */
+            /* Reject empty list: otherwise it's a false ACK and stale intervals stay applied. */
             if (*val == '\0') {
                 out->kind = CMD_INVALID;
                 return false;
@@ -156,8 +149,7 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
             uint8_t n = 0;
             char *tok = val;
             while (*tok) {
-                /* Reject, don't truncate — silent truncation is as bad as the
-                 * empty-list false ACK: host thinks its 33-entry payload landed. */
+                /* Reject overflow, don't truncate — silent truncation is a false ACK. */
                 if (n >= STROBE_MAX_PULSES) {
                     out->kind = CMD_INVALID;
                     return false;
@@ -169,9 +161,7 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
                     out->kind = CMD_INVALID;
                     return false;
                 }
-                /* Symmetric with the PULSE_WIDTH_US bounds check above.
-                 * Negative intervals don't make physical sense; values above
-                 * STROBE_MAX_INTERVAL_MS would push DMA wait past the watchdog. */
+                /* Above STROBE_MAX_INTERVAL_MS would push DMA wait past the watchdog. */
                 if (v < 0.0f || v > STROBE_MAX_INTERVAL_MS) {
                     out->kind = CMD_INVALID;
                     return false;
@@ -202,25 +192,20 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
             return true;
         }
         if (strcmp(key, "MIN_INTER_SHOT_MS") == 0) {
-            /* Host can tighten this for calibration sweeps (single-pulse,
-             * tiny energy per fire) but never below the boost-cap-protection
-             * floor : even 0 from the host snaps up to
-             * STROBE_MIN_INTER_SHOT_MS_FLOOR to prevent back-to-back fires
-             * before the cap recharges. */
+            /* Floored at STROBE_MIN_INTER_SHOT_MS_FLOOR so back-to-back fires
+             * can't drain the boost cap before it recharges. */
             long v;
             if (!parse_int(val, &v)) return false;
             if (v < (long)STROBE_MIN_INTER_SHOT_MS_FLOOR) {
                 v = (long)STROBE_MIN_INTER_SHOT_MS_FLOOR;
             }
-            if (v > 60000) v = 60000;     /* 1 minute ceiling : sanity bound */
+            if (v > 60000) v = 60000;     /* 1 min ceiling */
             out->kind = CMD_CFG_MIN_INTER_SHOT;
             out->u.u32 = (uint32_t)v;
             return true;
         }
         if (strcmp(key, "PRE_TRIGGER_DELAY_MS") == 0) {
-            /* Mirrors kPuttingStrobeDelayMs from the Pi-side C++. 0 disables
-             * (default). Bounded to keep a typo from blocking strobe_fire for
-             * minutes. */
+            /* Mirrors kPuttingStrobeDelayMs on the Pi side. 0 disables (default). */
             long v;
             if (!parse_int(val, &v)) return false;
             if (v < 0)     v = 0;
@@ -230,12 +215,9 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
             return true;
         }
         if (strcmp(key, "DECAY_CONFIRM_MS") == 0) {
-            /* How long after onset the impact-detector waits for sustained
-             * energy before firing. Lower = more sensitive (transient claps
-             * trigger), higher = more selective (rejects short clicks).
-             * 40 ms was the original compile-time default; 5 ms is the new
-             * runtime default. impact_detect_set_decay_confirm_ms clamps
-             * to 1..200. */
+            /* Post-onset sustained-energy window before firing. Lower = more
+             * sensitive, higher = rejects short clicks. Runtime default 5 ms
+             * (was 40 ms compile-time); detector clamps to 1..200. */
             long v;
             if (!parse_int(val, &v)) return false;
             if (v < 1)   v = 1;
@@ -245,9 +227,8 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
             return true;
         }
         if (strcmp(key, "STREAM_RMS") == 0) {
-            /* Continuous mic RMS emission rate. 0 stops streaming, anything
-             * above STREAM_RMS_MAX_HZ snaps down to the cap so the USB CDC
-             * TX queue can't be flooded by a typo. */
+            /* Mic RMS emission rate (Hz). 0 stops; capped at STREAM_RMS_MAX_HZ
+             * so a typo can't flood the USB CDC TX queue. */
             long v;
             if (!parse_int(val, &v)) return false;
             if (v < 0) v = 0;
@@ -257,14 +238,12 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
             return true;
         }
         if (strcmp(key, "STROBE_HOLD") == 0) {
-            /* Sustain the strobe pin HIGH for LED-current calibration.
-             * 1 = assert, 0 = release. The Pi-side calibration sweep uses
-             * this to keep DIAG HIGH while it reads ADC; a 200 ms hardware
-             * timeout in firmware auto-releases as a safety net. */
+            /* Hold strobe pin (DIAG) HIGH for LED-current calibration ADC reads.
+             * 1=assert, 0=release; firmware 200 ms hardware timeout auto-releases. */
             long v;
             if (!parse_int(val, &v)) return false;
             out->kind = CMD_CFG_STROBE_HOLD;
-            out->u.armed = (v != 0);  /* reuse the bool union member */
+            out->u.armed = (v != 0);  /* reuse bool union member */
             return true;
         }
     }

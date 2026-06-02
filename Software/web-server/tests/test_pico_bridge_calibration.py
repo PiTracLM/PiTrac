@@ -6,6 +6,7 @@ window. This matches the legacy diag.on/off duty cycle and is safe for the
 IR LED string.
 """
 
+import pytest
 from unittest.mock import MagicMock, patch
 
 
@@ -189,3 +190,50 @@ class TestPicoModeGetLedCurrent:
         diag.on.assert_called_once()
         diag.off.assert_called()
         mock_serial_mod.Serial.assert_not_called()
+
+
+class TestLmRunningGate:
+    """When pitrac_lm runs it owns the strobe hardware; _open_hardware (the choke
+    point every calibration entry point funnels through) must refuse before it
+    touches SPI, the Pico serial, or the legacy GPIO."""
+
+    @patch("strobe_calibration_manager.serial")
+    @patch("strobe_calibration_manager.spidev")
+    @patch("strobe_calibration_manager.DigitalOutputDevice")
+    def test_open_hardware_refuses_when_lm_running(
+        self, mock_led_cls, mock_spidev_mod, mock_serial_mod, monkeypatch
+    ):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        monkeypatch.setenv("PITRAC_PICO_ENABLED", "required")
+        cm = MagicMock()
+        cm.get_config.return_value = None
+        lm = MagicMock()
+        lm.is_running.return_value = True
+        mgr = StrobeCalibrationManager(cm, pitrac_manager=lm)
+
+        with pytest.raises(RuntimeError, match="launch monitor"):
+            mgr._open_hardware()
+
+        mock_spidev_mod.SpiDev.assert_not_called()
+        mock_serial_mod.Serial.assert_not_called()
+        mock_led_cls.assert_not_called()
+
+    @patch("strobe_calibration_manager.serial")
+    @patch("strobe_calibration_manager.spidev")
+    @patch("strobe_calibration_manager.DigitalOutputDevice")
+    def test_open_hardware_proceeds_when_lm_not_running(
+        self, mock_led_cls, mock_spidev_mod, mock_serial_mod, monkeypatch
+    ):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        monkeypatch.setenv("PITRAC_PICO_ENABLED", "required")
+        mock_spidev_mod.SpiDev.side_effect = [MagicMock(), MagicMock()]
+        cm = MagicMock()
+        cm.get_config.return_value = None
+        lm = MagicMock()
+        lm.is_running.return_value = False
+        mgr = StrobeCalibrationManager(cm, pitrac_manager=lm)
+
+        mgr._open_hardware()
+        mock_serial_mod.Serial.assert_called_once()

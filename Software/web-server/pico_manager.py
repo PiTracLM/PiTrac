@@ -25,28 +25,31 @@ THRESHOLD_MIN = 0
 THRESHOLD_MAX = 1_000_000_000
 MIN_INTER_SHOT_FLOOR_MS = 20
 MIN_INTER_SHOT_CEIL_MS = 60_000
-# Firmware clamps the decay-confirm window to 1..200 ms (impact_detect.c).
+# Firmware clamps to 1..200 ms (impact_detect.c).
 DECAY_CONFIRM_MIN_MS = 1
 DECAY_CONFIRM_MAX_MS = 200
 STREAM_RMS_MAX_HZ = 100
 
-# Mirrors the firmware strobe grammar in pico/include/config.h. PULSE_WIDTH_US
-# is a float capped at STROBE_MAX_PULSE_WIDTH_US; the interval vector is capped
-# at STROBE_MAX_PULSES entries, each at most STROBE_MAX_INTERVAL_MS.
+# Mirrors the strobe grammar in pico/include/config.h: PULSE_WIDTH_US float capped
+# at STROBE_MAX_PULSE_WIDTH_US; interval vector capped at STROBE_MAX_PULSES entries,
+# each <= STROBE_MAX_INTERVAL_MS.
 PULSE_WIDTH_US_MIN = 0.0  # exclusive; firmware rejects v <= 0
 PULSE_WIDTH_US_MAX = 500.0
 PULSE_INTERVALS_MAX = 32
 INTERVAL_MS_MAX = 1000.0
 
-# UF2 files start with a little-endian 0x0A324655 ("UF2\n") magic at offset 0.
+# UF2 magic: little-endian 0x0A324655 ("UF2\n") at offset 0.
 UF2_MAGIC = b"\x55\x46\x32\x0a"
 UF2_MIN_BYTES = 512
 MAX_UF2_BYTES = 8 * 1024 * 1024
 UPLOAD_CHUNK_BYTES = 64 * 1024
 
-# Boards we build firmware for; gates the bundled-firmware filename so a stray
-# target string can't be turned into a path traversal.
+# Gates the bundled-firmware filename so a stray target can't become path traversal.
 VALID_TARGETS = frozenset({"pico", "pico_w", "pico2", "pico2_w"})
+
+# pitrac_lm drives the Pico over /dev/ttyACM0 without O_EXCL, so this app-level gate
+# (not the OS) is the real arbiter: web transactions stand down with this message.
+LM_OWNS_PORT_MSG = "pitrac_lm is running; the Pico is owned by the launch monitor"
 
 
 def is_valid_uf2(data: bytes) -> bool:
@@ -55,14 +58,12 @@ def is_valid_uf2(data: bytes) -> bool:
 
 
 class PicoSerialOwner:
-    """The single holder of the /dev/ttyACM0 handle, shared by every component
-    that talks to the Pico (mic tuning, flashing, strobe calibration).
+    """Single holder of the /dev/ttyACM0 handle, borrowed by every Pico component
+    (mic tuning, flashing, strobe calibration).
 
-    pyserial opens the port with ``exclusive=True``; before this owner existed
-    the calibration manager and the mic page each kept their own exclusive fd
-    and clobbered one another. Everything now borrows one handle, opened lazily
-    on first use and closed when no borrow is outstanding, so transactions are
-    cheap to start and never leave a stale lock on the device.
+    pyserial opens with exclusive=True; before this owner, the calibration manager
+    and mic page each kept their own exclusive fd and clobbered each other. One
+    handle, opened lazily on first borrow and closed when no borrow is outstanding.
     """
 
     def __init__(self, device_resolver: Callable[[], str]):
@@ -71,7 +72,6 @@ class PicoSerialOwner:
         self._borrows = 0
 
     def open(self) -> Any:
-        """Return the live handle, opening it if this is the first borrow."""
         if self.handle is None:
             if serial is None:
                 raise RuntimeError("pyserial not installed; cannot reach the Pico")
@@ -82,7 +82,7 @@ class PicoSerialOwner:
         return self.handle
 
     def release(self) -> None:
-        """Drop one borrow; close the handle once nobody holds it."""
+        """Drop one borrow; close once nobody holds it."""
         if self._borrows > 0:
             self._borrows -= 1
         if self._borrows == 0:
@@ -110,8 +110,7 @@ class PicoManager:
         self._lock = lock
         self.serial_owner = serial_owner or PicoSerialOwner(self._device_path)
         self._stream_active = False
-        # While pitrac_lm runs it owns /dev/ttyACM0 (its own PicoStrobeClient
-        # arms the Pico), so the /pico background pollers must stand down.
+        # When pitrac_lm runs it owns the port, so /pico background pollers stand down.
         self._pitrac_manager = pitrac_manager
 
     def _device_path(self) -> str:
@@ -126,7 +125,7 @@ class PicoManager:
         return DEFAULT_DEVICE
 
     def _lm_is_running(self) -> bool:
-        """True when pitrac_lm holds the serial port; the web then defers to it."""
+        """True when pitrac_lm holds the port; the web defers to it."""
         if self._pitrac_manager is None:
             return False
         try:
@@ -135,8 +134,8 @@ class PicoManager:
             return False
 
     def _persist(self, key: str, value: Any) -> None:
-        """Save a tuned DSP value to config so the LM can re-push it to a
-        power-cycled Pico, which otherwise reverts to the compiled defaults."""
+        """Persist a tuned DSP value so the LM can re-push it to a power-cycled
+        Pico, which otherwise reverts to compiled defaults."""
         if self._config_manager is None:
             return
         try:
@@ -201,6 +200,8 @@ class PicoManager:
             return await asyncio.to_thread(self._probe_sync)
 
     def _probe_sync(self) -> Dict[str, Any]:
+        if self._lm_is_running():
+            return {"present": False, "error": LM_OWNS_PORT_MSG}
         try:
             ser = self.serial_owner.open()
         except (RuntimeError, OSError) as exc:
@@ -226,7 +227,7 @@ class PicoManager:
 
     def _status_sync(self) -> Dict[str, Any]:
         if self._lm_is_running():
-            return {"present": False, "error": "pitrac_lm is running; the Pico is owned by the launch monitor"}
+            return {"present": False, "error": LM_OWNS_PORT_MSG}
         try:
             ser = self.serial_owner.open()
         except (RuntimeError, OSError) as exc:
@@ -244,8 +245,7 @@ class PicoManager:
             data["device"] = self._device_path()
             return data
         except OSError as exc:
-            # Release this transaction's borrow only; the port stays open if a
-            # concurrent borrower (e.g. the RMS stream) still holds it.
+            # finally releases only this borrow; port stays open if the RMS stream still holds it.
             return {"present": False, "error": str(exc)}
         finally:
             self.serial_owner.release()
@@ -255,6 +255,8 @@ class PicoManager:
             return await asyncio.to_thread(self._selftest_sync)
 
     def _selftest_sync(self) -> Dict[str, Any]:
+        if self._lm_is_running():
+            return {"ok": False, "error": LM_OWNS_PORT_MSG}
         try:
             ser = self.serial_owner.open()
         except (RuntimeError, OSError) as exc:
@@ -290,12 +292,10 @@ class PicoManager:
         return result
 
     async def set_armed(self, armed: bool) -> Dict[str, Any]:
-        """Arm/disarm the detector, confirming the firmware actually took it.
+        """Arm/disarm, confirming via the STATUS echo that firmware took it.
 
-        The firmware refuses CFG ARMED=1 when the room is louder than
-        mic_threshold / DSP_ARM_QUIET_FACTOR (it logs "arm refused (room too
-        loud)"), so a bare ACK can leave the page showing armed while the device
-        stays disarmed. Check the STATUS echo and surface the refusal instead.
+        Firmware refuses ARMED=1 when the room exceeds mic_threshold /
+        DSP_ARM_QUIET_FACTOR, so a bare ACK can show armed while the device isn't.
         """
         want = 1 if armed else 0
         result = await self._send_cfg(f"ARMED={want}")
@@ -318,8 +318,7 @@ class PicoManager:
     async def set_decay_confirm(self, ms: int) -> Dict[str, Any]:
         """Set the impact decay-confirm window (ms). Shorter = lower hit->strobe
         latency but less margin against impulsive false triggers (claps, turf).
-        Firmware clamps to [1, 200]; confirm acceptance against the STATUS echo and
-        persist so the LM can re-push it to a power-cycled Pico.
+        Firmware clamps to [1, 200]; confirm via STATUS echo, then persist.
         """
         if isinstance(ms, bool) or not isinstance(ms, int):
             raise ValueError(f"decay_confirm_ms must be int: {ms!r}")
@@ -338,12 +337,10 @@ class PicoManager:
         return result
 
     async def set_pulse_width_us(self, value: float) -> Dict[str, Any]:
-        """Set the strobe pulse width after local validation and echo check.
+        """Set strobe pulse width, confirming via the STATUS echo (pulse_us).
 
-        The firmware treats PULSE_WIDTH_US as a float in
-        ``(0, STROBE_MAX_PULSE_WIDTH_US]`` and silently keeps the prior value if
-        the request is out of range, so we confirm acceptance against the STATUS
-        echo (``pulse_us``) rather than trusting that STATUS replied at all.
+        Firmware treats PULSE_WIDTH_US as a float in (0, STROBE_MAX_PULSE_WIDTH_US]
+        and silently keeps the prior value when out of range.
         """
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise ValueError(f"pulse_width_us must be a number: {value!r}")
@@ -360,14 +357,11 @@ class PicoManager:
         return result
 
     async def set_pulse_intervals(self, intervals: list) -> Dict[str, Any]:
-        """Push the strobe interval vector to the Pico after local validation.
+        """Push the strobe interval vector (CFG PULSE_INTERVALS=<comma floats>).
 
-        Mirrors the firmware grammar (``CFG PULSE_INTERVALS=<comma floats>``).
-        The vector must be non-empty, within the firmware's length cap, and have
-        unique consecutive ratios so each gap is distinguishable on playback —
-        a putt/shot pattern with a repeated ratio is ambiguous to decode. The
-        firmware re-validates and rejects bad lists, so we confirm acceptance
-        against the STATUS echo rather than trusting the write.
+        Must be non-empty, within the length cap, and have unique consecutive
+        ratios so each gap is distinguishable on playback (a repeated ratio is
+        ambiguous to decode). Confirm via STATUS echo; firmware re-validates too.
         """
         values = _validate_intervals(intervals)
         encoded = ",".join(_format_interval(v) for v in values)
@@ -383,13 +377,11 @@ class PicoManager:
         return self._rms_iter(clamped)
 
     async def _rms_iter(self, hz: int) -> AsyncIterator[Dict[str, int]]:
-        # The handle stays borrowed for the stream's life so the port doesn't
-        # churn, but the lock is only held around each read/write — between
-        # reads other transactions (status, threshold tuning, calibration) can
-        # grab the lock and tune the very mic this chart is displaying.
+        # Handle stays borrowed for the stream's life (no port churn); lock is held
+        # only around each read/write, so between reads other transactions can grab
+        # the lock and tune the very mic this chart displays.
         if self._lm_is_running():
-            # pitrac_lm owns the port while it runs; yield nothing so the stream
-            # closes cleanly instead of fighting the LM for /dev/ttyACM0.
+            # LM owns the port; yield nothing so the stream closes cleanly.
             logger.info("RMS stream not started: pitrac_lm is running")
             return
         async with self._lock:
@@ -408,8 +400,7 @@ class PicoManager:
                     try:
                         chunk = await asyncio.to_thread(ser.read, READ_CHUNK)
                     except OSError:
-                        # Device dropped mid-stream; end the generator cleanly so
-                        # the SSE response closes rather than raising out of it.
+                        # Device dropped mid-stream; end cleanly so SSE closes instead of raising.
                         logger.info("RMS stream read failed; stopping", exc_info=True)
                         break
                 if not chunk:
@@ -441,6 +432,8 @@ class PicoManager:
             return await asyncio.to_thread(self._send_cfg_sync, suffix)
 
     def _send_cfg_sync(self, suffix: str) -> Dict[str, Any]:
+        if self._lm_is_running():
+            return {"ok": False, "error": LM_OWNS_PORT_MSG}
         try:
             ser = self.serial_owner.open()
         except (RuntimeError, OSError) as exc:
@@ -469,6 +462,9 @@ class PicoManager:
         uf2_path: str,
         on_progress: Optional[Callable[[str], None]] = None,
     ) -> Dict[str, Any]:
+        # Flashing reboots into BOOTSEL -- catastrophic mid-round if the LM is driving it.
+        if self._lm_is_running():
+            return {"ok": False, "error": LM_OWNS_PORT_MSG}
         if shutil.which("picotool") is None:
             raise RuntimeError(
                 "picotool not installed; rerun packaging/build.sh dev"
@@ -531,6 +527,9 @@ class PicoManager:
         target: Optional[str] = None,
         on_progress: Optional[Callable[[str], None]] = None,
     ) -> Dict[str, Any]:
+        # Fail fast before _detect_target spawns picotool against an LM-owned device.
+        if self._lm_is_running():
+            return {"ok": False, "error": LM_OWNS_PORT_MSG}
         directory = Path(fw_dir).expanduser().resolve()
         if not directory.is_dir():
             raise RuntimeError(f"firmware dir not found at {directory}")
@@ -579,8 +578,7 @@ RATIO_MATCH_TOL = 1e-3
 def _validate_intervals(intervals: Any) -> list:
     """Coerce, range-check, and enforce the unique-consecutive-ratio rule.
 
-    Raises ValueError on anything the firmware would reject so the caller never
-    burns a serial round-trip on a doomed write.
+    Raises ValueError on anything firmware would reject, sparing a doomed round-trip.
     """
     if not isinstance(intervals, (list, tuple)):
         raise ValueError(f"intervals must be a list: {intervals!r}")
@@ -591,14 +589,28 @@ def _validate_intervals(intervals: Any) -> list:
             f"too many intervals ({len(intervals)} > {PULSE_INTERVALS_MAX})"
         )
 
-    values = []
+    coerced = []
     for raw in intervals:
         try:
-            v = float(raw)
+            coerced.append(float(raw))
         except (TypeError, ValueError):
             raise ValueError(f"interval is not a number: {raw!r}") from None
+
+    # A single trailing 0 is the firmware terminator sentinel (caps the train,
+    # present in shipped driver/putter vectors). Strip for validation, re-attach
+    # on return; any other non-positive value (interior 0, negative) is rejected.
+    has_terminator = len(coerced) > 1 and coerced[-1] == 0.0
+    gaps = coerced[:-1] if has_terminator else coerced
+    if not gaps:
+        raise ValueError("intervals must contain at least one positive gap")
+
+    values = []
+    for v in gaps:
         if v <= 0:
-            raise ValueError(f"interval must be positive: {v}")
+            raise ValueError(
+                "interval must be positive "
+                f"(only a single trailing 0 terminator is allowed): {v}"
+            )
         if v > INTERVAL_MS_MAX:
             raise ValueError(f"interval exceeds firmware max {INTERVAL_MS_MAX} ms: {v}")
         values.append(v)
@@ -611,7 +623,7 @@ def _validate_intervals(intervals: Any) -> list:
                     "consecutive interval ratios must be unique "
                     f"(ratio {ratios[i]:.3f} repeats)"
                 )
-    return values
+    return values + [0.0] if has_terminator else values
 
 
 def _format_interval(value: float) -> str:

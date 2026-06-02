@@ -1,23 +1,12 @@
 /*
  * main.c — PiTrac Pico firmware entry point.
  *
- * Boot sequence:
- *   1. stdio over USB CDC up (TinyUSB bundled with pico-sdk).
- *   2. Strobe PIO + DMA, default pulse train.
- *   3. I2S RX PIO + DMA, free-running into ring buffer.
- *   4. Impact detector init.
- *   5. Launch core 1 → USB CDC worker.
- *   6. Core 0 enters DSP loop forever:
- *        - read ring buffer
- *        - detect impact
- *        - if armed-and-triggered, fire strobe and notify core 1
+ * Boot: stdio/USB-CDC → strobe PIO+DMA → I2S RX PIO+DMA → impact detector →
+ * core 1 (USB CDC) → core 0 DSP loop (read ring, detect, fire+notify).
  *
- * Why DSP on core 0 and USB on core 1 (not the reverse): TinyUSB is
- * cooperative — it runs whatever scheduler context calls tud_task(). By
- * keeping it on core 1 (where it dominates the core's time), the DSP on
- * core 0 sees deterministic loop timing. The opposite arrangement would
- * mean USB interrupts could perturb the inner sample loop, and we'd lose
- * the worst-case-bounded latency that's critical for impact detection.
+ * DSP on core 0, USB on core 1: TinyUSB is cooperative (runs in whatever
+ * context calls tud_task), so pinning it to core 1 gives the DSP loop
+ * deterministic, worst-case-bounded timing — critical for impact detection.
  */
 
 #include <stdio.h>
@@ -43,69 +32,54 @@
 #include "proto.h"
 #include "ring_buffer.h"
 #include "strobe.h"
+#include "arm_gate.h"
 
 #include "i2s_rx.pio.h"
 
 volatile init_stage_t g_init_stage = INIT_STAGE_NONE;
 
-/* Shared runtime state owned in core1_usb.c — declared volatile because both
- * cores poke at it. We read/write the arm gate from the DSP loop. */
+/* Shared runtime state owned in core1_usb.c; volatile, touched by both cores. */
 extern volatile pitrac_state_t g_state;
+
+/* Arm gate + keep-alive deadline, core 0 only. g_state.armed mirrors
+ * s_arm_gate.armed for the DSP/strobe hot path; deadline owned by the gate. */
+static arm_gate_t s_arm_gate;
 
 /* --- audio ring + I2S DMA ----------------------------------------------- */
 
-/* The ring lives in BSS — 8 KB at I2S_RING_SAMPLES = 2048. Aligned naturally
- * by virtue of being a struct of uint32_t fields. */
+/* 8 KB in BSS at I2S_RING_SAMPLES = 2048; naturally aligned (struct of u32). */
 static ring_buffer_t s_audio_ring;
 
-/* DMA control block. The I2S RX channel is configured as a self-chaining
- * pair so it runs forever without CPU intervention:
- *   chan A: reads from PIO RX FIFO, writes to ring storage, chains to B
- *   chan B: writes the ring's read pointer back to chan A's write addr,
- *           re-arms chan A, chains back to A
- *
- * For this firmware we use the simpler "ring DMA" feature of RP2040: a
- * single channel with ring_size set so the write pointer auto-wraps inside
- * the storage area, plus the consumer (DSP) tracks the producer's position
- * by reading the DMA's transfer counter. This avoids needing a second DMA
- * channel and keeps the architecture flat.
- *
- * The "head" of our ring buffer is derived from the DMA transfer count:
- * each time we want to know how many new samples are available, we read
- * the DMA's `transfer_count` register and update s_audio_ring.head from it.
- */
+/* I2S RX uses RP2040 ring-DMA: a single channel with ring_size set so the
+ * write pointer auto-wraps inside storage. The consumer (DSP) tracks the
+ * producer by reading the DMA transfer_count register into s_audio_ring.head. */
 
-/* Total transfers we've configured the DMA for. We start with a huge count
- * so the DMA effectively never stops — periodically (every ~10 s of audio)
- * we'd re-arm if this firmware ran for hours. For now, 2^31 transfers
- * suffices (≈ 12 hours at 48 kHz × 2 slots). */
+/* DMA transfer count; 2^31 ≈ 6.2 h at 96 kHz (48 kHz x 2 slots). */
 #define I2S_DMA_TRANSFERS  (1u << 31)
 
 static volatile uint32_t s_dma_initial_count = I2S_DMA_TRANSFERS;
 
-static void i2s_setup(void) {
-    /* Load the I2S RX PIO program. */
-    uint offset = pio_add_program(I2S_PIO, &i2s_rx_program);
-    i2s_rx_program_init(I2S_PIO, I2S_PIO_SM, offset,
-                        PIN_I2S_BCLK,        /* base; LRCLK = base+1 */
-                        PIN_I2S_DIN,
-                        (float)I2S_SAMPLE_RATE_HZ);
+/* Re-arm before the finite count hits zero or the producer freezes and the
+ * detector goes deaf. This margin (~21 ms at 96 kHz) fits inside one DSP
+ * loop, so no audible gap. */
+#define I2S_DMA_REARM_MARGIN  ((uint32_t)I2S_RING_SAMPLES)
 
-    /* Configure the DMA channel. Reading from PIO RX FIFO, writing into
-     * the ring buffer with the write pointer wrapping inside the storage. */
+/* Configure + (re)start I2S RX DMA into a freshly reset ring. Shared by boot
+ * and the loop's re-arm so both use the proven path. Safe on a running channel
+ * (aborts first). Resetting head/tail to 0 realigns L/R slot parity (ring-index
+ * even = L), the invariant i2s_sync_head's even-skip guard protects. */
+static void i2s_dma_arm(void) {
+    dma_channel_abort(I2S_DMA_CHAN);
+
     dma_channel_config c = dma_channel_get_default_config(I2S_DMA_CHAN);
     channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
     channel_config_set_read_increment(&c, false);   /* PIO FIFO is a fixed addr */
     channel_config_set_write_increment(&c, true);
-    /* Ring-buffer mode on the write side: the DMA auto-wraps the write
-     * pointer inside a 2^I2S_RING_LOG2 × 4-byte region. The +2 is because
-     * the ring_size parameter is `log2(bytes)`, not log2(words). */
+    /* Write-side ring wraps inside a 2^I2S_RING_LOG2 x 4-byte region. +2 since
+     * ring_size is log2(bytes), not log2(words). */
     channel_config_set_ring(&c, true /* write side */, I2S_RING_LOG2 + 2);
     channel_config_set_dreq(&c, pio_get_dreq(I2S_PIO, I2S_PIO_SM, false /* RX */));
 
-    /* Configure but DO NOT start the DMA yet: we must reset the ring buffer
-     * head/tail before any samples can land, otherwise the consumer could
-     * race against stale-but-valid head/tail values from a soft-reset. */
     dma_channel_configure(
         I2S_DMA_CHAN,
         &c,
@@ -116,18 +90,36 @@ static void i2s_setup(void) {
     );
     s_dma_initial_count = I2S_DMA_TRANSFERS;
 
-    /* Reset before kicking the DMA so the producer's first write lands in a
-     * known-empty ring. */
+    /* Reset before kicking the DMA so the first write lands in an empty ring. */
     ring_buffer_reset(&s_audio_ring);
 
     dma_channel_start(I2S_DMA_CHAN);
 }
 
-/* Tear-safe read of a volatile uint64 written from the other core.
- * Cortex-M0+ has no 64-bit load: the compiler emits two ldr instructions,
- * and the other core can write between them. Classic seqlock-light: read
- * twice and retry until consecutive reads agree. Cheap on uncontended fields
- * (typical case). */
+static void i2s_setup(void) {
+    uint offset = pio_add_program(I2S_PIO, &i2s_rx_program);
+    i2s_rx_program_init(I2S_PIO, I2S_PIO_SM, offset,
+                        PIN_I2S_BCLK,        /* base; LRCLK = base+1 */
+                        PIN_I2S_DIN,
+                        (float)I2S_SAMPLE_RATE_HZ);
+    i2s_dma_arm();
+}
+
+/* Re-arm the capture DMA if it's about to run out of transfers. Returns true
+ * (and bumps the rearm counter) on a re-arm so the caller clears the stale
+ * overrun latch (ring is freshly reset). Called every loop; re-arms ~every 6 h. */
+static bool i2s_rearm_if_low(void) {
+    if (dma_channel_hw_addr(I2S_DMA_CHAN)->transfer_count >= I2S_DMA_REARM_MARGIN) {
+        return false;
+    }
+    i2s_dma_arm();
+    g_state.dma_rearm_count++;
+    return true;
+}
+
+/* Tear-safe read of a volatile u64 written from the other core. Cortex-M0+ has
+ * no 64-bit load (two ldr's, other core can write between); read twice, retry
+ * until consecutive reads agree. */
 static inline uint64_t read_volatile_u64(const volatile uint64_t *p) {
     uint64_t a, b;
     do {
@@ -137,22 +129,25 @@ static inline uint64_t read_volatile_u64(const volatile uint64_t *p) {
     return a;
 }
 
-/* Refresh the ring's head pointer from the DMA's transfer counter, then guard
- * against producer overrun. Returns true if it just dropped stale audio, so the
- * caller can emit a one-shot LOG.
+/* Boost-cap cooldown gate, shared by the mic-trigger and both manual-fire paths:
+ * true once at least min_inter_shot_ms has elapsed since the last fire, so the
+ * next fire won't brown out the rail. last_event_us == 0 means "never fired". */
+static inline bool cooldown_elapsed(void) {
+    uint64_t last_us = read_volatile_u64(&g_state.last_event_us);
+    if (last_us == 0u) return true;
+    return (time_us_64() - last_us) >= (uint64_t)g_state.min_inter_shot_ms * 1000u;
+}
+
+/* Refresh ring head from the DMA transfer counter, guard against producer
+ * overrun. Returns true if it dropped stale audio (caller LOGs once).
  *
- * During a fire the DSP loop is blocked tens of ms in strobe_fire() while the
- * I2S DMA keeps filling the ring at 48 kHz. If it laps the consumer, `head -
- * tail` exceeds the ring's capacity and the older slots between tail and
- * (head - capacity) have already been overwritten — reading them serves torn
- * audio. We explicitly skip tail forward to the newest full window instead.
- *
- * We're the consumer (sole writer of tail), so advancing it here races nothing.
- * The skip count is forced even so the detector's left/right slot parity, which
- * rides a per-word toggle through the word stream, stays aligned. */
+ * A fire blocks the DSP loop tens of ms in strobe_fire() while the DMA keeps
+ * filling at 48 kHz. If it laps the consumer, slots between tail and
+ * (head - capacity) are already overwritten (torn audio); skip tail forward to
+ * the newest full window. We're the sole writer of tail, so this races nothing.
+ * Skip count is forced even to keep the detector's per-word L/R parity aligned. */
 static inline bool i2s_sync_head(void) {
-    /* `transfer_count` counts down from initial to 0 — completed transfers
-     * = initial - remaining. */
+    /* transfer_count counts down: completed = initial - remaining. */
     uint32_t remaining = dma_channel_hw_addr(I2S_DMA_CHAN)->transfer_count;
     uint32_t completed = s_dma_initial_count - remaining;
     s_audio_ring.head = completed;
@@ -162,8 +157,7 @@ static inline bool i2s_sync_head(void) {
         return false;
     }
 
-    /* Drop everything but the newest full ring. Keep the dropped count even so
-     * an odd skip can't flip the L/R phase the detector tracks. */
+    /* Keep only the newest full ring; even skip preserves L/R phase. */
     uint32_t new_tail = s_audio_ring.head - I2S_RING_SAMPLES;
     if (((new_tail - s_audio_ring.tail) & 1u) != 0u) {
         new_tail += 1u;   /* drop one more word — stays an even skip, in-bounds */
@@ -174,64 +168,51 @@ static inline bool i2s_sync_head(void) {
 
 /* --- main --------------------------------------------------------------- */
 
-/* Post a telemetry/notify line to core 1's event queue. core0 → core1 messages
- * are all droppable (LOG / EVENT lines): if core 1 is briefly behind and the
- * FIFO is full, dropping a line beats blocking the DSP loop and missing the
- * watchdog feed. Control state never travels this way. */
+/* Post a telemetry/notify line to core 1. core0 → core1 messages are all
+ * droppable (LOG/EVENT): on a full FIFO, dropping beats blocking the DSP loop
+ * and missing the watchdog feed. Control state never travels this way. */
 static inline void notify_core1(uint32_t msg) {
     multicore_fifo_push_timeout_us(msg, FIFO_PUSH_TIMEOUT_US);
 }
 
-/* Set true by the FIRE_IN ISR once it has kicked a hardware fire; the DSP loop
- * watches it, finalises the fire when the train drains, and emits the event.
- * Written only on core 0 (ISR sets, loop clears) so there's no cross-core race;
- * the ISR refuses to start a second fire while one is in flight, so at most one
- * finalise is ever outstanding. */
+/* Set by the FIRE_IN ISR once it kicked a hardware fire; the DSP loop finalises
+ * when the train drains and emits the event. Core 0 only (ISR sets, loop
+ * clears); ISR refuses a second fire in flight, so at most one finalise pends. */
 static volatile bool s_hw_fire_pending = false;
 
-/* GP9 FIRE_IN rising-edge handler. The first edge — opening the camera shutter
- * and starting the strobe train — still happens right here so the FIRE_IN →
- * shutter latency stays as tight as before (a few GPIO writes + the same
- * cam-XTR setup busy-wait). What moved OUT of the ISR is the tail: we used to
- * call strobe_fire(), which blocks in dma_channel_wait_for_finish_blocking for
- * the whole train (tens of ms) and could sleep_ms on the pre-trigger delay —
- * both illegal-to-deadly in interrupt context. Now strobe_fire_begin() kicks
- * the DMA and returns; the DSP loop releases XTR and emits the EVENT line once
- * strobe_is_idle(). The callback runs on core 0 (where it was registered), the
- * same core that owns the strobe state, so no cross-core hop is involved. */
+/* GP9 FIRE_IN rising-edge handler. The first edge (camera shutter + strobe
+ * train start) happens here to keep FIRE_IN → shutter latency tight. The tail
+ * is deferred: strobe_fire() would block the whole train (tens of ms) in
+ * dma_channel_wait_for_finish_blocking and could sleep_ms on the pre-trigger
+ * delay — illegal in interrupt context. strobe_fire_begin() kicks the DMA and
+ * returns; the DSP loop releases XTR and emits EVENT once strobe_is_idle().
+ * Callback runs on core 0, which owns strobe state, so no cross-core hop. */
 static void m2_fire_in_irq_callback(uint gpio, uint32_t events) {
-    /* Defensive: the SDK calls this for any registered pin/event pair on
-     * the same core, so re-check we are actually the FIRE_IN rising edge. */
+    /* SDK calls this for any registered pin/event on the core; re-check ours. */
     if (gpio != PIN_FIRE_IN || (events & GPIO_IRQ_EDGE_RISE) == 0) {
         return;
     }
 
-    /* No cooldown check here. The Pi side gates fire requests; firmware
-     * trusts the wire. strobe_is_held protects against firing while the
-     * calibration sweep is sustaining DIAG HIGH. Never block on a push from
-     * interrupt context — drop the (telemetry-only) refusal if the FIFO is
-     * full rather than wedge the ISR. */
+    /* No cooldown here — the Pi gates fire requests; firmware trusts the wire.
+     * strobe_is_held guards against firing while the calibration sweep sustains
+     * DIAG HIGH. Never block a push from ISR context: drop the telemetry-only
+     * refusal on a full FIFO rather than wedge. */
     if (strobe_is_held() || !strobe_fire_begin()) {
         multicore_fifo_push_timeout_us(MAILBOX_FIRE_REFUSED_HELD, FIFO_PUSH_TIMEOUT_US);
         return;
     }
 
-    /* IRQ_OUT pulse so the Pi-side ISR can latch the rising edge
-     * deterministically (separate from the EVENT line which Pi reads later). */
+    /* IRQ_OUT pulse for the Pi-side ISR to latch the edge (separate from the
+     * EVENT line Pi reads later). */
     gpio_put(PIN_IRQ_OUT, 1);
     busy_wait_us_32(IRQ_OUT_PULSE_US);
     gpio_put(PIN_IRQ_OUT, 0);
 
-    /* Hand the tail to the DSP loop. */
     s_hw_fire_pending = true;
 }
 
-/* Diagnostic LED-blink helper. Each "checkpoint" blinks the onboard LED N
- * times slowly so we can see how far init got — works without USB, the only
- * channel left when enumeration fails. Each blink is ~200 ms, then a 500 ms
- * pause between groups. The pattern continues forever ONLY if the next
- * checkpoint is never reached; in normal operation each one runs once then
- * the firmware moves on and the heartbeat takes over. */
+/* Diagnostic blink: N slow onboard-LED pulses marking how far init got, the
+ * only channel left when USB enumeration fails. */
 static void diag_blink(int count) {
     for (int i = 0; i < count; i++) {
         led_set(true);
@@ -243,61 +224,51 @@ static void diag_blink(int count) {
 }
 
 int main(void) {
-    /* Initialise g_state at runtime instead of via static initialiser. A
-     * `volatile` struct with a partial float-array initialiser (intervals_ms
-     * is float[32] but the default has 8 entries) was found to corrupt
-     * TinyUSB internal state at boot — symptom: USB enumerates but CDC TX
-     * delivers zero bytes. Doing this BEFORE any other init avoids any
-     * window where another module reads g_state mid-initialisation. */
+    /* Runtime-init g_state, not a static initialiser: a volatile struct with a
+     * partial float-array init (intervals_ms is float[32], default has 8) was
+     * found to corrupt TinyUSB at boot (USB enumerates, CDC TX delivers zero
+     * bytes). First, before any module can read g_state mid-init. */
     g_state_runtime_init();
     init_stage_advance(INIT_STAGE_NONE, INIT_STAGE_RUNTIME_STATE);
 
-    /* PIO + DMA pre-claim, BEFORE cyw43_arch_init. The CYW43 driver does a
-     * first-fit `pio_claim_free_sm_and_add_program_for_gpio_range` + two
-     * `dma_claim_unused_channel` calls during init. Without pre-claiming our
-     * own slots, cyw43 picks PIO1 SM0 (descending search) + DMA 0/1
-     * (ascending) — exactly what we want for the strobe + I2S. Our later
-     * `pio_add_program(pio1, ...)` then panics from inside the SDK. Pre-
-     * claiming forces cyw43's search onto the leftovers (PIO1 SM1 + DMA 2/3).
-     * See pico-sdk issue #1351 for the canonical pattern. */
+    /* PIO + DMA pre-claim BEFORE cyw43_arch_init: the CYW43 driver first-fits
+     * a PIO SM + two DMA channels during init and would grab the slots we want
+     * for strobe + I2S, panicking our later pio_add_program(pio1). Pre-claiming
+     * forces its search onto the leftovers (PIO1 SM1 + DMA 2/3). See pico-sdk
+     * issue #1351. */
     pio_sm_claim(I2S_PIO,    I2S_PIO_SM);     /* pio0 sm0 */
     pio_sm_claim(STROBE_PIO, STROBE_PIO_SM);  /* pio1 sm0 */
     dma_channel_claim(I2S_DMA_CHAN);          /* 0 */
     dma_channel_claim(STROBE_DMA_CHAN);       /* 1 */
     init_stage_advance(INIT_STAGE_RUNTIME_STATE, INIT_STAGE_PRECLAIM);
 
-    /* LED up FIRST after pre-claim, before anything else can hang. On Pico W
-     * this also brings up the CYW43 SPI driver (needed to control the LED).
-     * If you never see ANY blink, either the firmware didn't reach main() or
-     * cyw43_arch_init failed — most likely cause is a board mismatch
-     * (PICO_BOARD vs actual hardware) or a PIO/DMA pre-claim that conflicts. */
+    /* LED up first after pre-claim, before anything can hang. On Pico W this
+     * also brings up the CYW43 SPI driver. No blink at all means main() wasn't
+     * reached or cyw43_arch_init failed — usually a board mismatch (PICO_BOARD)
+     * or a conflicting PIO/DMA pre-claim. */
     led_init();
     init_stage_advance(INIT_STAGE_PRECLAIM, INIT_STAGE_LED);
     diag_blink(1);   /* checkpoint 1: main() entered, LED path live */
 
-    /* Bring stdio up first so any failure during init can emit a LOG line. */
+    /* stdio up early so init failures can emit a LOG line. */
     stdio_init_all();
     init_stage_advance(INIT_STAGE_LED, INIT_STAGE_STDIO);
     diag_blink(2);   /* checkpoint 2: stdio_init_all returned */
 
-    /* Boot announce. Board ID via flash QSPI is skipped — known to hang on
-     * Pico clones with non-Winbond flash. If you need it later, gate it on a
-     * post-USB delay so a hang still leaves USB enumerated for debugging. */
+    /* Board ID via flash QSPI skipped — hangs on clones with non-Winbond
+     * flash. If re-added, gate behind a post-USB delay so a hang still leaves
+     * USB enumerated. */
     printf("LOG BOOT pitrac-pico fw=%s\n", PITRAC_PICO_FW_VERSION);
 
-    /* g_state was fully initialised at top of main via g_state_runtime_init().
-     * Watchdog enable is deferred to just before the DSP loop so init code
-     * (PIO program load, DMA configure, core 1 launch) has unlimited time.
-     * Once we're in the loop, watchdog_update() runs every iteration. */
+    /* Watchdog deferred to just before the DSP loop so init (PIO load, DMA
+     * configure, core 1 launch) has unlimited time. */
 
-    /* (LED was already initialised at top of main for diagnostic blinks.) */
     led_set(false);
 
 #if !PITRAC_LED_VIA_CYW43
-    /* Plain-Pico internal-function pins. On Pico W these are owned by the
-     * CYW43 driver and we MUST NOT touch them directly — doing so corrupts
-     * the WiFi chip's SPI bus, draws unwanted current via WL_ON, and breaks
-     * USB enumeration. The CYW43 driver manages SMPS PSM itself. */
+    /* Plain-Pico internal-function pins. On Pico W these belong to the CYW43
+     * driver — touching them corrupts its SPI bus, draws current via WL_ON,
+     * and breaks USB enumeration. CYW43 manages SMPS PSM itself. */
     gpio_init(PIN_SMPS_PSM);
     gpio_set_dir(PIN_SMPS_PSM, GPIO_OUT);
     gpio_put(PIN_SMPS_PSM, 1);
@@ -312,12 +283,8 @@ int main(void) {
     diag_blink(3);       /* checkpoint 3: board-specific init done */
     printf("LOG init: pre-strobe\n");
 
-    /* Strobe first — it's the path that absolutely must work even if
-     * everything else fails. Reports back via printf if PIO programs
-     * couldn't be loaded. */
+    /* Strobe first — the path that must work even if everything else fails. */
     if (!strobe_init()) {
-        /* This is rare-to-impossible in practice but worth handling so a
-         * silent failure shows up in the host's log. */
         printf("LOG fatal strobe_init failed\n");
         while (1) {
             led_set(true);  sleep_ms(100);
@@ -329,10 +296,9 @@ int main(void) {
     diag_blink(4);   /* checkpoint 4: strobe_init OK */
     printf("LOG init: strobe ok\n");
 
-    /* Compile the default pulse train. Deferred out of strobe_init() because
-     * pattern compilation does float math (softfloat helpers on M0+) that was
-     * implicated in a boot-time TinyUSB corruption. Safe to do now that stdio
-     * is up. */
+    /* Compile the default pulse train. Deferred out of strobe_init(): the
+     * float math (softfloat on M0+) was implicated in boot-time TinyUSB
+     * corruption; safe now that stdio is up. */
     {
         const float defaults[] = STROBE_DEFAULT_INTERVALS_MS;
         if (!strobe_set_pulse_train(defaults, STROBE_DEFAULT_INTERVAL_COUNT,
@@ -342,7 +308,6 @@ int main(void) {
     }
     init_stage_advance(INIT_STAGE_STROBE_PIO, INIT_STAGE_STROBE_PATTERN);
 
-    /* I2S — captures audio into the ring buffer. */
     i2s_setup();
     init_stage_advance(INIT_STAGE_STROBE_PATTERN, INIT_STAGE_I2S);
     diag_blink(5);   /* checkpoint 5: i2s_setup returned */
@@ -354,11 +319,9 @@ int main(void) {
     diag_blink(6);   /* checkpoint 6: impact_detect_init returned */
     printf("LOG init: impact ok\n");
 
-    /* M2 pin claims. HEARTBEAT_OUT goes HIGH here so the Pi can probe it
-     * within milliseconds of boot. IRQ_OUT starts LOW; main loop pulses it
-     * on every STRIKE / HARDWARE_FIRE. FIRE_IN uses internal pull-down so
-     * a disconnected wire reads LOW and never triggers; the boot check
-     * below skips the IRQ enable if the line reads HIGH unexpectedly. */
+    /* M2 pin claims. HEARTBEAT_OUT HIGH so the Pi can probe it right after
+     * boot. IRQ_OUT starts LOW, pulsed on every STRIKE/HARDWARE_FIRE. FIRE_IN
+     * pulled down so a disconnected wire reads LOW and never triggers. */
     gpio_init(PIN_HEARTBEAT_OUT);
     gpio_set_dir(PIN_HEARTBEAT_OUT, GPIO_OUT);
     gpio_put(PIN_HEARTBEAT_OUT, 1);
@@ -371,9 +334,8 @@ int main(void) {
     gpio_set_dir(PIN_FIRE_IN, GPIO_IN);
     gpio_pull_down(PIN_FIRE_IN);
 
-    /* Defensive boot check: if the pin reads HIGH at boot with our pull-down
-     * active, something is wrong (wire shorted to 3V3, or the Pi is asserting
-     * before we are ready). Log + skip the IRQ enable. */
+    /* HIGH at boot with our pull-down active = shorted to 3V3 or Pi asserting
+     * early. Log + skip the IRQ enable. */
     if (gpio_get(PIN_FIRE_IN)) {
         printf("LOG warn: FIRE_IN reads HIGH at boot, suspicious wiring; IRQ disabled\n");
     } else {
@@ -386,23 +348,22 @@ int main(void) {
 
     init_stage_advance(INIT_STAGE_IMPACT, INIT_STAGE_M2_PINS);
 
-    /* Launch USB CDC worker on core 1. After this point, host commands
-     * can arrive at any moment, and core 1 takes over tud_task pumping. */
+    /* Launch USB CDC worker on core 1; from here host commands can arrive any
+     * time and core 1 owns tud_task pumping. */
     printf("LOG init: launching core1\n");
     multicore_launch_core1(core1_usb_entry);
     init_stage_advance(INIT_STAGE_M2_PINS, INIT_STAGE_CORE1);
     diag_blink(7);   /* checkpoint 7: core 1 launched */
 
-    /* Brief settling pause so the I2S filter banks have valid state when
-     * the host first looks at us. The IIR filters need ~32 samples (~2 ms)
-     * to converge from zero state. */
+    /* Settling pause: the IIR filter banks need ~32 samples (~2 ms) to
+     * converge from zero state before the host first looks at us. */
     sleep_ms(20);
     diag_blink(8);   /* checkpoint 8: ready to enter DSP loop */
     printf("LOG init: entering dsp loop\n");
 
-    /* Now arm the watchdog. Anything that hangs from here on will reset the
-     * Pico (strobe pin reverts to gpio_init's LOW default, safe). pause_on_
-     * debug=true keeps gdb sessions alive across breakpoints. */
+    /* Arm watchdog: a hang from here resets the Pico (strobe pin reverts to
+     * gpio_init's LOW default, safe). pause_on_debug=true keeps gdb alive
+     * across breakpoints. */
     watchdog_enable(WATCHDOG_TIMEOUT_MS, true);
     init_stage_advance(INIT_STAGE_CORE1, INIT_STAGE_WATCHDOG);
 
@@ -413,30 +374,31 @@ int main(void) {
     /* --- main DSP loop ------------------------------------------------ */
 
     while (true) {
-        /* Feed the watchdog every loop iteration. If we're alive enough to
-         * get here, the firmware is making progress; a hang anywhere else
-         * (mailbox push wedged, hardfault) misses this update and we reset. */
+        /* Feed the watchdog every loop. A hang elsewhere (wedged mailbox push,
+         * hardfault) misses this and resets. */
         watchdog_update();
 
-        /* Safety net for STROBE_HOLD: if the Pi-side calibration sweep
-         * asserted DIAG HIGH and crashed without releasing, this auto-drops
-         * the line after STROBE_MAX_HOLD_MS to protect the IR LEDs. */
+        /* STROBE_HOLD safety net: if a calibration sweep asserted DIAG HIGH and
+         * crashed, auto-drop after STROBE_MAX_HOLD_MS to protect the IR LEDs. */
         strobe_check_hold_timeout();
 
-        /* Arm-timeout: if the host armed us and walked away, drop the gate
-         * so an unattended Pico doesn't strobe on random room noise. We
-         * push the LOG to core 1 via the mailbox rather than printf-ing
-         * from core 0 — stdio over USB CDC is core-1-owned and concurrent
-         * writes from core 0 would risk garbled output. */
-        if (g_state.armed && time_us_64() > g_state.arm_deadline_us) {
-            g_state.armed = false;
+        /* Arm-timeout: drop the gate if the host armed and walked away, so an
+         * unattended Pico doesn't strobe on room noise. LOG via mailbox, not
+         * printf — stdio is core-1-owned and a core-0 write would garble. */
+        if (arm_gate_poll(&s_arm_gate, time_us_64())) {
+            g_state.armed = false;   /* mirror for the DSP/strobe readers */
             notify_core1(MAILBOX_DISARM_TIMEOUT);
         }
 
-        /* Update the ring head from the DMA counter so the detector sees fresh
-         * data. If the producer lapped us (typically right after a fire's
-         * blocking window), it drops the stale audio and we LOG once per
-         * episode — edge-triggered so a sustained overrun doesn't spam. */
+        /* Re-arm the capture DMA before its count hits zero; re-arm resets the
+         * ring, so clear the overrun latch with it. */
+        if (i2s_rearm_if_low()) {
+            ring_overflow_logged = false;
+        }
+
+        /* Refresh ring head from the DMA counter. If the producer lapped us
+         * (typically right after a fire's blocking window), drop stale audio and
+         * LOG once per episode — edge-triggered so a sustained overrun can't spam. */
         bool ring_lapped = i2s_sync_head();
         if (ring_lapped && !ring_overflow_logged) {
             notify_core1(MAILBOX_RING_OVERFLOW);
@@ -445,42 +407,33 @@ int main(void) {
             ring_overflow_logged = false;
         }
 
-        /* Run impact detection. Reads what's available, returns true with
-         * RMS value if it just fired a trigger. */
         int32_t rms = 0;
         bool triggered = sensors_step(g_state.armed, &rms);
 
         if (triggered) {
             g_state.last_rms = rms;
 
-            /* Cooldown gate. last_event_us is updated on EVERY fire (both
-             * mic-triggered and manual) — core 0 is the SOLE writer to avoid
-             * the dual-writer race that core 1's prior bookkeeping introduced.
-             * If the boost cap hasn't recharged yet, refuse and log — better
-             * a missed shot than a brown-out during a dim train. */
-            uint64_t now_us = time_us_64();
-            uint64_t last_us = read_volatile_u64(&g_state.last_event_us);
-            uint64_t min_gap_us = (uint64_t)g_state.min_inter_shot_ms * 1000u;
-            if (last_us != 0 && now_us - last_us < min_gap_us) {
+            /* Cooldown gate. last_event_us updated on EVERY fire (mic + manual);
+             * core 0 is the SOLE writer to avoid the dual-writer race core 1's
+             * prior bookkeeping introduced. Refuse if the boost cap hasn't
+             * recharged — a missed shot beats a brown-out during a dim train. */
+            if (!cooldown_elapsed()) {
                 notify_core1(MAILBOX_FIRE_REFUSED_COOLDOWN);
-                /* Still consume the arm — a host that triggered noise during
-                 * cooldown has to explicitly re-arm anyway. */
+                /* Still consume the arm — noise during cooldown forces a re-arm. */
+                arm_gate_disarm(&s_arm_gate);
                 g_state.armed = false;
                 notify_core1(MAILBOX_DISARM_AFTER_FIRE);
             } else {
-                /* Fire the strobe + camera trigger. This blocks until the DMA
-                 * train completes (~tens of ms worst case); during that window
-                 * we won't process new audio, but the ring buffer is large
-                 * enough to soak it, and the debounce window is 300 ms anyway
-                 * so we won't re-trigger immediately. */
+                /* Fire strobe + camera trigger. Blocks until the DMA train
+                 * completes (~tens of ms worst case); the ring soaks the audio
+                 * we miss, and the 300 ms debounce prevents an immediate re-trigger. */
                 if (strobe_fire()) {
                     g_state.last_event_us = time_us_64();
-                    /* EVENT before disarm-LOG so the wire order reads
-                     * naturally (EVENT first, consequence second). */
+                    /* EVENT before disarm-LOG so the wire order reads naturally. */
                     notify_core1(MAILBOX_STRIKE);
 
-                    /* Pi-side IRQ on rising edge. Stay HIGH for 100 us so a
-                     * polled sampler can't miss the edge. */
+                    /* Pi-side IRQ: hold HIGH 100 us so a polled sampler can't
+                     * miss the edge. */
                     gpio_put(PIN_IRQ_OUT, 1);
                     busy_wait_us_32(IRQ_OUT_PULSE_US);
                     gpio_put(PIN_IRQ_OUT, 0);
@@ -488,18 +441,17 @@ int main(void) {
                     notify_core1(MAILBOX_FIRE_REFUSED_HELD);
                 }
 
-                /* Disarm even on refusal: noise during a held sweep still
-                 * burned the one-shot arm. */
+                /* Disarm even on refusal: noise during a held sweep burned the
+                 * one-shot arm. */
+                arm_gate_disarm(&s_arm_gate);
                 g_state.armed = false;
                 notify_core1(MAILBOX_DISARM_AFTER_FIRE);
             }
         }
 
-        /* Finalise a hardware (GP9) fire once its train has drained. The ISR
-         * kicked the DMA and left; here we release the cam XTR pins, stamp the
-         * event time (core 0 stays the sole writer of last_event_us), and emit
-         * the EVENT line. Checking strobe_is_idle() keeps us off the pin until
-         * the PIO has clocked the last pulse. */
+        /* Finalise a hardware (GP9) fire once its train drains: release cam XTR,
+         * stamp last_event_us (core 0 stays sole writer), emit EVENT.
+         * strobe_is_idle() keeps us off the pin until the last pulse is clocked. */
         if (s_hw_fire_pending && strobe_is_idle()) {
             strobe_fire_end();
             g_state.last_event_us = time_us_64();
@@ -507,30 +459,29 @@ int main(void) {
             notify_core1(MAILBOX_HARDWARE_FIRE_DONE);
         }
 
-        /* Drain one inbound request from core 1. Non-blocking — if nothing is
-         * waiting, fall through. core 1 posts arm/disarm intent and manual fire
-         * requests on this same FIFO; core 0 is the single point that applies
-         * arm state, so there's no multi-writer race on g_state.armed or the
-         * 64-bit arm_deadline_us. One pop per loop is plenty: the host can't
-         * issue requests faster than the loop spins. */
+        /* Drain one inbound request from core 1 (non-blocking). core 1 posts
+         * arm/disarm/manual-fire here; core 0 is the single applier of arm
+         * state, so no multi-writer race on g_state.armed or arm_deadline_us.
+         * One pop per loop suffices — the host can't outpace the loop. */
         if (multicore_fifo_rvalid()) {
             uint32_t msg = multicore_fifo_pop_blocking();
             if (msg == MAILBOX_REQ_ARM) {
-                /* Sole-writer arm: compute the deadline here from the (atomic
-                 * 32-bit) arm_timeout_ms core 1 set, then raise the gate. */
-                g_state.arm_deadline_us =
-                    time_us_64() + (uint64_t)g_state.arm_timeout_ms * 1000u;
+                /* Sole-writer arm: gate computes the deadline from the atomic
+                 * 32-bit arm_timeout_ms core 1 set; mirror armed out. */
+                arm_gate_arm(&s_arm_gate, time_us_64(), g_state.arm_timeout_ms);
                 g_state.armed = true;
             } else if (msg == MAILBOX_REQ_DISARM) {
+                arm_gate_disarm(&s_arm_gate);
                 g_state.armed = false;
+            } else if (msg == MAILBOX_REQ_HEARTBEAT) {
+                /* Keep-alive: push the deadline out across the player's swing.
+                 * Gate only acts while armed and skips the arm-quiet gate, so
+                 * armed is unchanged. */
+                arm_gate_heartbeat(&s_arm_gate, time_us_64(), g_state.arm_timeout_ms);
             } else if (msg == MAILBOX_MANUAL_FIRE) {
-                /* Same cooldown gate as the mic-triggered path. Calibration
-                 * sweeps can lower min_inter_shot_ms via CFG when each fire
-                 * is a tiny single pulse. */
-                uint64_t now_us = time_us_64();
-                uint64_t last_us = read_volatile_u64(&g_state.last_event_us);
-                uint64_t min_gap_us = (uint64_t)g_state.min_inter_shot_ms * 1000u;
-                if (last_us != 0 && now_us - last_us < min_gap_us) {
+                /* Same cooldown gate as the mic path. Calibration sweeps can
+                 * lower min_inter_shot_ms via CFG (each fire is a single pulse). */
+                if (!cooldown_elapsed()) {
                     notify_core1(MAILBOX_FIRE_REFUSED_COOLDOWN);
                 } else {
                     if (strobe_fire()) {
@@ -539,24 +490,20 @@ int main(void) {
                     } else {
                         notify_core1(MAILBOX_FIRE_REFUSED_HELD);
                     }
-                    /* Same disarm-after-fire policy for manual fires — keeps
-                     * the arm gate predictable: ARMED=1 is a one-shot intent.
-                     * Only notify when we actually changed state to avoid
-                     * misleading lines on FIRE-while-already-disarmed. */
-                    if (g_state.armed) {
+                    /* Disarm-after-fire (ARMED=1 is one-shot intent). Notify
+                     * only on a real state change to avoid a misleading line on
+                     * FIRE-while-already-disarmed. */
+                    if (s_arm_gate.armed) {
+                        arm_gate_disarm(&s_arm_gate);
                         g_state.armed = false;
                         notify_core1(MAILBOX_DISARM_AFTER_FIRE);
                     }
                 }
             } else if (msg == MAILBOX_MANUAL_FIRE_PEAK) {
-                /* Same cooldown gate, then fire + sample ADC0 for the train.
-                 * Result is stashed in g_state.last_peak_adc / last_peak_samples
-                 * before signalling completion to core 1 (the mailbox push is a
-                 * memory barrier so the read on the other core is consistent). */
-                uint64_t now_us = time_us_64();
-                uint64_t last_us = read_volatile_u64(&g_state.last_event_us);
-                uint64_t min_gap_us = (uint64_t)g_state.min_inter_shot_ms * 1000u;
-                if (last_us != 0 && now_us - last_us < min_gap_us) {
+                /* Cooldown gate, then fire + sample ADC0 across the train. Result
+                 * stashed in last_peak_adc/last_peak_samples before the completion
+                 * push (which barriers the other core's read). */
+                if (!cooldown_elapsed()) {
                     notify_core1(MAILBOX_FIRE_REFUSED_COOLDOWN);
                 } else {
                     uint16_t peak = 0u;
@@ -569,7 +516,8 @@ int main(void) {
                     } else {
                         notify_core1(MAILBOX_FIRE_REFUSED_HELD);
                     }
-                    if (g_state.armed) {
+                    if (s_arm_gate.armed) {
+                        arm_gate_disarm(&s_arm_gate);
                         g_state.armed = false;
                         notify_core1(MAILBOX_DISARM_AFTER_FIRE);
                     }
@@ -577,8 +525,7 @@ int main(void) {
             }
         }
 
-        /* Status LED heartbeat. Slow blink (1 Hz) when disarmed, fast
-         * (5 Hz) when armed. Cheap visual indicator while bench testing. */
+        /* Status LED heartbeat: 1 Hz disarmed, 5 Hz armed. */
         if (absolute_time_diff_us(get_absolute_time(), led_next_toggle) <= 0) {
             led_state = !led_state;
             led_set(led_state);

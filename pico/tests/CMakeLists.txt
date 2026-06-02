@@ -36,3 +36,35 @@ target_compile_options(test_impact_detect PRIVATE
 )
 
 add_test(NAME impact_detect COMMAND test_impact_detect)
+
+add_executable(test_strobe_compile
+    test_strobe_compile.c
+    ${CMAKE_CURRENT_LIST_DIR}/../src/strobe_compile.c
+)
+
+target_include_directories(test_strobe_compile PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/../include
+    ${CMAKE_CURRENT_LIST_DIR}/../src
+)
+
+target_compile_options(test_strobe_compile PRIVATE
+    -Wall -Wextra -Wno-unused-parameter -Werror
+)
+
+add_test(NAME strobe_compile COMMAND test_strobe_compile)
+
+add_executable(test_arm_gate
+    test_arm_gate.c
+    ${CMAKE_CURRENT_LIST_DIR}/../src/arm_gate.c
+)
+
+target_include_directories(test_arm_gate PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/../include
+    ${CMAKE_CURRENT_LIST_DIR}/../src
+)
+
+target_compile_options(test_arm_gate PRIVATE
+    -Wall -Wextra -Wno-unused-parameter -Werror
+)
+
+add_test(NAME arm_gate COMMAND test_arm_gate)
