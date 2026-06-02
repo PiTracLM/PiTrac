@@ -17,9 +17,8 @@ typedef struct {
     /* DSP config */
     void    (*set_threshold)(int32_t);
     int32_t (*get_threshold)(void);
-    /* int64 so the arm-quiet gate never narrows the mic's mean-square RMS —
-     * a loud strike pushes it past INT32_MAX and an int32 return wrapped
-     * negative, silently passing the quiet check. */
+    /* int64: mic mean-square RMS exceeds INT32_MAX on a loud strike; an int32
+     * return wrapped negative and silently passed the arm-quiet gate. */
     int64_t (*current_rms)(void);
     void    (*set_decay_confirm)(uint32_t ms);
 
@@ -49,12 +48,15 @@ typedef struct {
 
     /* IPC + control flow */
     void    (*request_manual_fire)(void);
-    /* Like request_manual_fire, but also samples ADC0 (GP26, wired to the V3
-     * CUR-SENSE node) during the strobe train and emits one EVENT line with
-     * the peak ADC reading. Used by the Pi-side calibration sweep. */
+    /* request_manual_fire + samples ADC0 (GP26 → V3 CUR-SENSE) across the
+     * strobe train, emits one EVENT with peak ADC. Pi-side calibration sweep. */
     void    (*request_fire_peak)(void);
     void    (*request_reset)(void);
     void    (*request_bootsel)(void);
+
+    /* Session keep-alive: refresh the arm deadline without re-running the
+     * arm-quiet gate. A no-op while disarmed. */
+    void    (*heartbeat)(void);
 
     /* Cam2 XTR pulse without firing the strobe. M2 addition. */
     void    (*cam_pulse)(uint32_t microseconds);

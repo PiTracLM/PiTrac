@@ -1,4 +1,4 @@
-/* Pure text-protocol parser. No side effects: same source compiles into
+/* Pure text-protocol parser, no side effects: same source compiles into
  * firmware and host-side tests. */
 
 #ifndef PITRAC_PICO_PROTO_PARSER_H
@@ -12,9 +12,8 @@
 extern "C" {
 #endif
 
-/* Parses an in-place mutable line. Returns true on a recognised command;
- * on failure sets out->kind to CMD_INVALID (CMD_NONE on empty) and returns
- * false. */
+/* Parses a mutable line in place. True on a recognised command; on failure
+ * sets out->kind to CMD_INVALID (CMD_NONE on empty) and returns false. */
 bool proto_parse_line(char *line, pitrac_cmd_t *out);
 
 #ifdef __cplusplus

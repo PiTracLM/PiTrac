@@ -106,8 +106,12 @@ class StrobeCalibrationManager:
     DAC_CONFIG_KEY = "gs_config.strobing.kDAC_setting"
 
     def __init__(self, config_manager, pico_lock: Optional[asyncio.Lock] = None,
-                 serial_owner=None):
+                 serial_owner=None, pitrac_manager=None):
         self.config_manager = config_manager
+        # When pitrac_lm runs it owns the strobe hardware (the Pico CDC in Pico
+        # mode, BCM 10 DIAG in legacy), so a calibration sweep must stand down
+        # rather than fire the strobe and grab the port out from under it.
+        self._pitrac_manager = pitrac_manager
         # Shared across both managers so concurrent /api/calibration and
         # /api/pico requests don't fight over /dev/ttyACM0. Constructed on
         # demand if none was injected — keeps the existing test wiring valid.
@@ -135,7 +139,23 @@ class StrobeCalibrationManager:
     # Hardware lifecycle
     # ------------------------------------------------------------------
 
+    def _lm_is_running(self) -> bool:
+        """True when pitrac_lm holds the strobe hardware; calibration defers to it."""
+        if self._pitrac_manager is None:
+            return False
+        try:
+            return bool(self._pitrac_manager.is_running())
+        except Exception:
+            return False
+
     def _open_hardware(self):
+        # The launch monitor owns the strobe + the CDC port while it runs; a
+        # sweep here would fire the strobe mid-round and fight it for the device.
+        # Every calibration entry point funnels through _open_hardware and
+        # catches this, so one guard covers them all.
+        if self._lm_is_running():
+            raise RuntimeError(
+                "pitrac_lm is running; stop the launch monitor before calibrating the strobe")
         if spidev is None:
             raise RuntimeError("spidev library not available -- not running on a Raspberry Pi?")
 

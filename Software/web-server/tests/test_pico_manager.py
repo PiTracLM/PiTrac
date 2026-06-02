@@ -20,6 +20,19 @@ def _build(serial_mock, *, get_config=None):
     return PicoManager(cm, lock)
 
 
+def _build_with_lm(serial_mock, *, running=True):
+    """A manager wired to a pitrac_manager whose is_running() we control, so we
+    can exercise the "LM owns the CDC port" gate."""
+    from pico_manager import PicoManager
+
+    cm = MagicMock()
+    cm.get_config.side_effect = lambda key: None
+    lock = asyncio.Lock()
+    lm = MagicMock()
+    lm.is_running.return_value = running
+    return PicoManager(cm, lock, pitrac_manager=lm)
+
+
 # --------------------------------------------------------------------- probe
 
 class TestProbe:
@@ -761,3 +774,123 @@ class TestDspPersistence:
         assert result.get("ok") is False
         keys_persisted = [c.args[0] for c in cm.set_config.call_args_list]
         assert "gs_config.pico.decay_confirm_ms" not in keys_persisted
+
+
+class TestLmOwnsPortGate:
+    """While pitrac_lm runs it owns /dev/ttyACM0, so every web transaction that
+    would open the port must refuse WITHOUT touching the device."""
+
+    @patch("pico_manager.serial")
+    def test_probe_refuses_when_lm_running(self, mock_serial_mod):
+        from pico_manager import LM_OWNS_PORT_MSG
+
+        mgr = _build_with_lm(mock_serial_mod)
+        data = asyncio.run(mgr.probe())
+        assert data["present"] is False
+        assert data["error"] == LM_OWNS_PORT_MSG
+        mock_serial_mod.Serial.assert_not_called()
+
+    @patch("pico_manager.serial")
+    def test_status_refuses_when_lm_running(self, mock_serial_mod):
+        from pico_manager import LM_OWNS_PORT_MSG
+
+        mgr = _build_with_lm(mock_serial_mod)
+        data = asyncio.run(mgr.status())
+        assert data["present"] is False
+        assert data["error"] == LM_OWNS_PORT_MSG
+        mock_serial_mod.Serial.assert_not_called()
+
+    @patch("pico_manager.serial")
+    def test_selftest_refuses_when_lm_running(self, mock_serial_mod):
+        from pico_manager import LM_OWNS_PORT_MSG
+
+        mgr = _build_with_lm(mock_serial_mod)
+        data = asyncio.run(mgr.selftest())
+        assert data["ok"] is False
+        assert data["error"] == LM_OWNS_PORT_MSG
+        mock_serial_mod.Serial.assert_not_called()
+
+    @patch("pico_manager.serial")
+    def test_setters_refuse_when_lm_running(self, mock_serial_mod):
+        from pico_manager import LM_OWNS_PORT_MSG
+
+        mgr = _build_with_lm(mock_serial_mod)
+        data = asyncio.run(mgr.set_threshold(8000))
+        assert data["ok"] is False
+        assert data["error"] == LM_OWNS_PORT_MSG
+        mock_serial_mod.Serial.assert_not_called()
+
+    @patch("pico_manager.shutil.which", return_value="/usr/bin/picotool")
+    @patch("pico_manager.serial")
+    def test_flash_refuses_when_lm_running(self, mock_serial_mod, _which):
+        from pico_manager import LM_OWNS_PORT_MSG
+
+        mgr = _build_with_lm(mock_serial_mod)
+        data = asyncio.run(mgr.flash("/tmp/whatever.uf2"))
+        assert data["ok"] is False
+        assert data["error"] == LM_OWNS_PORT_MSG
+        mock_serial_mod.Serial.assert_not_called()
+
+    @patch("pico_manager.serial")
+    def test_flash_bundled_refuses_when_lm_running(self, mock_serial_mod):
+        from pico_manager import LM_OWNS_PORT_MSG
+
+        mgr = _build_with_lm(mock_serial_mod)
+        data = asyncio.run(mgr.flash_bundled("/tmp/fw"))
+        assert data["ok"] is False
+        assert data["error"] == LM_OWNS_PORT_MSG
+        mock_serial_mod.Serial.assert_not_called()
+
+    @patch("pico_manager.serial")
+    def test_status_opens_port_when_lm_not_running(self, mock_serial_mod):
+        # Contrast: with the LM down, the same call opens the port normally.
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [b"STATUS armed=0 threshold=4096\n", b""]
+        mgr = _build_with_lm(mock_serial_mod, running=False)
+        data = asyncio.run(mgr.status())
+        assert data["present"] is True
+        mock_serial_mod.Serial.assert_called_once()
+
+
+class TestValidateIntervals:
+    """The validator must accept the firmware's optional trailing-0 terminator
+    (present in the shipped vectors) while still rejecting interior zeros,
+    negatives, and repeated consecutive ratios over the non-zero prefix."""
+
+    def test_accepts_trailing_zero_terminator(self):
+        from pico_manager import _validate_intervals
+
+        # The shipped driver vector: distinct ratios, ends in the 0 terminator.
+        out = _validate_intervals([0.7, 1.8, 3.0, 2.2, 3.0, 7.1, 4.0, 0])
+        assert out == [0.7, 1.8, 3.0, 2.2, 3.0, 7.1, 4.0, 0.0]
+
+    def test_accepts_vector_without_terminator(self):
+        from pico_manager import _validate_intervals
+
+        assert _validate_intervals([0.7, 1.8, 0.5]) == [0.7, 1.8, 0.5]
+
+    def test_rejects_interior_zero(self):
+        from pico_manager import _validate_intervals
+
+        with pytest.raises(ValueError, match="positive"):
+            _validate_intervals([0.7, 0.0, 1.8])
+
+    def test_rejects_negative(self):
+        from pico_manager import _validate_intervals
+
+        with pytest.raises(ValueError, match="positive"):
+            _validate_intervals([0.7, -1.0])
+
+    def test_rejects_lone_zero(self):
+        from pico_manager import _validate_intervals
+
+        with pytest.raises(ValueError):
+            _validate_intervals([0])
+
+    def test_rejects_repeated_consecutive_ratio_over_prefix(self):
+        from pico_manager import _validate_intervals
+
+        # The putter vector [5,30,30,30,50] has ratios 6,1,1,1.67 -> repeated 1.0,
+        # and the trailing terminator must not hide that.
+        with pytest.raises(ValueError, match="ratio"):
+            _validate_intervals([5.0, 30.0, 30.0, 30.0, 50.0, 0])

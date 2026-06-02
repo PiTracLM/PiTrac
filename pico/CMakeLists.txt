@@ -68,6 +68,8 @@ add_executable(pitrac_pico
   src/cmd_dispatcher.c
   src/impact_detect.c
   src/strobe.c
+  src/strobe_compile.c
+  src/arm_gate.c
   src/ring_buffer.c
   src/sensors.c
   src/sensor_mic.c

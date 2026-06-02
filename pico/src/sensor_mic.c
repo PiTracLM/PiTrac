@@ -1,8 +1,6 @@
 #include "sensor.h"
 #include "sensor_mic.h"
 
-#include <stdio.h>
-
 #include "impact_detect.h"
 
 static ring_buffer_t *s_ring = NULL;
@@ -29,10 +27,8 @@ static int64_t mic_current_level(void) {
 }
 
 static void mic_selftest_append(char *buf, int buflen, int *cursor) {
-    if (*cursor >= buflen) return;
-    int k = snprintf(buf + *cursor, buflen - *cursor,
-                     " mic_rms=%lld", (long long)impact_detect_current_rms());
-    if (k > 0) *cursor += k;
+    sensor_selftest_printf(buf, buflen, cursor,
+                           " mic_rms=%lld", (long long)impact_detect_current_rms());
 }
 
 const sensor_t g_sensor_mic = {

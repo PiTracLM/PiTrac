@@ -201,6 +201,7 @@ class PiTracServer:
         self.strobe_calibration_manager = StrobeCalibrationManager(
             self.config_manager, self.pico_lock,
             serial_owner=self.pico_manager.serial_owner,
+            pitrac_manager=self.pitrac_manager,
         )
         self.update_manager = UpdateManager()
         self.update_manager.set_broadcast_callback(self.connection_manager.broadcast)

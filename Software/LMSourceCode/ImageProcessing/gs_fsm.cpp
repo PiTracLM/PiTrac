@@ -10,6 +10,7 @@
 
 #include <variant>
 #include <thread>
+#include <chrono>
 #include "gs_format_lib.h"
 #include <iostream>
 #include <signal.h>
@@ -49,10 +50,19 @@ namespace golf_sim {
 
     static long kMaxCam2ImageReceivedTimeMs = 2000;
 
-    // In Pico mode the LM arms and then waits for the player to actually swing,
-    // so the cam2 wait has to outlast the firmware arm window (~10s). Legacy uses
-    // the short value above because there the timer only starts after the hit.
-    static long kMaxPicoStrikeWaitTimeMs = 12000;
+    // Pico mode is session-scoped: once armed, the player may take all the time
+    // they want before swinging -- address the ball, take a practice swing, step
+    // away entirely. So instead of a per-shot strike deadline, the wait handler
+    // ticks on this cadence, pinging the Pico to keep the arm alive and polling
+    // for the autonomous strike, and never tears the shot down just for sitting
+    // idle. The tick stays under PulseStrobe::kPicoArmTimeoutMs so the arm holds.
+    const long kPicoWaitTickMs = PulseStrobe::kPicoHeartbeatIntervalMs;
+
+    // Once the Pico reports a strike (event_count bumped), the strobed cam2 frame
+    // should arrive almost at once. Allow this grace for it -- covering a genuine
+    // dropped frame as well as the brief window where the frame event is queued
+    // just behind a wait tick -- before concluding cam2 missed it and restarting.
+    const long kPicoStrikeToFrameGraceMs = 1500;
 
     const int kWaitForBallPauseMs = 500;
     const int kEventLoopPauseMs = 5000;
@@ -69,9 +79,15 @@ namespace golf_sim {
     TimedCallbackThread* BallStabilizationCheckTimerThread = nullptr;
     TimedCallbackThread* ReceivedCam2ImageCheckTimerThread = nullptr;
 
-    // Pico strike counter sampled when we arm, compared on a cam2 timeout to tell
-    // "Pico never fired" from "Pico fired but cam2 dropped the frame".
+    // Pico strike counter sampled when we arm, compared each wait tick to tell
+    // "Pico never fired" (player hasn't swung -- keep waiting) from "Pico fired"
+    // (strobe went off -- the cam2 frame should be right behind it).
     static uint64_t g_pico_event_count_at_arm = 0;
+
+    // Set the first wait tick that sees the strike counter bump without the cam2
+    // frame having arrived. Gives the frame a grace window before we declare it
+    // dropped; the default (zero) time_point means "no strike seen this shot".
+    static std::chrono::steady_clock::time_point g_pico_strike_frame_deadline{};
 
 
     void queueBallStabilizationCheck() {
@@ -116,23 +132,26 @@ namespace golf_sim {
         // No need to restart timer.  The rest of the system will do so if appropriate.
     }
 
-    void setupCam2ImageReceivedCheckTimer() {
-
-        // Pico mode waits across the player's swing, so use the longer window.
-        // TimedCallbackThread takes milliseconds, so pass the value straight in --
-        // the old "* 1000" turned 2s into ~33min and is why a stuck capture parked.
-        const long timeout_ms = PulseStrobe::IsPicoActive() ? kMaxPicoStrikeWaitTimeMs : kMaxCam2ImageReceivedTimeMs;
-
-        GS_LOG_TRACE_MSG(trace, "setupCam2ImageReceivedCheckTimer - Setting call back for " + std::to_string(timeout_ms) + " milliseconds.");
-
-        // The timer is one-shot, so tear down any prior (already-fired) instance and
-        // build a fresh one -- otherwise only the first shot of a session is guarded.
+    // Tear down any live cam2-image check timer. Safe to call when none is set.
+    void teardownCam2ImageReceivedCheckTimer() {
         if (ReceivedCam2ImageCheckTimerThread != nullptr) {
             ReceivedCam2ImageCheckTimerThread->ExitThread();
             delete ReceivedCam2ImageCheckTimerThread;
             ReceivedCam2ImageCheckTimerThread = nullptr;
         }
-        ReceivedCam2ImageCheckTimerThread = new TimedCallbackThread("setupCam2ImageReceivedCheckTimerThread", timeout_ms, queueCam2ImageReceivedCheck);
+    }
+
+    // Arm the cam2-image check timer. Legacy mode passes a one-shot deadline that
+    // starts only after the hit is detected, so a lapse means cam2 failed. Pico
+    // mode passes a repeating keep-alive tick: each fire pings the Pico and polls
+    // for the strike, so the timer runs for the whole open-ended session wait.
+    void setupCam2ImageReceivedCheckTimer(long timeout_ms, bool repeat) {
+        GS_LOG_TRACE_MSG(trace, "setupCam2ImageReceivedCheckTimer - " +
+                         std::to_string(timeout_ms) + " ms, repeat=" + std::to_string(repeat));
+
+        teardownCam2ImageReceivedCheckTimer();
+        ReceivedCam2ImageCheckTimerThread = new TimedCallbackThread(
+            "setupCam2ImageReceivedCheckTimerThread", timeout_ms, queueCam2ImageReceivedCheck, repeat);
         ReceivedCam2ImageCheckTimerThread->CreateThread();
     }
 
@@ -454,6 +473,7 @@ namespace golf_sim {
             // Sample the strike counter just before arming -- a disarmed Pico cannot fire,
             // so this is the stable baseline for the cam2-timeout diagnostic.
             g_pico_event_count_at_arm = PulseStrobe::PicoEventCount();
+            g_pico_strike_frame_deadline = std::chrono::steady_clock::time_point{};
             if (!PulseStrobe::ArmPicoForShot()) {
                 // Every attempt hit the firmware arm-quiet gate (room too loud) or the port
                 // was busy. A disarmed Pico will never fire, so this shot could only
@@ -480,10 +500,16 @@ namespace golf_sim {
             GS_LOG_MSG(info, "============= BALL HIT ===============\n");
         }
 
-        // Make sure we do something sensible if we don't receive an image from the camera 2
-        // system in a reasonable amount of time.
-        // TBD - How to turn the check off when we DO get an image?
-        setupCam2ImageReceivedCheckTimer();
+        // Guard the wait for the cam2 image. Legacy mode arms a one-shot deadline
+        // (the hit already happened, so a lapse means cam2 failed). Pico mode arms
+        // a repeating keep-alive tick instead: the player hasn't swung yet and may
+        // take their time, so the handler pings the Pico and polls for the strike
+        // each tick rather than tearing the shot down on a fixed timeout.
+        if (PulseStrobe::IsPicoActive()) {
+            setupCam2ImageReceivedCheckTimer(kPicoWaitTickMs, /*repeat=*/true);
+        } else {
+            setupCam2ImageReceivedCheckTimer(kMaxCam2ImageReceivedTimeMs, /*repeat=*/false);
+        }
 
         // Start waiting for the camera 2 image to returned. 
         // TBD - Should probably start timer to make sure we get an image soon.
@@ -505,8 +531,11 @@ namespace golf_sim {
         const GolfSimEvent::Camera2ImageReceived& cam2ImageReceived) {
         GS_LOG_MSG(debug, "GolfSim state transition: BallHitNowWaitingForCam2Image - Received Camera2ImageReceived ");
 
-        // The frame arrived, so this shot is done -- disarm the Pico (the firmware
-        // arm-timeout is only a backstop). No-op in legacy mode.
+        // The frame arrived, so this shot is done. Stop the keep-alive/check timer
+        // (a repeating tick in Pico mode) so it doesn't keep firing into the next
+        // state, then disarm the Pico (the firmware arm-timeout is only a backstop).
+        // Both are no-ops in legacy mode / when no timer is set.
+        teardownCam2ImageReceivedCheckTimer();
         if (PulseStrobe::IsPicoActive()) {
             PulseStrobe::DisarmPico();
         }
@@ -591,26 +620,51 @@ namespace golf_sim {
         return state::WaitingForBall{ std::chrono::steady_clock::now(), false /* have not sent the waiting-for-ball IPC message yet */ };
     }
 
-    GolfSimState onEvent(const state::BallHitNowWaitingForCam2Image& BallHitNowWaitingForCam2Image,
+    GolfSimState onEvent(const state::BallHitNowWaitingForCam2Image& ballHitState,
         const GolfSimEvent::CheckForCam2ImageReceived& checkForCam2ImageReceived) {
-        GS_LOG_MSG(debug, "GolfSim state transition: BallHitNowWaitingForCam2Image - Received CheckForCam2ImageReceived - Will restart ");
-
-        GS_LOG_MSG(error, "BallHitNowWaitingForCam2Image - Timed out waiting for Cam2Image.  Restarting... ");
 
         if (PulseStrobe::IsPicoActive()) {
-            // Tell the operator which side failed: did the Pico fire (strike seen,
-            // cam2 dropped the frame) or never fire (no strike / arm window expired)?
+            // Session-scope wait: the player may take their time before swinging,
+            // so this tick does NOT tear the shot down for going idle. Each tick we
+            // keep the arm alive and poll the Pico's strike counter.
             const uint64_t now_count = PulseStrobe::PicoEventCount();
-            if (now_count > g_pico_event_count_at_arm) {
-                GS_LOG_MSG(error, "pico fired but cam2 dropped the frame (event_count " +
-                           std::to_string(g_pico_event_count_at_arm) + " -> " + std::to_string(now_count) + ")");
+
+            if (now_count <= g_pico_event_count_at_arm) {
+                // No strike yet -- the player simply hasn't swung. Ping the Pico so
+                // its auto-disarm deadline keeps moving out, and keep waiting. The
+                // repeating timer fires the next tick on its own.
+                PulseStrobe::PicoHeartbeat();
+                return ballHitState;
             }
-            else {
-                GS_LOG_MSG(error, "no strike detected before timeout (pico event_count still " +
-                           std::to_string(now_count) + ")");
+
+            // The Pico fired. The strobed cam2 frame should arrive as a
+            // Camera2ImageReceived almost immediately; give it a grace window
+            // (which also lets a frame event already queued behind this tick be
+            // processed) before concluding cam2 dropped it.
+            const auto now = std::chrono::steady_clock::now();
+            if (g_pico_strike_frame_deadline == std::chrono::steady_clock::time_point{}) {
+                g_pico_strike_frame_deadline = now + std::chrono::milliseconds(kPicoStrikeToFrameGraceMs);
+                GS_LOG_MSG(info, "pico strike detected (event_count " +
+                           std::to_string(g_pico_event_count_at_arm) + " -> " +
+                           std::to_string(now_count) + "); awaiting cam2 frame");
+                return ballHitState;
             }
+            if (now < g_pico_strike_frame_deadline) {
+                return ballHitState;  // still inside the grace window
+            }
+
+            GS_LOG_MSG(error, "pico fired but cam2 dropped the frame (event_count " +
+                       std::to_string(g_pico_event_count_at_arm) + " -> " +
+                       std::to_string(now_count) + ") -- restarting");
             PulseStrobe::DisarmPico();
         }
+        else {
+            // Legacy: the timer started only after the hit was detected, so a lapse
+            // here means cam2 genuinely failed to deliver. Restart.
+            GS_LOG_MSG(error, "BallHitNowWaitingForCam2Image - Timed out waiting for Cam2Image. Restarting...");
+        }
+
+        teardownCam2ImageReceivedCheckTimer();
 
         // Unblock cam2 if it is still parked in app.Wait() so it can be re-armed for
         // the next shot. (stop() would tear down the whole sim -- deliberately not that.)
@@ -784,12 +838,6 @@ namespace golf_sim {
         if (cam2_image_timeout_ms > 0) {
             kMaxCam2ImageReceivedTimeMs = cam2_image_timeout_ms;
         }
-        long pico_strike_timeout_ms = kMaxPicoStrikeWaitTimeMs;
-        GolfSimConfiguration::SetConstant("gs_config.ipc_interface.kMaxPicoStrikeWaitTimeMs", pico_strike_timeout_ms);
-        if (pico_strike_timeout_ms > 0) {
-            kMaxPicoStrikeWaitTimeMs = pico_strike_timeout_ms;
-        }
-
         GolfSimConfiguration::SetConstant("gs_config.user_interface.kWebServerCamera2Image", kWebServerCamera2Image);
         GolfSimConfiguration::SetConstant("gs_config.user_interface.kWebServerLastTeedBallImage", kWebServerLastTeedBallImage);        
         
@@ -871,6 +919,9 @@ namespace golf_sim {
                 // advances on a Restart event and nothing else re-queues one, so without this
                 // the FSM sits idle forever -- the "stuck on Confirming ball is stable" hang,
                 // since that was the last status we sent.
+                // If we threw mid-wait the keep-alive tick may still be running;
+                // stop it so it doesn't ping/poll into the reset.
+                teardownCam2ImageReceivedCheckTimer();
                 if (PulseStrobe::IsPicoActive()) {
                     // If we threw mid-shot the Pico may still be armed; a later noise
                     // transient would self-fire and strand us again. Disarm defensively.

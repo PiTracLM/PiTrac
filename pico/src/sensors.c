@@ -1,7 +1,11 @@
 #include "sensor.h"
 
+#include <stdarg.h>
 #include <stddef.h>
+#include <stdio.h>
 
+/* Trigger detectors. Mic (acoustic impact) is the only live one; optical is a
+ * template. sensors_step OR-combines fire flags, so any detector triggers. */
 extern const sensor_t g_sensor_mic;
 extern const sensor_t g_sensor_optical;
 
@@ -47,4 +51,13 @@ void sensors_selftest_append(char *buf, int buflen, int *cursor) {
             s_sensors[i]->selftest_append(buf, buflen, cursor);
         }
     }
+}
+
+void sensor_selftest_printf(char *buf, int buflen, int *cursor, const char *fmt, ...) {
+    if (buf == NULL || cursor == NULL || *cursor >= buflen) return;
+    va_list ap;
+    va_start(ap, fmt);
+    int k = vsnprintf(buf + *cursor, (size_t)(buflen - *cursor), fmt, ap);
+    va_end(ap);
+    if (k > 0) *cursor += k;
 }

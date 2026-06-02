@@ -1,7 +1,7 @@
 #ifndef PITRAC_PICO_INIT_STAGE_H
 #define PITRAC_PICO_INIT_STAGE_H
 
-#include <assert.h>
+#include "pico/assert.h"
 
 typedef enum {
     INIT_STAGE_NONE = 0,
@@ -21,7 +21,9 @@ typedef enum {
 extern volatile init_stage_t g_init_stage;
 
 static inline void init_stage_advance(init_stage_t expected, init_stage_t next) {
-    assert(g_init_stage == expected);
+    /* hard_assert, not assert: SDK Release builds NDEBUG, where assert()
+     * vanishes and this init-ordering guard with it. hard_assert survives NDEBUG. */
+    hard_assert(g_init_stage == expected);
     g_init_stage = next;
 }
 

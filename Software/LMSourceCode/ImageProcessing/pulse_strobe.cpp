@@ -44,24 +44,16 @@ namespace golf_sim {
 	std::vector<float>  PulseStrobe::pulse_intervals_slow_ms_;
 	int PulseStrobe::number_bits_for_slow_on_pulse_ = 0;
 
-	// Currently true for both Pi and InnoMaker cameras
-	// Should be set false if we are using the OG V1 Connector board,
-	// because that board would invert the external shutter signal (XTR)
-	// The new V2 board will not invert the XTR
+	// True for Pi and InnoMaker cameras. Set false only on the V1 Connector board,
+	// which inverts the external shutter (XTR) signal; V2 does not.
 	bool PulseStrobe::kUsingActiveHighTriggerCamera = true;
-
-	// The on-pulses for the tail repeat vector will be the same
-	// as the slow on pulses
-	std::vector<float>  PulseStrobe::pulse_intervals_tail_repeat_ms_;
 
 	char* PulseStrobe::camera_slow_pulse_sequence_ = nullptr;
 	char* PulseStrobe::camera_fast_pulse_sequence_ = nullptr;
 	char* PulseStrobe::no_pulse_camera_sequence_ = nullptr;
-	char* PulseStrobe::tail_repeat_pulse_sequence_ = nullptr;
 
 	unsigned long PulseStrobe::camera_fast_pulse_sequence_length_ = 0;
 	unsigned long PulseStrobe::camera_slow_pulse_sequence_length_ = 0;
-	unsigned long PulseStrobe::tail_repeat_sequence_length_ = 0;
 
 	int PulseStrobe::spiHandle_ = -1;
 	int PulseStrobe::lggpio_chip_handle_ = -1;
@@ -70,9 +62,8 @@ namespace golf_sim {
 	bool PulseStrobe::gpio_system_initialized_ = false;
 	std::unique_ptr<PicoStrobeClient> PulseStrobe::pico_client_;
 
-	// Logging hooks declared in pico_strobe_client.cpp; routed through the
-	// real LoggingTools so wire-level events land in pitrac.log. Test target
-	// stubs these out in test_pico_strobe_client.cpp.
+	// Hooks declared in pico_strobe_client.cpp; route wire-level events to
+	// pitrac.log. Test target stubs these out in test_pico_strobe_client.cpp.
 	void PicoLogTrace(const std::string& msg) {
 		GS_LOG_TRACE_MSG(trace, msg);
 	}
@@ -86,10 +77,9 @@ namespace golf_sim {
 
 	bool PulseStrobe::ArmPicoForShot() {
 		if (!pico_client_) return false;
-		// Select the club's strobe pattern before arming so the autonomous fire uses
-		// the putter vector on putts, not the driver default. This is the per-shot
-		// select the legacy SendCameraStrobeTriggerAndShutter path does -- which is
-		// gated off in Pico mode, so it has to happen here.
+		// Select the club's strobe pattern before arming so autonomous fire uses the
+		// putter vector on putts. The legacy SendCameraStrobeTriggerAndShutter does
+		// this per-shot, but it's gated off in Pico mode, so do it here.
 		const PicoStrobeClient::ClubProfile profile =
 			(GolfSimClubs::GetCurrentClubType() == GolfSimClubs::GsClubType::kPutter)
 				? PicoStrobeClient::ClubProfile::kPutter
@@ -97,11 +87,10 @@ namespace golf_sim {
 		if (!pico_client_->SelectClubProfile(profile)) {
 			GS_LOG_MSG(warning, "Pico club-profile select failed; arming on the previously-active strobe pattern");
 		}
-		// The firmware refuses to arm while the room is momentarily louder than
-		// threshold/4 (arm-quiet gate). Right after the ball is placed the player is
-		// still settling, so the first attempt often catches a transient. Retry over a
-		// couple of seconds to catch a quiet window -- this lets the threshold be set
-		// low enough to actually DETECT the (relatively quiet) strike yet still arm.
+		// Firmware refuses to arm while the room is louder than threshold/4 (arm-quiet
+		// gate). Right after ball placement the player is still settling, so retry for
+		// ~2s to catch a quiet window -- lets the threshold sit low enough to detect
+		// the quiet strike yet still arm.
 		constexpr int kArmAttempts = 12;
 		for (int attempt = 0; attempt < kArmAttempts; ++attempt) {
 			if (pico_client_->Arm()) {
@@ -119,6 +108,10 @@ namespace golf_sim {
 		return pico_client_ && pico_client_->Disarm();
 	}
 
+	bool PulseStrobe::PicoHeartbeat() {
+		return pico_client_ && pico_client_->Heartbeat();
+	}
+
 	uint64_t PulseStrobe::PicoEventCount() {
 		return pico_client_ ? pico_client_->LastEventCount() : 0;
 	}
@@ -133,12 +126,9 @@ namespace golf_sim {
 	int PulseStrobe::kPauseBeforeReadyForFinalPrimingPulseMs = 100;
 
 
-	int PulseStrobe::kLastPulsePutterRepeats = 5;
-	// Will be set when the pulse vector is set
-	unsigned long PulseStrobe::last_pulse_off_time;
 
-	// NOTE - lgpio library appears to use BCM pin numbering by default
-	const int kPulseTriggerOutputPin = 25;   // This is BCM GPIO25, pin 22
+	// lgpio uses BCM pin numbering by default
+	const int kPulseTriggerOutputPin = 25;   // BCM GPIO25, header pin 22
 	const int kRPi4GpioChipNumber = 0;
 	const int kRPi5GpioChipNumber = 4;
 	const int kRPi5SpiDeviceNumber = 0;
@@ -179,16 +169,14 @@ namespace golf_sim {
 									unsigned long& result_length,
 									bool turn_off_strobes) {
 
-		// TBD - All this setup needs to be done prior to the triggering so as not to waste time
+		// TBD - do this setup before triggering to avoid wasting time
 
-		// May need to alter the on-bits
 		int number_bits_for_on_pulse = number_bits_for_on_pulse_input;
 
 		double kBaudRatePulseMultiplier = 1.0;
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kBaudRatePulseMultiplier", kBaudRatePulseMultiplier);
 
-		// NOTE - The actual speed will depend on the clock speed of the
-		// Pi, which can vary unless you set force_turbo = 1 in boot/config
+		// Actual speed tracks the Pi clock, which varies unless force_turbo=1 in boot/config
 		const double bytesFor1000Ms = (baud_rate / 8.) * kBaudRatePulseMultiplier;
 		GS_LOG_TRACE_MSG(trace, "bytesFor1000Ms = " + std::to_string(bytesFor1000Ms));
 
@@ -196,24 +184,20 @@ namespace golf_sim {
 
 		bool kTakingOnePulsePicture = false;  // TBD - for debugging
 
-		// A '0' at the end of the pulse sequence just creates one last pause in the last 
-		// part of the sequence
+		// A trailing 0 in the sequence is just one final pause
 
 		LoggingTools::Trace("pulse_interval (may be fast or slow) vector is:", intervals);
 
 		static char buf[kMaxPulseBufferSize];
 
-		// Make sure the array is cleared initially to be safe
 		char* begin = &buf[0];
 		char* end = begin + sizeof(buf);
 		std::fill(begin, end, 0);
 
-		// For now, the pulse must be 8 bits or less, each bit being about 5 uS of 'on' time
-		// For example, 0b01111000 will be about a 20 uS pulse.
-		// The pulse pattern must start with the 'on' bits, e.g., 11....
+		// Pulse must be <= 8 bits, each bit ~5 uS of 'on' time (0b01111000 ~ 20 uS).
+		// Pattern must start with the 'on' bits, e.g. 11....
 
-		// NOTE -This value must be initialized to reflect the number of 0's on the
-		// right-hand side of the kPulseBitPatternInt, above.
+		// Must reflect the count of trailing 0's on the right of the pulse pattern.
 		int remainder_bits_from_prior_pulse = 8 - number_bits_for_on_pulse;
 
 		unsigned long current_byte = 0;
@@ -224,17 +208,14 @@ namespace golf_sim {
 			GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2AutoCalibrate ||
 			GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2BallLocation)) {
 
-			// Double the basic "on" pulse length, because we are only going to send one pulse
+			// Single pulse, so double its length, but cap at 15 to avoid over-saturating the ball
 			number_bits_for_on_pulse *= 2;
-			// Ensure the pulse is not so long that the ball will be over-saturated
 			number_bits_for_on_pulse = std::min(15, number_bits_for_on_pulse);
 			GS_LOG_TRACE_MSG(trace, "Due to still/calibration/locate mode, will send a pulse of length: " + std::to_string(number_bits_for_on_pulse));
 		}
 
-		// Invariant - current_byte is the index of the next unused byte in the buffer, and is
-		// equal to the length of the in-use buffer
+		// Invariant: current_byte indexes the next unused byte == in-use buffer length
 		for (float const& strobe_off_time_ms : intervals) {
-			// Determine the on and off bits to fill the next two bytes
 			unsigned char first_byte_bit_pattern, second_byte_bit_pattern;
 
 			remainder_bits_from_prior_pulse = GetNextTwoPulseBytes(next_pattern_zero_bits_pad, 
@@ -242,7 +223,7 @@ namespace golf_sim {
 																   first_byte_bit_pattern,
 																   second_byte_bit_pattern);
 
-			// Start with a short "on" pulse to turn on the strobe LED light
+			// Lead with a short "on" pulse to fire the strobe LED
 			if (turn_off_strobes) {
 				GS_LOG_TRACE_MSG(trace, "Creating a dummy pulse train with no strobe-on pulses");
 				buf[current_byte++] = 0;
@@ -257,10 +238,7 @@ namespace golf_sim {
 				GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kCamera2AutoCalibrate &&
 				GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kCamera2BallLocation) ) {
 
-				// Then, turn off the strobe for the specified number of milliseconds.
-
-				// Minus 1 for first pulse,  Plus 1 for the final strobe trigger.
-				// Note that we need to account for the actual on-pulse bits as well
+				// Strobe off for strobe_off_time_ms, less the prior pad and the on-pulse bits
 				long off_bits = (long)(std::round(((strobe_off_time_ms / 1000.0) * bytesFor1000Ms * 8.0)) - remainder_bits_from_prior_pulse) - number_bits_for_on_pulse;
 				if (off_bits < 0) {
 					off_bits = 0;
@@ -270,16 +248,15 @@ namespace golf_sim {
 
 				next_pattern_zero_bits_pad = off_bits - (one_pulse_cycle_length_bytes * 8);
 
-				// Fill in everything after the on-pulse (and its adjacent pad byte) with 0's
+				// Zero-fill everything after the on-pulse (and its pad byte)
 				for (int i = 0; i < one_pulse_cycle_length_bytes; i++) {
 					buf[current_byte++] = 0;
 				}
 			}
 			else
 			{
-				// If we want just a single, simple image, then we'll just send the strobe pulse 
-				// followed by a short additional amount of shutter-on time to make sure the 
-				// shutter pulse is not too short.
+				// Single image: one strobe pulse plus a little extra shutter-on time so
+				// the shutter pulse isn't too short.
 				buf[current_byte++] = 0;
 
 				GS_LOG_TRACE_MSG(trace, "Due to still/calibration/locate mode, will send only one pulse.");
@@ -295,7 +272,7 @@ namespace golf_sim {
 			}
 		}
 
-		// Round the size of the buffer up in order to end on an even word boundary
+		// Round buffer size up to an even word boundary
 		GS_LOG_TRACE_MSG(trace, "Initial buffer size at " + std::to_string(baud_rate) + " baud is " + std::to_string(current_byte) + " bytes.");
 		unsigned long final_buffer_size = AlignLengthToWordSize(current_byte, kBitsPerWord);
 		GS_LOG_TRACE_MSG(trace, "Final Buffer size is " + std::to_string(final_buffer_size) + " bytes.");
@@ -310,8 +287,6 @@ namespace golf_sim {
 		char* return_buffer = new char[result_length];
 		memcpy(return_buffer, buf, result_length);
 
-		last_pulse_off_time = (long)std::round(intervals.back());
-
 		return return_buffer;
 	}
 
@@ -324,7 +299,7 @@ namespace golf_sim {
 			return -1;
 		}
 
-		// Create the default, left-justified bit-pulse pattern
+		// Left-justified on-bit pattern
 		uint16_t next_bit_pattern = { 0b1000000000000000 };
 
 		for (int b = 0; b < number_bits_for_on_pulse - 1; b++) {
@@ -332,11 +307,10 @@ namespace golf_sim {
 			next_bit_pattern |= uint16_t(0b1000000000000000);
 		}
 
-		// Shift the on-bits to the right and fill in with the remaining 0 bits from the
-		// prior pulse sequence
+		// Shift on-bits right by the 0-bit pad left over from the prior pulse
 		next_bit_pattern >>= next_pattern_zero_bits_pad;
 
-		// TBD - Is this byte-ordering platform/architecture-independent??
+		// TBD - is this byte-ordering platform-independent?
 		uint16_t mask{ 0b0000000011111111 };
 		second_byte_bit_pattern = (unsigned char)(next_bit_pattern & mask);
 		uint16_t tmp_word = next_bit_pattern;
@@ -363,12 +337,9 @@ namespace golf_sim {
 			spiOpen_ = false;
 		}
 
-		// Approximate pulse lengths:
-		// 38,400       12uS
-		// lgGpioFlags consists of the least significant 22 bits.
-		// 21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
-		//  b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
-		//  bbbbbb defines the word size in bits (0-32). The default (0) sets 8 bits per word. Auxiliary SPI only.
+		// ~pulse length: 38,400 baud -> 12uS. lgGpioFlags = low 22 bits:
+		// 21..0 = bbbbbb R T nnnn W A u2 u1 u0 p2 p1 p0 m m
+		//  bbbbbb = word size in bits (0-32); 0 -> 8 bits/word. Auxiliary SPI only.
 		unsigned int lgSpiFlags = 0;
 
 		/*** DEPRECATED - WAS FOR PIGPIO
@@ -383,8 +354,7 @@ namespace golf_sim {
 
 		int spiDevice = 0;
 
-		// TBD - Setup flags to allow for multi-byte (32-bit) 
-		// transfers
+		// TBD - flags for multi-byte (32-bit) transfers
 		spi_handle = lgSpiOpen(kRPi5SpiDeviceNumber, kRPi5SpiDevChannel, baud, lgSpiFlags);
 
 		if (spi_handle < 0) {
@@ -407,22 +377,21 @@ namespace golf_sim {
 
 		if (pico_client_ && pico_client_->IsOpen()) {
 			if (send_no_strobes) return true;
-			// Fire the pattern that matches the club. The Pico keeps the last
-			// selected train, so this only re-sends config on a club change.
+			// Fire the club's pattern. Pico keeps the last selected train, so this
+			// only re-sends config on a club change.
 			const PicoStrobeClient::ClubProfile profile =
 				(GolfSimClubs::GetCurrentClubType() == GolfSimClubs::GsClubType::kPutter)
 					? PicoStrobeClient::ClubProfile::kPutter
 					: PicoStrobeClient::ClubProfile::kDriver;
-			// If the re-push fails the Pico is still holding the previously
-			// selected train, so the shot would fire on the wrong pattern. We
-			// still fire (losing the shot entirely is worse), but say so loudly.
+			// On re-push failure the Pico still holds the prior train, so the shot
+			// fires on the wrong pattern. Fire anyway (losing it is worse), loudly.
 			if (!pico_client_->SelectClubProfile(profile)) {
 				GS_LOG_MSG(warning, "Pico club-profile select failed; firing on the previously-active strobe pattern");
 			}
 			return pico_client_->FireWithShutter();
 		}
 
-		// The pulse sequence should have been pre-computed prior to calling this
+		// Pulse sequence must have been pre-computed before this call
 		unsigned long result_length = 0;
 		char* buf = 0;
 
@@ -450,7 +419,7 @@ namespace golf_sim {
 			return false;
 		}
 
-		// For putting mode, we need to wait a bit to ensure the ball is in the frame
+		// Putting mode: wait so the ball is in frame before triggering
 
 #ifdef __unix__  // Ignore in Windows environment
 
@@ -460,11 +429,8 @@ namespace golf_sim {
 		}
 
 
-		// Open shutter - 
-		// Note - the old V1 Connector Board  hardware will invert the signal to the XTR camera trigger
-
-		// Current cameras are active low, so the kOFF setting will open the
-		// shutter
+		// Open shutter. V1 Connector Board inverts the XTR trigger signal.
+		// Current cameras are active-low, so kOFF opens the shutter.
 		if (kUsingActiveHighTriggerCamera) {
 			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kOFF);
 		}
@@ -480,8 +446,7 @@ namespace golf_sim {
 			shutter_failure = true;
 		}
 
-		// Close shutter now that all of the strobe pulses should have been sent
-
+		// Close shutter now the strobe pulses are sent
 		if (kUsingActiveHighTriggerCamera) {
 			lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kON);
 		}
@@ -515,8 +480,7 @@ namespace golf_sim {
 
 		gpio_system_initialized_ = true;
 
-	        // If this is the non-camera1 process, then no need to further initialize the GPIO system, as the
-                // camera1 process would already have done so
+	        // Non-camera1 processes skip GPIO init; the camera1 process owns it.
                 if (GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kCamera1 &&
                     GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kCamera1TestStandalone &&
                     GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kTest &&
@@ -533,9 +497,8 @@ namespace golf_sim {
 
 #ifdef __unix__  // Ignore in Windows environment
 
-		// Skip GPIO hardware initialization in test mode - we only need pulse timing data
+		// Test mode needs only pulse timing, not GPIO hardware
 		if (GolfSimOptions::GetCommandLineOptions().system_mode_ != SystemMode::kTest) {
-			// Only initialize GPIO hardware for non-test modes
 			if (GolfSimConfiguration::GetPiModel() == GolfSimConfiguration::PiModel::kRPi5) {
 				lggpio_chip_handle_ = lgGpiochipOpen(kRPi5GpioChipNumber);
 			}
@@ -558,9 +521,8 @@ namespace golf_sim {
 				return false;
 			}
 
-			// PITRAC_PICO_ENABLED: "legacy" skips the Pico entirely; "required"
-			// fails loudly if the open fails; "auto" probes and falls through
-			// silently on miss.
+			// PITRAC_PICO_ENABLED: legacy=skip Pico, required=fail loudly on open
+			// failure, auto=probe and fall through on miss.
 			{
 				const char* gate_env = std::getenv("PITRAC_PICO_ENABLED");
 				std::string gate = gate_env ? gate_env : "auto";
@@ -580,27 +542,25 @@ namespace golf_sim {
 							GS_LOG_MSG(warning, "Pico probe succeeded but Open failed: " + device + " -- falling back to legacy strobe. cam2 will NOT trigger if its XTR is wired to the Pico.");
 						} else {
 							GS_LOG_MSG(trace, "PicoStrobeClient open on " + device);
-							// Pulse trains are staged below, once the per-club interval
-							// vectors and on-pulse widths have been loaded from config.
+							// Pulse trains staged below, after the per-club interval
+							// vectors and on-pulse widths load from config.
 						}
 					} else if (gate == "auto") {
-						// auto used to fall to legacy SILENTLY on a probe miss, which hid a
-						// mis-wired cam2 trigger for hours. Say it out loud.
+						// A silent legacy fallback on probe miss once hid a mis-wired
+						// cam2 trigger for hours. Say it out loud.
 						GS_LOG_MSG(warning, "PITRAC_PICO_ENABLED=auto but no Pico answered on " + device + " -- falling back to legacy strobe. cam2 will NOT trigger if its XTR is wired to the Pico.");
 					}
 				}
 			}
 
-			// The active-high setting will depend on which board the user sets
+			// Active-high setting depends on the configured board version
 			int kConnectionBoardVersionIntValue = 0;
 			GolfSimConfiguration::SetConstant("gs_config.strobing.kConnectionBoardVersion", kConnectionBoardVersionIntValue);
 			GolfSimConfiguration::ConnectionBoardType kConnectionBoardVersion = (GolfSimConfiguration::ConnectionBoardType)kConnectionBoardVersionIntValue;
 
-			// Set the static (class global) active high/low setting accordingly.
-			// The setting will be used throughout this class to invert (or not) the shutter signal
+			// Drives whether this class inverts the shutter signal; V1 board inverts.
 			kUsingActiveHighTriggerCamera = (kConnectionBoardVersion == GolfSimConfiguration::ConnectionBoardType::kVersion1_0) ? false : true;
 
-			// Note that the Connector Board will invert the shutter output
 			if (kUsingActiveHighTriggerCamera) {
 				GS_LOG_MSG(trace, "PulseStrobe::InitGPIOSystem - Will be using an active-HIGH camera");
 				lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kON);
@@ -610,7 +570,7 @@ namespace golf_sim {
 				lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kOFF);
 			}
 
-			// The cnclosure version will affect where the ball on the auto-calibration target is located relative to the cameras
+			// Enclosure version sets the auto-calibration target ball position relative to the cameras
 			int kEnclosureVersionIntValue = 0;
 			GolfSimConfiguration::SetConstant("gs_config.strobing.kEnclosureVersion", kEnclosureVersionIntValue);
 			GolfSimConfiguration::EnclosureType knclosureVersion = (GolfSimConfiguration::EnclosureType)kEnclosureVersionIntValue;
@@ -627,12 +587,11 @@ namespace golf_sim {
 		}
 
 #endif // #ifdef __unix__  // Ignore in Windows environment
-		// Pull the pulse intervals and strobe-on times from the JSON file each time to allow changes on the fly
+		// Re-read pulse intervals and strobe-on times from JSON each call for on-the-fly changes
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kStrobePulseVectorDriver", pulse_intervals_fast_ms_);
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kStrobePulseVectorPutter", pulse_intervals_slow_ms_);
-		GolfSimConfiguration::SetConstant("gs_config.strobing.kDynamicFollowOnPulseVectorPutter", pulse_intervals_tail_repeat_ms_);
 
-		// We generally want longer pulses in the optically-noisy comparison environment
+		// Longer pulses for the optically-noisy comparison environment
 		if (GolfSimOptions::GetCommandLineOptions().lm_comparison_mode_) {
 			GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvNumber_bits_for_fast_on_pulse_", number_bits_for_fast_on_pulse_);
 		}
@@ -647,9 +606,9 @@ namespace golf_sim {
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kBaudRateForFastPulses", kBaudRateForFastPulses);
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kBaudRateForSlowPulses", kBaudRateForSlowPulses);
 
-		// Stage both club pulse trains on the Pico from the configured
-		// vectors. SendCameraStrobeTriggerAndShutter then selects driver vs
-		// putter per shot, mirroring the legacy SPI fast/slow sequence pick.
+		// Stage both club pulse trains on the Pico from the configured vectors;
+		// SendCameraStrobeTriggerAndShutter picks driver vs putter per shot,
+		// mirroring the legacy SPI fast/slow pick.
 		if (pico_client_ && pico_client_->IsOpen()) {
 			const float driver_pulse_us =
 				(static_cast<float>(number_bits_for_fast_on_pulse_) / static_cast<float>(kBaudRateForFastPulses)) * 1e6f;
@@ -661,9 +620,14 @@ namespace golf_sim {
 				putter_pulse_us, pulse_intervals_slow_ms_);
 			pico_client_->SelectClubProfile(PicoStrobeClient::ClubProfile::kDriver);
 
-			// Push the operator's persisted DSP tuning so a power-cycled Pico self-recovers
-			// instead of arming on the compiled defaults (which may not clear the arm-quiet
-			// gate for this room). Values arrive via the LM env from gs_config.pico.*.
+			// Match the auto-disarm window to our heartbeat cadence: armed across the
+			// swing (FSM pings every kPicoHeartbeatIntervalMs) yet safety-disarms
+			// within kPicoArmTimeoutMs if the LM crashes mid-session.
+			pico_client_->SetArmTimeout(static_cast<uint32_t>(kPicoArmTimeoutMs));
+
+			// Push the operator's persisted DSP tuning so a power-cycled Pico recovers
+			// instead of arming on compiled defaults (may not clear the room's arm-quiet
+			// gate). Values arrive via the LM env from gs_config.pico.*.
 			if (const char* thr = std::getenv("PITRAC_PICO_MIC_THRESHOLD"); thr && *thr) {
 				try {
 					if (!pico_client_->SetMicThreshold(std::stoi(thr))) {
@@ -684,16 +648,13 @@ namespace golf_sim {
 			}
 		}
 
-		// Pre-compute the pulse sequences to save time later
+		// Pre-compute the pulse sequences to save time at trigger
 		GS_LOG_TRACE_MSG(trace, "Building Fast pulse sequence.");
 		camera_fast_pulse_sequence_ = PulseStrobe::BuildPulseTrain((unsigned long)kBaudRateForFastPulses, pulse_intervals_fast_ms_, number_bits_for_fast_on_pulse_,
 														kBitsPerWord, camera_fast_pulse_sequence_length_, false);
 		GS_LOG_TRACE_MSG(trace, "Building Slow pulse sequence.");
 		camera_slow_pulse_sequence_ = PulseStrobe::BuildPulseTrain((unsigned long)kBaudRateForSlowPulses, pulse_intervals_slow_ms_, number_bits_for_slow_on_pulse_,
 														kBitsPerWord, camera_slow_pulse_sequence_length_, false);
-		GS_LOG_TRACE_MSG(trace, "Building follow-on pulse sequence.");
-		tail_repeat_pulse_sequence_ = PulseStrobe::BuildPulseTrain((unsigned long)kBaudRateForSlowPulses, pulse_intervals_tail_repeat_ms_, number_bits_for_slow_on_pulse_,
-			kBitsPerWord, tail_repeat_sequence_length_, false);
 
 		if (camera_fast_pulse_sequence_ == nullptr || camera_slow_pulse_sequence_ == nullptr) {
 			GS_LOG_MSG(error, "Failed to build pulse sequences.");
@@ -707,8 +668,8 @@ namespace golf_sim {
 #ifdef __unix__  // Ignore in Windows environment
 		GS_LOG_TRACE_MSG(trace, "PulseStrobe::DeinitGPIOSystem.");
 
-		// Drop the Pico client first so its destructor closes the USB-CDC fd
-		// before we release the gpio chip it was using for the fast path.
+		// Drop the Pico client first: its destructor closes the USB-CDC fd before
+		// we release the gpio chip it shared for the fast path.
 		pico_client_.reset();
 
 		if (spiOpen_) {
@@ -730,8 +691,7 @@ namespace golf_sim {
 	void PulseStrobe::SendOnOffPulse(long length_us) {
 #ifdef __unix__  // Ignore in Windows environment
 
-		// Route the on/off pulse through the Pico when the bridge is up:
-		// it as a single CAM_PULSE command (firmware handles edge timing).
+		// When the bridge is up, send a single CAM_PULSE; firmware handles edge timing.
 		if (pico_client_ && pico_client_->IsOpen()) {
 			pico_client_->CamPulse(static_cast<uint32_t>(length_us));
 			return;
@@ -753,23 +713,21 @@ namespace golf_sim {
 
 #ifdef __unix__  // Ignore in Windows environment
 
-		// In Pico mode the Pico self-fires the strobe + cam2 trigger on the mic
-		// strike, so there is no legacy priming train to send. Skip the SPI open
-		// and the whole 9-state priming machine.
+		// In Pico mode the Pico self-fires strobe + cam2 trigger on the mic strike;
+		// no legacy priming train, so skip the SPI open and the priming machine.
 		if (IsPicoActive()) {
 			GS_LOG_TRACE_MSG(trace, "SendCameraPrimingPulses: Pico active -- skipping legacy priming pulses.");
 			return true;
 		}
 
-		// Re-establish putting delay each time to make it easier to adjust on the fly
+		// Re-read putting delay each call for on-the-fly tuning
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kPuttingStrobeDelayMs", kPuttingStrobeDelayMs);
 
-		// Make sure we are sending pulses at a known speed.  In this case, in the "fast" setting
+		// Prime at the "fast" baud
 		unsigned int baud_rate = 0;
 
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kBaudRateForFastPulses", baud_rate);
 
-		// This will determine how fast the later pulses are sent
 		spiHandle_ = OpenSpi(baud_rate, kBitsPerWord);
 
 		if (spiHandle_ < 0) {
@@ -782,8 +740,7 @@ namespace golf_sim {
 		usleep(200 * 1000);  // 200ms — pipeline pre-opened, just StartCamera + settle
 		GS_LOG_TRACE_MSG(trace, "Sending PRIMING pulses...");
 
-		// Generate a short low pulse (aka shutter speed) at a
-		// relatively low frame rate as priming pulses
+		// Priming pulses: short low pulse (shutter speed) at a low frame rate
 		const int kShutterSpeed = 100; // microseconds
 		const int kShutterOffset = 14; // uS
 
@@ -792,17 +749,15 @@ namespace golf_sim {
 		GS_LOG_TRACE_MSG(trace, "Priming Pulse kOffTimeWidth = " + std::to_string(kShutterSpeed));
 		GS_LOG_TRACE_MSG(trace, "Priming Pulse kOnTimeWidth =  " + std::to_string(kOnTimeWidth));
 
-		// Send the priming pulses
 		for (int i = 0; i < kNumberPrimingPulses; i++) {
 			GS_LOG_TRACE_MSG(trace, "Sent priming pulse");
 			SendOnOffPulse(kShutterSpeed - kShutterOffset);
 			usleep(kOnTimeWidth);
 
-			// If we are running an InnoMaker camera, the camera 2 system needs a moment
-			// to (re)setup the external trigger after the first image is received
+			// InnoMaker cam2 needs a moment to set up its external trigger once,
+			// after the first image post-start.
 			const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot2CameraType;
 
-			// The camera 2 system only needs to set up an InnoMaker camera external trigger once after the camera has started running
 			if (i == 0 && camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
 				GS_LOG_TRACE_MSG(trace, "Pausing for InnoMaker external trigger setup: " + std::to_string(kPauseToSetUpInnoMakerExternalTriggerMilliseconds) + " ms");
 				usleep(kPauseToSetUpInnoMakerExternalTriggerMilliseconds * 1000);
@@ -814,12 +769,12 @@ namespace golf_sim {
 
 		usleep(kPauseBeforeReadyForFinalPrimingPulseMs * 1000);
 
-		// This next priming pulses gets the camera2 state machine ready to take an actual image
+		// Gets the cam2 state machine ready to take a real image
 		SendOnOffPulse(kShutterSpeed - kShutterOffset);
 
 		GS_LOG_TRACE_MSG(trace, "Sent final priming pulse. Camera 2 should be primed at this point.");
 
-		// Deal with a pre-image exposure if we need to (mostly deprecated - didn't work well)
+		// Optional pre-image exposure (mostly deprecated - didn't work well)
 		GolfSimConfiguration::SetConstant("gs_config.ball_exposure_selection.kUsePreImageSubtraction", 
 												GolfSimCamera::kUsePreImageSubtraction);
 

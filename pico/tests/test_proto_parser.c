@@ -32,6 +32,14 @@ static void test_status_parses_correctly(void) {
     EXPECT(cmd.kind == CMD_STATUS, "STATUS kind");
 }
 
+static void test_heartbeat_parses_correctly(void) {
+    pitrac_cmd_t cmd;
+    char line[] = "HEARTBEAT";
+    bool ok = proto_parse_line(line, &cmd);
+    EXPECT(ok, "HEARTBEAT should parse");
+    EXPECT(cmd.kind == CMD_HEARTBEAT, "HEARTBEAT kind");
+}
+
 static void test_cfg_threshold_parses_value(void) {
     pitrac_cmd_t cmd;
     char line[] = "CFG MIC_THRESHOLD=8192";
@@ -131,7 +139,7 @@ static void test_cam_pulse_garbage_arg_invalid(void) {
 }
 
 static void test_cam_pulse_zero_parses_for_clamp_at_strobe_layer(void) {
-    /* Parser is permissive; bounds clamping happens in strobe_cam_pulse. */
+    /* Parser is permissive; clamping happens in strobe_cam_pulse. */
     pitrac_cmd_t cmd;
     char line[] = "CAM_PULSE 0";
     bool ok = proto_parse_line(line, &cmd);
@@ -186,9 +194,8 @@ static void test_cfg_stream_rms_clamped_to_max(void) {
 /* --- M4: interval-list validation --- */
 
 static void test_cfg_intervals_empty_list_rejected(void) {
-    /* An empty list is a false ACK: downstream re-applies current intervals
-     * unchanged and the host never finds out its CFG was a no-op. Reject it
-     * the same way PULSE_WIDTH_US=0 is rejected. */
+    /* Empty list is a false ACK: downstream keeps current intervals and the host
+     * can't tell its CFG was a no-op. Reject like PULSE_WIDTH_US=0. */
     pitrac_cmd_t cmd;
     char line[] = "CFG PULSE_INTERVALS=";
     bool ok = proto_parse_line(line, &cmd);
@@ -197,11 +204,9 @@ static void test_cfg_intervals_empty_list_rejected(void) {
 }
 
 static void test_cfg_intervals_overlong_list_rejected(void) {
-    /* Overlong list: parser must REJECT, not silently truncate.  Truncation
-     * leaves the host with no indication that it sent a bad payload. */
+    /* Overlong list must be rejected, not truncated — truncation hides the bad
+     * payload from the host. Literal has 33 values (STROBE_MAX_PULSES is 32). */
     pitrac_cmd_t cmd;
-    /* Build "CFG PULSE_INTERVALS=0.1,0.1,...,0.1" with STROBE_MAX_PULSES+1
-     * entries. The literal here has 33 values (STROBE_MAX_PULSES is 32). */
     char line[] =
         "CFG PULSE_INTERVALS="
         "0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,"  /* 8  */
@@ -215,8 +220,8 @@ static void test_cfg_intervals_overlong_list_rejected(void) {
 }
 
 static void test_cfg_intervals_out_of_range_rejected(void) {
-    /* Each interval must be in [0, STROBE_MAX_INTERVAL_MS].  Symmetry with
-     * the existing PULSE_WIDTH_US bound check at proto_parser.c:139. */
+    /* Each interval must be in [0, STROBE_MAX_INTERVAL_MS]; mirrors the
+     * PULSE_WIDTH_US bound check at proto_parser.c:139. */
     pitrac_cmd_t cmd;
     char line[] = "CFG PULSE_INTERVALS=0.7,1.8,9999.0";  /* 9999 >> 1000 ms max */
     bool ok = proto_parse_line(line, &cmd);
@@ -225,8 +230,7 @@ static void test_cfg_intervals_out_of_range_rejected(void) {
 }
 
 static void test_cfg_intervals_boundary_values_accepted(void) {
-    /* 0.0 (no delay, valid) and STROBE_MAX_INTERVAL_MS exactly must both pass.
-     * Mirrors how PULSE_WIDTH_US accepts values up to the max inclusive. */
+    /* 0.0 and STROBE_MAX_INTERVAL_MS are both inclusive-valid. */
     pitrac_cmd_t cmd;
     char line[] = "CFG PULSE_INTERVALS=0.0,1000.0";
     bool ok = proto_parse_line(line, &cmd);
@@ -238,8 +242,7 @@ static void test_cfg_intervals_boundary_values_accepted(void) {
 }
 
 static void test_cfg_intervals_exactly_max_pulses_accepted(void) {
-    /* STROBE_MAX_PULSES entries exactly must succeed — rejection should only
-     * trigger on count > STROBE_MAX_PULSES, not count == it. */
+    /* count == STROBE_MAX_PULSES must pass; rejection is only for count >. */
     pitrac_cmd_t cmd;
     char line[] =
         "CFG PULSE_INTERVALS="
@@ -273,6 +276,20 @@ static int mock_emit_log_calls = 0;
 static void mock_emit_log(const char *msg) {
     (void)msg;
     mock_emit_log_calls++;
+}
+
+static int mock_heartbeat_calls = 0;
+static void mock_heartbeat(void) { mock_heartbeat_calls++; }
+
+static void test_dispatcher_routes_heartbeat_to_vtable(void) {
+    /* HEARTBEAT reaches the vtable but stays silent — no LOG per ping. */
+    hw_driver_t hw = (hw_driver_t){ .heartbeat = mock_heartbeat, .emit_log = mock_emit_log };
+    mock_heartbeat_calls = 0;
+    mock_emit_log_calls = 0;
+    pitrac_cmd_t cmd = { .kind = CMD_HEARTBEAT };
+    cmd_dispatcher_apply(&cmd, &hw);
+    EXPECT(mock_heartbeat_calls == 1, "heartbeat called once");
+    EXPECT(mock_emit_log_calls == 0, "heartbeat emits no LOG");
 }
 
 static void test_dispatcher_routes_cam_pulse_to_vtable(void) {
@@ -320,10 +337,8 @@ static void mock_set_armed(bool a) {
 }
 
 static void test_arm_refused_when_rms_exceeds_int32(void) {
-    /* A loud strike pushes the mic's mean-square RMS past INT32_MAX. If the
-     * gate narrowed it to int32 it would wrap negative and sail under the quiet
-     * ceiling, arming on a noisy room. With the chain int64, the comparison
-     * holds and the arm is refused. */
+    /* RMS past INT32_MAX: a narrowing int32 cast wraps negative and sails under
+     * the quiet ceiling (arms a noisy room). int64 chain holds, arm refused. */
     hw_driver_t hw = (hw_driver_t){
         .current_rms = mock_current_rms,
         .get_threshold = mock_get_threshold,
@@ -362,9 +377,8 @@ static void test_arm_allowed_when_quiet(void) {
 }
 
 static void test_dispatcher_cmd_none_is_silent_noop(void) {
-    /* A whitespace-only or empty line parses to CMD_NONE. The dispatcher must
-     * not bark "invalid command" at an honest no-op (regression: it used to
-     * share the CMD_INVALID arm). */
+    /* Blank line parses to CMD_NONE; must not log "invalid command"
+     * (regression: it once shared the CMD_INVALID arm). */
     hw_driver_t hw = (hw_driver_t){ .emit_log = mock_emit_log };
     mock_emit_log_calls = 0;
     pitrac_cmd_t cmd = { .kind = CMD_NONE };
@@ -373,7 +387,7 @@ static void test_dispatcher_cmd_none_is_silent_noop(void) {
 }
 
 static void test_dispatcher_cmd_invalid_still_logs(void) {
-    /* The flip side: a genuinely bad command must still surface a LOG line. */
+    /* Flip side: a genuinely bad command must still surface a LOG line. */
     hw_driver_t hw = (hw_driver_t){ .emit_log = mock_emit_log };
     mock_emit_log_calls = 0;
     pitrac_cmd_t cmd = { .kind = CMD_INVALID };
@@ -382,8 +396,7 @@ static void test_dispatcher_cmd_invalid_still_logs(void) {
 }
 
 static void test_whitespace_line_parses_to_cmd_none(void) {
-    /* End-to-end: the parser turns a blank/whitespace line into CMD_NONE so
-     * the silent-noop path above is the one that fires. */
+    /* Parser turns a whitespace line into CMD_NONE (feeds the silent-noop path). */
     pitrac_cmd_t cmd;
     char line[] = "   ";
     bool ok = proto_parse_line(line, &cmd);
@@ -394,6 +407,7 @@ static void test_whitespace_line_parses_to_cmd_none(void) {
 int main(void) {
     test_fire_parses_correctly();
     test_status_parses_correctly();
+    test_heartbeat_parses_correctly();
     test_cfg_threshold_parses_value();
     test_cfg_pulse_width_in_range();
     test_cfg_pulse_width_out_of_range_rejected();
@@ -412,6 +426,7 @@ int main(void) {
     test_cfg_stream_rms_zero_stops();
     test_cfg_stream_rms_in_range();
     test_cfg_stream_rms_clamped_to_max();
+    test_dispatcher_routes_heartbeat_to_vtable();
     test_dispatcher_routes_cam_pulse_to_vtable();
     test_dispatcher_routes_stream_rms_to_vtable();
     test_dispatcher_cmd_none_is_silent_noop();
@@ -429,6 +444,6 @@ int main(void) {
         printf("%d failure(s)\n", failures);
         return 1;
     }
-    printf("%d tests passed\n", 32);
+    printf("%d tests passed\n", 34);
     return 0;
 }

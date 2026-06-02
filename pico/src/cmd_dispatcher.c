@@ -32,10 +32,9 @@ void cmd_dispatcher_apply(const pitrac_cmd_t *c, const hw_driver_t *hw) {
 
     case CMD_CFG_ARMED:
         if (c->u.armed) {
-            /* Refuse arm if the decay tail of a recent noise event would
-             * re-trigger us immediately. Kept entirely in int64 — the mic RMS
-             * is a mean-square energy that runs past INT32_MAX on a loud room,
-             * and narrowing either side here would wrap the comparison. */
+            /* Refuse arm if room RMS is still above the quiet ceiling (a recent
+             * noise tail would re-trigger). int64 throughout: mic mean-square
+             * RMS runs past INT32_MAX on a loud room and would wrap if narrowed. */
             int64_t now_rms = hw->current_rms();
             int64_t quiet_ceiling = (int64_t)hw->get_threshold() / DSP_ARM_QUIET_FACTOR;
             if (now_rms > quiet_ceiling) {
@@ -106,6 +105,12 @@ void cmd_dispatcher_apply(const pitrac_cmd_t *c, const hw_driver_t *hw) {
         hw->request_fire_peak();
         break;
 
+    case CMD_HEARTBEAT:
+        /* No LOG reply: host pings ~1 Hz while armed. core 0 refreshes the
+         * deadline only if armed. */
+        hw->heartbeat();
+        break;
+
     case CMD_STATUS:
         hw->emit_status();
         break;
@@ -125,9 +130,7 @@ void cmd_dispatcher_apply(const pitrac_cmd_t *c, const hw_driver_t *hw) {
         break;
 
     case CMD_NONE:
-        /* Empty or whitespace-only line — the host sent nothing actionable
-         * (a stray newline, a blank keep-alive). Silently ignore it rather
-         * than barking "invalid command" at an honest no-op. */
+        /* Blank/whitespace-only line: ignore silently, don't flag as invalid. */
         break;
 
     case CMD_INVALID:

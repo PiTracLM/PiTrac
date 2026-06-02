@@ -3,8 +3,7 @@
  * Copyright (C) 2022-2025, Verdant Consultants, LLC.
  */
 
-// Represents a vector of timed pulses used for strobing in the system
-// also contains a number related helper methods.
+// Timed-pulse strobe vector plus helpers.
 
 #pragma once
 
@@ -41,9 +40,7 @@ namespace golf_sim {
 		static bool InitGPIOSystem(GsSignalCallback callback_function = nullptr);
 		static bool DeinitGPIOSystem();
 
-		// Example output:
-		//	    pulse sequence:  { 3,      5,       11,      15,       20,   0 }
-		//      ratio sequence:  {    1.67,    2.2       2.5      1.33         }
+		// e.g. pulse { 3, 5, 11, 15, 20, 0 } -> ratio { 1.67, 2.2, 2.5, 1.33 }
 		static std::vector<double> GetPulseRatios();
 
 		// Caller owns the byte buffer that is returned
@@ -62,29 +59,33 @@ namespace golf_sim {
 		static bool SendCameraPrimingPulses(bool use_high_speed);
 		static bool SendExternalTrigger();
 
-		// Pico autonomous-trigger bridge. When the Pico is open it owns the
-		// strobe + cam2 external trigger, so the legacy SPI/BCM fire paths stand
-		// down and the FSM arms-and-waits instead. These forward to pico_client_
-		// (which is protected) so callers outside PulseStrobe don't reach in.
+		// Pico autonomous-trigger bridge. When open, the Pico owns the strobe +
+		// cam2 external trigger; legacy SPI/BCM fire paths stand down and the FSM
+		// arms-and-waits. Forward to the protected pico_client_.
 		static bool IsPicoActive();
 		static bool ArmPicoForShot();
 		static bool DisarmPico();
 		static uint64_t PicoEventCount();
 
-		// Sends the already-created pulse buffer to the strobes via SPI, and also
-		// opens the shutter while the pulses are sent.
-		// requires the camera_fast_pulse_sequence_ to have already been created by
-		// the BuildPulseTrain function.
-		// send_no_strobes can be set to true in order to get a "before" or "pre" image
-		// that shows just the ambient light.
+		// Pushes out the Pico's auto-disarm deadline so the arm lives as long as
+		// the LM does, not on a fixed per-shot timer.
+		static bool PicoHeartbeat();
+
+		// Firmware auto-disarms kPicoArmTimeoutMs after the last Arm()/Heartbeat();
+		// FSM pings every kPicoHeartbeatIntervalMs. Interval << timeout so one
+		// dropped ping won't trip the safety disarm, but a dead LM still disarms.
+		static constexpr long kPicoHeartbeatIntervalMs = 1000;
+		static constexpr long kPicoArmTimeoutMs = 3000;
+
+		// Sends the pre-built pulse buffer via SPI and holds the shutter open for
+		// its duration. Requires camera_fast_pulse_sequence_ built by BuildPulseTrain.
+		// send_no_strobes=true yields an ambient-only "pre" image.
 		static bool SendCameraStrobeTriggerAndShutter(int spiHandle, bool send_no_strobes = false);
 
-		// Returns a handle to the now - open SPI channel,
-		// or a negative value on failure
+		// Returns the open SPI handle, negative on failure.
 		static int OpenSpi(const unsigned int baud, int wordSizeBits = 8);
 
-		// Deprecated, but keep around for now...
-
+		// Deprecated, kept for now.
 		static bool SendCameraSpiPrimingPulses();
 
 		static bool SendSpiMsg(const unsigned int baud,
@@ -100,49 +101,35 @@ namespace golf_sim {
 
 		static bool kRecordAllImages;
 
-		// Cleared by cam2's event loop on entry, set true once it exits the
-		// priming/quiesce window. gs_fsm waits on this before arming cam1 so
-		// a fast hit can't fire the trigger while cam2 is still ignoring it.
+		// Cleared by cam2's event loop on entry, set once it exits the
+		// priming/quiesce window. gs_fsm waits on this before arming cam1 so a fast
+		// hit can't fire the trigger while cam2 is still ignoring it.
 		static std::atomic<bool> cam2_ready_for_final_trigger_;
 
 	protected:
 
-		// This vector describes the amount of time to send 0's after sending a strobe
-		// pulse.  The last pulse should be of size 0 to ensure the pulse sequence ends
-		// with the pulse turned OFF.
-		// Should be setup in the BuildPulseTrain function
-		// Pulse intervals must be > 0.0 for all but the last pulse
+		// Off-time (ms) after each strobe pulse; built in BuildPulseTrain. Last entry
+		// must be 0 so the sequence ends strobe-OFF; all others must be > 0.0.
 		static std::vector<float> pulse_intervals_fast_ms_;
 		static std::vector<float> pulse_intervals_slow_ms_;
-		static std::vector<float> pulse_intervals_tail_repeat_ms_;
 
 		static int number_bits_for_fast_on_pulse_;
 		static int number_bits_for_slow_on_pulse_;
 
-		// This is the buffer that will be written out (bit-banged) to the SPI channel
+		// Buffers bit-banged out to the SPI channel
 		static char* camera_slow_pulse_sequence_;
 		static char* camera_fast_pulse_sequence_;
-		static char* no_pulse_camera_sequence_;  // Will be all 0's, but the same length as the 'real' pulse sequence
+		static char* no_pulse_camera_sequence_;  // all 0's, same length as the real sequence
 		static unsigned long camera_fast_pulse_sequence_length_;
 		static unsigned long camera_slow_pulse_sequence_length_;
-
-		static char* tail_repeat_pulse_sequence_;
-		static unsigned long tail_repeat_sequence_length_;
 
 		static int spiHandle_;
 		static bool spiOpen_;
 		static int lggpio_chip_handle_;
 
-		// Pico bridge. When non-null and open, the strobe trigger + on/off
-		// pulse paths short-circuit through USB-CDC + BCM 26 instead of the
-		// legacy SPI + GPIO 10 path.
+		// When non-null and open, strobe trigger + on/off pulse paths route through
+		// USB-CDC + BCM 26 instead of the legacy SPI + GPIO 10 path.
 		static std::unique_ptr<PicoStrobeClient> pico_client_;
-
-
-		// The number of times the last (usually quite long pulse-off interval)
-		// will be repeated after the earlier part of the pulse pattern
-		static int kLastPulsePutterRepeats;
-		static unsigned long last_pulse_off_time;
 
 		static int AlignLengthToWordSize(int initialBufferLength, int wordSizeBits);
 	};

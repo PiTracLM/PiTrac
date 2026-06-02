@@ -8,9 +8,8 @@
 
 #include "pico_strobe_client.h"
 
-// Stub the PicoLogTrace / PicoLogWarn hooks that pico_strobe_client.cpp
-// forward-declares. Production links real implementations from pulse_strobe.cpp
-// which route through LoggingTools; the test target stays Boost.Log-free.
+// Stub the log hooks pico_strobe_client.cpp forward-declares; keeps the test
+// target Boost.Log-free (production links the real ones from pulse_strobe.cpp).
 #include <string>
 namespace golf_sim {
     void PicoLogTrace(const std::string&) {}
@@ -42,8 +41,7 @@ static std::string DrainHost(int fd, int settle_ms = 50) {
     return out;
 }
 
-// Returns the host-side fd of a connected pair. The other end is handed to the
-// client via AttachFd().
+// host fd stays here; client fd is handed to PicoStrobeClient via AttachFd().
 struct SocketPair {
     int host = -1;
     int client = -1;
@@ -56,8 +54,7 @@ struct SocketPair {
     }
 
     ~SocketPair() {
-        if (host >= 0) ::close(host);
-        // client fd is owned by the PicoStrobeClient once attached.
+        if (host >= 0) ::close(host);  // client fd owned by PicoStrobeClient once attached
     }
 };
 
@@ -70,8 +67,7 @@ BOOST_AUTO_TEST_CASE(attach_fd_marks_open) {
 
 BOOST_AUTO_TEST_CASE(open_dev_null_fails_cleanly) {
     PicoStrobeClient client;
-    // /dev/null is openable but tcsetattr() does not apply to it; Open() must
-    // detect this, clean up, and return false without crashing.
+    // /dev/null opens but tcsetattr() rejects it; Open() must clean up and fail.
     BOOST_CHECK(!client.Open("/dev/null"));
     BOOST_CHECK(!client.IsOpen());
 }
@@ -95,14 +91,12 @@ BOOST_AUTO_TEST_CASE(read_status_parses_firmware_reply) {
     PicoStrobeClient client;
     BOOST_REQUIRE(client.AttachFd(pair.client));
 
-    // Make the host side non-blocking so DrainHost terminates.
+    // Non-blocking host side so DrainHost terminates.
     int flags = ::fcntl(pair.host, F_GETFL, 0);
     ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
 
-    // Prime the host side with the canned reply BEFORE the client reads.
-    // The client first writes "STATUS\n" then reads one line back.
+    // Reply after a short delay so the client's STATUS write lands first.
     std::thread responder([&]() {
-        // Wait briefly so the client's STATUS write lands first.
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
         const char reply[] =
             "STATUS armed=0 threshold=4096 pulse_us=8.68 "
@@ -124,13 +118,11 @@ BOOST_AUTO_TEST_CASE(read_status_parses_firmware_reply) {
     BOOST_CHECK_EQUAL(status.strobe_hold, true);
     BOOST_CHECK(status.fw_version.empty());  // fw= not in fw 0.3.0 STATUS
 
-    // Confirm the client wrote "STATUS\n".
     std::string host_in = DrainHost(pair.host, 10);
     BOOST_CHECK_EQUAL(host_in, "STATUS\n");
 }
 
-// Writes the canned STATUS reply after a short delay so the client's own
-// writes land first, mirroring read_status_parses_firmware_reply.
+// Writes the STATUS reply after a delay so the client's own writes land first.
 static std::thread RespondStatus(int host_fd, const std::string& line) {
     return std::thread([host_fd, line]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
@@ -156,9 +148,8 @@ BOOST_AUTO_TEST_CASE(arm_succeeds_when_firmware_echoes_armed) {
 }
 
 BOOST_AUTO_TEST_CASE(arm_succeeds_when_log_ack_precedes_status) {
-    // Real firmware emits its "LOG armed" CFG-ack AHEAD of the STATUS reply.
-    // ReadStatus must skip the LOG line and read the STATUS line; otherwise every
-    // arm verify false-negatives and the cam2 capture path restart-loops. Regression.
+    // Firmware emits its "LOG armed" ack ahead of STATUS; ReadStatus must skip
+    // the LOG line or every arm verify false-negatives and cam2 restart-loops. Regression.
     SocketPair pair;
     PicoStrobeClient client;
     BOOST_REQUIRE(client.AttachFd(pair.client));
@@ -174,8 +165,8 @@ BOOST_AUTO_TEST_CASE(arm_succeeds_when_log_ack_precedes_status) {
 }
 
 BOOST_AUTO_TEST_CASE(set_mic_threshold_succeeds_when_log_ack_precedes_status) {
-    // "LOG threshold updated" lands before the STATUS echo; the verify must skip it
-    // and still read threshold=8000 rather than choking on the LOG line.
+    // "LOG threshold updated" lands before the STATUS echo; verify must skip it
+    // and still read threshold=8000.
     SocketPair pair;
     PicoStrobeClient client;
     BOOST_REQUIRE(client.AttachFd(pair.client));
@@ -197,7 +188,7 @@ BOOST_AUTO_TEST_CASE(arm_fails_when_firmware_refuses) {
     int flags = ::fcntl(pair.host, F_GETFL, 0);
     ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
 
-    // Firmware ignored the arm (room too loud) — STATUS still reports armed=0.
+    // Arm ignored (room too loud) — STATUS still reports armed=0.
     std::thread responder = RespondStatus(pair.host, "STATUS armed=0 threshold=4096 fw=0.6.1\n");
     bool ok = client.Arm();
     responder.join();
@@ -252,7 +243,7 @@ BOOST_AUTO_TEST_CASE(last_event_count_returns_parsed_value) {
     responder.join();
 
     BOOST_CHECK_EQUAL(count, 42ull);
-    // LastEventCount must query live, so a STATUS line should have gone out.
+    // LastEventCount queries live, so a STATUS line must have gone out.
     std::string host_in = DrainHost(pair.host, 10);
     BOOST_CHECK(host_in.find("STATUS\n") != std::string::npos);
 }
@@ -315,7 +306,7 @@ BOOST_AUTO_TEST_CASE(set_mic_threshold_fails_on_echo_mismatch) {
     int flags = ::fcntl(pair.host, F_GETFL, 0);
     ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
 
-    // Firmware reports a different threshold than requested -> not accepted.
+    // Echoed threshold differs from requested -> rejected.
     std::thread responder = RespondStatus(pair.host, "STATUS armed=0 threshold=4096 fw=0.6.1\n");
     bool ok = client.SetMicThreshold(8000);
     responder.join();
@@ -355,7 +346,7 @@ BOOST_AUTO_TEST_CASE(read_status_parses_decay_confirm) {
     BOOST_CHECK_EQUAL(status.decay_confirm_ms, 12u);
 }
 
-BOOST_AUTO_TEST_CASE(send_pulse_config_writes_both_lines) {
+BOOST_AUTO_TEST_CASE(send_pulse_config_writes_both_lines_and_echo_verifies) {
     SocketPair pair;
     PicoStrobeClient client;
     BOOST_REQUIRE(client.AttachFd(pair.client));
@@ -363,12 +354,41 @@ BOOST_AUTO_TEST_CASE(send_pulse_config_writes_both_lines) {
     int flags = ::fcntl(pair.host, F_GETFL, 0);
     ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
 
-    BOOST_REQUIRE(client.SendPulseConfig(8.68f, {0.7f, 1.8f, 3.0f, 0.0f}));
+    // Firmware echoes the train back via STATUS at %.2f, so verify passes.
+    std::thread responder([&]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        const char reply[] =
+            "STATUS armed=0 pulse_us=8.68 intervals=0.70,1.80,3.00,0.00\n";
+        ::write(pair.host, reply, sizeof(reply) - 1);
+    });
+    bool ok = client.SendPulseConfig(8.68f, {0.7f, 1.8f, 3.0f, 0.0f});
+    responder.join();
+    BOOST_CHECK(ok);
 
-    std::string wire = DrainHost(pair.host, 30);
-    BOOST_CHECK_EQUAL(wire,
-        "CFG PULSE_WIDTH_US=8.680\n"
-        "CFG PULSE_INTERVALS=0.700,1.800,3.000,0.000\n");
+    std::string wire = DrainHost(pair.host, 10);
+    BOOST_CHECK(wire.find("CFG PULSE_WIDTH_US=8.680\n") != std::string::npos);
+    BOOST_CHECK(wire.find("CFG PULSE_INTERVALS=0.700,1.800,3.000,0.000\n") != std::string::npos);
+    BOOST_CHECK(wire.find("STATUS\n") != std::string::npos);  // round-trips to verify
+}
+
+BOOST_AUTO_TEST_CASE(send_pulse_config_fails_when_firmware_echo_mismatches) {
+    SocketPair pair;
+    PicoStrobeClient client;
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    // Firmware kept a different vector — must fail so SelectClubProfile won't
+    // mark the club active on a discarded config.
+    std::thread responder([&]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        const char reply[] = "STATUS armed=0 pulse_us=8.68 intervals=9.90,9.90\n";
+        ::write(pair.host, reply, sizeof(reply) - 1);
+    });
+    bool ok = client.SendPulseConfig(8.68f, {0.7f, 1.8f, 3.0f, 0.0f});
+    responder.join();
+    BOOST_CHECK(!ok);
 }
 
 BOOST_AUTO_TEST_CASE(hold_on_writes_strobe_hold_1) {
@@ -393,6 +413,35 @@ BOOST_AUTO_TEST_CASE(hold_off_writes_strobe_hold_0) {
 
     BOOST_REQUIRE(client.HoldOff());
     BOOST_CHECK_EQUAL(DrainHost(pair.host, 20), "CFG STROBE_HOLD=0\n");
+}
+
+BOOST_AUTO_TEST_CASE(heartbeat_writes_bare_keepalive_line) {
+    SocketPair pair;
+    PicoStrobeClient client;
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    BOOST_REQUIRE(client.Heartbeat());
+    BOOST_CHECK_EQUAL(DrainHost(pair.host, 20), "HEARTBEAT\n");
+}
+
+BOOST_AUTO_TEST_CASE(heartbeat_fails_when_closed) {
+    PicoStrobeClient client;
+    BOOST_CHECK(!client.Heartbeat());
+}
+
+BOOST_AUTO_TEST_CASE(set_arm_timeout_writes_cfg_line) {
+    SocketPair pair;
+    PicoStrobeClient client;
+    BOOST_REQUIRE(client.AttachFd(pair.client));
+
+    int flags = ::fcntl(pair.host, F_GETFL, 0);
+    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
+
+    BOOST_REQUIRE(client.SetArmTimeout(3000));
+    BOOST_CHECK_EQUAL(DrainHost(pair.host, 20), "CFG ARM_TIMEOUT_MS=3000\n");
 }
 
 BOOST_AUTO_TEST_CASE(cam_pulse_writes_decimal_microseconds) {
@@ -420,12 +469,12 @@ BOOST_AUTO_TEST_CASE(fire_with_shutter_falls_back_to_usb_cdc_without_gpio) {
     BOOST_CHECK_EQUAL(DrainHost(pair.host, 20), "FIRE\n");
 }
 
-// With a chip handle present, FireWithShutter must drive BCM 26 high then low
-// through the injected writer rather than writing "FIRE" to the CDC stream. This
-// exercises the production low-latency path without needing real lgpio hardware.
+// With a chip handle present, FireWithShutter drives BCM 26 high/low via the
+// injected writer instead of writing "FIRE" to CDC — exercises the low-latency
+// path without real lgpio hardware.
 BOOST_AUTO_TEST_CASE(fire_with_shutter_pulses_gpio_when_handle_present) {
     SocketPair pair;
-    PicoStrobeClient client(7);  // any non-negative chip handle selects the fast path
+    PicoStrobeClient client(7);  // any non-negative handle selects the fast path
     BOOST_REQUIRE(client.AttachFd(pair.client));
 
     int flags = ::fcntl(pair.host, F_GETFL, 0);
@@ -446,14 +495,13 @@ BOOST_AUTO_TEST_CASE(fire_with_shutter_pulses_gpio_when_handle_present) {
     BOOST_CHECK_EQUAL(writes[1].first, 26);   // BCM 26 low
     BOOST_CHECK_EQUAL(writes[1].second, 0);
 
-    // Nothing should have leaked onto the CDC wire on the fast path.
+    // Fast path must not leak onto the CDC wire.
     BOOST_CHECK_EQUAL(DrainHost(pair.host, 20), "");
 }
 
-// Both club profiles are pre-staged once; SelectClubProfile then re-pushes the
-// matching pulse width + interval vector only when the club actually changes.
-// This is the branch SendCameraStrobeTriggerAndShutter relies on so a putt fires
-// the putter pattern instead of the driver pattern.
+// SelectClubProfile re-pushes the staged pulse width + interval vector only on
+// an actual club change — the branch SendCameraStrobeTriggerAndShutter relies on
+// so a putt fires the putter pattern, not the driver's.
 BOOST_AUTO_TEST_CASE(select_club_profile_pushes_matching_vector_on_change) {
     SocketPair pair;
     PicoStrobeClient client;
@@ -467,19 +515,37 @@ BOOST_AUTO_TEST_CASE(select_club_profile_pushes_matching_vector_on_change) {
     client.StageClubProfile(PicoStrobeClient::ClubProfile::kPutter,
                             12.5f, {1.1f, 2.4f, 5.0f, 0.0f});
 
-    // First driver selection pushes the driver config.
-    BOOST_REQUIRE(client.SelectClubProfile(PicoStrobeClient::ClubProfile::kDriver));
-    BOOST_CHECK_EQUAL(DrainHost(pair.host, 30),
-        "CFG PULSE_WIDTH_US=8.680\n"
-        "CFG PULSE_INTERVALS=0.700,1.800,3.000,0.000\n");
+    // First driver selection pushes + echo-verifies; feed a matching STATUS.
+    {
+        std::thread r([&]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            const char reply[] =
+                "STATUS armed=0 pulse_us=8.68 intervals=0.70,1.80,3.00,0.00\n";
+            ::write(pair.host, reply, sizeof(reply) - 1);
+        });
+        BOOST_REQUIRE(client.SelectClubProfile(PicoStrobeClient::ClubProfile::kDriver));
+        r.join();
+        std::string wire = DrainHost(pair.host, 10);
+        BOOST_CHECK(wire.find("CFG PULSE_WIDTH_US=8.680\n") != std::string::npos);
+        BOOST_CHECK(wire.find("CFG PULSE_INTERVALS=0.700,1.800,3.000,0.000\n") != std::string::npos);
+    }
 
-    // Re-selecting the same club is a no-op on the wire.
+    // Re-selecting the same club is a no-op on the wire (no push, no echo).
     BOOST_REQUIRE(client.SelectClubProfile(PicoStrobeClient::ClubProfile::kDriver));
     BOOST_CHECK_EQUAL(DrainHost(pair.host, 20), "");
 
-    // Switching to the putter pushes the putter config.
-    BOOST_REQUIRE(client.SelectClubProfile(PicoStrobeClient::ClubProfile::kPutter));
-    BOOST_CHECK_EQUAL(DrainHost(pair.host, 30),
-        "CFG PULSE_WIDTH_US=12.500\n"
-        "CFG PULSE_INTERVALS=1.100,2.400,5.000,0.000\n");
+    // Switching to the putter pushes + echo-verifies the putter config.
+    {
+        std::thread r([&]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            const char reply[] =
+                "STATUS armed=0 pulse_us=12.50 intervals=1.10,2.40,5.00,0.00\n";
+            ::write(pair.host, reply, sizeof(reply) - 1);
+        });
+        BOOST_REQUIRE(client.SelectClubProfile(PicoStrobeClient::ClubProfile::kPutter));
+        r.join();
+        std::string wire = DrainHost(pair.host, 10);
+        BOOST_CHECK(wire.find("CFG PULSE_WIDTH_US=12.500\n") != std::string::npos);
+        BOOST_CHECK(wire.find("CFG PULSE_INTERVALS=1.100,2.400,5.000,0.000\n") != std::string::npos);
+    }
 }

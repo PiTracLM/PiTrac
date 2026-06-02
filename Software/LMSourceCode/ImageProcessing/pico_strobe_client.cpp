@@ -6,6 +6,7 @@
 #include "pico_strobe_client.h"
 
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <iomanip>
@@ -14,8 +15,8 @@
 #include <thread>
 #include <utility>
 
-// Logging hooks. Production-linked from pulse_strobe.cpp (LoggingTools); the
-// test target supplies stubs so it doesn't pull Boost.Log.
+// Logging hooks: production links these from pulse_strobe.cpp (LoggingTools);
+// the test target stubs them to avoid pulling Boost.Log.
 namespace golf_sim {
 void PicoLogTrace(const std::string& msg);
 void PicoLogWarn(const std::string& msg);
@@ -52,16 +53,14 @@ struct PicoStrobeClient::Impl {
 
     GpioWriteFn gpio_writer;
 
-    // Serializes every CDC transaction (a WriteLine plus its STATUS echo read). The FSM
-    // thread (Arm/Disarm/PicoEventCount) and the cam2 thread (CamPulse warm-up) share this
-    // one fd; without serialization their request/response lines interleave and the
-    // echo-verify reads the wrong reply. Recursive because the verified setters (Arm,
-    // Disarm, SetMicThreshold, SelectClubProfile, ...) lock and then call ReadStatus /
-    // SendPulseConfig, which lock again on the same thread.
+    // Serializes every CDC transaction (WriteLine + its STATUS echo read). The FSM thread
+    // (Arm/Disarm/PicoEventCount) and the cam2 thread (CamPulse warm-up) share one fd;
+    // without this their request/response lines interleave and echo-verify reads the wrong
+    // reply. Recursive: verified setters (Arm, SetMicThreshold, SelectClubProfile, ...)
+    // lock then call ReadStatus / SendPulseConfig, which lock again on the same thread.
     std::recursive_mutex io_mutex;
 
-    // -1 means nothing has been pushed yet, so the first SelectClubProfile of
-    // either profile always writes.
+    // -1 = nothing pushed yet, so the first SelectClubProfile always writes.
     int active_profile = -1;
 
     struct StagedConfig {
@@ -72,23 +71,21 @@ struct PicoStrobeClient::Impl {
     StagedConfig driver;
     StagedConfig putter;
 
-    // Bytes pulled off the fd that have not yet been handed back as a complete line.
-    // The Pico multiplexes ONE USB-CDC text stream: solicited replies (STATUS ...,
-    // SELFTEST ...) interleaved with unsolicited async lines (LOG <ack/error>, EVENT
-    // <telemetry>). Linux cdc-acm delivers an undelimited byte stream -- USB packet
-    // boundaries are NOT line boundaries -- so a single read() routinely returns several
-    // lines at once (a CFG's "LOG ..." ack immediately ahead of the "STATUS ..." reply)
-    // and lines can span reads. We MUST buffer here and reassemble; assuming one read()
-    // == one line silently dropped every line past the first newline and stalled the
-    // STATUS demux. Cleared on flush/open/close so it tracks a tcflush of the OS buffer.
+    // fd bytes not yet handed back as a complete line. The Pico multiplexes ONE USB-CDC
+    // text stream: solicited replies (STATUS ..., SELFTEST ...) interleaved with async
+    // lines (LOG <ack/error>, EVENT <telemetry>). cdc-acm delivers an undelimited byte
+    // stream -- USB packet boundaries are NOT line boundaries -- so one read() routinely
+    // returns several lines (a CFG's "LOG ..." ack ahead of the "STATUS ..." reply) and
+    // lines span reads. Must buffer and reassemble; the one-read()==one-line assumption
+    // dropped every line past the first newline and stalled the STATUS demux. Cleared on
+    // flush/open/close to track a tcflush of the OS buffer.
     std::string rx_buf;
 
     bool WriteLine(const std::string& line);
     bool ReadLineWithTimeout(std::string& out, int timeout_ms);
-    // Demux the single channel: return the next SOLICITED reply beginning with `prefix`
-    // within one TOTAL deadline, surfacing (not dropping) any async LOG/EVENT lines that
-    // arrive ahead of it. The firmware emits STATUS only on demand, so the next matching
-    // line is the reply.
+    // Return the next solicited reply beginning with `prefix` within one TOTAL deadline,
+    // surfacing (not dropping) async LOG/EVENT lines that arrive ahead of it. STATUS is
+    // emitted only on demand, so the next matching line is the reply.
     bool ReadSolicitedReply(const char* prefix, int timeout_ms, std::string& out);
 };
 
@@ -121,8 +118,7 @@ bool PicoStrobeClient::Probe(const std::string& device_path) {
     PicoStatus s;
     bool ok = probe.ReadStatus(s);
     probe.Close();
-    // Reply must start with "STATUS " which is sufficient to distinguish the
-    // PiTrac Pico from any other CDC device that happens to be listening.
+    // A "STATUS " reply distinguishes the PiTrac Pico from any other CDC device.
     return ok;
 }
 
@@ -180,9 +176,9 @@ bool PicoStrobeClient::AttachFd(int fd) {
     std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (impl_->fd >= 0) ::close(impl_->fd);
     impl_->fd = fd;
-    // Match what Open() produces: a non-blocking fd. ReadLineWithTimeout relies on read()
-    // returning EAGAIN to honour its deadline -- a blocking fd would wedge the demux
-    // waiting for a line that never comes (this seam adopts a raw fd, e.g. a test socket).
+    // Force non-blocking like Open() does: ReadLineWithTimeout needs read() to return
+    // EAGAIN to honour its deadline -- a blocking fd (e.g. a raw test socket) would
+    // wedge the demux waiting for a line that never comes.
     int fl = ::fcntl(fd, F_GETFL, 0);
     if (fl >= 0) { ::fcntl(fd, F_SETFL, fl | O_NONBLOCK); }
     impl_->rx_buf.clear();
@@ -204,7 +200,30 @@ bool PicoStrobeClient::SendPulseConfig(float pulse_width_us,
         if (i > 0) iv << ',';
         iv << intervals_ms[i];
     }
-    return impl_->WriteLine(iv.str());
+    if (!impl_->WriteLine(iv.str())) return false;
+
+    // Echo-verify both took. A bare write returned true even when the firmware rejected
+    // the train (bad/overlong vector) and kept the previous one -- SelectClubProfile would
+    // then mark the club active and fire the wrong club's pattern. STATUS reports pulse_us
+    // and intervals at %.2f, so compare with rounding slack.
+    PicoStatus st;
+    if (!ReadStatus(st)) return false;
+    constexpr float kEchoTolMs = 0.02f;
+    if (std::fabs(st.pulse_width_us - pulse_width_us) > kEchoTolMs) {
+        PicoLogWarn("PicoStrobeClient::SendPulseConfig: pulse width not echoed by firmware");
+        return false;
+    }
+    if (st.intervals.size() != intervals_ms.size()) {
+        PicoLogWarn("PicoStrobeClient::SendPulseConfig: interval count not echoed by firmware");
+        return false;
+    }
+    for (size_t i = 0; i < intervals_ms.size(); ++i) {
+        if (std::fabs(st.intervals[i] - intervals_ms[i]) > kEchoTolMs) {
+            PicoLogWarn("PicoStrobeClient::SendPulseConfig: intervals not echoed by firmware");
+            return false;
+        }
+    }
+    return true;
 }
 
 bool PicoStrobeClient::CamPulse(uint32_t microseconds) {
@@ -224,10 +243,9 @@ bool PicoStrobeClient::FireWithShutter() {
         return impl_->WriteLine("FIRE");
     }
 
-    // Fast path: pulse BCM 26 HIGH then LOW. Pico GP9 IRQ catches the rising edge.
+    // Pulse BCM 26 HIGH then LOW; Pico GP9 IRQ catches the rising edge.
     impl_->gpio_writer(impl_->gpio_handle, kPicoFirePin, 1);
-    // Few-microsecond busy-loop: lgGpioWrite already takes microseconds, but a
-    // short hold guarantees the rising edge is visible even with USB-CDC slack.
+    // Short hold so the rising edge stays visible despite USB-CDC slack.
     for (int spin = 0; spin < 50; ++spin) {
         asm volatile("" : : : "memory");
     }
@@ -303,6 +321,20 @@ bool PicoStrobeClient::Disarm() {
     return !st.armed;
 }
 
+bool PicoStrobeClient::SetArmTimeout(uint32_t ms) {
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
+    if (!IsOpen()) return false;
+    // Blind write -- STATUS does not echo the timeout; firmware clamps to range.
+    return impl_->WriteLine("CFG ARM_TIMEOUT_MS=" + std::to_string(ms));
+}
+
+bool PicoStrobeClient::Heartbeat() {
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
+    if (!IsOpen()) return false;
+    // Fire-and-forget: firmware refreshes its deadline silently (no LOG/STATUS).
+    return impl_->WriteLine("HEARTBEAT");
+}
+
 bool PicoStrobeClient::SetMicThreshold(int32_t threshold) {
     std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (!IsOpen()) return false;
@@ -331,21 +363,19 @@ uint64_t PicoStrobeClient::LastEventCount() {
 bool PicoStrobeClient::ReadStatus(PicoStatus& out) {
     std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (!IsOpen()) return false;
-    // Drop stale/unsolicited bytes (a boot banner, a prior CFG's LOG ack, a partial
-    // line) before asking, so the first read after a fresh CDC connect returns THIS
-    // STATUS reply rather than a leftover line -- otherwise the echo-verify in
-    // Arm/SetMicThreshold/etc. false-negatives on the first contact. Mirrors the
-    // Python side's reset_input_buffer(); a no-op (harmless) on the test socket fd.
+    // Drop stale bytes (boot banner, prior CFG's LOG ack, partial line) before asking, so
+    // the first read after a fresh CDC connect returns THIS reply, not a leftover -- else
+    // echo-verify in Arm/SetMicThreshold/etc. false-negatives on first contact. Mirrors the
+    // Python reset_input_buffer(); harmless no-op on the test socket fd.
     if (impl_->fd >= 0) { ::tcflush(impl_->fd, TCIFLUSH); }
-    impl_->rx_buf.clear();  // tcflush drops the OS input buffer; drop our software one too.
+    impl_->rx_buf.clear();  // tcflush drops the OS buffer; drop our software buffer too.
     if (!impl_->WriteLine("STATUS")) return false;
 
-    // A CFG command sent just before STATUS (Arm, SetMicThreshold, SetDecayConfirm)
-    // lands its "LOG <ack>" / "LOG error: ..." ahead of the reply, and an EVENT strike
-    // can arrive at any time -- ReadSolicitedReply skips those async lines (logging them
-    // rather than dropping them) and returns the STATUS reply, all under one bounded
-    // deadline. (The old loop polled 32 x 1000ms PER line, so a single dropped/absent
-    // line could stall it ~32s; now it is a single total timeout.)
+    // A preceding CFG (Arm, SetMicThreshold, SetDecayConfirm) lands its "LOG <ack>" /
+    // "LOG error: ..." ahead of the reply, and an EVENT strike can arrive any time --
+    // ReadSolicitedReply logs+skips those async lines and returns the STATUS reply under
+    // one bounded deadline. (Old loop polled 32x1000ms PER line, so one missing line
+    // stalled ~32s; now a single total timeout.)
     constexpr const char* kPrefix = "STATUS ";
     constexpr int kReplyTimeoutMs = 1500;
     std::string line;
@@ -372,6 +402,20 @@ bool PicoStrobeClient::ReadStatus(PicoStatus& out) {
                 out.decay_confirm_ms = static_cast<uint32_t>(std::stoul(val));
             } else if (key == "event_count") {
                 out.event_count = static_cast<uint64_t>(std::stoull(val));
+            } else if (key == "intervals") {
+                // CSV pulse-gap vector, e.g. "0.70,1.80,3.00,0.00"; parsed for
+                // SendPulseConfig's echo-verify.
+                out.intervals.clear();
+                std::stringstream ivss(val);
+                std::string field;
+                while (std::getline(ivss, field, ',')) {
+                    if (field.empty()) continue;
+                    try {
+                        out.intervals.push_back(std::stof(field));
+                    } catch (const std::exception&) {
+                        // Skip a malformed token, don't fail the parse.
+                    }
+                }
             } else if (key == "strobe_hold") {
                 out.strobe_hold = ParseBoolDigit(val);
             } else if (key == "fw") {
@@ -379,7 +423,7 @@ bool PicoStrobeClient::ReadStatus(PicoStatus& out) {
             }
             // Unknown keys are tolerated.
         } catch (const std::exception&) {
-            // Skip malformed values; do not fail the whole parse.
+            // Skip a malformed value, don't fail the parse.
         }
     }
     return true;
@@ -416,9 +460,9 @@ bool PicoStrobeClient::Impl::WriteLine(const std::string& line) {
 bool PicoStrobeClient::Impl::ReadLineWithTimeout(std::string& out, int timeout_ms) {
     out.clear();
 
-    // Hand back a line already sitting in rx_buf from a previous read first -- a single
-    // read() can deliver several lines, and the trailing ones must survive to the next
-    // call (the bug this fixes: they were discarded, stalling the STATUS demux).
+    // Drain any line already buffered from a prior read first -- one read() can deliver
+    // several lines and the trailing ones must survive to the next call (the bug this
+    // fixes: they were discarded, stalling the STATUS demux).
     auto take_buffered_line = [&]() -> bool {
         auto nl = rx_buf.find('\n');
         if (nl == std::string::npos) return false;
@@ -464,9 +508,8 @@ bool PicoStrobeClient::Impl::ReadSolicitedReply(const char* prefix, int timeout_
             out = std::move(line);
             return true;
         }
-        // Unsolicited async line (LOG ack/error, EVENT strike/telemetry) landed ahead of
-        // the reply. Surface it so it is observable rather than black-holed, then keep
-        // waiting for the solicited reply within the same deadline.
+        // Async line (LOG ack/error, EVENT strike/telemetry) ahead of the reply: surface
+        // it rather than black-hole it, then keep waiting within the same deadline.
         if (!line.empty()) {
             PicoLogTrace("PicoStrobeClient <- (async) " + line);
         }
