@@ -515,6 +515,8 @@ class PiTracServer:
             """Stop the PiTrac launch monitor process"""
             result = await self.pitrac_manager.stop()
             logger.info(f"PiTrac stop request: {result}")
+            if result.get("status") == "stopped":
+                self.session_repo.close_open(datetime.now().isoformat())
             return result
 
         @self.app.post("/api/pitrac/restart")

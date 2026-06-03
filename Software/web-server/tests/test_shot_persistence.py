@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import AsyncMock
 
 
 def make_hit_payload(shot_id=1717236000123):
@@ -43,3 +44,14 @@ class TestShotPersistence:
         del payload["images"]
         client.post("/api/internal/shot-result", json=payload)
         assert server_instance.session_repo.list()[0]["shot_count"] == 1
+
+    def test_stop_closes_open_session(self, client, server_instance):
+        client.post("/api/internal/shot-result", json=make_hit_payload())
+        assert server_instance.session_repo.list()[0]["ended_at"] is None
+
+        server_instance.pitrac_manager.stop = AsyncMock(
+            return_value={"status": "stopped"}
+        )
+        client.post("/api/pitrac/stop")
+
+        assert server_instance.session_repo.list()[0]["ended_at"] is not None
