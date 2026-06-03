@@ -12,6 +12,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 os.environ["TESTING"] = "true"
 
+import tempfile
+os.environ.setdefault("PITRAC_DB_PATH", str(Path(tempfile.mkdtemp()) / "import-time.db"))
+
 from models import ShotData
 from managers import ConnectionManager, ShotDataStore
 from parsers import ShotDataParser
@@ -24,8 +27,10 @@ from utils.test_helpers import ShotDataHelper
 
 
 @pytest.fixture
-def server_instance():
+def server_instance(monkeypatch, tmp_path):
     """Create PiTracServer instance with mocked dependencies"""
+    import server as server_module
+    monkeypatch.setattr(server_module, "DB_PATH", tmp_path / "test.db")
     server = PiTracServer()
     server.shutdown_flag = False
     return server

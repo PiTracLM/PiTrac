@@ -17,9 +17,12 @@ from calibration_manager import CalibrationManager
 from camera_detector import CameraDetector
 from config_manager import ConfigurationManager
 from constants import (
+    DB_PATH,
     IMAGES_DIR,
     MPS_TO_MPH,
 )
+from db.database import Database
+from db.repositories import SessionRepository, ShotRepository
 from managers import ConnectionManager, ShotDataStore
 from models import ShotData
 from parsers import ShotDataParser
@@ -186,6 +189,11 @@ class PiTracServer:
         self.strobe_calibration_manager = StrobeCalibrationManager(self.config_manager)
         self.update_manager = UpdateManager()
         self.update_manager.set_broadcast_callback(self.connection_manager.broadcast)
+        self.db = Database(DB_PATH)
+        self.session_repo = SessionRepository(self.db)
+        self.shot_repo = ShotRepository(self.db)
+        metadata = self.config_manager.load_configurations_metadata()
+        self.session_timeout_minutes = metadata.get("storage", {}).get("sessionTimeoutMinutes", {}).get("default", 30)
         self.shutdown_flag = False
         self.background_tasks: set[asyncio.Task] = set()
         self._active_cameras: Dict[int, str] = {}  # camera_index -> endpoint name
@@ -292,6 +300,12 @@ class PiTracServer:
                     message=message,
                     timestamp=datetime.now().isoformat(),
                 )
+                shot_data.shot_id = body.get("shot_id")
+                shot_data.images = list(body.get("images", []))
+                if result_type_str == "Hit":
+                    shot_id = shot_data.shot_id or int(datetime.now().timestamp() * 1000)
+                    images = [(Path(p).stem, p) for p in shot_data.images]
+                    await asyncio.to_thread(self._persist_shot, shot_id, shot_data, images)
 
             self.shot_store.update(shot_data)
             await self.connection_manager.broadcast(shot_data.to_dict())
@@ -1343,6 +1357,10 @@ class PiTracServer:
             if not hasattr(self.testing_manager, "completed_results"):
                 self.testing_manager.completed_results = {}
             self.testing_manager.completed_results[tool_id] = {"status": "error", "message": str(e)}
+
+    def _persist_shot(self, shot_id, shot_data, images):
+        session_id = self.session_repo.ensure_open(shot_data.timestamp, self.session_timeout_minutes)
+        self.shot_repo.add(shot_id, session_id, shot_data, images)
 
     async def shutdown_event(self) -> None:
         logger.info("Shutting down PiTrac Web Server...")

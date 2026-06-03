@@ -150,6 +150,22 @@
       "internal": true
     }
   },
+  "storage": {
+    "sessionTimeoutMinutes": {
+      "displayName": "Session Timeout Minutes",
+      "description": "Minutes of inactivity before a new session starts",
+      "type": "number",
+      "default": 30,
+      "internal": true
+    },
+    "imageStorageCapMB": {
+      "displayName": "Image Storage Cap MB",
+      "description": "Maximum disk space for stored shot images",
+      "type": "number",
+      "default": 5000,
+      "internal": true
+    }
+  },
   "environmentDefaults": {
     "ldLibraryPath": {
       "displayName": "LD Library Path",
