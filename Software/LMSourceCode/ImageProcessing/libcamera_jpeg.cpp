@@ -122,8 +122,17 @@ static void PicoWarmUpSensor(LibcameraJpegApp& app, int pulses, long pulse_width
 		}
 		app.DrainMessages();  // non-blocking: drop the readout frame, keep the buffer pool free
 	}
-	app.DrainMessages();
-	GS_LOG_TRACE_MSG(trace, "Pico warm-up complete (" + std::to_string(pulses) + " XTR pulses on a timer).");
+	// Settle: the final pulse's readout is still in flight, and in a lit room it is NOT black
+	// -- the mean<1 discard guard won't catch it, so the armed wait would grab it as the
+	// strike (capturing a pre-strike frame, which the FSM then drops -- leaving cam2's one-shot
+	// capture spent and nothing to catch the real hit). Drain across a short window so every
+	// trailing warm-up frame is gone; in trigger mode nothing new can arrive until the real
+	// strike's XTR, so this can't eat the actual shot.
+	for (int s = 0; s < 4 && gs::GolfSimGlobals::golf_sim_running_; ++s) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(50));
+		app.DrainMessages();
+	}
+	GS_LOG_TRACE_MSG(trace, "Pico warm-up complete (" + std::to_string(pulses) + " XTR pulses on a timer; pipeline settled).");
 }
 
 // Run the triggered capture event loop on an already-opened camera.
