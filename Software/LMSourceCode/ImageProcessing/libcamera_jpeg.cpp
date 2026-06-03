@@ -107,19 +107,23 @@ void SetExternalTrigger(bool& flag) {
 // via the Pico's CAM_PULSE) a handful of times and drain the readout frames so the
 // real strike lands on a sensor that is actually integrating light.
 static void PicoWarmUpSensor(LibcameraJpegApp& app, int pulses, long pulse_width_us) {
+	// Fire the XTR pulses on a timer, exactly like the legacy priming train
+	// (SendCameraPrimingPulses). NEVER block on a per-pulse frame: a cold IMX296 emits no
+	// frame until it has had several quick external triggers, so the old wait-per-pulse
+	// (app.Wait() here) deadlocked on the very first pulse when the sensor was cold -- one
+	// CAM_PULSE, then a 60s hang. DrainMessages() is just msg_queue_.Clear(), so it drops
+	// the warm-up readouts and frees their buffers without blocking.
+	const long inter_pulse_us =
+		(long)(1000000.0 / gs::PulseStrobe::kPrimingPulseFPS) - pulse_width_us;
 	for (int i = 0; i < pulses && gs::GolfSimGlobals::golf_sim_running_; ++i) {
 		gs::PulseStrobe::SendOnOffPulse(pulse_width_us);  // -> Pico CAM_PULSE: XTR low/high, no strobe
-		RPiCamApp::Msg msg = app.Wait();                  // drain the (free-running) frame
-		if (msg.type == RPiCamApp::MsgType::RequestComplete) {
-			// Hold the request only long enough for its buffers to re-queue; the
-			// (cold/black) warm-up frame is intentionally discarded.
-			CompletedRequestPtr& discard = std::get<CompletedRequestPtr>(msg.payload);
-			(void)discard;
-		} else if (msg.type != RPiCamApp::MsgType::Timeout) {
-			break;  // Quit / unexpected -- let the main loop handle it.
+		if (inter_pulse_us > 0) {
+			std::this_thread::sleep_for(std::chrono::microseconds(inter_pulse_us));
 		}
+		app.DrainMessages();  // non-blocking: drop the readout frame, keep the buffer pool free
 	}
-	GS_LOG_TRACE_MSG(trace, "Pico warm-up complete (" + std::to_string(pulses) + " XTR pulses).");
+	app.DrainMessages();
+	GS_LOG_TRACE_MSG(trace, "Pico warm-up complete (" + std::to_string(pulses) + " XTR pulses on a timer).");
 }
 
 // Run the triggered capture event loop on an already-opened camera.

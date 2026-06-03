@@ -344,12 +344,13 @@ namespace golf_sim {
         }
 
         // Don't advance to "ready to hit" until cam2 is actually warmed and idle on the
-        // trigger -- its first triggered frame can take 10-25s, and arming the Pico before
-        // then lets a hit land while cam2 still can't catch it. Hold the UI on "stable"
-        // meanwhile; golf_sim_running_ lets a Stop break the wait.
+        // trigger -- arming the Pico before then lets a hit land while cam2 still can't catch
+        // it. The priming-burst warm-up makes cam2 ready in ~1s, so this is normally a brief
+        // hold on "stable"; the cap is just a safety net if the sensor ever wedges.
+        // golf_sim_running_ lets a Stop break the wait.
         {
             GsUISystem::SendIPCStatusMessage(GsIPCResultType::kPausingForBallStabilization);
-            constexpr int kCam2WarmupTimeoutMs = 60000;
+            constexpr int kCam2WarmupTimeoutMs = 15000;
             const auto wait_deadline = std::chrono::steady_clock::now()
                                        + std::chrono::milliseconds(kCam2WarmupTimeoutMs);
             while (!PulseStrobe::cam2_ready_for_final_trigger_.load() &&
