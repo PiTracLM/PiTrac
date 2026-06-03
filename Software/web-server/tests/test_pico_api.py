@@ -215,3 +215,56 @@ class TestFlashEndpoint:
         assert called is False
 
 
+class TestLmStartReleasesRmsStream:
+    """The LM drives the Pico over the same CDC port, so /api/pitrac/start and
+    /restart must tear down the mic stream BEFORE launching the LM -- otherwise a
+    trailing EVENT RMS line poisons the LM's STATUS handshake into legacy fallback."""
+
+    def test_start_stops_rms_stream_before_launching_lm(self, server_instance, client):
+        server_instance.strobe_calibration_manager.is_strobe_safe = MagicMock(
+            return_value={"safe": True}
+        )
+        order = []
+        server_instance.pico_manager.stop_rms_stream = AsyncMock(
+            side_effect=lambda *a, **k: order.append("stop_rms")
+        )
+        server_instance.pitrac_manager.start = AsyncMock(
+            side_effect=lambda *a, **k: (order.append("start_lm"), {"status": "started"})[1]
+        )
+
+        resp = client.post("/api/pitrac/start")
+        assert resp.status_code == 200
+        server_instance.pico_manager.stop_rms_stream.assert_awaited_once()
+        server_instance.pitrac_manager.start.assert_awaited_once()
+        assert order == ["stop_rms", "start_lm"]
+
+    def test_restart_stops_rms_stream_before_relaunching_lm(self, server_instance, client):
+        server_instance.strobe_calibration_manager.is_strobe_safe = MagicMock(
+            return_value={"safe": True}
+        )
+        order = []
+        server_instance.pico_manager.stop_rms_stream = AsyncMock(
+            side_effect=lambda *a, **k: order.append("stop_rms")
+        )
+        server_instance.pitrac_manager.restart = AsyncMock(
+            side_effect=lambda *a, **k: (order.append("restart_lm"), {"status": "restarted"})[1]
+        )
+
+        resp = client.post("/api/pitrac/restart")
+        assert resp.status_code == 200
+        server_instance.pico_manager.stop_rms_stream.assert_awaited_once()
+        server_instance.pitrac_manager.restart.assert_awaited_once()
+        assert order == ["stop_rms", "restart_lm"]
+
+    def test_start_blocked_by_unsafe_strobe_leaves_stream_alone(self, server_instance, client):
+        server_instance.strobe_calibration_manager.is_strobe_safe = MagicMock(
+            return_value={"safe": False, "reason": "strobe live"}
+        )
+        server_instance.pico_manager.stop_rms_stream = AsyncMock()
+        server_instance.pitrac_manager.start = AsyncMock()
+
+        resp = client.post("/api/pitrac/start")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "error"
+        server_instance.pico_manager.stop_rms_stream.assert_not_awaited()
+        server_instance.pitrac_manager.start.assert_not_awaited()

@@ -634,6 +634,10 @@ class PiTracServer:
                 return {"status": "error", "message": safety["reason"]}
             if refusal := self._testing_tool_refusal():
                 return refusal
+            # The LM drives the Pico over the same CDC port. Tear down the /pico mic
+            # stream first (and wait for it) so a trailing EVENT RMS line can't poison
+            # the LM's STATUS handshake into the silent legacy-strobe fallback.
+            await self.pico_manager.stop_rms_stream()
             result = await self.pitrac_manager.start()
             logger.info(f"PiTrac start request: {result}")
             return result
@@ -655,6 +659,8 @@ class PiTracServer:
                 return {"status": "error", "message": safety["reason"]}
             if refusal := self._testing_tool_refusal():
                 return refusal
+            # Same port handoff as start: release the mic stream before the LM reclaims it.
+            await self.pico_manager.stop_rms_stream()
             result = await self.pitrac_manager.restart()
             logger.info(f"PiTrac restart request: {result}")
             return result
