@@ -229,6 +229,7 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	std::thread pico_warmup_thread;
 	std::chrono::steady_clock::time_point pico_quiesce_start{};
 	bool pico_quiesce_done = false;
+	uint64_t pico_event_baseline = 0;
 	if (pico_mode) {
 		int warm_up_pulses = gs::PulseStrobe::kNumberPrimingPulses;
 		if (warm_up_pulses < 6) {
@@ -322,9 +323,29 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 				// Quiesce window elapsed: cam2 is warm and the pipeline is quiet. Let the FSM
 				// arm the Pico (it waits on this flag); the NEXT frame is the real strike.
 				pico_quiesce_done = true;
+				pico_event_baseline = gs::PulseStrobe::PicoEventCount();
 				gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
-				GS_LOG_TRACE_MSG(trace, "Pico: quiesce window complete -- cam2 armed, waiting for the real strike.");
+				GS_LOG_TRACE_MSG(trace, "Pico: quiesce complete -- cam2 armed (fire-count baseline " +
+					std::to_string(pico_event_baseline) + "), waiting for the Pico to fire.");
 				break;
+			}
+
+			// Capture ONLY when the Pico has actually fired. Its strike advances event_count
+			// (the firmware emits an EVENT + bumps the counter on every fire, once the strobe
+			// train drains). Any frame whose fire-count is still the arming baseline is a
+			// cold-start warm-up straggler, NOT the strike -- ignore it and keep waiting. This
+			// is the real strike signal, not a brightness or timing guess.
+			if (pico_mode) {
+				const uint64_t fire_count = gs::PulseStrobe::PicoEventCount();
+				if (fire_count <= pico_event_baseline) {
+					GS_LOG_TRACE_MSG(trace, "Pico: pre-fire frame (count " + std::to_string(fire_count) +
+						" == baseline " + std::to_string(pico_event_baseline) + ") -- ignoring, waiting for the strike.");
+					CompletedRequestPtr& discard = std::get<CompletedRequestPtr>(msg.payload);
+					(void)discard;
+					break;
+				}
+				GS_LOG_MSG(info, "Pico: strike fired (count " + std::to_string(fire_count) + " > baseline " +
+					std::to_string(pico_event_baseline) + ") -- capturing the strobed image.");
 			}
 
 			GS_LOG_TRACE_MSG(trace, "Received Final Image Trigger - capturing strobed image.");
