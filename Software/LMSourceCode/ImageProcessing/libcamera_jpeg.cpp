@@ -98,21 +98,13 @@ void SetExternalTrigger(bool& flag) {
 	}
 }
 
-// In Pico autonomous mode the strike is a single, self-fired XTR trigger -- there
-// is no legacy priming train. The PiGS/InnoMaker IMX296 reads out empty,
-// non-integrating frames for its first several external triggers after trigger
-// mode is (re)enabled; legacy mode hides this by firing-and-ignoring a burst of
-// priming pulses before the real shot. Without that warm-up the lone strike frame
-// comes back all-zero. Warm the sensor the same way: pulse cam2 XTR (no strobe,
-// via the Pico's CAM_PULSE) a handful of times and drain the readout frames so the
-// real strike lands on a sensor that is actually integrating light.
-static void PicoWarmUpSensor(LibcameraJpegApp& app, int pulses, long pulse_width_us) {
-	// Fire the XTR pulses on a timer, exactly like the legacy priming train
-	// (SendCameraPrimingPulses). NEVER block on a per-pulse frame: a cold IMX296 emits no
-	// frame until it has had several quick external triggers, so the old wait-per-pulse
-	// (app.Wait() here) deadlocked on the very first pulse when the sensor was cold -- one
-	// CAM_PULSE, then a 60s hang. DrainMessages() is just msg_queue_.Clear(), so it drops
-	// the warm-up readouts and frees their buffers without blocking.
+// Pico autonomous mode warms cam2 the same way the legacy priming train does: fire-and-ignore
+// a burst of XTR pulses (no strobe, via the Pico's CAM_PULSE) before the real shot, so the
+// IMX296 is past its cold-start empty frames. This ONLY sends the pulses on a timer -- it runs
+// in a background thread while the event loop ignores the resulting frames for the quiesce
+// window (exactly like legacy's kWaitingForFirstPrimingTimeEnd). Nothing is drained or
+// inspected here.
+static void PicoFireWarmUpPulses(int pulses, long pulse_width_us) {
 	const long inter_pulse_us =
 		(long)(1000000.0 / gs::PulseStrobe::kPrimingPulseFPS) - pulse_width_us;
 	for (int i = 0; i < pulses && gs::GolfSimGlobals::golf_sim_running_; ++i) {
@@ -120,19 +112,8 @@ static void PicoWarmUpSensor(LibcameraJpegApp& app, int pulses, long pulse_width
 		if (inter_pulse_us > 0) {
 			std::this_thread::sleep_for(std::chrono::microseconds(inter_pulse_us));
 		}
-		app.DrainMessages();  // non-blocking: drop the readout frame, keep the buffer pool free
 	}
-	// Settle: the final pulse's readout is still in flight, and in a lit room it is NOT black
-	// -- the mean<1 discard guard won't catch it, so the armed wait would grab it as the
-	// strike (capturing a pre-strike frame, which the FSM then drops -- leaving cam2's one-shot
-	// capture spent and nothing to catch the real hit). Drain across a short window so every
-	// trailing warm-up frame is gone; in trigger mode nothing new can arrive until the real
-	// strike's XTR, so this can't eat the actual shot.
-	for (int s = 0; s < 4 && gs::GolfSimGlobals::golf_sim_running_; ++s) {
-		std::this_thread::sleep_for(std::chrono::milliseconds(50));
-		app.DrainMessages();
-	}
-	GS_LOG_TRACE_MSG(trace, "Pico warm-up complete (" + std::to_string(pulses) + " XTR pulses on a timer; pipeline settled).");
+	GS_LOG_TRACE_MSG(trace, "Pico warm-up pulses fired (" + std::to_string(pulses) + " XTR on a timer).");
 }
 
 // Run the triggered capture event loop on an already-opened camera.
@@ -241,23 +222,27 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 
 	bool return_status = true;
 
+	// Pico mode warms cam2 exactly like the legacy priming train: a background thread fires the
+	// XTR warm-up pulses while the event loop below IGNORES every frame for the quiesce window
+	// (kQuiesceTimeMs), then takes the first frame AFTER the window as the real strike. The
+	// window -- not any brightness/frame-mean check -- is what separates warm-up from the shot.
+	std::thread pico_warmup_thread;
+	std::chrono::steady_clock::time_point pico_quiesce_start{};
+	bool pico_quiesce_done = false;
 	if (pico_mode) {
-		// The IMX296 reads out empty frames for its first several triggers after trigger
-		// mode is enabled. Burn through them with a short XTR warm-up so the real strike
-		// lands on a sensor that's integrating light. Floor so a zeroed config can't skip it.
 		int warm_up_pulses = gs::PulseStrobe::kNumberPrimingPulses;
 		if (warm_up_pulses < 6) {
 			warm_up_pulses = 6;
 		}
-		PicoWarmUpSensor(app, warm_up_pulses, /*pulse_width_us=*/200);
-
-		// Drop the warm-up frames so the armed wait starts on the real strike.
-		app.DrainMessages();
-
-		// Now let gs_fsm arm the Pico (it waits on this flag).
-		gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
-		GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop: Pico mode -- trigger committed + sensor warmed, armed for a single autonomous trigger.");
+		pico_warmup_thread = std::thread(PicoFireWarmUpPulses, warm_up_pulses, /*pulse_width_us=*/200);
+		// The quiesce clock starts on the FIRST warm-up frame (in the loop, like legacy's
+		// timeOfFirstTrigger), and cam2_ready_for_final_trigger_ is set only after the window
+		// completes -- so the FSM doesn't arm the Pico until cam2 is past the warm-up frames.
 	}
+	struct PicoWarmupThreadGuard {
+		std::thread& t;
+		~PicoWarmupThreadGuard() { if (t.joinable()) t.join(); }
+	} pico_warmup_guard{pico_warmup_thread};
 
 	for (;state != kFinalImageReceived;)
 	{
@@ -315,30 +300,31 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 
 		case kWaitingForFinalImageTrigger: {
 
-			// A leftover warm-up / cold trigger reads out all-zero (mean ~0). Discard it
-			// and wait for the strobe-lit strike, whose flashes lift the mean off zero.
-			if (pico_mode) {
-				Stream* probe_stream = app.ViewfinderStream();
-				if (probe_stream != nullptr) {
-					StreamInfo probe_info = app.GetStreamInfo(probe_stream);
-					CompletedRequestPtr& probe_payload = std::get<CompletedRequestPtr>(msg.payload);
-					libcamera::FrameBuffer* probe_buffer = probe_payload->buffers[probe_stream];
-					BufferReadSync probe_r(&app, probe_buffer);
-					const std::vector<libcamera::Span<uint8_t>> probe_mem = probe_r.Get();
-					uint32_t* probe_image = (uint32_t*)probe_mem[0].data();
-					if (probe_image != nullptr) {
-						cv::Mat probe_frame(probe_info.height, probe_info.width, CV_8UC3, probe_image, probe_info.stride);
-						cv::Mat ch0;
-						cv::extractChannel(probe_frame, ch0, 0);
-						const double frame_mean = cv::mean(ch0)[0];
-						GS_LOG_TRACE_MSG(trace, "Pico: cam2 armed-wait frame mean = " + std::to_string(frame_mean));
-						if (frame_mean < 1.0) {
-							GS_LOG_TRACE_MSG(trace, "Pico: discarding non-strobed frame; waiting for the strobe-lit strike.");
-							break;  // stay in kWaitingForFinalImageTrigger and wait for the next frame
-						}
-					}
+			// Pico mode: replicate the legacy time-quiesce (kWaitingForFirstPrimingTimeEnd).
+			// Ignore EVERY frame received during the quiesce window -- these are the background
+			// warm-up pulses' readouts -- then take the first frame AFTER the window as the real
+			// strike. No brightness/frame-mean check: the warm-up pulses stop well before the
+			// window ends, so in trigger mode nothing new arrives until the Pico's autonomous
+			// strike fires cam2 XTR.
+			if (pico_mode && !pico_quiesce_done) {
+				if (pico_quiesce_start == std::chrono::steady_clock::time_point{}) {
+					// First warm-up readout -- start the quiesce clock here (legacy's
+					// timeOfFirstTrigger), so the window absorbs the sensor's cold-start delay.
+					pico_quiesce_start = std::chrono::steady_clock::now();
 				}
-				// Fall through: this is the strobe-lit strike -- capture it below.
+				const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+					std::chrono::steady_clock::now() - pico_quiesce_start).count();
+				if (elapsed_ms < kQuiesceTimeMs) {
+					CompletedRequestPtr& discard = std::get<CompletedRequestPtr>(msg.payload);
+					(void)discard;  // warm-up readout -- ignore it, keep quiescing
+					break;
+				}
+				// Quiesce window elapsed: cam2 is warm and the pipeline is quiet. Let the FSM
+				// arm the Pico (it waits on this flag); the NEXT frame is the real strike.
+				pico_quiesce_done = true;
+				gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
+				GS_LOG_TRACE_MSG(trace, "Pico: quiesce window complete -- cam2 armed, waiting for the real strike.");
+				break;
 			}
 
 			GS_LOG_TRACE_MSG(trace, "Received Final Image Trigger - capturing strobed image.");
