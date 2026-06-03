@@ -50,7 +50,10 @@ class PicoController {
         this.rmsPeak = 0;
         this.rmsLastEventAt = 0;
         this.rmsStaleTimer = null;
-        this.rmsPaused = false;
+        // The chart never auto-starts; streamRequested tracks whether the operator
+        // pressed Start, so visibility/hz changes only resume a stream they asked for.
+        this.streamRequested = false;
+        this.lmRunning = false;
         this.canvas = null;
         this.ctx = null;
         this.lastStatus = null;
@@ -75,7 +78,10 @@ class PicoController {
         this.setupEventListeners();
         this.refreshStatus();
         this.startStatusPolling();
-        this.startRmsStream();
+        // Don't auto-start the mic stream -- the operator presses Start. Until then
+        // the port stays free for the LM and the chart sits idle.
+        this.updateRmsToggleButton();
+        this.setRmsHint('Press Start to view live mic energy.');
     }
 
     setupPageCleanup() {
@@ -85,7 +91,7 @@ class PicoController {
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
                 this.stopRmsStream();
-            } else if (!this.rmsPaused && !this.flashInProgress) {
+            } else if (this.streamRequested && !this.lmRunning && !this.flashInProgress) {
                 this.startRmsStream();
             }
         });
@@ -139,7 +145,11 @@ class PicoController {
             const resp = await fetch('/api/pico/status');
             if (resp.status === 503) {
                 const data = await resp.json();
-                this.renderDisconnected(data);
+                if (data.lm_running) {
+                    this.renderLmRunning(data);
+                } else {
+                    this.renderDisconnected(data);
+                }
                 return;
             }
             if (!resp.ok) throw new Error(`status ${resp.status}`);
@@ -152,6 +162,12 @@ class PicoController {
 
     renderStatus(data) {
         this.lastStatus = data;
+        // A healthy STATUS means the LM is not holding the port; re-enable Start.
+        if (this.lmRunning) {
+            this.lmRunning = false;
+            this.setRmsHint('Press Start to view live mic energy.');
+            this.updateRmsToggleButton();
+        }
 
         const badge = document.getElementById('pico-conn-state');
         badge.textContent = 'Connected';
@@ -253,6 +269,20 @@ class PicoController {
         this.setRmsHint('Pico disconnected. Reconnect USB and click Refresh.');
     }
 
+    renderLmRunning(_data) {
+        this.lmRunning = true;
+        // The LM owns the port; drop any intent so the chart won't auto-resume --
+        // the operator must press Start again after stopping PiTrac.
+        this.streamRequested = false;
+        const badge = document.getElementById('pico-conn-state');
+        badge.textContent = 'LM running';
+        badge.className = 'badge badge-warning';
+        document.getElementById('pico-fw').textContent = '--';
+        if (this.rmsSource) this.stopRmsStream();
+        this.setRmsHint('Launch monitor is running — it owns the Pico. Stop PiTrac to use the mic chart.');
+        this.updateRmsToggleButton();
+    }
+
     async runSelftest() {
         const out = document.getElementById('pico-selftest-output');
         out.textContent = 'Running SELFTEST...';
@@ -345,11 +375,14 @@ class PicoController {
 
     startRmsStream() {
         if (this.rmsSource) return;
+        if (this.lmRunning) {
+            this.setRmsHint('Launch monitor is running — it owns the Pico. Stop PiTrac to use the mic chart.');
+            return;
+        }
         const hz = document.getElementById('pico-rms-hz').value || '20';
         this.rmsSamples = [];
         this.rmsPeak = 0;
         this.rmsLastEventAt = Date.now();
-        this.rmsPaused = false;
         this.setRmsHint('Connecting to stream...');
 
         this.rmsSource = new EventSource(`/api/pico/rms-stream?hz=${hz}`);
@@ -384,15 +417,20 @@ class PicoController {
 
     restartRmsStream() {
         this.stopRmsStream();
-        if (!this.rmsPaused && !this.flashInProgress) this.startRmsStream();
+        if (this.streamRequested && !this.lmRunning && !this.flashInProgress) this.startRmsStream();
     }
 
     toggleRmsStream() {
-        this.rmsPaused = !this.rmsPaused;
-        if (this.rmsPaused) {
+        if (this.rmsSource) {
+            this.streamRequested = false;
             this.stopRmsStream();
-            this.setRmsHint('Paused');
+            this.setRmsHint('Stopped. Press Start to resume.');
         } else {
+            if (this.lmRunning) {
+                this.setRmsHint('Launch monitor is running — it owns the Pico. Stop PiTrac to use the mic chart.');
+                return;
+            }
+            this.streamRequested = true;
             this.startRmsStream();
         }
     }
@@ -400,6 +438,7 @@ class PicoController {
     updateRmsToggleButton() {
         const btn = document.getElementById('pico-rms-toggle');
         if (!btn) return;
+        btn.disabled = this.lmRunning;
         const icon = btn.querySelector('i');
         const label = btn.querySelector('span');
         if (this.rmsSource) {
@@ -407,7 +446,7 @@ class PicoController {
             if (label) label.textContent = 'Pause';
         } else {
             if (icon) icon.setAttribute('data-lucide', 'play');
-            if (label) label.textContent = 'Resume';
+            if (label) label.textContent = 'Start';
         }
         if (window.lucide) window.lucide.createIcons();
     }
@@ -680,7 +719,7 @@ class PicoController {
             this.flashInProgress = false;
             if (wasStreaming) {
                 setTimeout(() => {
-                    if (!this.rmsPaused && !document.hidden) this.startRmsStream();
+                    if (this.streamRequested && !this.lmRunning && !document.hidden) this.startRmsStream();
                 }, 2500);
             }
         }

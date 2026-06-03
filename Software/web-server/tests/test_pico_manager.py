@@ -329,8 +329,8 @@ class TestRmsStream:
             async for evt in stream:
                 samples.append(evt)
                 if len(samples) >= 3:
-                    await mgr.stop_rms_stream()
                     await stream.aclose()
+                    await mgr.stop_rms_stream()
                     break
             return samples
 
@@ -344,6 +344,46 @@ class TestRmsStream:
             {"value": 39, "timestamp": 300},
         ]
 
+    def test_stop_rms_stream_returns_when_no_stream(self):
+        # Nothing streaming -> the closed-event is pre-set, so stop returns at once
+        # rather than blocking the LM-start handler that awaits it.
+        from pico_manager import PicoManager
+
+        cm = MagicMock()
+        cm.get_config.return_value = None
+        mgr = PicoManager(cm, asyncio.Lock())
+        asyncio.run(asyncio.wait_for(mgr.stop_rms_stream(), timeout=1.0))
+
+    @patch("pico_manager.serial")
+    def test_stop_rms_stream_waits_for_teardown(self, mock_serial_mod):
+        # Drive the generator as a concurrent task (like StreamingResponse does):
+        # stop_rms_stream must not return until the generator's finally has run and
+        # released the port, so the LM gets a clean handshake.
+        ser = mock_serial_mod.Serial.return_value
+        reads = [b"EVENT RMS value=9 timestamp=1\n"]
+        ser.read.side_effect = lambda _n: reads.pop(0) if reads else b""
+
+        async def drive():
+            mgr = _build(mock_serial_mod)
+            stream = await mgr.start_rms_stream(hz=10)
+
+            async def consume():
+                async for _ in stream:
+                    pass
+
+            task = asyncio.create_task(consume())
+            await asyncio.sleep(0.05)  # let it emit, then park on empty reads
+            assert mgr.serial_owner.handle is not None
+            await asyncio.wait_for(mgr.stop_rms_stream(), timeout=2.0)
+            await task
+            return mgr
+
+        mgr = asyncio.run(drive())
+        assert mgr._stream_active is False
+        assert mgr.serial_owner.handle is None
+        writes = [c.args[0] for c in ser.write.call_args_list]
+        assert b"CFG STREAM_RMS=0\n" in writes
+
     @patch("pico_manager.serial")
     def test_rms_stream_clamps_hz_to_max(self, mock_serial_mod):
         ser = mock_serial_mod.Serial.return_value
@@ -356,8 +396,8 @@ class TestRmsStream:
             mgr = _build(mock_serial_mod)
             stream = await mgr.start_rms_stream(hz=9999)
             async for _ in stream:
-                await mgr.stop_rms_stream()
                 await stream.aclose()
+                await mgr.stop_rms_stream()
                 break
 
         asyncio.run(drive())
@@ -423,8 +463,8 @@ class TestSharedLock:
             ser.read.side_effect = [b"STATUS armed=1\n", b""]
             status_data = await asyncio.wait_for(mgr.status(), timeout=1.0)
 
-            await mgr.stop_rms_stream()
             await stream.aclose()
+            await mgr.stop_rms_stream()
             return first, status_data
 
         first, status_data = asyncio.run(drive())
@@ -460,8 +500,8 @@ class TestSharedLock:
             close_calls = ser.close.call_count
 
             ser.reset_input_buffer.side_effect = None
-            await mgr.stop_rms_stream()
             await stream.aclose()
+            await mgr.stop_rms_stream()
             return first, status_data, handle_after, close_calls
 
         first, status_data, handle_after, close_calls = asyncio.run(drive())
@@ -850,6 +890,16 @@ class TestLmOwnsPortGate:
         data = asyncio.run(mgr.status())
         assert data["present"] is True
         mock_serial_mod.Serial.assert_called_once()
+
+    @patch("pico_manager.serial")
+    def test_status_reports_lm_running_flag(self, mock_serial_mod):
+        # The /pico page distinguishes "LM owns the port" from "USB unplugged" via
+        # this flag so it can show the right warning and disable Start.
+        mgr = _build_with_lm(mock_serial_mod)
+        data = asyncio.run(mgr.status())
+        assert data["present"] is False
+        assert data["lm_running"] is True
+        mock_serial_mod.Serial.assert_not_called()
 
 
 class TestValidateIntervals:

@@ -166,15 +166,9 @@ configure_boot_config() {
     local config_block="# PiTrac Camera Configuration - Added by pitrac installer
 # DO NOT MODIFY - Managed automatically by PiTrac"
 
-    # Only add parameters that don't already exist
-    if ! grep -q "^camera_auto_detect=" "$config_path"; then
-        config_block="$config_block
-
-# Disable automatic camera detection for manual control
-camera_auto_detect=0"
-    else
-        log_info "  camera_auto_detect already exists, skipping"
-    fi
+    # camera_auto_detect is forced to 0 after the block is written (see below). "Add only
+    # if missing" isn't enough: the OS ships camera_auto_detect=1, which conflicts with our
+    # explicit imx296 overlays and double-loads camera overlays.
 
     config_block="$config_block
 
@@ -212,28 +206,21 @@ arm_boost=1"
     if [[ "$num_cameras" -eq 2 ]]; then
         config_block="$config_block
 
-# Dual camera configuration (single-pi system)
-# Camera 0: free-running, Camera 1: trigger mode set at runtime via sysfs
-# Using always-on (instead of sync-sink) keeps the 1.8V regulator powered for
-# external triggering while allowing runtime trigger mode switching without reboot.
+# Dual camera: both ports get the imx296 overlay with always-on (keeps the rail powered
+# for external triggering). Trigger mode is toggled at runtime over i2c while stopped.
 [all]
-dtoverlay=imx296,cam0
-dtoverlay=imx296,always-on"
+dtoverlay=imx296,always-on,cam0
+dtoverlay=imx296,always-on,cam1"
     elif [[ "$num_cameras" -eq 1 ]]; then
         config_block="$config_block
 
 # Single camera configuration
 [all]
-dtoverlay=imx296,cam0"
+dtoverlay=imx296,always-on,cam0"
     fi
 
-    if [[ "$has_innomaker" == "true" ]]; then
-        config_block="$config_block
-
-# InnoMaker IMX296 camera support
-dtparam=i2c_vc=on
-dtoverlay=vc_mipi_imx296"
-    fi
+    # InnoMaker IMX296 runs on the stock imx296 driver + overlay above. Do NOT add
+    # dtoverlay=vc_mipi_imx296 or dtparam=i2c_vc -- they conflict with the stock driver.
 
     config_block="$config_block
 
@@ -268,6 +255,10 @@ dtoverlay=vc_mipi_imx296"
     fi
 
     mv "$temp_file" "$config_path"
+
+    # Force camera_auto_detect=0 (OS default is 1). With explicit imx296 overlays,
+    # auto-detect MUST be off or the firmware double-loads the camera overlays.
+    update_config_txt_param "$config_path" "camera_auto_detect" "0"
 
     log_success "config.txt configuration complete"
 

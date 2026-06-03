@@ -24,6 +24,7 @@ void PicoLogWarn(const std::string& msg);
 
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -477,20 +478,36 @@ bool PicoStrobeClient::Impl::ReadLineWithTimeout(std::string& out, int timeout_m
     auto deadline = std::chrono::steady_clock::now() +
                     std::chrono::milliseconds(timeout_ms);
     char buf[256];
-    while (std::chrono::steady_clock::now() < deadline) {
+    for (;;) {
+        const auto now = std::chrono::steady_clock::now();
+        if (now >= deadline) return false;
+        const int remaining = static_cast<int>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count());
+
+        // Wait with poll(), not a read() spin: the cdc-acm port is VMIN=0/VTIME=0, so a
+        // read() with nothing ready returns 0 (not EAGAIN). Treating that 0 as EOF bailed
+        // before the Pico's ~5ms reply landed. After poll(), read()==0 means a real hangup.
+        struct pollfd pfd{};
+        pfd.fd = fd;
+        pfd.events = POLLIN;
+        const int pr = ::poll(&pfd, 1, remaining);
+        if (pr == 0) return false;  // deadline reached with no data
+        if (pr < 0) {
+            if (errno == EINTR) continue;
+            return false;
+        }
+        if (pfd.revents & (POLLERR | POLLNVAL)) return false;
+
         ssize_t n = ::read(fd, buf, sizeof(buf));
         if (n > 0) {
             rx_buf.append(buf, static_cast<size_t>(n));
             if (take_buffered_line()) return true;
             continue;
         }
-        if (n == 0) return false;  // EOF: peer closed the port, no more lines coming.
-        if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
-            return false;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        if (n == 0) return false;  // poll signalled readable but nothing there: real EOF/hangup
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) continue;
+        return false;
     }
-    return false;
 }
 
 bool PicoStrobeClient::Impl::ReadSolicitedReply(const char* prefix, int timeout_ms,

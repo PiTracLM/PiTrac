@@ -343,21 +343,26 @@ namespace golf_sim {
             GS_LOG_MSG(error, "FAILED to PulseStrobe::SendCameraPrimingPulses");
         }
 
-        // Wait for cam2 to exit its priming/quiesce window before we arm. Otherwise
-        // a fast hit (or the Pico's autonomous fire) can land while cam2 is still
-        // rejecting triggers, producing a black final frame.
+        // Don't advance to "ready to hit" until cam2 is actually warmed and idle on the
+        // trigger -- its first triggered frame can take 10-25s, and arming the Pico before
+        // then lets a hit land while cam2 still can't catch it. Hold the UI on "stable"
+        // meanwhile; golf_sim_running_ lets a Stop break the wait.
         {
-            constexpr int kCam2ReadyTimeoutMs = 3000;
+            GsUISystem::SendIPCStatusMessage(GsIPCResultType::kPausingForBallStabilization);
+            constexpr int kCam2WarmupTimeoutMs = 60000;
             const auto wait_deadline = std::chrono::steady_clock::now()
-                                       + std::chrono::milliseconds(kCam2ReadyTimeoutMs);
+                                       + std::chrono::milliseconds(kCam2WarmupTimeoutMs);
             while (!PulseStrobe::cam2_ready_for_final_trigger_.load() &&
+                   GolfSimGlobals::golf_sim_running_ &&
                    std::chrono::steady_clock::now() < wait_deadline) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(20));
             }
             if (!PulseStrobe::cam2_ready_for_final_trigger_.load()) {
-                GS_LOG_MSG(warning, "cam2 not ready for trigger after " +
-                           std::to_string(kCam2ReadyTimeoutMs) +
-                           " ms -- arming anyway. A fast hit could be dropped.");
+                GS_LOG_MSG(warning, "cam2 still not warmed after " +
+                           std::to_string(kCam2WarmupTimeoutMs) +
+                           " ms -- proceeding anyway (cam2 may be wedged).");
+            } else {
+                GS_LOG_MSG(info, "cam2 warmed and idle on the trigger -- ready to arm.");
             }
         }
 

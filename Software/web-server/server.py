@@ -511,6 +511,10 @@ class PiTracServer:
             safety = self.strobe_calibration_manager.is_strobe_safe()
             if not safety["safe"]:
                 return {"status": "error", "message": safety["reason"]}
+            # The LM drives the Pico over the same CDC port. Tear down the /pico mic
+            # stream first (and wait for it) so a trailing EVENT RMS line can't poison
+            # the LM's STATUS handshake into the silent legacy-strobe fallback.
+            await self.pico_manager.stop_rms_stream()
             result = await self.pitrac_manager.start()
             logger.info(f"PiTrac start request: {result}")
             return result
@@ -528,6 +532,8 @@ class PiTracServer:
             safety = self.strobe_calibration_manager.is_strobe_safe()
             if not safety["safe"]:
                 return {"status": "error", "message": safety["reason"]}
+            # Same port handoff as start: release the mic stream before the LM reclaims it.
+            await self.pico_manager.stop_rms_stream()
             result = await self.pitrac_manager.restart()
             logger.info(f"PiTrac restart request: {result}")
             return result

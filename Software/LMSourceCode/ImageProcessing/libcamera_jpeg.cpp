@@ -109,7 +109,7 @@ void SetExternalTrigger(bool& flag) {
 static void PicoWarmUpSensor(LibcameraJpegApp& app, int pulses, long pulse_width_us) {
 	for (int i = 0; i < pulses && gs::GolfSimGlobals::golf_sim_running_; ++i) {
 		gs::PulseStrobe::SendOnOffPulse(pulse_width_us);  // -> Pico CAM_PULSE: XTR low/high, no strobe
-		RPiCamApp::Msg msg = app.Wait();                  // drain the frame this trigger reads out
+		RPiCamApp::Msg msg = app.Wait();                  // drain the (free-running) frame
 		if (msg.type == RPiCamApp::MsgType::RequestComplete) {
 			// Hold the request only long enough for its buffers to re-queue; the
 			// (cold/black) warm-up frame is intentionally discarded.
@@ -141,6 +141,14 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	// is stopped here, so there is no legitimate in-flight message to lose.
 	app.DrainMessages();
 
+	// Pico mode: enter external-trigger mode BEFORE StartCamera. The standby-toggle that
+	// commits it only takes cleanly while stopped -- doing it mid-stream stalls the sensor ~14s.
+	const bool pico_mode = gs::PulseStrobe::IsPicoActive();
+	const gs::CameraHardware::CameraModel camera_model = gs::GolfSimCamera::kSystemSlot2CameraType;
+	if (pico_mode && camera_model == gs::CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+		SetImx296TriggerModeViaI2C(1);
+	}
+
 	app.StartCamera();
 	GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop: camera started, waiting for triggers");
 
@@ -151,8 +159,6 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	long kQuiesceTimeMs = (gs::PulseStrobe::kNumberPrimingPulses ) * (1000 / gs::PulseStrobe::kPrimingPulseFPS) + 10;
 
 	// If appropriate, add the time we allow to setup external trigginer for the InnoMaker cameras
-	const gs::CameraHardware::CameraModel  camera_model = gs::GolfSimCamera::kSystemSlot2CameraType;
-
 	if (camera_model == gs::CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
 		kQuiesceTimeMs += gs::PulseStrobe::kPauseToSetUpInnoMakerExternalTriggerMilliseconds;
 	}
@@ -168,7 +174,6 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	// trigger coincident with the strobe -- there is no priming train to
 	// quiesce through, so jump straight to the final-image state and capture
 	// the one frame the Pico produces.
-	const bool pico_mode = gs::PulseStrobe::IsPicoActive();
 	FlightCameraState state = pico_mode ? kWaitingForFinalImageTrigger : kWaitingForFirstPrimingPulseGroup;
 
 	// Check here, once, to see if we are going to expect to produce a pre-image for later subtraction
@@ -176,15 +181,15 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 												golf_sim::GolfSimCamera::kUsePreImageSubtraction);
 
 
-    // True if the InnoMaker camera external trigger script has not been called yet
-    // Note - The InnoMaker camera needs its trigger script to be called AFTER the camera
-    // has already started up.  No idea why.
+    // Legacy priming path only -- see the kWaitingForFirstPrimingPulseGroup case.
 	bool innomaker_first_external_trigger_is_set = false;
 
-	// We want to make sure we are externally triggered here every time just in case we're using an InnoMaker camera
-
-	bool dummy = false;
-	SetExternalTrigger(dummy);
+	// Legacy path only. Pico mode already committed trigger before StartCamera; toggling
+	// the standby mid-stream is what stalled the sensor.
+	if (!pico_mode) {
+		bool dummy = false;
+		SetExternalTrigger(dummy);
+	}
 
 	// Send priming pulses + trigger in a background thread so the event loop
 	// can process the resulting hardware trigger events as they arrive.
@@ -224,25 +229,21 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	bool return_status = true;
 
 	if (pico_mode) {
-		// cam2 is externally triggered now; give the InnoMaker trigger setup a
-		// moment to take.
-		if (camera_model == gs::CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
-			std::this_thread::sleep_for(std::chrono::milliseconds(gs::PulseStrobe::kPauseToSetUpInnoMakerExternalTriggerMilliseconds));
-		}
-
-		// Warm the GS sensor past its cold-start empty frames BEFORE arming, so the
-		// single self-fired strike frame is actually exposed (see PicoWarmUpSensor).
-		// Reuse the (config-calibrated) legacy priming count, with a floor so a
-		// missing/zeroed kNumberPrimingPulses can never silently skip the warm-up.
+		// The IMX296 reads out empty frames for its first several triggers after trigger
+		// mode is enabled. Burn through them with a short XTR warm-up so the real strike
+		// lands on a sensor that's integrating light. Floor so a zeroed config can't skip it.
 		int warm_up_pulses = gs::PulseStrobe::kNumberPrimingPulses;
 		if (warm_up_pulses < 6) {
 			warm_up_pulses = 6;
 		}
 		PicoWarmUpSensor(app, warm_up_pulses, /*pulse_width_us=*/200);
 
+		// Drop the warm-up frames so the armed wait starts on the real strike.
+		app.DrainMessages();
+
 		// Now let gs_fsm arm the Pico (it waits on this flag).
 		gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
-		GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop: Pico mode -- sensor warmed, armed for a single autonomous trigger.");
+		GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop: Pico mode -- trigger committed + sensor warmed, armed for a single autonomous trigger.");
 	}
 
 	for (;state != kFinalImageReceived;)
@@ -301,10 +302,8 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 
 		case kWaitingForFinalImageTrigger: {
 
-			// Pico mode: leftover warm-up / cold triggers read out as an all-zero frame.
-			// Discard such a frame (BEFORE stopping the camera) and keep waiting for the
-			// strobe-lit strike frame -- otherwise we hand the FSM an empty image and
-			// report a bogus "Error" shot.
+			// A leftover warm-up / cold trigger reads out all-zero (mean ~0). Discard it
+			// and wait for the strobe-lit strike, whose flashes lift the mean off zero.
 			if (pico_mode) {
 				Stream* probe_stream = app.ViewfinderStream();
 				if (probe_stream != nullptr) {
@@ -316,13 +315,17 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 					uint32_t* probe_image = (uint32_t*)probe_mem[0].data();
 					if (probe_image != nullptr) {
 						cv::Mat probe_frame(probe_info.height, probe_info.width, CV_8UC3, probe_image, probe_info.stride);
-						const cv::Scalar channel_sums = cv::sum(probe_frame);
-						if (channel_sums[0] == 0.0 && channel_sums[1] == 0.0 && channel_sums[2] == 0.0) {
-							GS_LOG_TRACE_MSG(trace, "Pico: ignoring all-zero (non-strobed) frame; waiting for the lit strike frame.");
-							break;  // stay in this state; buffers re-queue at scope exit
+						cv::Mat ch0;
+						cv::extractChannel(probe_frame, ch0, 0);
+						const double frame_mean = cv::mean(ch0)[0];
+						GS_LOG_TRACE_MSG(trace, "Pico: cam2 armed-wait frame mean = " + std::to_string(frame_mean));
+						if (frame_mean < 1.0) {
+							GS_LOG_TRACE_MSG(trace, "Pico: discarding non-strobed frame; waiting for the strobe-lit strike.");
+							break;  // stay in kWaitingForFinalImageTrigger and wait for the next frame
 						}
 					}
 				}
+				// Fall through: this is the strobe-lit strike -- capture it below.
 			}
 
 			GS_LOG_TRACE_MSG(trace, "Received Final Image Trigger - capturing strobed image.");

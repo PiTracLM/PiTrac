@@ -110,6 +110,12 @@ class PicoManager:
         self._lock = lock
         self.serial_owner = serial_owner or PicoSerialOwner(self._device_path)
         self._stream_active = False
+        # Set whenever no RMS stream is running. stop_rms_stream() awaits this so a
+        # caller handing the port to pitrac_lm knows the stream has truly released
+        # it (CFG STREAM_RMS=0 sent, borrow dropped). Otherwise a lingering EVENT RMS
+        # line poisons the LM's STATUS handshake and it falls back to legacy strobe.
+        self._stream_closed = asyncio.Event()
+        self._stream_closed.set()
         # When pitrac_lm runs it owns the port, so /pico background pollers stand down.
         self._pitrac_manager = pitrac_manager
 
@@ -201,7 +207,7 @@ class PicoManager:
 
     def _probe_sync(self) -> Dict[str, Any]:
         if self._lm_is_running():
-            return {"present": False, "error": LM_OWNS_PORT_MSG}
+            return {"present": False, "lm_running": True, "error": LM_OWNS_PORT_MSG}
         try:
             ser = self.serial_owner.open()
         except (RuntimeError, OSError) as exc:
@@ -227,7 +233,7 @@ class PicoManager:
 
     def _status_sync(self) -> Dict[str, Any]:
         if self._lm_is_running():
-            return {"present": False, "error": LM_OWNS_PORT_MSG}
+            return {"present": False, "lm_running": True, "error": LM_OWNS_PORT_MSG}
         try:
             ser = self.serial_owner.open()
         except (RuntimeError, OSError) as exc:
@@ -384,6 +390,7 @@ class PicoManager:
             # LM owns the port; yield nothing so the stream closes cleanly.
             logger.info("RMS stream not started: pitrac_lm is running")
             return
+        self._stream_closed.clear()
         async with self._lock:
             ser = await asyncio.to_thread(self.serial_owner.open)
             try:
@@ -423,9 +430,18 @@ class PicoManager:
                 except Exception:
                     logger.debug("RMS stop write failed", exc_info=True)
                 self.serial_owner.release()
+            self._stream_closed.set()
 
-    async def stop_rms_stream(self) -> None:
+    async def stop_rms_stream(self, timeout_s: float = 2.0) -> None:
+        """Signal the stream to stop and wait until it has actually released the
+        port (CFG STREAM_RMS=0 sent, borrow dropped). Callers that then hand the
+        port to pitrac_lm depend on this completing so the LM's STATUS handshake
+        isn't poisoned by a trailing EVENT RMS line."""
         self._stream_active = False
+        try:
+            await asyncio.wait_for(self._stream_closed.wait(), timeout=timeout_s)
+        except asyncio.TimeoutError:
+            logger.warning("RMS stream did not stop within %.1fs", timeout_s)
 
     async def _send_cfg(self, suffix: str) -> Dict[str, Any]:
         async with self._lock:

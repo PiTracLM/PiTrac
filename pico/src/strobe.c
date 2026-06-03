@@ -107,15 +107,18 @@ bool strobe_init(void) {
         s_adc_spin = spin_lock_instance((uint)sl);
     }
 
-    /* Cam2 XTR — straight GPIO, active low, idle HIGH. */
+    /* Cam2 XTR — active low, idle HIGH. The InnoMaker J3 trigger input is opto-isolated
+     * (~10mA load); the RP2040 4mA default sags, so drive 12mA to hold a clean edge. */
     gpio_init(PIN_CAM2_XTR);
     gpio_set_dir(PIN_CAM2_XTR, GPIO_OUT);
+    gpio_set_drive_strength(PIN_CAM2_XTR, GPIO_DRIVE_STRENGTH_12MA);
     gpio_put(PIN_CAM2_XTR, 1);
 
-    /* Cam1 XTR — same, idle HIGH. Reserved for future stereo; harmless on
+    /* Cam1 XTR — same (incl. 12mA opto drive). Reserved for future stereo; harmless on
      * single-camera installs. */
     gpio_init(PIN_CAM1_XTR);
     gpio_set_dir(PIN_CAM1_XTR, GPIO_OUT);
+    gpio_set_drive_strength(PIN_CAM1_XTR, GPIO_DRIVE_STRENGTH_12MA);
     gpio_put(PIN_CAM1_XTR, 1);
 
     /* Strobe pin floats between reset and PIO claiming it, which can briefly
