@@ -241,6 +241,14 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	if (pico_warm_up_pulses < 6) {
 		pico_warm_up_pulses = 6;
 	}
+	if (pico_mode) {
+		// set-1 (SetExternalTrigger above) already engaged the trigger, so cam2 is in trigger
+		// mode and NO frame arrives on its own. Fire the warm-up/priming XTR pulses NOW -- like
+		// main fires its priming train from a separate thread -- so triggered frames flow and the
+		// loop can quiesce. Without this the loop blocks forever on a first frame trigger mode
+		// never produces (which is why the FSM timed out after 15s and armed cold).
+		pico_warmup_thread = std::thread(PicoFireWarmUpPulses, pico_warm_up_pulses, /*pulse_width_us=*/200);
+	}
 	struct PicoWarmupThreadGuard {
 		std::thread& t;
 		~PicoWarmupThreadGuard() { if (t.joinable()) t.join(); }
@@ -307,12 +315,14 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 			// doesn't stick and cam2 free-runs). Then start the background warm-up/priming pulses.
 			// Ignore this last pre-trigger frame.
 			if (pico_mode && !pico_trigger_set) {
+				// First triggered (warm-up) frame: re-commit the trigger, like main's second
+				// SetExternalTrigger on the first frame. Warm-up pulses are already firing
+				// (started before the loop). Ignore this frame.
 				pico_trigger_set = true;
 				if (camera_model == gs::CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
 					SetImx296TriggerModeViaI2C(1);
 				}
-				pico_warmup_thread = std::thread(PicoFireWarmUpPulses, pico_warm_up_pulses, /*pulse_width_us=*/200);
-				GS_LOG_TRACE_MSG(trace, "Pico: first frame -- external trigger set after StartCamera (main-style), warm-up started.");
+				GS_LOG_TRACE_MSG(trace, "Pico: first frame -- trigger re-committed (main-style set-2).");
 				CompletedRequestPtr& first_discard = std::get<CompletedRequestPtr>(msg.payload);
 				(void)first_discard;
 				break;
