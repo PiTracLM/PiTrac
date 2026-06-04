@@ -65,6 +65,11 @@ uint32_t impact_detect_get_decay_confirm_ms(void);
  * until that chain is widened separately. */
 int64_t impact_detect_current_rms(void);
 
+/* Peak windowed RMS since the last call (resets on read). The EVENT RMS mic-stream
+ * telemetry uses this so a sub-sample ball-strike transient isn't missed between
+ * emits (the instantaneous level falls between 100-500Hz samples). */
+int64_t impact_detect_take_peak_rms(void);
+
 /* Count of 16 kHz samples pushed through the DSP since init. Diagnostic — lets
  * a host confirm de-interleave + decimation realise fs/2/DSP_DECIMATION rather
  * than drifting. */
