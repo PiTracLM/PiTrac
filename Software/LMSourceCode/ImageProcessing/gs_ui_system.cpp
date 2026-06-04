@@ -6,6 +6,11 @@
 
 #ifdef __unix__  // Ignore in Windows environment
 
+#include <algorithm>
+#include <chrono>
+#include <filesystem>
+#include <mutex>
+
 #include "logging_tools.h"
 
 #include "gs_result_types.h"
@@ -27,6 +32,25 @@ namespace golf_sim {
     std::string GsUISystem::kWebServerErrorExposuresImage;
     std::string GsUISystem::kWebServerBallSearchAreaImage;
 
+    long GsUISystem::current_shot_id_ = 0;
+    std::vector<std::string> GsUISystem::current_shot_image_paths_;
+    std::mutex GsUISystem::shot_images_mutex_;
+
+    std::string GsUISystem::CurrentShotRelativePath(const std::string& file_name) {
+        std::lock_guard<std::mutex> lock(shot_images_mutex_);
+        if (current_shot_id_ == 0) {
+            current_shot_id_ = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+        }
+        return "shots/" + std::to_string(current_shot_id_) + "/" + file_name;
+    }
+
+    void GsUISystem::ResetCurrentShot() {
+        std::lock_guard<std::mutex> lock(shot_images_mutex_);
+        current_shot_id_ = 0;
+        current_shot_image_paths_.clear();
+    }
+
     static std::string EscapeJson(const std::string& s) {
         std::string out;
         out.reserve(s.size() + 16);
@@ -47,7 +71,8 @@ namespace golf_sim {
                                        float speed_mps = 0, float launch_deg = 0,
                                        float side_deg = 0, int back_spin = 0,
                                        int side_spin = 0, int carry_m = 0,
-                                       const std::vector<std::string>& images = {}) {
+                                       const std::vector<std::string>& images = {},
+                                       long shot_id = 0) {
         std::string json = "{";
         json += "\"result_type\":" + std::to_string(result_type);
         json += ",\"speed_mps\":" + std::to_string(speed_mps);
@@ -62,7 +87,11 @@ namespace golf_sim {
             if (i > 0) json += ",";
             json += "\"" + EscapeJson(images[i]) + "\"";
         }
-        json += "]}";
+        json += "]";
+        if (shot_id != 0) {
+            json += ",\"shot_id\":" + std::to_string(shot_id);
+        }
+        json += "}";
         return json;
     }
 
@@ -76,9 +105,22 @@ namespace golf_sim {
             msg = error_message;
         }
 
+        // Flush whatever images this failed attempt accumulated so they attach to this
+        // shot's result and don't bleed into the next shot.
+        std::vector<std::string> images;
+        long shot_id;
+        {
+            std::lock_guard<std::mutex> lock(shot_images_mutex_);
+            images = current_shot_image_paths_;
+            shot_id = current_shot_id_;
+            current_shot_image_paths_.clear();
+            current_shot_id_ = 0;
+        }
+
         GS_LOG_TRACE_MSG(trace, "Sending error result: " + msg);
         GsHttpClient::PostResult(BuildResultJson(
-            static_cast<int>(GsIPCResultType::kError), msg));
+            static_cast<int>(GsIPCResultType::kError), msg,
+            0, 0, 0, 0, 0, 0, images, shot_id));
     }
 
 
@@ -138,6 +180,14 @@ namespace golf_sim {
         int carry = 100 + rand() % 150;
 
         std::vector<std::string> images;
+        long shot_id;
+        {
+            std::lock_guard<std::mutex> lock(shot_images_mutex_);
+            images = current_shot_image_paths_;
+            shot_id = current_shot_id_;
+            current_shot_image_paths_.clear();
+            current_shot_id_ = 0;
+        }
 
         std::string msg = "Ball Hit - Results returned." + secondary_message;
 
@@ -152,7 +202,7 @@ namespace golf_sim {
 
         GsHttpClient::PostResult(BuildResultJson(
             static_cast<int>(GsIPCResultType::kHit), msg,
-            speed, launch, side, back_spin, side_spin, carry, images));
+            speed, launch, side, back_spin, side_spin, carry, images, shot_id));
     }
 
 
@@ -181,11 +231,25 @@ namespace golf_sim {
             file_name += ".png";
         }
 
-        std::string fname = kWebServerShareDirectory + file_name;
+        // Route every shot image into its own per-shot directory so shot history survives.
+        // NOTE: CurrentShotRelativePath takes shot_images_mutex_, so call it before taking
+        // the lock below to record the path (otherwise we'd deadlock).
+        std::string relative = CurrentShotRelativePath(file_name);
+        std::string fname = kWebServerShareDirectory + relative;
+        std::filesystem::create_directories(std::filesystem::path(fname).parent_path());
 
         try {
             if (cv::imwrite(fname, img)) {
                 GS_LOG_TRACE_MSG(trace, "Logged image to file: " + fname);
+
+                // Record the relative path once per shot.  Some images (e.g. the ball
+                // search-area image) are re-saved every wait-loop cycle; overwriting the
+                // file on disk is fine, but we must not flood the POST/DB with dupes.
+                std::lock_guard<std::mutex> lock(shot_images_mutex_);
+                if (std::find(current_shot_image_paths_.begin(), current_shot_image_paths_.end(), relative)
+                        == current_shot_image_paths_.end()) {
+                    current_shot_image_paths_.push_back(relative);
+                }
             }
             else {
                 GS_LOG_MSG(warning, "GsUISystem::SaveWebserverImage - could not save to file name: " + fname);

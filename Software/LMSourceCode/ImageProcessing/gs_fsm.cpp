@@ -128,6 +128,10 @@ namespace golf_sim {
         // Let the monitor interface know what's happening
         GsUISystem::SendIPCStatusMessage(GsIPCResultType::kInitializing);
 
+        // A restart abandons any in-progress shot (cam2 timeout, trigger failure) without
+        // flushing a result POST, so drop its stale shot id/images before the next attempt.
+        GsUISystem::ResetCurrentShot();
+
         // If we're already armed, just start waiting for a ball to appear.
         if (GsSimInterface::GetAllSystemsArmed()) {
             GolfSimEventElement beginWaitingForBallPlacedEvent{ new GolfSimEvent::BeginWaitingForBallPlaced{ } };
@@ -482,16 +486,20 @@ namespace golf_sim {
             auto velocity_time_period_string = GS_FORMATLIB_FORMAT("{: <6.2f}", velocity_time_period);
             s = " Time between chosen images for velocity calculation: " + velocity_time_period_string + " ms.";
 
-            GsUISystem::SendIPCHitMessage(result_ball, s);
-
-#ifdef __unix__ 
+            // Save the exposure-candidates image and announce it BEFORE SendIPCHitMessage:
+            // that call flushes the accumulated image paths into the POST and resets the
+            // shot id, so any image saved after it would land under a fresh shot.
+#ifdef __unix__
             if (exposures_image.empty()) {
                 GS_LOG_MSG(warning, "Exposures_image from ProcessReceivedCamera2 was empty.");
             }
             GsUISystem::SaveWebserverImage(GsUISystem::kWebServerResultBallExposureCandidates,
                 exposures_image, exposure_balls);
-            GsHttpClient::PostImageReady(GsUISystem::kWebServerResultBallExposureCandidates + ".png");
+            GsHttpClient::PostImageReady(
+                GsUISystem::CurrentShotRelativePath(GsUISystem::kWebServerResultBallExposureCandidates + ".png"));
 #endif
+
+            GsUISystem::SendIPCHitMessage(result_ball, s);
 
         }
 

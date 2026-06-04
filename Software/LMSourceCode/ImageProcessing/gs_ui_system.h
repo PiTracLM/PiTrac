@@ -10,6 +10,10 @@
 #ifdef __unix__  // Ignore in Windows environment
 
 
+#include <mutex>
+#include <string>
+#include <vector>
+
 #include "logging_tools.h"
 #include "golf_ball.h"
 #include "gs_result_types.h"
@@ -30,7 +34,21 @@ namespace golf_sim {
         static std::string kWebServerResultBallRotatedByBestAngles;
         static std::string kWebServerErrorExposuresImage;
         static std::string kWebServerBallSearchAreaImage;
-        
+
+        // Per-shot image bookkeeping.  shot_id is an epoch-ms id minted once per shot
+        // (lazily, when the first image of the shot is saved) and reset when the shot's
+        // result is flushed to the web server.  Image paths are relative to the share dir.
+        static long current_shot_id_;
+        static std::vector<std::string> current_shot_image_paths_;
+        static std::mutex shot_images_mutex_;
+
+        // Returns "shots/<shot_id>/<file_name>", minting the shot id if not already set.
+        static std::string CurrentShotRelativePath(const std::string& file_name);
+
+        // Clears the current shot id and accumulated image paths so the next shot starts
+        // fresh.  Used when a shot is abandoned (timeout/trigger failure) without a result POST.
+        static void ResetCurrentShot();
+
 
         static void SendIPCErrorStatusMessage(const std::string& error_message);
 
