@@ -237,9 +237,15 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	bool pico_trigger_set = false;
 	bool pico_quiesce_done = false;
 	uint64_t pico_event_baseline = 0;
-	int pico_warm_up_pulses = gs::PulseStrobe::kNumberPrimingPulses;
-	if (pico_warm_up_pulses < 6) {
-		pico_warm_up_pulses = 6;
+	// Fire warm-up pulses spanning the WHOLE quiesce window + margin, so a triggered frame still
+	// arrives AFTER the window closes and the time-quiesce can complete. main gets this for free
+	// (its priming train spans ~1.8s via the InnoMaker commit pause); our 12-pulse ~800ms train
+	// stopped short of the 1302ms window, so the quiesce never fired and cam2 blocked until the
+	// strike -- the 93s hang. CAM_PULSE runs on core1 (no DSP/audio impact), so more is safe.
+	const long pico_inter_pulse_ms = 1000 / gs::PulseStrobe::kPrimingPulseFPS;  // ~66ms at 15fps
+	int pico_warm_up_pulses = (int)((kQuiesceTimeMs + 400) / pico_inter_pulse_ms) + 1;
+	if (pico_warm_up_pulses < gs::PulseStrobe::kNumberPrimingPulses) {
+		pico_warm_up_pulses = gs::PulseStrobe::kNumberPrimingPulses;
 	}
 	if (pico_mode) {
 		// set-1 (SetExternalTrigger above) already engaged the trigger, so cam2 is in trigger
