@@ -135,13 +135,14 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	// is stopped here, so there is no legitimate in-flight message to lose.
 	app.DrainMessages();
 
-	// Pico mode: enter external-trigger mode BEFORE StartCamera. The standby-toggle that
-	// commits it only takes cleanly while stopped -- doing it mid-stream stalls the sensor ~14s.
+	// cam2's external trigger is set AFTER StartCamera, on the first frame (see the loop) --
+	// EXACTLY like main/legacy. main runs imx296_trigger while the stream is already live (its
+	// comment: "needs to be called AFTER the camera has already started up") and lets the ~1s
+	// InnoMaker pause baked into the quiesce window commit it. Setting it BEFORE StartCamera (the
+	// old pico path, commit 1da2ac5) doesn't stick -- StartCamera re-inits the sensor and cam2
+	// free-runs at 30fps. So: don't set it here.
 	const bool pico_mode = gs::PulseStrobe::IsPicoActive();
 	const gs::CameraHardware::CameraModel camera_model = gs::GolfSimCamera::kSystemSlot2CameraType;
-	if (pico_mode && camera_model == gs::CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
-		SetImx296TriggerModeViaI2C(1);
-	}
 
 	app.StartCamera();
 	GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop: camera started, waiting for triggers");
@@ -178,8 +179,8 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
     // Legacy priming path only -- see the kWaitingForFirstPrimingPulseGroup case.
 	bool innomaker_first_external_trigger_is_set = false;
 
-	// Legacy path only. Pico mode already committed trigger before StartCamera; toggling
-	// the standby mid-stream is what stalled the sensor.
+	// Legacy path only -- sets the trigger right after StartCamera (main does this too). Pico
+	// mode sets it on the first frame instead (in the loop below), so skip it here.
 	if (!pico_mode) {
 		bool dummy = false;
 		SetExternalTrigger(dummy);
@@ -222,23 +223,19 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 
 	bool return_status = true;
 
-	// Pico mode warms cam2 exactly like the legacy priming train: a background thread fires the
-	// XTR warm-up pulses while the event loop below IGNORES every frame for the quiesce window
-	// (kQuiesceTimeMs), then takes the first frame AFTER the window as the real strike. The
-	// window -- not any brightness/frame-mean check -- is what separates warm-up from the shot.
+	// Pico mode mirrors main: on the FIRST frame (sensor now streaming) we set the external
+	// trigger and start the background warm-up/priming pulses; the loop then IGNORES every frame
+	// for the quiesce window (kQuiesceTimeMs already includes the ~1s InnoMaker commit pause),
+	// and the fire-count gate takes the real strike. Trigger is set there, after StartCamera --
+	// before StartCamera doesn't stick and cam2 free-runs.
 	std::thread pico_warmup_thread;
 	std::chrono::steady_clock::time_point pico_quiesce_start{};
+	bool pico_trigger_set = false;
 	bool pico_quiesce_done = false;
 	uint64_t pico_event_baseline = 0;
-	if (pico_mode) {
-		int warm_up_pulses = gs::PulseStrobe::kNumberPrimingPulses;
-		if (warm_up_pulses < 6) {
-			warm_up_pulses = 6;
-		}
-		pico_warmup_thread = std::thread(PicoFireWarmUpPulses, warm_up_pulses, /*pulse_width_us=*/200);
-		// The quiesce clock starts on the FIRST warm-up frame (in the loop, like legacy's
-		// timeOfFirstTrigger), and cam2_ready_for_final_trigger_ is set only after the window
-		// completes -- so the FSM doesn't arm the Pico until cam2 is past the warm-up frames.
+	int pico_warm_up_pulses = gs::PulseStrobe::kNumberPrimingPulses;
+	if (pico_warm_up_pulses < 6) {
+		pico_warm_up_pulses = 6;
 	}
 	struct PicoWarmupThreadGuard {
 		std::thread& t;
@@ -300,6 +297,22 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 		switch (state) {
 
 		case kWaitingForFinalImageTrigger: {
+
+			// Pico mode, FIRST frame: the sensor is now streaming, so set the InnoMaker external
+			// trigger the SAME way main does -- HERE, after StartCamera, NOT before it (before
+			// doesn't stick and cam2 free-runs). Then start the background warm-up/priming pulses.
+			// Ignore this last pre-trigger frame.
+			if (pico_mode && !pico_trigger_set) {
+				pico_trigger_set = true;
+				if (camera_model == gs::CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+					SetImx296TriggerModeViaI2C(1);
+				}
+				pico_warmup_thread = std::thread(PicoFireWarmUpPulses, pico_warm_up_pulses, /*pulse_width_us=*/200);
+				GS_LOG_TRACE_MSG(trace, "Pico: first frame -- external trigger set after StartCamera (main-style), warm-up started.");
+				CompletedRequestPtr& first_discard = std::get<CompletedRequestPtr>(msg.payload);
+				(void)first_discard;
+				break;
+			}
 
 			// Pico mode: replicate the legacy time-quiesce (kWaitingForFirstPrimingTimeEnd).
 			// Ignore EVERY frame received during the quiesce window -- these are the background
