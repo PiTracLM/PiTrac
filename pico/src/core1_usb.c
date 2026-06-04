@@ -454,7 +454,7 @@ void core1_usb_entry(void) {
                  * whole loop (command parse + FIFO drain). Emit only while
                  * attached; schedule still advances so we don't burst on reconnect. */
                 if (stdio_usb_connected()) {
-                    int64_t rms = sensors_max_level();
+                    int64_t rms = impact_detect_take_peak_rms();  /* peak since last emit, not instantaneous */
                     printf("EVENT RMS value=%lld timestamp=%llu\n",
                            (long long)rms,
                            (unsigned long long)now_us);

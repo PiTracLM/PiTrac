@@ -211,11 +211,11 @@
 #define STROBE_MAX_HOLD_MS  200u
 
 /* Firmware version — surfaced on the boot LOG line. */
-#define PITRAC_PICO_FW_VERSION "0.7.6"
+#define PITRAC_PICO_FW_VERSION "0.8.0"
 
 /* EVENT RMS streaming rate ceiling (samples/sec). Caps the web UI mic
  * visualiser so USB CDC TX can't saturate and starve STATUS replies. */
-#define STREAM_RMS_MAX_HZ  100u
+#define STREAM_RMS_MAX_HZ  500u
 
 /* Cam2/Cam1 XTR setup time before the strobe train. Host-tunable via CFG
  * CAM_XTR_SETUP_US. IMX296/Mira220 imply a few hundred µs min; 1 ms is safe. */

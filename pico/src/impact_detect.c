@@ -44,7 +44,6 @@
 
 typedef enum {
     ST_IDLE = 0,
-    ST_ONSET_WATCH,
     ST_DEBOUNCE,
 } state_t;
 
@@ -156,6 +155,11 @@ static inline void env_push_lo(int32_t sample) {
     s.sq_hist_lo[s.sq_hist_idx] = sq;
 }
 
+/* Peak windowed-RMS between mic-stream reads. volatile: core0 writes it per sample,
+ * core1 takes+resets it for the EVENT RMS telemetry. Lets a 100-500Hz stream catch a
+ * ~1ms ball-strike transient that sampling the instantaneous level falls between. */
+static volatile int64_t s_peak_rms = 0;
+
 /* Run one 16-kHz sample through the pipeline. Returns true on a trigger event
  * and sets *rms_out to the high-band sum-of-squares at the trigger point. */
 static bool process_sample(int32_t x, bool armed, int32_t *rms_out) {
@@ -169,9 +173,14 @@ static bool process_sample(int32_t x, bool armed, int32_t *rms_out) {
     s.sq_hist_idx++;
     if (s.sq_hist_idx >= DSP_RMS_WINDOW_SAMPLES) s.sq_hist_idx = 0;
 
-    /* No divide-by-window: both sides of every comparison carry the same scale. */
+    /* No divide-by-window: the threshold comparison carries the same scale. */
     int64_t env_hi = s.sq_hi_sum;
-    int64_t env_lo = s.sq_lo_sum;
+
+    /* Hold the peak windowed RMS for the EVENT RMS telemetry stream (diagnostic). */
+    {
+        int64_t cur_rms = (env_hi < 0 ? 0 : env_hi) / DSP_RMS_WINDOW_SAMPLES;
+        if (cur_rms > s_peak_rms) s_peak_rms = cur_rms;
+    }
 
     if (++s.baseline_update_counter >= DSP_BASELINE_UPDATE_INTERVAL) {
         s.baseline_update_counter = 0;
@@ -196,44 +205,17 @@ static bool process_sample(int32_t x, bool armed, int32_t *rms_out) {
         return false;
 
     case ST_IDLE: {
-        /* Gate 1: noise floor — high-band envelope above raw threshold. */
+        /* Fire on the threshold crossing. The old onset-jump/two-band/decay-confirm gates
+         * rejected real strikes — a sharp crack collapses before the decay window — and a
+         * strike runs orders of magnitude over the floor, so threshold + debounce is enough. */
         if (env_hi < (int64_t)s.threshold * DSP_RMS_WINDOW_SAMPLES) return false;
+        if (!armed) return false;
 
-        /* Gate 2: onset jump over baseline. Squared comparison, so square the
-         * ratio: (2033/256)^2 ≈ 63.05 → env_hi > baseline * ~63. */
-        int64_t jump_threshold = s.baseline_hi_sq * DSP_ONSET_JUMP_RATIO_SQUARED;
-        if (env_hi < jump_threshold) return false;
-
-        /* Gate 3: two-band ratio > 2.0, squared → env_hi > 4 * env_lo. */
-        if (env_lo > 0 && env_hi < (env_lo * 4)) return false;
-        if (!armed) {
-            /* DSP still runs to keep the baseline warm; just don't fire. */
-            return false;
-        }
-
-        s.state = ST_ONSET_WATCH;
-        s.state_samples = 0;
         s.last_trigger_rms = (int32_t)(env_hi / DSP_RMS_WINDOW_SAMPLES);
-        return false;
-    }
-
-    case ST_ONSET_WATCH: {
-        s.state_samples++;
-        /* Energy collapses to <1/4 threshold before the timer → transient
-         * click, abandon. */
-        if (env_hi < ((int64_t)s.threshold * DSP_RMS_WINDOW_SAMPLES) / 4) {
-            s.state = ST_IDLE;
-            s.state_samples = 0;
-            return false;
-        }
-        /* Timer expired with energy still elevated → genuine impact. */
-        if (s.state_samples >= s.decay_confirm_samples) {
-            s.state = ST_DEBOUNCE;
-            s.state_samples = 0;
-            if (rms_out) *rms_out = s.last_trigger_rms;
-            return true;
-        }
-        return false;
+        s.state = ST_DEBOUNCE;
+        s.state_samples = 0;
+        if (rms_out) *rms_out = s.last_trigger_rms;
+        return true;
     }
 
     default:
@@ -334,6 +316,12 @@ int64_t impact_detect_current_rms(void) {
     int64_t env = s.sq_hi_sum;
     if (env < 0) env = 0;
     return env / DSP_RMS_WINDOW_SAMPLES;
+}
+
+int64_t impact_detect_take_peak_rms(void) {
+    int64_t p = s_peak_rms;
+    s_peak_rms = 0;
+    return p;
 }
 
 uint32_t impact_detect_processed_sample_count(void) {

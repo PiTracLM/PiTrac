@@ -193,13 +193,14 @@ static void test_noise_floor_threshold_gates_a_strike(void) {
     EXPECT(feed_count(10000, 200, true, true) == 0, "strike below a higher noise floor must not fire");
 }
 
-/* Gate 3 (band ratio): constant loud DC has no high-band AC, so the band-pass
- * rejects it. Low-frequency rumble / a held DC offset must not trip the trigger. */
+/* Sustained DC is killed by the band-pass (both LPFs converge → high band ~0), not a gate.
+ * Settle the init 0→DC step disarmed first, then prove the held DC stays silent. */
 static void test_dc_rumble_does_not_fire(void) {
     ring_buffer_reset(&g_ring);
     impact_detect_init(&g_ring);
-    uint32_t fires = feed_count(120000, 200, true, /*alternate=*/false);
-    EXPECT(fires == 0, "constant low-band/DC energy must not trip the impact detector");
+    feed_count(120000, 100, /*armed=*/false, /*alternate=*/false);  /* let the LPFs converge */
+    uint32_t fires = feed_count(120000, 200, /*armed=*/true, /*alternate=*/false);
+    EXPECT(fires == 0, "sustained low-band/DC energy must not trip the impact detector");
 }
 
 /* Debounce: a sustained strike would re-onset every sample; the 300 ms lockout
@@ -211,14 +212,13 @@ static void test_debounce_suppresses_immediate_refire(void) {
     EXPECT(fires == 1, "debounce must collapse a sustained strike to a single fire");
 }
 
-/* Decay confirmation: a click shorter than the decay-confirm window must be
- * rejected. Onset may start, but the energy has to persist before we trust it. */
-static void test_short_transient_does_not_fire(void) {
+/* A sharp sub-ms crack is a real strike and must fire immediately — the old 5 ms
+ * decay-confirm rejected exactly this (the "ready to hit forever" bug). */
+static void test_short_transient_fires(void) {
     ring_buffer_reset(&g_ring);
     impact_detect_init(&g_ring);
-    uint32_t fires = feed_count(120000, 30, true, true);   /* ~2 ms strike, < 5 ms confirm */
-    fires += feed_count(0, 120, true, true);               /* then quiet: onset abandons */
-    EXPECT(fires == 0, "a transient shorter than the decay-confirm window must not fire");
+    uint32_t fires = feed_count(120000, 30, true, true);   /* ~2 ms sharp strike */
+    EXPECT(fires >= 1, "a sharp transient above threshold must fire (no decay-confirm gate)");
 }
 
 int main(void) {
@@ -230,7 +230,7 @@ int main(void) {
     test_noise_floor_threshold_gates_a_strike();
     test_dc_rumble_does_not_fire();
     test_debounce_suppresses_immediate_refire();
-    test_short_transient_does_not_fire();
+    test_short_transient_fires();
 
     if (failures > 0) {
         printf("%d failure(s)\n", failures);
