@@ -179,9 +179,13 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
     // Legacy priming path only -- see the kWaitingForFirstPrimingPulseGroup case.
 	bool innomaker_first_external_trigger_is_set = false;
 
-	// Legacy path only -- sets the trigger right after StartCamera (main does this too). Pico
-	// mode sets it on the first frame instead (in the loop below), so skip it here.
-	if (!pico_mode) {
+	// Set the InnoMaker trigger right after StartCamera -- main does this for ALL modes (its
+	// SetExternalTrigger right after the stream starts), then re-commits it again on the first
+	// frame (the loop below does that for Pico). This first set doesn't fully commit (the stream
+	// only just started), so a free-running first frame still arrives and the loop's re-commit
+	// lands it -- exactly like main's double-set. No (!pico_mode) gate now: SetExternalTrigger
+	// no-ops for non-InnoMaker cameras, so it's safe in every mode.
+	{
 		bool dummy = false;
 		SetExternalTrigger(dummy);
 	}
