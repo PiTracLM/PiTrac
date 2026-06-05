@@ -148,7 +148,6 @@ class PiTracProcessManager:
             for cfg_key, env_var in (
                 ("gs_config.pico.mic_threshold", "PITRAC_PICO_MIC_THRESHOLD"),
                 ("gs_config.pico.mic_threshold_putt", "PITRAC_PICO_MIC_THRESHOLD_PUTT"),
-                ("gs_config.pico.decay_confirm_ms", "PITRAC_PICO_DECAY_CONFIRM_MS"),
             ):
                 node = merged_config
                 for part in cfg_key.split("."):

@@ -20,7 +20,6 @@ typedef struct {
     /* int64: mic mean-square RMS exceeds INT32_MAX on a loud strike; an int32
      * return wrapped negative and silently passed the arm-quiet gate. */
     int64_t (*current_rms)(void);
-    void    (*set_decay_confirm)(uint32_t ms);
 
     /* Strobe pattern. Pass intervals_ms=NULL to keep current intervals;
      * pass pulse_width_us=0.0f to keep current width. Returns false if the

@@ -214,18 +214,6 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
             out->u.u32 = (uint32_t)v;
             return true;
         }
-        if (strcmp(key, "DECAY_CONFIRM_MS") == 0) {
-            /* Post-onset sustained-energy window before firing. Lower = more
-             * sensitive, higher = rejects short clicks. Runtime default 5 ms
-             * (was 40 ms compile-time); detector clamps to 1..200. */
-            long v;
-            if (!parse_int(val, &v)) return false;
-            if (v < 1)   v = 1;
-            if (v > 200) v = 200;
-            out->kind = CMD_CFG_DECAY_CONFIRM;
-            out->u.u32 = (uint32_t)v;
-            return true;
-        }
         if (strcmp(key, "STREAM_RMS") == 0) {
             /* Mic RMS emission rate (Hz). 0 stops; capped at STREAM_RMS_MAX_HZ
              * so a typo can't flood the USB CDC TX queue. */

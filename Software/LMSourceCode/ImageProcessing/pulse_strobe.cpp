@@ -646,20 +646,6 @@ namespace golf_sim {
 			// swing (FSM pings every kPicoHeartbeatIntervalMs) yet safety-disarms
 			// within kPicoArmTimeoutMs if the LM crashes mid-session.
 			pico_client_->SetArmTimeout(static_cast<uint32_t>(kPicoArmTimeoutMs));
-
-			// Push the operator's persisted DSP tuning so a power-cycled Pico recovers
-			// instead of arming on compiled defaults (may not clear the room's arm-quiet
-			// gate). Values arrive via the LM env from gs_config.pico.*. The mic floor is
-			// already pushed by the kDriver SelectClubProfile above (per-club thresholds).
-			if (const char* dc = std::getenv("PITRAC_PICO_DECAY_CONFIRM_MS"); dc && *dc) {
-				try {
-					if (!pico_client_->SetDecayConfirm(static_cast<uint32_t>(std::stoul(dc)))) {
-						GS_LOG_MSG(warning, "Pico did not accept persisted decay_confirm_ms " + std::string(dc));
-					}
-				} catch (const std::exception&) {
-					GS_LOG_MSG(warning, "ignoring malformed PITRAC_PICO_DECAY_CONFIRM_MS=" + std::string(dc));
-				}
-			}
 		}
 
 		// Pre-compute the pulse sequences to save time at trigger

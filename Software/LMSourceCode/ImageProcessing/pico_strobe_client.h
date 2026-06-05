@@ -18,7 +18,6 @@ struct PicoStatus {
     int32_t     mic_threshold = 0;
     float       pulse_width_us = 0.0f;
     uint32_t    min_inter_shot_ms = 0;
-    uint32_t    decay_confirm_ms = 0;
     bool        strobe_hold = false;
     uint64_t    event_count = 0;
     std::vector<float> intervals;   // strobe pulse-gap vector echoed by firmware
@@ -79,7 +78,6 @@ public:
     // Persist DSP detector config so a power-cycled Pico recovers operator tuning
     // instead of compiled defaults. Each STATUS-verifies the echo.
     bool SetMicThreshold(int32_t threshold);
-    bool SetDecayConfirm(uint32_t ms);
 
     // Calibration hold.
     bool HoldOn();

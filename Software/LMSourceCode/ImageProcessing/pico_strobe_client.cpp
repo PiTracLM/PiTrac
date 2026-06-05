@@ -354,15 +354,6 @@ bool PicoStrobeClient::SetMicThreshold(int32_t threshold) {
     return st.mic_threshold == threshold;
 }
 
-bool PicoStrobeClient::SetDecayConfirm(uint32_t ms) {
-    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
-    if (!IsOpen()) return false;
-    if (!impl_->WriteLine("CFG DECAY_CONFIRM_MS=" + std::to_string(ms))) return false;
-    PicoStatus st;
-    if (!ReadStatus(st)) return false;
-    return st.decay_confirm_ms == ms;
-}
-
 uint64_t PicoStrobeClient::LastEventCount() {
     std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     PicoStatus st;
@@ -381,7 +372,7 @@ bool PicoStrobeClient::ReadStatus(PicoStatus& out) {
     impl_->rx_buf.clear();  // tcflush drops the OS buffer; drop our software buffer too.
     if (!impl_->WriteLine("STATUS")) return false;
 
-    // A preceding CFG (Arm, SetMicThreshold, SetDecayConfirm) lands its "LOG <ack>" /
+    // A preceding CFG (Arm, SetMicThreshold) lands its "LOG <ack>" /
     // "LOG error: ..." ahead of the reply, and an EVENT strike can arrive any time --
     // ReadSolicitedReply logs+skips those async lines and returns the STATUS reply under
     // one bounded deadline. (Old loop polled 32x1000ms PER line, so one missing line
@@ -408,8 +399,6 @@ bool PicoStrobeClient::ReadStatus(PicoStatus& out) {
                 out.pulse_width_us = std::stof(val);
             } else if (key == "min_inter_shot_ms") {
                 out.min_inter_shot_ms = static_cast<uint32_t>(std::stoul(val));
-            } else if (key == "decay_confirm_ms") {
-                out.decay_confirm_ms = static_cast<uint32_t>(std::stoul(val));
             } else if (key == "event_count") {
                 out.event_count = static_cast<uint64_t>(std::stoull(val));
             } else if (key == "intervals") {

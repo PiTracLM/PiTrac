@@ -21,16 +21,7 @@
  * State machine:
  *
  *   IDLE
- *     ├─ high-band energy > threshold AND ratio passes → ONSET
- *     │
- *   ONSET
- *     ├─ start decay-confirm timer (40 ms)
- *     ├─ wait for sustained energy through the timer
- *     │   ├─ energy drops below threshold/2 mid-timer → IDLE (false alarm)
- *     │   └─ timer expires with energy still elevated → TRIGGER
- *     │
- *   TRIGGER
- *     └─ return true, enter DEBOUNCE
+ *     └─ armed AND high-band energy > threshold → TRIGGER, enter DEBOUNCE
  *
  *   DEBOUNCE
  *     └─ DSP_DEBOUNCE_MS pass → IDLE
@@ -58,10 +49,6 @@ static struct {
     uint32_t       state_samples;   /* samples elapsed in current state */
     uint32_t       sample_count;    /* diagnostics */
 
-    /* How long high-band energy must persist post-onset to accept the impact.
-     * Host-tunable via CFG DECAY_CONFIRM_MS. */
-    uint32_t       decay_confirm_samples;
-
     /* Single-pole IIR low-pass state (Q15 coefficients), one per band. */
     int32_t        lpf_lo_y;        /* output of <1 kHz low-pass */
     int32_t        lpf_hi_y;        /* output of <6 kHz low-pass */
@@ -77,7 +64,7 @@ static struct {
     int32_t        dec_sum;
     uint8_t        dec_count;
 
-    /* Sum-of-squares envelopes — running sums over RMS_WINDOW_SAMPLES, kept O(1)
+    /* Sum-of-squares envelope — running sum over RMS_WINDOW_SAMPLES, kept O(1)
      * via a circular history (subtract outgoing square, add incoming).
      *
      * Slots are int64: the per-sample square reaches ~1.7e10 (18b × 18b) >
@@ -85,24 +72,15 @@ static struct {
      * truncated one 16 samples later, so the running sum drifts
      * (observed: mic_rms = -1.6e9 with a working mic). */
     int64_t        sq_hi_sum;       /* high-band squared envelope */
-    int64_t        sq_lo_sum;       /* low-band  squared envelope */
     int64_t        sq_hist_hi[DSP_RMS_WINDOW_SAMPLES];
-    int64_t        sq_hist_lo[DSP_RMS_WINDOW_SAMPLES];
     uint16_t       sq_hist_idx;
 
-    /* Baseline: slow exponential average of high-band envelope, compared
-     * against the instantaneous envelope for the >18 dB jump. Updated every
-     * ~4 ms (64 samples at 16 kHz). */
-    int64_t        baseline_hi_sq;
-    uint16_t       baseline_update_counter;
-
-    /* Latched at onset for return to caller. */
+    /* Latched at trigger for return to caller. */
     int32_t        last_trigger_rms;
 } s;
 
-/* IIR coefficients and baseline tuning live in config.h (DSP_LPF_ALPHA_*,
- * DSP_BASELINE_*). 1 kHz LPF output is the "low band"; (6 kHz − 1 kHz) is the
- * "high band". */
+/* IIR coefficients live in config.h (DSP_LPF_ALPHA_*). 1 kHz LPF output is the
+ * "low band"; (6 kHz − 1 kHz) is the "high band". */
 
 /* Unpack one I2S word to a signed 18-bit sample (SPH0645's usable range).
  *
@@ -148,13 +126,6 @@ static inline void env_push_hi(int32_t sample) {
     s.sq_hist_hi[s.sq_hist_idx] = sq;
 }
 
-static inline void env_push_lo(int32_t sample) {
-    int64_t sq = (int64_t)sample * sample;
-    s.sq_lo_sum += sq;
-    s.sq_lo_sum -= s.sq_hist_lo[s.sq_hist_idx];
-    s.sq_hist_lo[s.sq_hist_idx] = sq;
-}
-
 /* Peak windowed-RMS between mic-stream reads. volatile: core0 writes it per sample,
  * core1 takes+resets it for the EVENT RMS telemetry. Lets a 100-500Hz stream catch a
  * ~1ms ball-strike transient that sampling the instantaneous level falls between. */
@@ -164,12 +135,9 @@ static volatile int64_t s_peak_rms = 0;
  * and sets *rms_out to the high-band sum-of-squares at the trigger point. */
 static bool process_sample(int32_t x, bool armed, int32_t *rms_out) {
     int32_t band_hi = band_filter(x);
-    int32_t band_lo = s.lpf_lo_y;
 
     env_push_hi(band_hi);
-    env_push_lo(band_lo);
 
-    /* Advance index *after* both pushes so hi/lo reference the same slot. */
     s.sq_hist_idx++;
     if (s.sq_hist_idx >= DSP_RMS_WINDOW_SAMPLES) s.sq_hist_idx = 0;
 
@@ -180,16 +148,6 @@ static bool process_sample(int32_t x, bool armed, int32_t *rms_out) {
     {
         int64_t cur_rms = (env_hi < 0 ? 0 : env_hi) / DSP_RMS_WINDOW_SAMPLES;
         if (cur_rms > s_peak_rms) s_peak_rms = cur_rms;
-    }
-
-    if (++s.baseline_update_counter >= DSP_BASELINE_UPDATE_INTERVAL) {
-        s.baseline_update_counter = 0;
-        /* Update only below threshold so impacts don't pull the baseline up. */
-        if (env_hi < s.threshold * (int64_t)DSP_RMS_WINDOW_SAMPLES) {
-            int64_t err = env_hi - s.baseline_hi_sq;
-            s.baseline_hi_sq += err >> DSP_BASELINE_STEP_SHIFT;
-            if (s.baseline_hi_sq < 1) s.baseline_hi_sq = 1;  /* never divide-by-zero */
-        }
     }
 
     s.sample_count++;
@@ -229,7 +187,6 @@ void impact_detect_init(ring_buffer_t *source) {
      * envelopes behind (BSS only covers the first init). */
     for (uint32_t i = 0; i < DSP_RMS_WINDOW_SAMPLES; ++i) {
         s.sq_hist_hi[i] = 0;
-        s.sq_hist_lo[i] = 0;
     }
     s.src = source;
     s.threshold = DSP_DEFAULT_THRESHOLD;
@@ -242,24 +199,8 @@ void impact_detect_init(ring_buffer_t *source) {
     s.dec_sum = 0;
     s.dec_count = 0;
     s.sq_hi_sum = 0;
-    s.sq_lo_sum = 0;
     s.sq_hist_idx = 0;
-    s.baseline_hi_sq = 1;  /* never zero — used as a divisor proxy */
-    s.baseline_update_counter = 0;
     s.last_trigger_rms = 0;
-    s.decay_confirm_samples = DSP_DECAY_CONFIRM_MS * DSP_SAMPLE_RATE_HZ / 1000u;
-}
-
-void impact_detect_set_decay_confirm_ms(uint32_t ms) {
-    /* Clamp 1..200 ms: <1 ms rounds to 0 samples (always-fire on any onset);
-     * 200 ms is well past any real golf-impact decay tail. */
-    if (ms < 1)   ms = 1;
-    if (ms > 200) ms = 200;
-    s.decay_confirm_samples = ms * DSP_SAMPLE_RATE_HZ / 1000u;
-}
-
-uint32_t impact_detect_get_decay_confirm_ms(void) {
-    return s.decay_confirm_samples * 1000u / DSP_SAMPLE_RATE_HZ;
 }
 
 bool impact_detect_step(bool armed, int32_t *rms_out) {

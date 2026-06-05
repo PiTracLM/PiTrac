@@ -110,12 +110,11 @@ static bool vbus_present(void) {
 int proto_format_status(const pitrac_state_t *st, char *buf, int buflen) {
     int n = snprintf(buf, buflen,
         "STATUS armed=%d threshold=%ld pulse_us=%.2f min_inter_shot_ms=%lu "
-        "pre_trigger_delay_ms=%lu decay_confirm_ms=%lu strobe_hold=%d "
+        "pre_trigger_delay_ms=%lu strobe_hold=%d "
         "event_count=%lu dma_rearm=%lu vsys_mv=%lu vbus=%d fw=%s board=%s intervals=",
         (int)st->armed, (long)st->mic_threshold, (double)st->pulse_width_us,
         (unsigned long)st->min_inter_shot_ms,
         (unsigned long)st->pre_trigger_delay_ms,
-        (unsigned long)impact_detect_get_decay_confirm_ms(),
         (int)strobe_is_held(),
         (unsigned long)st->event_count,
         (unsigned long)st->dma_rearm_count,
@@ -188,10 +187,6 @@ static void fw_set_threshold(int32_t v) {
 
 static int32_t fw_get_threshold(void) { return g_state.mic_threshold; }
 static int64_t fw_current_rms(void)   { return sensors_max_level(); }
-
-static void fw_set_decay_confirm(uint32_t ms) {
-    impact_detect_set_decay_confirm_ms(ms);
-}
 
 /* Sentinels let CMD_CFG_INTERVALS and CMD_CFG_PULSE_WIDTH share one slot:
  * intervals_ms=NULL keeps current intervals, pulse_width_us=0 keeps current width. */
@@ -341,7 +336,6 @@ static const hw_driver_t fw_driver = {
     .set_threshold         = fw_set_threshold,
     .get_threshold         = fw_get_threshold,
     .current_rms           = fw_current_rms,
-    .set_decay_confirm     = fw_set_decay_confirm,
     .set_pulse_train       = fw_set_pulse_train,
     .set_armed             = fw_set_armed,
     .set_arm_timeout       = fw_set_arm_timeout,

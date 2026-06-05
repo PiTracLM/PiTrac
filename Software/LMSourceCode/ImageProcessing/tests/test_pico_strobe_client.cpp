@@ -100,7 +100,7 @@ BOOST_AUTO_TEST_CASE(read_status_parses_firmware_reply) {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
         const char reply[] =
             "STATUS armed=0 threshold=4096 pulse_us=8.68 "
-            "min_inter_shot_ms=200 pre_trigger_delay_ms=0 decay_confirm_ms=5 "
+            "min_inter_shot_ms=200 pre_trigger_delay_ms=0 "
             "strobe_hold=1 vsys_mv=0 vbus=1 "
             "intervals=0.70,1.80,3.00,2.20,3.00,7.10,4.00,0.00\n";
         ::write(pair.host, reply, sizeof(reply) - 1);
@@ -312,38 +312,6 @@ BOOST_AUTO_TEST_CASE(set_mic_threshold_fails_on_echo_mismatch) {
     responder.join();
 
     BOOST_CHECK(!ok);
-}
-
-BOOST_AUTO_TEST_CASE(set_decay_confirm_verifies_echo) {
-    SocketPair pair;
-    PicoStrobeClient client;
-    BOOST_REQUIRE(client.AttachFd(pair.client));
-    int flags = ::fcntl(pair.host, F_GETFL, 0);
-    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
-
-    std::thread responder = RespondStatus(pair.host, "STATUS armed=0 threshold=4096 decay_confirm_ms=3 fw=0.6.1\n");
-    bool ok = client.SetDecayConfirm(3);
-    responder.join();
-
-    BOOST_CHECK(ok);
-    std::string host_in = DrainHost(pair.host, 10);
-    BOOST_CHECK(host_in.find("CFG DECAY_CONFIRM_MS=3\n") != std::string::npos);
-}
-
-BOOST_AUTO_TEST_CASE(read_status_parses_decay_confirm) {
-    SocketPair pair;
-    PicoStrobeClient client;
-    BOOST_REQUIRE(client.AttachFd(pair.client));
-    int flags = ::fcntl(pair.host, F_GETFL, 0);
-    ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
-
-    std::thread responder = RespondStatus(pair.host, "STATUS armed=0 threshold=4096 decay_confirm_ms=12 fw=0.6.1\n");
-    PicoStatus status;
-    bool ok = client.ReadStatus(status);
-    responder.join();
-
-    BOOST_REQUIRE(ok);
-    BOOST_CHECK_EQUAL(status.decay_confirm_ms, 12u);
 }
 
 BOOST_AUTO_TEST_CASE(send_pulse_config_writes_both_lines_and_echo_verifies) {
