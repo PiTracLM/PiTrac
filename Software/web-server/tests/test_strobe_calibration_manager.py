@@ -492,6 +492,28 @@ class TestCalibrate:
         assert success is False
 
     @patch("strobe_calibration_manager.time.sleep")
+    def test_per_call_hard_cap_overrides_default(self, _sleep):
+        """A looser hard_cap lets the sweep accept a reading the 12 A cap rejects.
+
+        12.5 A trips the default 12 A cap but stays under the experimental 13 A
+        cap, so the same reading aborts at the default and succeeds at 13.
+        """
+        def build():
+            mgr = _make_mgr_with_hw()
+            mgr._find_dac_start = lambda: (50, 7.0)
+            current_dac = [50]
+            mgr._set_dac = lambda v: current_dac.__setitem__(0, v)
+            mgr.get_ldo_voltage = lambda: 7.0
+            # Cross the 12 A target as DAC steps down so phase 2 terminates.
+            mgr.get_led_current = lambda: 11.5 if current_dac[0] > 25 else 12.5
+            return mgr
+
+        # Default cap (12) rejects the 12.5 A reading.
+        assert build()._calibrate(12.0)[0] is False
+        # Experimental 13 A cap accepts it and finishes the sweep.
+        assert build()._calibrate(12.0, hard_cap=13.0)[0] is True
+
+    @patch("strobe_calibration_manager.time.sleep")
     def test_skips_ldo_below_min_during_sweep(self, _sleep):
         """When LDO drops below min during sweep, that step is skipped"""
         mgr = _make_mgr_with_hw()
@@ -665,13 +687,46 @@ class TestStartCalibration:
         mgr._close_hardware = Mock()
 
         captured_target = []
-        def fake_calibrate(target):
+        captured_cap = []
+        def fake_calibrate(target, hard_cap=None):
             captured_target.append(target)
+            captured_cap.append(hard_cap)
             return (True, 0x80, 9.5)
         mgr._calibrate = fake_calibrate
 
         await mgr.start_calibration(led_type="v3")
         assert captured_target[0] == 10.0
+        # v3 keeps the standard 12 A short-circuit cap
+        assert captured_cap[0] == 12.0
+
+    @pytest.mark.asyncio
+    @patch("strobe_calibration_manager.time.sleep")
+    async def test_uses_v3_high_target_and_cap(self, _sleep):
+        from strobe_calibration_manager import StrobeCalibrationManager
+
+        cm = Mock()
+        cm.get_config.side_effect = lambda key=None: {
+            "gs_config.strobing.kConnectionBoardVersion": "3",
+            "gs_config.strobing.kDAC_setting": None,
+        }.get(key)
+        cm.set_config.return_value = (True, "ok", False)
+
+        mgr = StrobeCalibrationManager(cm)
+        mgr._open_hardware = Mock()
+        mgr._close_hardware = Mock()
+
+        captured_target = []
+        captured_cap = []
+        def fake_calibrate(target, hard_cap=None):
+            captured_target.append(target)
+            captured_cap.append(hard_cap)
+            return (True, 0x80, 11.8)
+        mgr._calibrate = fake_calibrate
+
+        await mgr.start_calibration(led_type="v3_high")
+        # Experimental preset drives harder (12 A) under its own looser 13 A cap
+        assert captured_target[0] == 12.0
+        assert captured_cap[0] == 13.0
 
     @pytest.mark.asyncio
     @patch("strobe_calibration_manager.time.sleep")
@@ -690,13 +745,17 @@ class TestStartCalibration:
         mgr._close_hardware = Mock()
 
         captured_target = []
-        def fake_calibrate(target):
+        captured_cap = []
+        def fake_calibrate(target, hard_cap=None):
             captured_target.append(target)
+            captured_cap.append(hard_cap)
             return (True, 0x80, 8.5)
         mgr._calibrate = fake_calibrate
 
         await mgr.start_calibration(led_type="legacy")
         assert captured_target[0] == 9.0
+        # legacy shares the standard 12 A cap
+        assert captured_cap[0] == 12.0
 
     @pytest.mark.asyncio
     @patch("strobe_calibration_manager.time.sleep")
@@ -715,13 +774,17 @@ class TestStartCalibration:
         mgr._close_hardware = Mock()
 
         captured_target = []
-        def fake_calibrate(target):
+        captured_cap = []
+        def fake_calibrate(target, hard_cap=None):
             captured_target.append(target)
+            captured_cap.append(hard_cap)
             return (True, 0x80, 7.5)
         mgr._calibrate = fake_calibrate
 
         await mgr.start_calibration(led_type="v3", target_current=7.5)
         assert captured_target[0] == 7.5
+        # explicit target override still applies the chosen preset's cap (v3 → 12)
+        assert captured_cap[0] == 12.0
 
     @pytest.mark.asyncio
     @patch("strobe_calibration_manager.time.sleep")

@@ -477,10 +477,15 @@
                 <div class="flex items-center gap-3">
                     <label for="strobe-led-type" class="text-sm font-semibold opacity-60 min-w-[80px]">LED Type:</label>
                     <select id="strobe-led-type" class="select select-bordered select-sm">
-                        <option value="v3" selected>V3 LED Board (10A)</option>
+                        <option value="v3" selected>V3 (standard, 10 A)</option>
                         <option value="legacy">Legacy 100W LED (9A)</option>
+                        <option value="v3_high">V3 — High Current (experimental)</option>
                     </select>
                 </div>
+                <p class="text-xs opacity-60 max-w-prose" id="strobe-led-type-help">
+                    Drives the IR LEDs to 12 A — above the standard 10 A and beyond datasheet spec.
+                    Experimental; may shorten LED life. Keep strobe pulses short.
+                </p>
                 <div class="flex items-center gap-3">
                     <button id="strobe-calibrate-btn" class="btn btn-primary btn-sm" onclick="calibration.startStrobeCalibration()">
                         Calibrate

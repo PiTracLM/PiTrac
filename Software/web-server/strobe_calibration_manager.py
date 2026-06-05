@@ -102,6 +102,12 @@ class StrobeCalibrationManager:
     LEGACY_TARGET_CURRENT = 9.0
     HARD_CAP_CURRENT = 12.0
 
+    # Experimental high-current preset: drives the IR LEDs past datasheet spec.
+    # Gets its own looser cap so it doesn't relax the tight 12 A short-circuit
+    # detector that protects the standard v3/legacy presets.
+    V3_HIGH_TARGET_CURRENT = 12.0
+    V3_HIGH_HARD_CAP = 13.0
+
     # Config key for persisting the result
     DAC_CONFIG_KEY = "gs_config.strobing.kDAC_setting"
 
@@ -452,12 +458,19 @@ class StrobeCalibrationManager:
 
         return dac_start, ldo
 
-    def _calibrate(self, target_current: float):
+    def _calibrate(self, target_current: float, hard_cap: Optional[float] = None):
         """Run full calibration: find safe start, sweep down to target, average.
+
+        The hard cap is the short-circuit detector — any reading above it aborts
+        the sweep. It's a per-call argument so the experimental high-current
+        preset can loosen its own ceiling without weakening the standard preset's
+        12 A trip point. Defaults to HARD_CAP_CURRENT to keep older callers safe.
 
         Returns:
             (success, final_dac, led_current)
         """
+        if hard_cap is None:
+            hard_cap = self.HARD_CAP_CURRENT
         # Pre-flight: check for current with strobe off — indicates blown MOSFET or gate driver
         idle_adc = self._read_adc(self.ADC_CH0_CMD)
         if idle_adc > self.PREFLIGHT_CURRENT_THRESHOLD:
@@ -504,8 +517,8 @@ class StrobeCalibrationManager:
             led_current = self.get_led_current()
             logger.info(f"DAC={dac:#04x}, current={led_current:.2f}A")
 
-            if led_current > self.HARD_CAP_CURRENT:
-                self.status["message"] = f"LED current ({led_current:.2f}A) exceeds hard cap ({self.HARD_CAP_CURRENT}A). This strongly indicates the LED is shorted."
+            if led_current > hard_cap:
+                self.status["message"] = f"LED current ({led_current:.2f}A) exceeds hard cap ({hard_cap}A). This strongly indicates the LED is shorted."
                 return False, -1, -1
 
             if led_current > target_current:
@@ -583,13 +596,22 @@ class StrobeCalibrationManager:
             self.status = {"state": "error", "progress": 0, "message": msg}
             return {"status": "error", "message": msg}
 
-        # Resolve target
-        if target_current is not None:
-            target = target_current
+        # Resolve target + hard cap from the preset. The cap is per-preset so
+        # the experimental high-current mode can run hotter without loosening
+        # the standard preset's short-circuit detector. An explicit
+        # target_current override still picks the cap of the chosen led_type.
+        if led_type == "v3_high":
+            target = self.V3_HIGH_TARGET_CURRENT
+            hard_cap = self.V3_HIGH_HARD_CAP
         elif led_type == "legacy":
             target = self.LEGACY_TARGET_CURRENT
+            hard_cap = self.HARD_CAP_CURRENT
         else:
             target = self.V3_TARGET_CURRENT
+            hard_cap = self.HARD_CAP_CURRENT
+
+        if target_current is not None:
+            target = target_current
 
         self._cancel_requested = False
         self.status = {"state": "calibrating", "progress": 0, "message": "Starting calibration"}
@@ -597,19 +619,21 @@ class StrobeCalibrationManager:
         loop = asyncio.get_event_loop()
         try:
             async with self._pico_lock:
-                result = await loop.run_in_executor(None, self._run_calibration_sync, target)
+                result = await loop.run_in_executor(
+                    None, self._run_calibration_sync, target, hard_cap)
             return result
         except Exception as e:
             logger.error(f"Calibration error: {e}")
             self.status = {"state": "error", "progress": 0, "message": str(e)}
             return {"status": "error", "message": str(e)}
 
-    def _run_calibration_sync(self, target: float) -> Dict[str, Any]:
+    def _run_calibration_sync(self, target: float,
+                              hard_cap: Optional[float] = None) -> Dict[str, Any]:
         """Synchronous calibration wrapper — runs in executor thread."""
         try:
             self._open_hardware()
 
-            success, final_dac, led_current = self._calibrate(target)
+            success, final_dac, led_current = self._calibrate(target, hard_cap)
 
             if success and final_dac > 0:
                 ldo = self.get_ldo_voltage()
