@@ -62,6 +62,22 @@ class TestConfigEndpoint:
         assert response.status_code == 200
         server_instance.pico_manager.set_threshold.assert_awaited_once_with(8000)
 
+    def test_set_putt_threshold_dispatches(self, server_instance, client):
+        server_instance.pico_manager.set_putt_threshold = AsyncMock(
+            return_value={"ok": True, "threshold_putt": 2_500_000}
+        )
+        response = client.post("/api/pico/config", json={"putt_threshold": 2_500_000})
+        assert response.status_code == 200
+        server_instance.pico_manager.set_putt_threshold.assert_awaited_once_with(2_500_000)
+
+    def test_putt_threshold_garbage_returns_400(self, server_instance, client):
+        async def _raise(_value):
+            raise ValueError("putt threshold out of range")
+
+        server_instance.pico_manager.set_putt_threshold = AsyncMock(side_effect=_raise)
+        response = client.post("/api/pico/config", json={"putt_threshold": "abc"})
+        assert response.status_code == 400
+
     def test_set_armed_dispatches(self, server_instance, client):
         server_instance.pico_manager.set_armed = AsyncMock(
             return_value={"ok": True, "armed": 1}

@@ -35,7 +35,7 @@
         <div class="card-body p-4 sm:p-6">
             <h2 class="card-title text-primary">Mic tuning</h2>
             <p class="text-sm opacity-60">
-                Live mic energy from the Pico. Set the threshold to at least 4&times; the room noise floor (grey line) so the Pico can arm &mdash; or hit <span class="font-semibold">Set above noise</span> &mdash; then arm and clap. A detected shot flashes on the chart.
+                Live mic energy from the Pico. Set the threshold to at least 2&times; the room noise floor (grey line) so the Pico can arm &mdash; or hit <span class="font-semibold">Set above noise</span> &mdash; then arm and clap. A detected shot flashes on the chart. The <span class="font-semibold">putt</span> floor sits lower; the launch monitor applies it per shot when the club is a putter.
             </p>
 
             <div class="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 mt-3">
@@ -48,7 +48,7 @@
 
                     <div class="form-control">
                         <div class="flex items-baseline justify-between pb-1">
-                            <span id="pico-threshold-label" class="label-text text-xs opacity-60">Threshold (raw RMS)</span>
+                            <span id="pico-threshold-label" class="label-text text-xs opacity-60">Full-shot threshold (raw RMS)</span>
                             <span id="pico-threshold-value" class="text-xs mono font-semibold" aria-live="polite">--</span>
                         </div>
                         <input id="pico-threshold" type="range" min="0" max="100000" step="1000" value="0" class="range range-primary range-sm"
@@ -64,6 +64,23 @@
                                 <i data-lucide="wand-2" class="icon-sm"></i>
                                 Set above noise
                             </button>
+                        </div>
+                    </div>
+
+                    {# -- Putt floor: persisted only; the LM swaps it in per club profile, not a live Pico value. -- #}
+                    <div class="form-control">
+                        <div class="flex items-baseline justify-between pb-1">
+                            <span id="pico-putt-threshold-label" class="label-text text-xs opacity-60" title="Lower floor the launch monitor applies when the club is a putter. Persisted only — not pushed live to the Pico.">Putt threshold (raw RMS)</span>
+                            <span id="pico-putt-threshold-value" class="text-xs mono font-semibold" aria-live="polite">--</span>
+                        </div>
+                        <input id="pico-putt-threshold" type="range" min="0" max="100000" step="1000" value="0" class="range range-secondary range-sm"
+                               aria-labelledby="pico-putt-threshold-label" aria-valuetext="not set" />
+                        <div class="flex justify-between text-[10px] opacity-50 mt-1 mono">
+                            <span>0</span>
+                            <span id="pico-putt-threshold-max">100k</span>
+                        </div>
+                        <div class="mt-2">
+                            <span id="pico-putt-threshold-margin" class="text-[11px] opacity-70" role="status" aria-live="polite">noise floor --</span>
                         </div>
                     </div>
 
