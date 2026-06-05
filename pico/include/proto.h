@@ -36,7 +36,6 @@ typedef enum {
     CMD_CFG_CAM_XTR_SETUP,    /* CFG CAM_XTR_SETUP_US=<int>         */
     CMD_CFG_MIN_INTER_SHOT,   /* CFG MIN_INTER_SHOT_MS=<int>        */
     CMD_CFG_PRE_TRIGGER_DELAY,/* CFG PRE_TRIGGER_DELAY_MS=<int>     */
-    CMD_CFG_DECAY_CONFIRM,    /* CFG DECAY_CONFIRM_MS=<int>         */
     CMD_CFG_STROBE_HOLD,      /* CFG STROBE_HOLD=<0|1> — sustain DIAG HIGH for calibration */
     CMD_CFG_STREAM_RMS,       /* CFG STREAM_RMS=<hz> — emit EVENT RMS at this rate; 0 = stop */
     CMD_CAM_PULSE,            /* CAM_PULSE <us>: drive cam2 XTR LOW for N microseconds */

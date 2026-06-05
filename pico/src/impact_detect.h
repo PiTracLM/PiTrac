@@ -5,18 +5,14 @@
  *
  *   1. I2S samples arrive at 48 kHz via PIO + DMA into the ring buffer.
  *   2. Decimate by 3 → 16 kHz with a 3-tap box-average anti-alias.
- *   3. Pre-compute fast (2-6 kHz band) and slow (<1 kHz band) energies
- *      using two single-pole IIR band-pass biquads in fixed-point Q15.
- *   4. Compute 1 ms RMS envelopes of both bands.
- *   5. Onset detection: high-band RMS jumps >18 dB over 4 ms baseline.
- *   6. Two-band ratio gate: high/low energy ratio > 2.0.
- *   7. Decay confirmation: high-band energy persists ≥40 ms post-onset.
- *   8. Debounce: 300 ms lockout after each successful trigger.
+ *   3. Band-pass the high band (2-6 kHz) via two single-pole IIR low-passes
+ *      in fixed-point Q15: high LPF − low LPF.
+ *   4. Compute a 1 ms RMS envelope of the high band.
+ *   5. Fire when armed and the high-band energy exceeds the threshold.
+ *   6. Debounce: 300 ms lockout after each successful trigger.
  *
- * Energy + onset + ratio run on every 16 kHz sample; decay confirmation is a
- * state machine that latches after onset and watches for sustained energy. The
- * inner loop is ~300 cycles/sample on M0+ — well under the 7800 cycle budget
- * per 16 kHz sample at 125 MHz.
+ * The inner loop is well under the 7800 cycle budget per 16 kHz sample at
+ * 125 MHz.
  *
  * All state is module-internal; this header declares only the lifecycle and
  * per-tick entry points.
@@ -45,15 +41,8 @@ void impact_detect_init(ring_buffer_t *source);
  * arm/disarm is glitch-free. */
 bool impact_detect_step(bool armed, int32_t *rms_out);
 
-/* Threshold = linear RMS units the high-band RMS must exceed to *start* onset
- * evaluation — a noise-floor gate before the 18 dB jump check. */
+/* Threshold = high-band RMS-squared energy the envelope must exceed to fire. */
 void impact_detect_set_threshold(int32_t threshold);
-
-/* Decay-confirm window: how long high-band energy must persist after onset
- * before we accept the impact. Clamped to 1..200 ms. Default comes from
- * DSP_DECAY_CONFIRM_MS in config.h. Tuned via CFG DECAY_CONFIRM_MS=<n>. */
-void     impact_detect_set_decay_confirm_ms(uint32_t ms);
-uint32_t impact_detect_get_decay_confirm_ms(void);
 
 /* Latest high-band RMS, read from core 1 to decide whether the room is quiet
  * enough to honour CFG ARMED=1 (refusing prevents auto-fire on a noise decay).

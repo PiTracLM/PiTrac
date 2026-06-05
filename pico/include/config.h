@@ -100,20 +100,6 @@
  * for sensitivity to brief clicks. */
 #define DSP_RMS_WINDOW_SAMPLES  16u
 
-/* Onset: RMS must jump this much over a 4 ms baseline. Fixed-point (×256) of
- * the linear amplitude ratio, so no log/exp in the DSP loop. 18 dB ≈ 7.94× → 2033. */
-#define DSP_ONSET_RATIO_X256    2033
-
-/* Two-band gate: E(2-6 kHz)/E(<1 kHz) must exceed this. Same ×256. 2.0× → 512. */
-#define DSP_BAND_RATIO_X256     512
-
-/* Decay confirm: high-band energy must persist this many ms post-onset to be a
- * real impact (rejects single-sample clicks / static pops). DEFAULT, host can
- * override via CFG DECAY_CONFIRM_MS. Was 40 ms but that missed short strikes
- * (putts, wedge contact) and claps in bench testing; lowered to 5 ms. Runtime
- * bound 1..200 ms. 5 ms at 16 kHz = 80 samples. */
-#define DSP_DECAY_CONFIRM_MS    5
-
 /* Debounce after firing. 300 ms avoids double-firing on the ball bouncing off
  * the enclosure, yet still catches a quick re-tee. */
 #define DSP_DEBOUNCE_MS         300u
@@ -124,14 +110,6 @@
  *   fc = 6 kHz → 0.702 → 23004 */
 #define DSP_LPF_ALPHA_LO_Q15            9240
 #define DSP_LPF_ALPHA_HI_Q15            23004
-
-/* Baseline tracker: update interval × step shift = time constant. 64 samples
- * at 16 kHz, 1/16 step → ~64 ms TC, slow enough that an impact won't poison it. */
-#define DSP_BASELINE_UPDATE_INTERVAL    64u
-#define DSP_BASELINE_STEP_SHIFT         4
-
-/* Onset jump on the squared high-band envelope: 18 dB ≈ 7.94× amplitude ≈ 63× energy. */
-#define DSP_ONSET_JUMP_RATIO_SQUARED    63
 
 /* --------------------------------------------------------- strobe defaults */
 
@@ -215,11 +193,11 @@
 #define STROBE_MAX_HOLD_MS  200u
 
 /* Firmware version — surfaced on the boot LOG line. */
-#define PITRAC_PICO_FW_VERSION "0.8.1"
+#define PITRAC_PICO_FW_VERSION "0.8.2"
 
 /* EVENT RMS streaming rate ceiling (samples/sec). Caps the web UI mic
  * visualiser so USB CDC TX can't saturate and starve STATUS replies. */
-#define STREAM_RMS_MAX_HZ  500u
+#define STREAM_RMS_MAX_HZ  100u
 
 /* Cam2/Cam1 XTR setup time before the strobe train. Host-tunable via CFG
  * CAM_XTR_SETUP_US. IMX296/Mira220 imply a few hundred µs min; 1 ms is safe. */

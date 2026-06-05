@@ -25,9 +25,6 @@ THRESHOLD_MIN = 0
 THRESHOLD_MAX = 1_000_000_000
 MIN_INTER_SHOT_FLOOR_MS = 20
 MIN_INTER_SHOT_CEIL_MS = 60_000
-# Firmware clamps to 1..200 ms (impact_detect.c).
-DECAY_CONFIRM_MIN_MS = 1
-DECAY_CONFIRM_MAX_MS = 200
 STREAM_RMS_MAX_HZ = 100
 
 # Mirrors the strobe grammar in pico/include/config.h: PULSE_WIDTH_US float capped
@@ -320,27 +317,6 @@ class PicoManager:
             raise ValueError(f"min_inter_shot must be int: {ms!r}")
         clamped = max(MIN_INTER_SHOT_FLOOR_MS, min(ms, MIN_INTER_SHOT_CEIL_MS))
         return await self._send_cfg(f"MIN_INTER_SHOT_MS={clamped}")
-
-    async def set_decay_confirm(self, ms: int) -> Dict[str, Any]:
-        """Set the impact decay-confirm window (ms). Shorter = lower hit->strobe
-        latency but less margin against impulsive false triggers (claps, turf).
-        Firmware clamps to [1, 200]; confirm via STATUS echo, then persist.
-        """
-        if isinstance(ms, bool) or not isinstance(ms, int):
-            raise ValueError(f"decay_confirm_ms must be int: {ms!r}")
-        if ms < DECAY_CONFIRM_MIN_MS or ms > DECAY_CONFIRM_MAX_MS:
-            raise ValueError(
-                f"decay_confirm_ms out of range "
-                f"[{DECAY_CONFIRM_MIN_MS}, {DECAY_CONFIRM_MAX_MS}]: {ms}"
-            )
-        result = await self._send_cfg(f"DECAY_CONFIRM_MS={ms}")
-        echoed = result.get("decay_confirm_ms")
-        if echoed is not None and echoed != ms:
-            result["ok"] = False
-            result.setdefault("error", "firmware did not accept the decay-confirm window")
-        elif echoed == ms:
-            self._persist("gs_config.pico.decay_confirm_ms", ms)
-        return result
 
     async def set_pulse_width_us(self, value: float) -> Dict[str, Any]:
         """Set strobe pulse width, confirming via the STATUS echo (pulse_us).

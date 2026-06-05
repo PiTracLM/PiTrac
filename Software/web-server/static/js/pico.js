@@ -115,7 +115,6 @@ class PicoController {
 
         document.getElementById('pico-armed-toggle').addEventListener('change', (e) => this.setArmed(e.target.checked));
         document.getElementById('pico-min-inter-shot-save').addEventListener('click', () => this.saveMinInterShot());
-        document.getElementById('pico-decay-confirm-save').addEventListener('click', () => this.saveDecayConfirm());
 
         const thresholdSlider = document.getElementById('pico-threshold');
         thresholdSlider.addEventListener('input', () => {
@@ -204,11 +203,6 @@ class PicoController {
         const minInput = document.getElementById('pico-min-inter-shot');
         if (document.activeElement !== minInput && typeof data.min_inter_shot_ms === 'number') {
             minInput.value = data.min_inter_shot_ms;
-        }
-
-        const decayInput = document.getElementById('pico-decay-confirm');
-        if (document.activeElement !== decayInput && typeof data.decay_confirm_ms === 'number') {
-            decayInput.value = data.decay_confirm_ms;
         }
     }
 
@@ -322,15 +316,6 @@ class PicoController {
             return;
         }
         await this.postConfig({ min_inter_shot_ms: value });
-    }
-
-    async saveDecayConfirm() {
-        const value = Number(document.getElementById('pico-decay-confirm').value);
-        if (!Number.isInteger(value) || value < 1 || value > 200) {
-            this.flashMessage('decay_confirm_ms must be an integer in [1, 200]', 'error');
-            return;
-        }
-        await this.postConfig({ decay_confirm_ms: value });
     }
 
     async postConfig(payload) {
