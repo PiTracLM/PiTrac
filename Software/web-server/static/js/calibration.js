@@ -350,11 +350,12 @@ class CalibrationPage {
 
     async startStrobeCalibration() {
         const ledType = document.getElementById('strobe-led-type').value;
+        const targetByLedType = { v3: 10.0, legacy: 9.0, v3_high: 12.0 };
         this.showStrobeRunning();
         try {
             await api('/api/strobe-calibration/start', {
                 method: 'POST',
-                body: { led_type: ledType, target_current: ledType === 'v3' ? 10.0 : 9.0, overwrite: true },
+                body: { led_type: ledType, target_current: targetByLedType[ledType] ?? 10.0, overwrite: true },
             });
             this.pollStrobeStatus();
         } catch (error) {
