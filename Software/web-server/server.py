@@ -692,6 +692,7 @@ class PiTracServer:
                 return {"status": "error", "message": "Invalid camera"}
             if self.calibration_manager.loop is None:
                 return {"status": "error", "message": "Server still starting up, please retry in a moment"}
+            await self.pico_manager.stop_rms_stream()  # free the Pico port before the LM grabs it
             return await self.calibration_manager.check_ball_location(camera)
 
         @self.app.post("/api/calibration/auto/{camera}")
@@ -708,6 +709,10 @@ class PiTracServer:
                 return {"status": "error", "message": "Stop PiTrac before calibrating"}
             if reason := self._camera_busy(camera):
                 return {"status": "error", "message": reason}
+            # The LM grabs the Pico CDC port for cam2's strobe/XTR handshake. Stop the /pico
+            # mic stream first (and wait) so a trailing EVENT RMS line can't shred the LM's
+            # STATUS reply and drop it to legacy strobe, which never triggers cam2.
+            await self.pico_manager.stop_rms_stream()
             return await self.calibration_manager.run_auto_calibration(camera)
 
         @self.app.post("/api/calibration/manual/{camera}")
@@ -720,6 +725,7 @@ class PiTracServer:
                 return {"status": "error", "message": safety["reason"]}
             if self.calibration_manager.loop is None:
                 return {"status": "error", "message": "Server still starting up, please retry in a moment"}
+            await self.pico_manager.stop_rms_stream()  # free the Pico port before the LM grabs it
             return await self.calibration_manager.run_manual_calibration(camera)
 
         @self.app.post("/api/calibration/capture/{camera}")
@@ -733,6 +739,7 @@ class PiTracServer:
                     return {"status": "error", "message": safety["reason"]}
             if self.calibration_manager.loop is None:
                 return {"status": "error", "message": "Server still starting up, please retry in a moment"}
+            await self.pico_manager.stop_rms_stream()  # free the Pico port before the LM grabs it
             return await self.calibration_manager.capture_still_image(camera)
 
         @self.app.get("/api/calibration/charuco-board")
