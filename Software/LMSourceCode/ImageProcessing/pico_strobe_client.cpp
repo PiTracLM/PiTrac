@@ -68,6 +68,7 @@ struct PicoStrobeClient::Impl {
         bool valid = false;
         float pulse_width_us = 0.0f;
         std::vector<float> intervals_ms;
+        int32_t mic_threshold = 0;  // per-profile acoustic floor; 0 = don't override
     };
     StagedConfig driver;
     StagedConfig putter;
@@ -260,7 +261,8 @@ void PicoStrobeClient::SetGpioWriterForTest(GpioWriteFn writer) {
 
 void PicoStrobeClient::StageClubProfile(ClubProfile profile,
                                         float pulse_width_us,
-                                        const std::vector<float>& intervals_ms) {
+                                        const std::vector<float>& intervals_ms,
+                                        int32_t mic_threshold) {
     if (!impl_) return;
     std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     Impl::StagedConfig& slot =
@@ -268,6 +270,7 @@ void PicoStrobeClient::StageClubProfile(ClubProfile profile,
     slot.valid = true;
     slot.pulse_width_us = pulse_width_us;
     slot.intervals_ms = intervals_ms;
+    slot.mic_threshold = mic_threshold;
 }
 
 bool PicoStrobeClient::SelectClubProfile(ClubProfile profile) {
@@ -283,6 +286,12 @@ bool PicoStrobeClient::SelectClubProfile(ClubProfile profile) {
     }
 
     if (!SendPulseConfig(slot.pulse_width_us, slot.intervals_ms)) return false;
+    // Each profile carries its own mic floor (putts sit far below full shots); push it on
+    // the switch so putt mode catches soft taps the full-shot floor would skip.
+    if (slot.mic_threshold > 0 && !SetMicThreshold(slot.mic_threshold)) {
+        PicoLogWarn("PicoStrobeClient::SelectClubProfile: mic threshold not accepted");
+        return false;
+    }
     impl_->active_profile = static_cast<int>(profile);
     return true;
 }

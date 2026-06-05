@@ -511,9 +511,9 @@ BOOST_AUTO_TEST_CASE(select_club_profile_pushes_matching_vector_on_change) {
     ::fcntl(pair.host, F_SETFL, flags | O_NONBLOCK);
 
     client.StageClubProfile(PicoStrobeClient::ClubProfile::kDriver,
-                            8.68f, {0.7f, 1.8f, 3.0f, 0.0f});
+                            8.68f, {0.7f, 1.8f, 3.0f, 0.0f}, 12000000);
     client.StageClubProfile(PicoStrobeClient::ClubProfile::kPutter,
-                            12.5f, {1.1f, 2.4f, 5.0f, 0.0f});
+                            12.5f, {1.1f, 2.4f, 5.0f, 0.0f}, 2500000);
 
     // First driver selection pushes + echo-verifies; feed a matching STATUS.
     {

@@ -44,12 +44,15 @@ public:
                          const std::vector<float>& intervals_ms);
 
     // Legacy SPI path uses a different pulse train for putting vs full swings.
-    // Stage both profiles once, then select the active one per shot.
+    // Stage both profiles once, then select the active one per shot. Each profile
+    // also carries its own acoustic mic floor (putts sit far lower than full shots);
+    // mic_threshold of 0 leaves the Pico's current threshold untouched on select.
     enum class ClubProfile { kDriver, kPutter };
 
     void StageClubProfile(ClubProfile profile,
                           float pulse_width_us,
-                          const std::vector<float>& intervals_ms);
+                          const std::vector<float>& intervals_ms,
+                          int32_t mic_threshold);
 
     // Pushes the staged config only if it differs from the last push, so
     // back-to-back shots of the same club don't re-send over CDC.
