@@ -646,6 +646,17 @@ namespace golf_sim {
 			// swing (FSM pings every kPicoHeartbeatIntervalMs) yet safety-disarms
 			// within kPicoArmTimeoutMs if the LM crashes mid-session.
 			pico_client_->SetArmTimeout(static_cast<uint32_t>(kPicoArmTimeoutMs));
+
+			// Cam2 XTR settle delay, tuned via /pico and persisted to
+			// gs_config.pico.cam_xtr_setup_us. Re-push it so a power-cycled Pico
+			// recovers the operator's value instead of the compiled default.
+			if (const char* xtr = std::getenv("PITRAC_PICO_CAM_XTR_SETUP_US"); xtr && *xtr) {
+				try {
+					pico_client_->SetCamXtrSetup(static_cast<uint32_t>(std::stoul(xtr)));
+				} catch (const std::exception&) {
+					GS_LOG_MSG(warning, "ignoring malformed PITRAC_PICO_CAM_XTR_SETUP_US=" + std::string(xtr));
+				}
+			}
 		}
 
 		// Pre-compute the pulse sequences to save time at trigger

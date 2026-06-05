@@ -338,6 +338,13 @@ bool PicoStrobeClient::SetArmTimeout(uint32_t ms) {
     return impl_->WriteLine("CFG ARM_TIMEOUT_MS=" + std::to_string(ms));
 }
 
+bool PicoStrobeClient::SetCamXtrSetup(uint32_t microseconds) {
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
+    if (!IsOpen()) return false;
+    // Blind write -- STATUS does not echo the setup delay; firmware clamps to range.
+    return impl_->WriteLine("CFG CAM_XTR_SETUP_US=" + std::to_string(microseconds));
+}
+
 bool PicoStrobeClient::Heartbeat() {
     std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (!IsOpen()) return false;

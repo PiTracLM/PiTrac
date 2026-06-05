@@ -300,6 +300,18 @@
       "passedVia": "environment",
       "envVariable": "PITRAC_PICO_MIC_THRESHOLD_PUTT"
     },
+    "gs_config.pico.cam_xtr_setup_us": {
+      "category": "System",
+      "subcategory": "advanced",
+      "displayName": "Pico Cam XTR Setup (µs)",
+      "description": "Camera external-trigger settle delay (µs): time the Pico holds cam2 XTR low before firing the strobe. Lower = less trigger latency; too low and the strobe fires before the sensor is integrating → dim/missed frame. Tune by sweeping down while watching cam2 exposure.",
+      "type": "number",
+      "min": 100,
+      "max": 5000,
+      "default": 1000,
+      "passedVia": "environment",
+      "envVariable": "PITRAC_PICO_CAM_XTR_SETUP_US"
+    },
     "gs_config.strobing.kDAC_setting": {
       "category": "Strobing",
       "subcategory": "advanced",

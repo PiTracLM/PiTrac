@@ -75,6 +75,12 @@ public:
     // period. Blind write (STATUS does not report it); firmware clamps to [100, 300000].
     bool SetArmTimeout(uint32_t ms);
 
+    // Camera external-trigger settle delay in µs -- how long the Pico holds cam2's
+    // XTR low before firing the strobe train. Blind write (STATUS does not report it);
+    // firmware clamps to [100, 10000]. Lower trims trigger latency; too low and the
+    // strobe fires before the sensor is integrating.
+    bool SetCamXtrSetup(uint32_t microseconds);
+
     // Persist DSP detector config so a power-cycled Pico recovers operator tuning
     // instead of compiled defaults. Each STATUS-verifies the echo.
     bool SetMicThreshold(int32_t threshold);

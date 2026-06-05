@@ -1259,6 +1259,13 @@ class PiTracServer:
                     )
                 except (TypeError, ValueError) as exc:
                     errors["min_inter_shot_ms"] = str(exc)
+            if "cam_xtr_setup_us" in body:
+                try:
+                    applied["cam_xtr_setup_us"] = await self.pico_manager.set_cam_xtr_setup(
+                        int(body["cam_xtr_setup_us"])
+                    )
+                except (TypeError, ValueError) as exc:
+                    errors["cam_xtr_setup_us"] = str(exc)
             if "pulse_width_us" in body:
                 try:
                     applied["pulse_width_us"] = await self.pico_manager.set_pulse_width_us(
