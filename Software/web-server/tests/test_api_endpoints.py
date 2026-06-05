@@ -134,6 +134,31 @@ class TestAPIEndpoints:
         assert response.status_code == 200
         assert response.json() == {"error": "Image not found"}
 
+    def test_image_endpoint_nested_path(self, client, tmp_path):
+        """Slashed paths like shots/123/x.png are routed and served correctly"""
+        with patch("server.IMAGES_DIR", tmp_path):
+            nested = tmp_path / "shots" / "1717236000123"
+            nested.mkdir(parents=True)
+            (nested / "ball_exposure_candidates.png").write_bytes(b"fake image data")
+
+            response = client.get("/api/images/shots/1717236000123/ball_exposure_candidates.png")
+            assert response.status_code == 200
+
+    def test_image_endpoint_nested_not_found(self, client, tmp_path):
+        """A slashed path that doesn't exist returns the not-found JSON (not a 404 routing error)"""
+        with patch("server.IMAGES_DIR", tmp_path):
+            response = client.get("/api/images/shots/999/missing.png")
+            assert response.status_code == 200
+            assert response.json() == {"error": "Image not found"}
+
+    def test_image_traversal_blocked(self, client, tmp_path):
+        """URL-encoded traversal (%2e%2e) is decoded by the router and blocked by is_relative_to"""
+        with patch("server.IMAGES_DIR", tmp_path):
+            # %2e%2e decodes to '..' — Starlette passes it as '../etc/passwd' to the handler
+            response = client.get("/api/images/%2e%2e/etc/passwd")
+            assert response.status_code == 200
+            assert response.json() == {"error": "Image not found"}
+
     def test_cors_headers(self, client):
         """Test CORS headers are present if needed"""
         response = client.get("/api/shot")

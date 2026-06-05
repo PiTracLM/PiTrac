@@ -212,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateBallStatus(null, null, false);
 
-    // Check if a shot image already exists on disk (e.g. page refresh after a shot)
+    // Best-effort pre-per-shot-dir fallback: try to restore the last shot image on refresh
     const img = new Image();
     img.onload = () => handleImageReady('ball_exposure_candidates.png');
     img.src = '/images/ball_exposure_candidates.png?t=' + Date.now();

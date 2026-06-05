@@ -246,9 +246,11 @@ class PiTracServer:
         async def get_shot_history(limit: int = 10) -> list:
             return [shot.to_dict() for shot in self.shot_store.get_history(limit)]
 
-        @self.app.get("/api/images/{filename}", response_model=None)
+        @self.app.get("/api/images/{filename:path}", response_model=None)
         async def get_image(filename: str):
-            image_path = IMAGES_DIR / filename
+            image_path = (IMAGES_DIR / filename).resolve()
+            if not image_path.is_relative_to(IMAGES_DIR.resolve()):
+                return {"error": "Image not found"}
             if image_path.exists() and image_path.is_file():
                 return FileResponse(image_path)
             return {"error": "Image not found"}
