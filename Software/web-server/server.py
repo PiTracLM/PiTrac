@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from calibration_manager import CalibrationManager
+from retention import ImageRetention
 from camera_detector import CameraDetector
 from config_manager import ConfigurationManager
 from constants import (
@@ -194,6 +195,8 @@ class PiTracServer:
         self.shot_repo = ShotRepository(self.db)
         metadata = self.config_manager.load_configurations_metadata()
         self.session_timeout_minutes = metadata.get("storage", {}).get("sessionTimeoutMinutes", {}).get("default", 30)
+        self.image_cap_mb = metadata.get("storage", {}).get("imageStorageCapMB", {}).get("default", 5000)
+        self.retention = ImageRetention(self.session_repo, self.shot_repo, IMAGES_DIR, self.image_cap_mb)
         self.shutdown_flag = False
         self.background_tasks: set[asyncio.Task] = set()
         self._active_cameras: Dict[int, str] = {}  # camera_index -> endpoint name
@@ -1331,6 +1334,14 @@ class PiTracServer:
         except Exception as e:
             logger.error(f"Error streaming file logs: {e}")
 
+    async def _maintenance_loop(self) -> None:
+        while not self.shutdown_flag:
+            await asyncio.sleep(300)
+            try:
+                await asyncio.to_thread(self.retention.prune)
+            except Exception:
+                logger.exception("retention prune failed; will retry next cycle")
+
     async def startup_event(self) -> None:
         logger.info("Starting PiTrac Web Server...")
         loop = asyncio.get_event_loop()
@@ -1343,6 +1354,10 @@ class PiTracServer:
             logger.warning(
                 "V3 DAC not initialized — strobe calibration required before PiTrac can run"
             )
+
+        task = asyncio.create_task(self._maintenance_loop())
+        self.background_tasks.add(task)
+        task.add_done_callback(self.background_tasks.discard)
 
         logger.info("PiTrac Web Server ready — receiving results via HTTP POST")
 
@@ -1371,12 +1386,14 @@ class PiTracServer:
 
         self.shutdown_flag = True
 
-        for task in self.background_tasks:
+        loop = asyncio.get_event_loop()
+        current_tasks = {t for t in self.background_tasks if t.get_loop() is loop}
+        for task in current_tasks:
             if not task.done():
                 task.cancel()
 
-        if self.background_tasks:
-            await asyncio.gather(*self.background_tasks, return_exceptions=True)
+        if current_tasks:
+            await asyncio.gather(*current_tasks, return_exceptions=True)
 
         for ws in self.connection_manager.connections:
             try:

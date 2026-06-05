@@ -109,3 +109,12 @@ class ShotRepository:
             "DELETE FROM shot_images WHERE shot_id IN (SELECT id FROM shots WHERE session_id = ?)",
             (session_id,),
         )
+
+    def shot_ids_with_images(self) -> set:
+        """Set of shot ids that have at least one shot_images row."""
+        rows = self.db.query("SELECT DISTINCT shot_id FROM shot_images")
+        return {r["shot_id"] for r in rows}
+
+    def shot_ids_for_session(self, session_id: int) -> list:
+        rows = self.db.query("SELECT id FROM shots WHERE session_id = ?", (session_id,))
+        return [r["id"] for r in rows]
