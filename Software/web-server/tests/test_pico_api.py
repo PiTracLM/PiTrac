@@ -80,6 +80,24 @@ class TestConfigEndpoint:
         assert response.status_code == 200
         server_instance.pico_manager.set_min_inter_shot.assert_awaited_once_with(5)
 
+    def test_set_cam_xtr_setup_dispatches(self, server_instance, client):
+        server_instance.pico_manager.set_cam_xtr_setup = AsyncMock(
+            return_value={"ok": True}
+        )
+        response = client.post(
+            "/api/pico/config", json={"cam_xtr_setup_us": 200}
+        )
+        assert response.status_code == 200
+        server_instance.pico_manager.set_cam_xtr_setup.assert_awaited_once_with(200)
+
+    def test_cam_xtr_setup_garbage_returns_400(self, server_instance, client):
+        async def _raise(_value):
+            raise ValueError("cam_xtr_setup_us out of range")
+
+        server_instance.pico_manager.set_cam_xtr_setup = AsyncMock(side_effect=_raise)
+        response = client.post("/api/pico/config", json={"cam_xtr_setup_us": "abc"})
+        assert response.status_code == 400
+
     def test_threshold_garbage_returns_400(self, server_instance, client):
         async def _raise(_value):
             raise ValueError("threshold out of range")

@@ -181,6 +181,28 @@ class TestSetters:
             asyncio.run(mgr.set_threshold(2**40))
 
     @patch("pico_manager.serial")
+    def test_set_cam_xtr_setup_writes_cfg(self, mock_serial_mod):
+        # Firmware does not echo cam_xtr_setup in STATUS; a bare STATUS reply
+        # marks the transaction ok.
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [b"STATUS armed=0\n", b""]
+
+        mgr = _build(mock_serial_mod)
+        data = asyncio.run(mgr.set_cam_xtr_setup(200))
+
+        writes = [c.args[0] for c in ser.write.call_args_list]
+        assert b"CFG CAM_XTR_SETUP_US=200\n" in writes
+        assert data["ok"] is True
+
+    @patch("pico_manager.serial")
+    def test_set_cam_xtr_setup_rejects_out_of_range(self, mock_serial_mod):
+        mgr = _build(mock_serial_mod)
+        with pytest.raises(ValueError):
+            asyncio.run(mgr.set_cam_xtr_setup(0))
+        with pytest.raises(ValueError):
+            asyncio.run(mgr.set_cam_xtr_setup(6000))
+
+    @patch("pico_manager.serial")
     def test_set_armed_writes_correct_cfg(self, mock_serial_mod):
         ser = mock_serial_mod.Serial.return_value
         ser.read.side_effect = [b"STATUS armed=1\n", b"", b"STATUS armed=0\n", b""]
@@ -784,6 +806,16 @@ class TestDspPersistence:
         mgr, cm = self._mgr(mock_serial_mod)
         asyncio.run(mgr.set_threshold(8000))
         cm.set_config.assert_any_call("gs_config.pico.mic_threshold", 8000)
+
+    @patch("pico_manager.serial")
+    def test_set_cam_xtr_setup_persists_on_accept(self, mock_serial_mod):
+        # No STATUS echo for this field, so a clean transaction (ok=True) is enough
+        # to persist the operator's tuned value for the LM to re-push.
+        ser = mock_serial_mod.Serial.return_value
+        ser.read.side_effect = [b"STATUS armed=0\n", b""]
+        mgr, cm = self._mgr(mock_serial_mod)
+        asyncio.run(mgr.set_cam_xtr_setup(200))
+        cm.set_config.assert_any_call("gs_config.pico.cam_xtr_setup_us", 200)
 
 
 class TestLmOwnsPortGate:

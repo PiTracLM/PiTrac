@@ -27,6 +27,11 @@ MIN_INTER_SHOT_FLOOR_MS = 20
 MIN_INTER_SHOT_CEIL_MS = 60_000
 STREAM_RMS_MAX_HZ = 100
 
+# Cam2 XTR settle delay (µs) the Pico holds before firing the strobe. Firmware
+# clamps CAM_XTR_SETUP_US to [100, 10000]; we keep a tighter operator-facing band.
+CAM_XTR_SETUP_US_MIN = 100
+CAM_XTR_SETUP_US_MAX = 5000
+
 # Mirrors the strobe grammar in pico/include/config.h: PULSE_WIDTH_US float capped
 # at STROBE_MAX_PULSE_WIDTH_US; interval vector capped at STROBE_MAX_PULSES entries,
 # each <= STROBE_MAX_INTERVAL_MS.
@@ -292,6 +297,24 @@ class PicoManager:
         result = await self._send_cfg(f"MIC_THRESHOLD={value}")
         if result.get("threshold") == value:
             self._persist("gs_config.pico.mic_threshold", value)
+        return result
+
+    async def set_cam_xtr_setup(self, us: int) -> Dict[str, Any]:
+        """Set the cam2 XTR settle delay (µs) and persist it for the LM to re-push.
+
+        Firmware does not echo this in STATUS (same as ARM_TIMEOUT_MS), so there's
+        no echo to verify -- best-effort send, then persist on a clean transaction.
+        """
+        if isinstance(us, bool) or not isinstance(us, int):
+            raise ValueError(f"cam_xtr_setup_us must be int: {us!r}")
+        if us < CAM_XTR_SETUP_US_MIN or us > CAM_XTR_SETUP_US_MAX:
+            raise ValueError(
+                f"cam_xtr_setup_us out of range "
+                f"[{CAM_XTR_SETUP_US_MIN}, {CAM_XTR_SETUP_US_MAX}]: {us}"
+            )
+        result = await self._send_cfg(f"CAM_XTR_SETUP_US={us}")
+        if result.get("ok"):
+            self._persist("gs_config.pico.cam_xtr_setup_us", us)
         return result
 
     async def set_armed(self, armed: bool) -> Dict[str, Any]:

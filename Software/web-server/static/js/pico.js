@@ -76,6 +76,9 @@ class PicoController {
         window.addEventListener('resize', () => this.resizeCanvas());
 
         this.setupEventListeners();
+        // Cam XTR setup isn't echoed in STATUS, so seed the input from the
+        // persisted config rather than the device poll.
+        this.loadCamXtrSetup();
         this.refreshStatus();
         this.startStatusPolling();
         // Don't auto-start the mic stream -- the operator presses Start. Until then
@@ -115,6 +118,7 @@ class PicoController {
 
         document.getElementById('pico-armed-toggle').addEventListener('change', (e) => this.setArmed(e.target.checked));
         document.getElementById('pico-min-inter-shot-save').addEventListener('click', () => this.saveMinInterShot());
+        document.getElementById('pico-cam-xtr-setup-save').addEventListener('click', () => this.saveCamXtrSetup());
 
         const thresholdSlider = document.getElementById('pico-threshold');
         thresholdSlider.addEventListener('input', () => {
@@ -316,6 +320,28 @@ class PicoController {
             return;
         }
         await this.postConfig({ min_inter_shot_ms: value });
+    }
+
+    async loadCamXtrSetup() {
+        try {
+            const resp = await fetch('/api/config?key=gs_config.pico.cam_xtr_setup_us');
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (typeof data.data === 'number') {
+                document.getElementById('pico-cam-xtr-setup').value = data.data;
+            }
+        } catch {
+            // Non-fatal: the input keeps its default until the operator saves.
+        }
+    }
+
+    async saveCamXtrSetup() {
+        const value = Number(document.getElementById('pico-cam-xtr-setup').value);
+        if (!Number.isInteger(value) || value < 10 || value > 5000) {
+            this.flashMessage('Cam XTR setup must be an integer in 10-5000 µs', 'error');
+            return;
+        }
+        await this.postConfig({ cam_xtr_setup_us: value });
     }
 
     async postConfig(payload) {

@@ -75,6 +75,14 @@
                         </div>
                     </label>
 
+                    <label class="form-control">
+                        <span class="label-text text-xs opacity-60 pb-1" title="Time the Pico holds cam2 XTR low before firing the strobe. Lower = less trigger latency; too low and the strobe fires before the sensor is integrating.">Cam XTR setup (µs)</span>
+                        <div class="join">
+                            <input id="pico-cam-xtr-setup" type="number" class="input input-bordered input-sm join-item flex-1 mono" min="10" max="5000" step="10" value="1000" />
+                            <button id="pico-cam-xtr-setup-save" class="btn btn-primary btn-sm join-item">Save</button>
+                        </div>
+                    </label>
+
                     <div class="text-xs opacity-60 mt-1">
                         Latest: <span id="pico-rms-latest" class="mono font-semibold">--</span>
                         &nbsp;Peak: <span id="pico-rms-peak" class="mono font-semibold">--</span>
