@@ -288,6 +288,18 @@
       "type": "string",
       "default": ""
     },
+    "gs_config.pico.mic_threshold_putt": {
+      "category": "System",
+      "subcategory": "advanced",
+      "displayName": "Pico Putt Mic Threshold",
+      "description": "Acoustic trigger floor used in putt mode (club=Putter). Lower than mic_threshold because putt impacts sit near the room noise floor (~1-10M vs 20M+ for full shots).",
+      "type": "number",
+      "min": 0,
+      "max": 1000000000,
+      "default": 2500000,
+      "passedVia": "environment",
+      "envVariable": "PITRAC_PICO_MIC_THRESHOLD_PUTT"
+    },
     "gs_config.strobing.kDAC_setting": {
       "category": "Strobing",
       "subcategory": "advanced",

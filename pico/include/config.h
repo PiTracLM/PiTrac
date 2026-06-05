@@ -194,9 +194,13 @@
  * (clap, dropped club) can't auto-trigger on the way down.
  *
  * UNITS: mic_threshold and impact_detect_current_rms() are mean-square (energy)
- * units, so this factor is an ENERGY ratio — factor 4 ≈ 2× amplitude headroom.
- * Doubling it halves the energy ceiling but only drops amplitude by ~√2. */
-#define DSP_ARM_QUIET_FACTOR  4
+ * units, so this factor is an ENERGY ratio — factor 2 ≈ √2× amplitude headroom.
+ * Doubling it halves the energy ceiling but only drops amplitude by ~√2.
+ *
+ * The arm-quiet ceiling is threshold/2: a ~2.5M putt floor leaves a ~1.25M ceiling
+ * that still clears a ~1M room. Factor 4 gave only a 0.6M ceiling < the room, so a
+ * low putt floor could never arm. */
+#define DSP_ARM_QUIET_FACTOR  2
 
 /* Hardware watchdog timeout. Covers the longest train (16 pulses × 7 ms ≈
  * 110 ms) plus a slow USB flush. On timeout the silicon resets with the strobe
@@ -211,7 +215,7 @@
 #define STROBE_MAX_HOLD_MS  200u
 
 /* Firmware version — surfaced on the boot LOG line. */
-#define PITRAC_PICO_FW_VERSION "0.8.0"
+#define PITRAC_PICO_FW_VERSION "0.8.1"
 
 /* EVENT RMS streaming rate ceiling (samples/sec). Caps the web UI mic
  * visualiser so USB CDC TX can't saturate and starve STATUS replies. */

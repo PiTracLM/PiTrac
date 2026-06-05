@@ -614,10 +614,32 @@ namespace golf_sim {
 				(static_cast<float>(number_bits_for_fast_on_pulse_) / static_cast<float>(kBaudRateForFastPulses)) * 1e6f;
 			const float putter_pulse_us =
 				(static_cast<float>(number_bits_for_slow_on_pulse_) / static_cast<float>(kBaudRateForSlowPulses)) * 1e6f;
+
+			// Per-club acoustic floors (putt mode drops the floor for soft taps). From
+			// gs_config.pico.mic_threshold[_putt] via the LM env; an unset putt floor reuses
+			// the shot floor; 0 leaves the Pico's threshold alone.
+			int32_t shot_threshold = 0;
+			int32_t putt_threshold = 0;
+			if (const char* thr = std::getenv("PITRAC_PICO_MIC_THRESHOLD"); thr && *thr) {
+				try {
+					shot_threshold = std::stoi(thr);
+				} catch (const std::exception&) {
+					GS_LOG_MSG(warning, "ignoring malformed PITRAC_PICO_MIC_THRESHOLD=" + std::string(thr));
+				}
+			}
+			if (const char* thr = std::getenv("PITRAC_PICO_MIC_THRESHOLD_PUTT"); thr && *thr) {
+				try {
+					putt_threshold = std::stoi(thr);
+				} catch (const std::exception&) {
+					GS_LOG_MSG(warning, "ignoring malformed PITRAC_PICO_MIC_THRESHOLD_PUTT=" + std::string(thr));
+				}
+			}
+			if (putt_threshold <= 0) putt_threshold = shot_threshold;
+
 			pico_client_->StageClubProfile(PicoStrobeClient::ClubProfile::kDriver,
-				driver_pulse_us, pulse_intervals_fast_ms_);
+				driver_pulse_us, pulse_intervals_fast_ms_, shot_threshold);
 			pico_client_->StageClubProfile(PicoStrobeClient::ClubProfile::kPutter,
-				putter_pulse_us, pulse_intervals_slow_ms_);
+				putter_pulse_us, pulse_intervals_slow_ms_, putt_threshold);
 			pico_client_->SelectClubProfile(PicoStrobeClient::ClubProfile::kDriver);
 
 			// Match the auto-disarm window to our heartbeat cadence: armed across the
@@ -627,16 +649,8 @@ namespace golf_sim {
 
 			// Push the operator's persisted DSP tuning so a power-cycled Pico recovers
 			// instead of arming on compiled defaults (may not clear the room's arm-quiet
-			// gate). Values arrive via the LM env from gs_config.pico.*.
-			if (const char* thr = std::getenv("PITRAC_PICO_MIC_THRESHOLD"); thr && *thr) {
-				try {
-					if (!pico_client_->SetMicThreshold(std::stoi(thr))) {
-						GS_LOG_MSG(warning, "Pico did not accept persisted mic threshold " + std::string(thr));
-					}
-				} catch (const std::exception&) {
-					GS_LOG_MSG(warning, "ignoring malformed PITRAC_PICO_MIC_THRESHOLD=" + std::string(thr));
-				}
-			}
+			// gate). Values arrive via the LM env from gs_config.pico.*. The mic floor is
+			// already pushed by the kDriver SelectClubProfile above (per-club thresholds).
 			if (const char* dc = std::getenv("PITRAC_PICO_DECAY_CONFIRM_MS"); dc && *dc) {
 				try {
 					if (!pico_client_->SetDecayConfirm(static_cast<uint32_t>(std::stoul(dc)))) {
