@@ -1248,6 +1248,13 @@ class PiTracServer:
                     )
                 except (TypeError, ValueError) as exc:
                     errors["threshold"] = str(exc)
+            if "putt_threshold" in body:
+                try:
+                    applied["putt_threshold"] = await self.pico_manager.set_putt_threshold(
+                        int(body["putt_threshold"])
+                    )
+                except (TypeError, ValueError) as exc:
+                    errors["putt_threshold"] = str(exc)
             if "armed" in body:
                 applied["armed"] = await self.pico_manager.set_armed(
                     bool(body["armed"])

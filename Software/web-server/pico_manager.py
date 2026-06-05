@@ -299,6 +299,19 @@ class PicoManager:
             self._persist("gs_config.pico.mic_threshold", value)
         return result
 
+    async def set_putt_threshold(self, value: int) -> Dict[str, Any]:
+        """Persist the putt-mode mic floor only — no live CFG to the Pico.
+
+        Unlike the full-shot threshold, this is a single live value the firmware
+        never holds: the LM swaps it in per club profile (club=Putter) when it
+        pushes config at shot time. So we just store it for the LM to apply and
+        deliberately leave gs_config.pico.mic_threshold (the live shot value)
+        alone."""
+        if not isinstance(value, int) or value < THRESHOLD_MIN or value > THRESHOLD_MAX:
+            raise ValueError(f"putt threshold out of range: {value!r}")
+        self._persist("gs_config.pico.mic_threshold_putt", value)
+        return {"ok": True, "threshold_putt": value}
+
     async def set_cam_xtr_setup(self, us: int) -> Dict[str, Any]:
         """Set the cam2 XTR settle delay (µs) and persist it for the LM to re-push.
 

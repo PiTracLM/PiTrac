@@ -817,6 +817,30 @@ class TestDspPersistence:
         asyncio.run(mgr.set_cam_xtr_setup(200))
         cm.set_config.assert_any_call("gs_config.pico.cam_xtr_setup_us", 200)
 
+    @patch("pico_manager.serial")
+    def test_set_putt_threshold_persists_putt_key_only(self, mock_serial_mod):
+        # The putt floor is persist-only (the LM applies it per club profile), so
+        # it must store mic_threshold_putt and never write the live mic_threshold
+        # or touch the serial port at all.
+        mgr, cm = self._mgr(mock_serial_mod)
+        result = asyncio.run(mgr.set_putt_threshold(2_500_000))
+
+        assert result["ok"] is True
+        assert result["threshold_putt"] == 2_500_000
+        cm.set_config.assert_called_once_with(
+            "gs_config.pico.mic_threshold_putt", 2_500_000
+        )
+        mock_serial_mod.Serial.assert_not_called()
+
+    @patch("pico_manager.serial")
+    def test_set_putt_threshold_rejects_garbage(self, mock_serial_mod):
+        mgr, cm = self._mgr(mock_serial_mod)
+        with pytest.raises(ValueError):
+            asyncio.run(mgr.set_putt_threshold(-1))
+        with pytest.raises(ValueError):
+            asyncio.run(mgr.set_putt_threshold(2**40))
+        cm.set_config.assert_not_called()
+
 
 class TestLmOwnsPortGate:
     """While pitrac_lm runs it owns /dev/ttyACM0, so every web transaction that

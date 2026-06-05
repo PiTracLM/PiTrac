@@ -5,7 +5,7 @@ const AXIS_EASE = 0.2;
 const AXIS_HEADROOM = 1.4;
 const SET_ABOVE_NOISE_FACTOR = 4.5;
 const SLIDER_RANGE_FACTOR = 8;
-const ARM_QUIET_FACTOR = 4;  // firmware arm gate: refuses unless threshold >= noise * 4
+const ARM_QUIET_FACTOR = 2;  // firmware arm gate: refuses unless threshold >= noise * 2
 const RMS_DROPOUT_RATIO = 0.5;
 const MARGIN_CLASS = 'text-[11px]';
 
@@ -59,6 +59,7 @@ class PicoController {
         this.lastStatus = null;
         this.flashInProgress = false;
         this.userTouchedThreshold = false;
+        this.userTouchedPuttThreshold = false;
         this.toastTimer = null;
         this.noiseFloor = 0;
         this.axisTop = 0;
@@ -76,9 +77,10 @@ class PicoController {
         window.addEventListener('resize', () => this.resizeCanvas());
 
         this.setupEventListeners();
-        // Cam XTR setup isn't echoed in STATUS, so seed the input from the
-        // persisted config rather than the device poll.
+        // Cam XTR setup and the putt floor aren't echoed in STATUS, so seed those
+        // inputs from the persisted config rather than the device poll.
         this.loadCamXtrSetup();
+        this.loadPuttThreshold();
         this.refreshStatus();
         this.startStatusPolling();
         // Don't auto-start the mic stream -- the operator presses Start. Until then
@@ -128,6 +130,13 @@ class PicoController {
         });
         thresholdSlider.addEventListener('change', () => this.saveThreshold());
         document.getElementById('pico-threshold-auto').addEventListener('click', () => this.applyAutoThreshold());
+
+        const puttSlider = document.getElementById('pico-putt-threshold');
+        puttSlider.addEventListener('input', () => {
+            this.userTouchedPuttThreshold = true;
+            this.updatePuttThresholdReadout(puttSlider.value);
+        });
+        puttSlider.addEventListener('change', () => this.savePuttThreshold());
 
         document.getElementById('pico-rms-toggle').addEventListener('click', () => this.toggleRmsStream());
         document.getElementById('pico-rms-hz').addEventListener('change', () => this.restartRmsStream());
@@ -313,6 +322,19 @@ class PicoController {
         if (ok) this.userTouchedThreshold = false;
     }
 
+    async savePuttThreshold() {
+        const value = Number(document.getElementById('pico-putt-threshold').value);
+        if (!Number.isInteger(value) || value < 0) {
+            this.flashMessage('Putt threshold must be a non-negative integer', 'error');
+            return;
+        }
+        // Persist-only: the LM applies this floor per club profile, so there's no
+        // live Pico echo to wait on. The latch just guards the seeded value until
+        // the operator commits their own.
+        await this.postConfig({ putt_threshold: value });
+        this.userTouchedPuttThreshold = false;
+    }
+
     async saveMinInterShot() {
         const value = Number(document.getElementById('pico-min-inter-shot').value);
         if (!Number.isInteger(value) || value < 0) {
@@ -342,6 +364,70 @@ class PicoController {
             return;
         }
         await this.postConfig({ cam_xtr_setup_us: value });
+    }
+
+    async loadPuttThreshold() {
+        try {
+            const resp = await fetch('/api/config?key=gs_config.pico.mic_threshold_putt');
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (this.userTouchedPuttThreshold) return;
+            if (typeof data.data === 'number') {
+                const slider = document.getElementById('pico-putt-threshold');
+                this.syncPuttSliderRange(data.data);
+                slider.value = data.data;
+                this.updatePuttThresholdReadout(slider.value);
+            }
+        } catch {
+            // Non-fatal: the input keeps its default until the operator saves.
+        }
+    }
+
+    updatePuttThresholdReadout(value) {
+        const slider = document.getElementById('pico-putt-threshold');
+        const v = Number(value) || 0;
+        document.getElementById('pico-putt-threshold-value').textContent = v.toLocaleString();
+        slider.setAttribute('aria-valuetext', `${v} raw RMS, ${this.marginPhrase(v)}`);
+        this.updatePuttMarginReadout(v);
+    }
+
+    updatePuttMarginReadout(threshold) {
+        const el = document.getElementById('pico-putt-threshold-margin');
+        if (!el) return;
+        const floorText = this.noiseFloor ? formatThousands(this.noiseFloor) : '--';
+        const tier = marginTier(threshold, this.noiseFloor);
+        if (tier === 'unknown') {
+            el.textContent = threshold
+                ? `putt: noise floor ${floorText} · no live signal`
+                : `putt: noise floor ${floorText} · not set`;
+            el.className = `${MARGIN_CLASS} text-warning`;
+            return;
+        }
+        const ratio = threshold / this.noiseFloor;
+        if (tier === 'noarm') {
+            el.textContent = `putt: noise ${floorText} · ${ratio.toFixed(1)}× — won't arm (need ${ARM_QUIET_FACTOR}×)`;
+            el.className = `${MARGIN_CLASS} text-error`;
+        } else if (tier === 'tight') {
+            el.textContent = `putt: noise ${floorText} · ${ratio.toFixed(1)}× — armable, tight`;
+            el.className = `${MARGIN_CLASS} text-warning`;
+        } else {
+            el.textContent = `putt: noise ${floorText} · ${ratio.toFixed(1)}× — armed-ready`;
+            el.className = `${MARGIN_CLASS} opacity-70`;
+        }
+    }
+
+    syncPuttSliderRange(mustFit = 0) {
+        const slider = document.getElementById('pico-putt-threshold');
+        const threshold = Number(slider.value) || 0;
+        const target = Math.max(this.noiseFloor * SLIDER_RANGE_FACTOR, threshold * 1.25, mustFit * 1.1, 100000);
+        const targetMax = Math.ceil(target / 100000) * 100000;
+        const currentMax = Number(slider.max) || 100000;
+        const idle = !this.userTouchedPuttThreshold && document.activeElement !== slider;
+        if (targetMax > currentMax || (idle && currentMax > targetMax * 1.6)) {
+            slider.max = String(targetMax);
+            slider.step = String(Math.max(1000, Math.round(targetMax / 200 / 1000) * 1000));
+            document.getElementById('pico-putt-threshold-max').textContent = formatThousands(targetMax);
+        }
     }
 
     async postConfig(payload) {
@@ -500,8 +586,10 @@ class PicoController {
         this.updateNoiseFloor();
         this.updateAxis();
         this.syncSliderRange();
+        this.syncPuttSliderRange();
         this.updateAutoButton();
         this.updateMarginReadout(Number(document.getElementById('pico-threshold').value) || 0);
+        this.updatePuttMarginReadout(Number(document.getElementById('pico-putt-threshold').value) || 0);
         this.drawRms();
     }
 
