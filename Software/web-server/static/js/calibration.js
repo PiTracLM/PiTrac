@@ -710,8 +710,7 @@ class CalibrationManager {
         const originalText = btn.textContent;
 
         const ledType = document.getElementById('strobe-led-type').value;
-        const targetByLedType = { v3: 10.0, legacy: 9.0, v3_high: 12.0 };
-        const targetCurrent = targetByLedType[ledType] ?? 10.0;
+        const targetCurrent = ledType === 'v3' ? 10.0 : 9.0;
 
         try {
             btn.disabled = true;

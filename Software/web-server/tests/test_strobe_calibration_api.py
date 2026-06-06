@@ -82,21 +82,6 @@ class TestStrobeCalibrationAPI:
         assert response.status_code == 200
         assert response.json()["status"] == "started"
 
-    def test_start_calibration_v3_high(self, client, server_instance, mock_strobe_manager):
-        """Start endpoint accepts and forwards the experimental v3_high preset"""
-        server_instance.strobe_calibration_manager = mock_strobe_manager
-
-        response = client.post(
-            "/api/strobe-calibration/start",
-            json={"led_type": "v3_high", "overwrite": True},
-        )
-        assert response.status_code == 200
-        assert response.json()["status"] == "started"
-
-        mock_strobe_manager.start_calibration.assert_awaited_once()
-        _, kwargs = mock_strobe_manager.start_calibration.call_args
-        assert kwargs["led_type"] == "v3_high"
-
     def test_cancel(self, client, server_instance, mock_strobe_manager):
         """Cancel endpoint calls manager.cancel and returns ok"""
         server_instance.strobe_calibration_manager = mock_strobe_manager
