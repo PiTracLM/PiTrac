@@ -116,7 +116,7 @@ static void test_train_energy_cap_rejected(void) {
     for (int i = 0; i < STROBE_MAX_PULSES; ++i) ivals[i] = 0.1f;
     uint32_t out[STROBE_PATTERN_MAX_WORDS];
     uint32_t len = 0;
-    const float hot = STROBE_MAX_PULSE_WIDTH_US;  /* 32 * 500 = 16000 > 5000 cap */
+    const float hot = STROBE_MAX_PULSE_WIDTH_US;  /* 32 * 100 = 3200 > 1500 cap */
     EXPECT(!strobe_compile_pulse_train(ivals, STROBE_MAX_PULSES, hot, kPioHz,
                                        out, STROBE_PATTERN_MAX_WORDS, &len),
            "train energy over the cap rejected");
