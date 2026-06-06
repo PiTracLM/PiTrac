@@ -42,15 +42,10 @@
                 <select id="strobe-led-type" class="select select-sm w-auto">
                     <option value="v3" selected>V3 LED board (10 A)</option>
                     <option value="legacy">Legacy 100 W LED (9 A)</option>
-                    <option value="v3_high">V3 high current (12 A, experimental)</option>
                 </select>
                 <button id="strobe-calibrate-btn" class="btn btn-primary btn-sm" onclick="calibration.startStrobeCalibration()">Calibrate</button>
                 <button id="strobe-cancel-btn" class="btn btn-error btn-sm" onclick="calibration.cancelStrobeCalibration()" hidden>Cancel</button>
             </div>
-            <p class="text-xs opacity-60 max-w-prose" id="strobe-led-type-help">
-                High current drives the IR LEDs to 12 A, above the standard 10 A and beyond the datasheet spec.
-                It may shorten LED life. Keep strobe pulses short.
-            </p>
 
             <div id="strobe-progress-area" hidden>
                 <progress class="progress progress-primary w-full" id="strobe-progress-fill" value="0" max="100"></progress>
