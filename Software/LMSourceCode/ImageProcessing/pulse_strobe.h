@@ -67,6 +67,12 @@ namespace golf_sim {
 		static bool DisarmPico();
 		static uint64_t PicoEventCount();
 
+		// One-shot fire for a still/calibration capture. Unlike a live shot (the FSM
+		// arms the Pico and a real acoustic strike fires it), still captures have no
+		// FSM and no strike, so cam2_run_event_loop calls this to fire the strobe +
+		// cam2 XTR itself. Bumps event_count so the loop's fire-count gate releases.
+		static bool FirePicoForStill();
+
 		// Pushes out the Pico's auto-disarm deadline so the arm lives as long as
 		// the LM does, not on a fixed per-shot timer.
 		static bool PicoHeartbeat();

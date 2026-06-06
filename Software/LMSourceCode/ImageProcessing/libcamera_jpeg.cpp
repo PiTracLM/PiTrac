@@ -353,13 +353,41 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 					(void)discard;  // warm-up readout -- ignore it, keep quiescing
 					break;
 				}
-				// Quiesce window elapsed: cam2 is warm and the pipeline is quiet. Let the FSM
-				// arm the Pico (it waits on this flag); the NEXT frame is the real strike.
+				// Quiesce window elapsed: cam2 is warm and the pipeline is quiet.
 				pico_quiesce_done = true;
-				pico_event_baseline = gs::PulseStrobe::PicoEventCount();
-				gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
-				GS_LOG_TRACE_MSG(trace, "Pico: quiesce complete -- cam2 armed (fire-count baseline " +
-					std::to_string(pico_event_baseline) + "), waiting for the Pico to fire.");
+
+				if (send_priming_pulses) {
+					// Still-picture / calibration capture: there is no FSM to arm the
+					// Pico and no acoustic strike to fire it, so fire it ourselves to
+					// produce one strobed frame. First join the warm-up thread and drain
+					// its trailing CAM_PULSE (XTR-only) readouts so the fire-count gate
+					// grabs the strobed frame, not a leftover dark warm-up frame -- with
+					// the sensor in external-trigger mode, the only frame after the drain
+					// is the one our fire triggers.
+					if (pico_warmup_thread.joinable()) {
+						pico_warmup_thread.join();
+					}
+					constexpr long kPicoStillSettleMs = 150;  // > one warm-up frame period + readout
+					std::this_thread::sleep_for(std::chrono::milliseconds(kPicoStillSettleMs));
+					app.DrainMessages();
+					pico_event_baseline = gs::PulseStrobe::PicoEventCount();
+					gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
+					if (!gs::PulseStrobe::FirePicoForStill()) {
+						GS_LOG_MSG(error, "Pico still-capture fire failed -- cam2 will not trigger.");
+						return_status = false;
+						state = kFinalImageReceived;
+						break;
+					}
+					GS_LOG_MSG(info, "Pico: quiesce complete -- fired for still/calibration (fire-count baseline " +
+						std::to_string(pico_event_baseline) + ").");
+				} else {
+					// Live shot: let the FSM arm the Pico (it waits on this flag); the
+					// real acoustic strike fires it and the NEXT frame is the strike.
+					pico_event_baseline = gs::PulseStrobe::PicoEventCount();
+					gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
+					GS_LOG_TRACE_MSG(trace, "Pico: quiesce complete -- cam2 armed (fire-count baseline " +
+						std::to_string(pico_event_baseline) + "), waiting for the Pico to fire.");
+				}
 				break;
 			}
 

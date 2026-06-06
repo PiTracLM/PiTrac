@@ -116,6 +116,14 @@ namespace golf_sim {
 		return pico_client_ ? pico_client_->LastEventCount() : 0;
 	}
 
+	bool PulseStrobe::FirePicoForStill() {
+		// Reuses the autonomous fire path: SendCameraStrobeTriggerAndShutter's Pico
+		// branch selects the club train and pulses GP9 FIRE_IN (strobe + cam2 XTR
+		// coincident), which bumps event_count. spiHandle is ignored in Pico mode.
+		if (!IsPicoActive()) return false;
+		return SendCameraStrobeTriggerAndShutter(lggpio_chip_handle_);
+	}
+
 	int PulseStrobe::kPuttingStrobeDelayMs = 0;
 
 	long PulseStrobe::kCam2SetupPeriodMilliseconds = 2000;
