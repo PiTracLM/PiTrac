@@ -8,13 +8,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from fastapi import FastAPI, File, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from calibration_manager import CalibrationManager
-from retention import ImageRetention
+from retention import ImageRetention, _dir_bytes
 from camera_detector import CameraDetector
 from config_manager import ConfigurationManager
 from constants import (
@@ -1115,6 +1115,43 @@ class PiTracServer:
                     },
                 }
 
+        # Shot history API
+        @self.app.get("/api/sessions")
+        async def list_sessions(limit: int = 50, offset: int = 0) -> list:
+            return await asyncio.to_thread(self.session_repo.list, limit, offset)
+
+        @self.app.get("/api/sessions/{session_id}/shots")
+        async def list_shots_for_session(session_id: int) -> list:
+            session = await asyncio.to_thread(self.session_repo.get, session_id)
+            if session is None:
+                raise HTTPException(status_code=404, detail="Session not found")
+            return await asyncio.to_thread(self.shot_repo.list_for_session, session_id)
+
+        @self.app.get("/api/shots/{shot_id}")
+        async def get_shot(shot_id: int) -> Dict[str, Any]:
+            shot = await asyncio.to_thread(self.shot_repo.get, shot_id)
+            if shot is None:
+                raise HTTPException(status_code=404, detail="Shot not found")
+            return shot
+
+        @self.app.delete("/api/sessions/{session_id}")
+        async def delete_session(session_id: int) -> Dict[str, Any]:
+            session = await asyncio.to_thread(self.session_repo.get, session_id)
+            if session is None:
+                raise HTTPException(status_code=404, detail="Session not found")
+            image_paths = await asyncio.to_thread(
+                self.shot_repo.image_paths_for_session, session_id
+            )
+            await asyncio.to_thread(self.session_repo.delete, session_id)
+            await asyncio.to_thread(self._delete_session_files, image_paths)
+            return {"status": "deleted", "session_id": session_id}
+
+        @self.app.get("/api/storage/usage")
+        async def storage_usage() -> Dict[str, Any]:
+            shots_dir = IMAGES_DIR / "shots"
+            used_bytes = await asyncio.to_thread(_dir_bytes, shots_dir)
+            return {"used_mb": used_bytes // (1024 * 1024), "cap_mb": self.image_cap_mb}
+
         @self.app.get("/api/cameras/types")
         async def get_camera_types() -> Dict[str, Any]:
             """Get available camera types and their descriptions"""
@@ -1380,6 +1417,20 @@ class PiTracServer:
     def _persist_shot(self, shot_id, shot_data, images):
         session_id = self.session_repo.ensure_open(shot_data.timestamp, self.session_timeout_minutes)
         self.shot_repo.add(shot_id, session_id, shot_data, images)
+
+    def _delete_session_files(self, image_paths: List[str]) -> None:
+        """Unlink image files and remove emptied per-shot dirs."""
+        parent_dirs: set[Path] = set()
+        for rel in image_paths:
+            p = IMAGES_DIR / rel
+            p.unlink(missing_ok=True)
+            parent_dirs.add(p.parent)
+        for d in parent_dirs:
+            if d.is_dir():
+                try:
+                    d.rmdir()
+                except OSError:
+                    pass
 
     async def shutdown_event(self) -> None:
         logger.info("Shutting down PiTrac Web Server...")
