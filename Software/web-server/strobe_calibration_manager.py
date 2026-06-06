@@ -486,6 +486,8 @@ class StrobeCalibrationManager:
         for fine in range(last_good + 1, min(first_bad, self.DAC_MAX + 1)):
             if self._cancel_requested:
                 return -1, 0.0
+            self.status["progress"] = int((fine / self.DAC_MAX) * 20)
+            self.status["message"] = f"Finding safe start point... DAC {fine}/{self.DAC_MAX}"
             ldo = self._read_ldo_settled(fine)
             if ldo < self.LDO_MIN_V:
                 break
@@ -547,6 +549,7 @@ class StrobeCalibrationManager:
                 self.status["message"] = "Lost current telemetry from the Pico mid-sweep. Aborting so the DAC isn't driven blind."
                 return False, -1, -1
             logger.info(f"DAC={dac:#04x}, current={led_current:.2f}A")
+            self.status["message"] = f"Sweeping to target {target_current:.0f}A... {led_current:.1f}A"
 
             if led_current > self.HARD_CAP_CURRENT:
                 self.status["message"] = f"LED current ({led_current:.2f}A) exceeds hard cap ({self.HARD_CAP_CURRENT}A). This strongly indicates the LED is shorted."
@@ -577,6 +580,8 @@ class StrobeCalibrationManager:
 
             self._set_dac(final_dac)
             time.sleep(0.1)
+            self.status["progress"] = 85
+            self.status["message"] = f"Refining at DAC {final_dac:#04x}..."
 
             ldo = self.get_ldo_voltage()
             if ldo < self.LDO_MIN_V:
