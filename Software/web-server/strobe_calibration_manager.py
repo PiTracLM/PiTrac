@@ -87,6 +87,9 @@ class StrobeCalibrationManager:
     DAC_MIN = 0
     DAC_MAX = 0xFF
 
+    # Coarse step for _find_dac_start's LDO scan; valid codes are one block (0..boundary).
+    DAC_START_COARSE_STEP = 16
+
     # Failure fallback. DAC is inverse (higher code = less current), so DAC_MAX = min current.
     SAFE_DAC_VALUE = DAC_MAX
 
@@ -435,34 +438,60 @@ class StrobeCalibrationManager:
     # Calibration algorithm
     # ------------------------------------------------------------------
 
+    def _read_ldo_settled(self, code: int) -> float:
+        """Read LDO at a DAC code; a sub-floor reading is re-checked once so a noisy
+        sample on a hand-built board can't set a false boundary."""
+        self._set_dac(code)
+        time.sleep(0.1)
+        ldo = self.get_ldo_voltage()
+        if ldo < self.LDO_MIN_V:
+            time.sleep(0.05)
+            ldo = self.get_ldo_voltage()
+        logger.debug(f"DAC={code:#04x}, LDO={ldo:.2f}V")
+        return ldo
+
     def _find_dac_start(self):
-        """Sweep DAC 0->255, return last value where LDO stays >= LDO_MIN_V.
+        """Find the highest DAC code with LDO >= LDO_MIN_V (lowest in-regulation
+        current = safe sweep start), by coarse-bracketing the boundary then fine-pinning
+        it. No firing.
 
         Returns:
             (dac_value, ldo_voltage) — dac_value is -1 if even DAC 0 is unsafe.
         """
-        dac_start = 0
-        ldo = 0.0
+        step = self.DAC_START_COARSE_STEP
 
-        for i in range(self.DAC_MAX + 1):
+        # Coarse pass: find the first sampled code that's out of regulation.
+        last_good = -1
+        last_good_ldo = 0.0
+        first_bad = self.DAC_MAX + 1
+        ldo = 0.0
+        code = 0
+        while code <= self.DAC_MAX:
             if self._cancel_requested:
                 return -1, 0.0
-
-            self._set_dac(i)
-            time.sleep(0.1)
-            ldo = self.get_ldo_voltage()
-            logger.debug(f"DAC={i:#04x}, LDO={ldo:.2f}V")
-
-            self.status["progress"] = int((i / self.DAC_MAX) * 20)
-            self.status["message"] = f"Finding safe start point... DAC {i}/{self.DAC_MAX}"
-
+            ldo = self._read_ldo_settled(code)
+            self.status["progress"] = int((code / self.DAC_MAX) * 20)
+            self.status["message"] = f"Finding safe start point... DAC {code}/{self.DAC_MAX}"
             if ldo < self.LDO_MIN_V:
-                dac_start = i - 1
-                return dac_start, ldo
+                first_bad = code
+                break
+            last_good, last_good_ldo = code, ldo
+            code += step
 
-            dac_start = i
+        if last_good < 0:
+            return -1, ldo  # even DAC 0 is out of regulation
 
-        return dac_start, ldo
+        # Fine pass: walk up by 1 from the last good code to pin the boundary.
+        boundary, boundary_ldo = last_good, last_good_ldo
+        for fine in range(last_good + 1, min(first_bad, self.DAC_MAX + 1)):
+            if self._cancel_requested:
+                return -1, 0.0
+            ldo = self._read_ldo_settled(fine)
+            if ldo < self.LDO_MIN_V:
+                break
+            boundary, boundary_ldo = fine, ldo
+
+        return boundary, boundary_ldo
 
     def _calibrate(self, target_current: float):
         """Run full calibration: find safe start, sweep down to target, average.

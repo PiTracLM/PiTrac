@@ -311,19 +311,48 @@ class TestFindDacStart:
     def test_finds_boundary(self, _sleep):
         mgr = _make_mgr_with_hw()
 
-        # LDO drops below 4.5V at DAC=5, so start should be 4
-        voltages = [8.0, 7.5, 6.5, 5.5, 4.8, 4.3]
-        call_idx = [0]
-
-        def fake_ldo():
-            v = voltages[min(call_idx[0], len(voltages) - 1)]
-            call_idx[0] += 1
-            return v
-
-        mgr.get_ldo_voltage = fake_ldo
+        # In-regulation up to DAC=4, drops below 4.5V above it -> start should be 4.
+        last = {"code": 0}
+        mgr._set_dac = lambda v: last.__setitem__("code", v)
+        mgr.get_ldo_voltage = lambda: 7.0 if last["code"] <= 4 else 4.0
 
         dac_start, ldo = mgr._find_dac_start()
         assert dac_start == 4
+
+    @patch("strobe_calibration_manager.time.sleep")
+    def test_matches_full_scan_on_clean_curve(self, _sleep):
+        """Coarse+fine must land on the exact boundary a 1-by-1 scan would."""
+        mgr = _make_mgr_with_hw()
+        BOUNDARY = 237
+        last = {"code": 0}
+        mgr._set_dac = lambda v: last.__setitem__("code", v)
+        mgr.get_ldo_voltage = lambda: 7.0 if last["code"] <= BOUNDARY else 4.0
+
+        dac_start, _ = mgr._find_dac_start()
+        assert dac_start == BOUNDARY
+
+    @patch("strobe_calibration_manager.time.sleep")
+    def test_resists_transient_ldo_dip(self, _sleep):
+        """A single noisy sub-floor sample at a coarse code must not set a false
+        boundary -- the re-read confirms and the scan continues to the real edge."""
+        mgr = _make_mgr_with_hw()
+        BOUNDARY = 237
+        last = {"code": 0}
+        reads = {}
+        mgr._set_dac = lambda v: last.__setitem__("code", v)
+
+        def ldo():
+            c = last["code"]
+            reads[c] = reads.get(c, 0) + 1
+            if c > BOUNDARY:
+                return 4.0
+            if c == 48 and reads[c] == 1:  # transient dip on a coarse sample
+                return 4.0
+            return 7.0
+
+        mgr.get_ldo_voltage = ldo
+        dac_start, _ = mgr._find_dac_start()
+        assert dac_start == BOUNDARY
 
     @patch("strobe_calibration_manager.time.sleep")
     def test_dac_zero_already_unsafe(self, _sleep):
