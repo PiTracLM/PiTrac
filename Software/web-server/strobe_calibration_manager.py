@@ -299,7 +299,7 @@ class StrobeCalibrationManager:
         adc_value = self._read_adc(self.ADC_CH1_CMD)
         return (3.3 / 4096) * adc_value * 3.0
 
-    def get_led_current(self) -> float:
+    def get_led_current(self) -> Optional[float]:
         """Read LED current sense at the current DAC value.
 
         Two paths:
@@ -355,7 +355,7 @@ class StrobeCalibrationManager:
     # collapses that to <2% while still completing each DAC step in ~250 ms.
     PICO_PEAK_REPEATS = 3
 
-    def _get_led_current_pico(self, spi, ser, msg) -> float:
+    def _get_led_current_pico(self, spi, ser, msg) -> Optional[float]:
         """Ask the Pico to fire a few pulse trains and report median peak ADC.
 
         The Pico's onboard ADC samples GP26 (wired to V3 CUR-SENSE / TP4)
@@ -374,8 +374,10 @@ class StrobeCalibrationManager:
                 samples_total += samples
 
         if not peaks:
+            # No telemetry (serial drop / Pico not replying). Return None, NOT 0.0 --
+            # a fake 0 A reads as "below target" and the sweep would keep raising current.
             logger.warning("get_led_current: no PEAK replies from Pico")
-            return 0.0
+            return None
 
         peaks.sort()
         median_adc = peaks[len(peaks) // 2]
@@ -512,6 +514,9 @@ class StrobeCalibrationManager:
                 return False, -1, -1
 
             led_current = self.get_led_current()
+            if led_current is None:
+                self.status["message"] = "Lost current telemetry from the Pico mid-sweep. Aborting so the DAC isn't driven blind."
+                return False, -1, -1
             logger.info(f"DAC={dac:#04x}, current={led_current:.2f}A")
 
             if led_current > self.HARD_CAP_CURRENT:
@@ -551,7 +556,11 @@ class StrobeCalibrationManager:
 
             current_sum = 0.0
             for _ in range(n_avg):
-                current_sum += self.get_led_current()
+                reading = self.get_led_current()
+                if reading is None:
+                    self.status["message"] = "Lost current telemetry from the Pico during averaging. Aborting."
+                    return False, -1, -1
+                current_sum += reading
                 time.sleep(0.1)
             led_current = current_sum / n_avg
 
@@ -705,7 +714,11 @@ class StrobeCalibrationManager:
                 result["warning"] = "No DAC calibration — LED current measurement skipped to protect hardware"
             elif ldo >= self.LDO_MIN_V:
                 led_current = self.get_led_current()
-                result["led_current"] = round(led_current, 2)
+                if led_current is None:
+                    result["led_current"] = None
+                    result["warning"] = "No current telemetry from the Pico"
+                else:
+                    result["led_current"] = round(led_current, 2)
             else:
                 result["led_current"] = None
                 result["warning"] = f"LDO unsafe ({ldo:.2f}V) — skipped LED current read"

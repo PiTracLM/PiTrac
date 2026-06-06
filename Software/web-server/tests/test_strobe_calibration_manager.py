@@ -492,6 +492,20 @@ class TestCalibrate:
         assert success is False
 
     @patch("strobe_calibration_manager.time.sleep")
+    def test_aborts_when_telemetry_lost(self, _sleep):
+        """None from get_led_current (serial drop) must abort, not read as 0 A and
+        keep stepping toward higher current."""
+        mgr = _make_mgr_with_hw()
+
+        mgr._find_dac_start = lambda: (50, 7.0)
+        mgr._set_dac = lambda v: None
+        mgr.get_ldo_voltage = lambda: 7.0
+        mgr.get_led_current = lambda: None
+
+        success, dac, current = mgr._calibrate(10.0)
+        assert success is False
+
+    @patch("strobe_calibration_manager.time.sleep")
     def test_skips_ldo_below_min_during_sweep(self, _sleep):
         """When LDO drops below min during sweep, that step is skipped"""
         mgr = _make_mgr_with_hw()
