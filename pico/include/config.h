@@ -143,14 +143,16 @@
  * interval; pathological values rejected silently. */
 #define STROBE_MAX_INTERVAL_MS         1000.0f
 
-/* Pete: boost converter droops significantly beyond 500 µs. Hard cap enforced
- * in strobe_set_pulse_train and the CFG parser. */
-#define STROBE_MAX_PULSE_WIDTH_US 500.0f
+/* Per-flash on-time cap. A real flash is 1-10 bits at 115200 baud = 8.68-86.8 µs,
+ * so nothing legitimate exceeds this -- it only rejects a corrupted/absurd width,
+ * never a real shot. (Boost also droops past ~500 µs per Pete.) Enforced in
+ * strobe_compile and the CFG parser. */
+#define STROBE_MAX_PULSE_WIDTH_US 100.0f
 
-/* Total on-time per train (pulse_width × count). Caps per-fire LED energy so
- * the host can't request an unsurvivable train. 5 ms at 13 A ≈ 65 mJ, inside
- * the Vishay VSMA1085400 pulse spec. Real shots run ≪ 100 µs total. */
-#define STROBE_MAX_TRAIN_ON_TIME_US 5000.0f
+/* Total on-time per train (pulse_width × count). Caps per-fire LED energy. A real
+ * train is ~8-10 flashes × 1-10 bits ≈ 70-870 µs, so this won't reject a real
+ * shot; it keeps a corrupted/oversized request away from the LED's pulse limit. */
+#define STROBE_MAX_TRAIN_ON_TIME_US 1500.0f
 
 /* Minimum gap between fires. Boost cap needs ~tens of ms to recharge after a
  * multi-pulse train; fires before recharge dim the image anyway. Host can lower
@@ -193,7 +195,7 @@
 #define STROBE_MAX_HOLD_MS  200u
 
 /* Firmware version — surfaced on the boot LOG line. */
-#define PITRAC_PICO_FW_VERSION "0.8.2"
+#define PITRAC_PICO_FW_VERSION "0.8.3"
 
 /* EVENT RMS streaming rate ceiling (samples/sec). Caps the web UI mic
  * visualiser so USB CDC TX can't saturate and starve STATUS replies. */
