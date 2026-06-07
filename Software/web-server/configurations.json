@@ -798,6 +798,65 @@
       "requiresRestart": true,
       "passedVia": "json"
     },
+    "simulators.ogs.enabled": {
+      "category": "Simulators",
+      "subcategory": "basic",
+      "basicSubcategory": "Simulators",
+      "displayName": "OpenGolfSim Enabled",
+      "description": "Show OpenGolfSim in the simulators drawer and allow connecting",
+      "type": "boolean",
+      "default": false,
+      "requiresRestart": false,
+      "passedVia": "python"
+    },
+    "simulators.ogs.auto_connect": {
+      "category": "Simulators",
+      "subcategory": "basic",
+      "basicSubcategory": "Simulators",
+      "displayName": "OpenGolfSim Auto-Connect",
+      "description": "Open the OpenGolfSim connection automatically when the server starts",
+      "type": "boolean",
+      "default": false,
+      "requiresRestart": false,
+      "passedVia": "python"
+    },
+    "simulators.ogs.host": {
+      "category": "Simulators",
+      "subcategory": "basic",
+      "basicSubcategory": "Simulators",
+      "displayName": "OpenGolfSim Host",
+      "description": "IP address of the device running OpenGolfSim (e.g. the iPad)",
+      "type": "ip_address",
+      "default": "",
+      "requiresRestart": false,
+      "passedVia": "python"
+    },
+    "simulators.ogs.port": {
+      "category": "Simulators",
+      "subcategory": "basic",
+      "basicSubcategory": "Simulators",
+      "displayName": "OpenGolfSim Port",
+      "description": "OpenGolfSim Developer API port",
+      "type": "number",
+      "min": 1,
+      "max": 65535,
+      "default": 3111,
+      "requiresRestart": false,
+      "passedVia": "python"
+    },
+    "simulators.ogs.keepalive_sec": {
+      "category": "Simulators",
+      "subcategory": "basic",
+      "basicSubcategory": "Simulators",
+      "displayName": "OpenGolfSim Keepalive (sec)",
+      "description": "How often to re-send the device-ready heartbeat so OpenGolfSim keeps the monitor connected",
+      "type": "number",
+      "min": 1,
+      "max": 60,
+      "default": 5,
+      "requiresRestart": false,
+      "passedVia": "python"
+    },
     "gs_config.ball_identification.kUseCLAHEProcessing": {
       "category": "Ball Detection",
       "subcategory": "basic",
