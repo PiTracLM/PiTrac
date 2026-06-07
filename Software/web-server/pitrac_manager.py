@@ -7,9 +7,11 @@ import logging
 import os
 import signal
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any
 from config_manager import ConfigurationManager
+from log_files import run_log_path, latest_run_log, prune_run_logs, tail_lines
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +34,13 @@ class PiTracProcessManager:
         log_dir = expand_path(sys_paths.get("logDirectory", {}).get("default", "~/.pitrac/logs"))
         pid_dir = expand_path(sys_paths.get("pidDirectory", {}).get("default", "~/.pitrac/run"))
 
-        self.log_file = log_dir / proc_mgmt.get("camera1LogFile", {}).get("default", "pitrac.log")
+        self.log_dir = log_dir
+        self.log_file = latest_run_log(log_dir) or (log_dir / "pitrac.log")
         self.pid_file = pid_dir / proc_mgmt.get("camera1PidFile", {}).get("default", "pitrac.pid")
+
+        storage = metadata.get("storage", {})
+        self.log_dir_cap_bytes = storage.get("logDirectoryCapMB", {}).get("default", 30) * 1024 * 1024
+        self.run_log_cap_bytes = storage.get("runLogCapMB", {}).get("default", 50) * 1024 * 1024
 
         self.process_check_command = proc_mgmt.get("processCheckCommand", {}).get("default", "pitrac_lm")
         self.startup_delay = proc_mgmt.get("startupDelayCamera1", {}).get("default", 3)
@@ -146,6 +153,9 @@ class PiTracProcessManager:
             Path(env["PITRAC_WEBSERVER_SHARE_DIR"]).mkdir(parents=True, exist_ok=True)
 
             cmd = self._build_command(config_file_path=generated_config_path)
+
+            self.log_file = run_log_path(self.log_dir, datetime.now())
+            prune_run_logs(self.log_dir, self.log_dir_cap_bytes)
 
             with open(self.log_file, "a") as log:
                 process = subprocess.Popen(
@@ -271,9 +281,7 @@ class PiTracProcessManager:
 
         if self.log_file.exists():
             try:
-                with open(self.log_file, "r") as f:
-                    lines = f.readlines()
-                    status["recent_logs"] = lines[-self.recent_log_lines:] if len(lines) > self.recent_log_lines else lines
+                status["recent_logs"] = tail_lines(self.log_file, self.recent_log_lines)[0]
             except Exception as e:
                 status["log_error"] = str(e)
 

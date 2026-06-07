@@ -164,6 +164,20 @@
       "type": "number",
       "default": 5000,
       "internal": true
+    },
+    "logDirectoryCapMB": {
+      "displayName": "Log Directory Cap MB",
+      "description": "Maximum total disk space for all per-run log files",
+      "type": "number",
+      "default": 30,
+      "internal": true
+    },
+    "runLogCapMB": {
+      "displayName": "Run Log Cap MB",
+      "description": "Maximum size for a single per-run log file before truncation",
+      "type": "number",
+      "default": 50,
+      "internal": true
     }
   },
   "environmentDefaults": {
