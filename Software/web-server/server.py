@@ -360,9 +360,10 @@ class PiTracServer:
 
             self.shot_store.update(shot_data)
             await self.connection_manager.broadcast(shot_data.to_dict())
-            task = asyncio.create_task(self.sim_manager.on_shot(shot_data))
-            self.background_tasks.add(task)
-            task.add_done_callback(self.background_tasks.discard)
+            if not is_status and not is_fake_hit:
+                task = asyncio.create_task(self.sim_manager.on_shot(shot_data))
+                self.background_tasks.add(task)
+                task.add_done_callback(self.background_tasks.discard)
             return {"status": "ok"}
 
         @self.app.post("/api/internal/image-ready")
