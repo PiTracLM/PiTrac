@@ -72,7 +72,7 @@ bool Camera2Thread::init_pipeline() {
     }
 
     if (GolfSimCamera::kSystemSlot2CameraOrientation == CameraHardware::CameraOrientation::kUpsideDown) {
-        options->Set().transform = libcamera::Transform::VFlip;
+        options->Set().transform = libcamera::Transform::VFlip | libcamera::Transform::HFlip;
     }
 
     if (!SetLibcameraTuningFileEnvVariable(*camera_)) {
