@@ -249,6 +249,21 @@ void strobe_fire_end(void) {
     strobe_release_xtr();
 }
 
+/* Max in-pulse CUR_SENSE samples buffered per FIRE_PEAK. Default 8.68 µs pulses
+ * yield ~3 kept samples each over 8 pulses (~24); a 100 µs pulse-width sweep can
+ * reach a few hundred. Past the cap we stop buffering — the median of the first N
+ * is still representative because the current is steady across pulses. */
+#define STROBE_FIRE_PEAK_MAX_SAMPLES 384u
+
+static void u16_insertion_sort(uint16_t *a, uint32_t n) {
+    for (uint32_t i = 1u; i < n; ++i) {
+        uint16_t key = a[i];
+        uint32_t j = i;
+        while (j > 0u && a[j - 1u] > key) { a[j] = a[j - 1u]; --j; }
+        a[j] = key;
+    }
+}
+
 bool strobe_fire_peak(uint16_t *peak_adc_out, uint32_t *samples_out) {
     if (peak_adc_out)  *peak_adc_out = 0u;
     if (samples_out)   *samples_out  = 0u;
@@ -278,19 +293,35 @@ bool strobe_fire_peak(uint16_t *peak_adc_out, uint32_t *samples_out) {
 
     strobe_kick_dma(true /* loop context — pre-trigger delay allowed */);
 
-    /* RP2040 ADC ~2 us/sample; with 8.68 us pulses ~4 samples land per pulse-ON
-     * window, running max captures the peak. 60 ms deadline keeps a wedged DMA
-     * from chewing through the 2 s watchdog. */
+    /* Sample CUR_SENSE only while PIN_STROBE_OUT is HIGH (LED actually driven),
+     * and drop the first sample of each pulse: the boost/gate-driver turn-on
+     * transient there is a rail-slew artifact whose amplitude barely tracks the
+     * DAC. The old global running-max latched that spike (and sampled the dark
+     * gaps too), so it read a near-constant ~12.5 A regardless of drive. Take the
+     * median of the steady in-pulse samples instead. 60 ms deadline keeps a
+     * wedged DMA from chewing through the 2 s watchdog. RP2040 ADC ~2 us/sample. */
+    static uint16_t in_pulse[STROBE_FIRE_PEAK_MAX_SAMPLES];
     const uint64_t adc_deadline = time_us_64() + 60000ull;
-    uint16_t peak = 0u;
+    uint32_t n = 0u;
     uint32_t samples = 0u;
+    bool prev_high = false;
     while (dma_channel_is_busy(STROBE_DMA_CHAN) && time_us_64() < adc_deadline) {
+        bool high = gpio_get(PIN_STROBE_OUT);
         uint16_t v = adc_read();
-        if (v > peak) peak = v;
+        if (high && prev_high && n < STROBE_FIRE_PEAK_MAX_SAMPLES) {
+            in_pulse[n++] = v;
+        }
+        prev_high = high;
         ++samples;
         if ((samples & 0x3FFu) == 0u) watchdog_update();
     }
     watchdog_update();
+
+    uint16_t result = 0u;
+    if (n > 0u) {
+        u16_insertion_sort(in_pulse, n);
+        result = in_pulse[n / 2u];
+    }
 
     /* Release the mux to core 1. */
     if (s_adc_spin != NULL) {
@@ -301,8 +332,8 @@ bool strobe_fire_peak(uint16_t *peak_adc_out, uint32_t *samples_out) {
 
     strobe_release_xtr();
 
-    if (peak_adc_out) *peak_adc_out = peak;
-    if (samples_out)  *samples_out  = samples;
+    if (peak_adc_out) *peak_adc_out = result;
+    if (samples_out)  *samples_out  = n;
     return true;
 }
 
