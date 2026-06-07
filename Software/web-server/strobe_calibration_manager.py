@@ -352,22 +352,23 @@ class StrobeCalibrationManager:
         )
         return current_a
 
-    # Number of FIRE_PEAK measurements averaged per DAC step. Single-sample
-    # peaks have ~10-15% noise from ADC sample-timing alignment, boost rail
-    # transients, and pulse-edge ringing. Taking the median of 3 reads
-    # collapses that to <2% while still completing each DAC step in ~250 ms.
-    PICO_PEAK_REPEATS = 3
+    # Number of FIRE_PEAK measurements taken per DAC step (median of these).
+    PICO_PEAK_REPEATS = 5
 
     def _get_led_current_pico(self, spi, ser, msg) -> Optional[float]:
-        """Ask the Pico to fire a few pulse trains and report median peak ADC.
+        """Ask the Pico to fire pulse trains and report the median in-pulse current.
 
-        The Pico's onboard ADC samples GP26 (wired to V3 CUR-SENSE / TP4)
-        with single-cycle PIO determinism during the strobe train, completely
-        sidestepping USB-CDC and Python timing jitter. We fire FIRE_PEAK
-        `PICO_PEAK_REPEATS` times and take the median peak so a single noise
-        spike (pulse-edge ringing, boost rail transient, ADC sample landing
-        on an edge) doesn't trip HARD_CAP_CURRENT.
+        The Pico's onboard ADC samples GP26 (wired to V3 CUR-SENSE / TP4) during
+        the strobe train and (fw 0.8.4+) returns the median of the steady in-pulse
+        samples, sidestepping USB-CDC and Python timing jitter.
+
+        The first fire after a DAC change runs on a boost cap that's still
+        recharging from the previous step's firing, so it reads low; we throw away
+        one warm-up fire to top the rail off, then take the median of
+        `PICO_PEAK_REPEATS` reads.
         """
+        self._fire_peak_once(ser)  # warm-up: discard, lets the boost rail settle
+
         peaks = []
         samples_total = 0
         for _ in range(self.PICO_PEAK_REPEATS):
@@ -389,8 +390,8 @@ class StrobeCalibrationManager:
         # scaling as the legacy MCP3202 reading on Pi-side.
         current_a = (3.3 / 4096) * median_adc * 10.0
         logger.info(
-            "get_led_current: path=pico reads=%d peaks=%s median_adc=%d current=%.3fA",
-            len(peaks), peaks, median_adc, current_a,
+            "get_led_current: path=pico reads=%d peaks=%s median_adc=%d samples=%d current=%.3fA",
+            len(peaks), peaks, median_adc, samples_total, current_a,
         )
         return current_a
 
@@ -570,7 +571,7 @@ class StrobeCalibrationManager:
             self.status["message"] = "MAX_DAC resulted in current above target. This generally indicates a problem."
             return False, -1, -1
 
-        # Phase 3: average readings at the final setting to refine
+        # Phase 3: median of readings at the final setting to refine
         led_current = 0.0
         n_avg = 10
 
@@ -588,15 +589,16 @@ class StrobeCalibrationManager:
                 final_dac -= 1
                 break
 
-            current_sum = 0.0
+            readings = []
             for _ in range(n_avg):
                 reading = self.get_led_current()
                 if reading is None:
                     self.status["message"] = "Lost current telemetry from the Pico during averaging. Aborting."
                     return False, -1, -1
-                current_sum += reading
+                readings.append(reading)
                 time.sleep(0.1)
-            led_current = current_sum / n_avg
+            readings.sort()
+            led_current = readings[len(readings) // 2]
 
             if led_current > target_current:
                 final_dac += 1

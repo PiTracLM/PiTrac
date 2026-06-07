@@ -249,11 +249,8 @@ void strobe_fire_end(void) {
     strobe_release_xtr();
 }
 
-/* Max in-pulse CUR_SENSE samples buffered per FIRE_PEAK. Default 8.68 µs pulses
- * yield ~3 kept samples each over 8 pulses (~24); a 100 µs pulse-width sweep can
- * reach a few hundred. Past the cap we stop buffering — the median of the first N
- * is still representative because the current is steady across pulses. */
-#define STROBE_FIRE_PEAK_MAX_SAMPLES 384u
+/* CUR_SENSE samples buffered per FIRE_PEAK: one pulse is ~3 at 8.68 µs, ~50 at the 100 µs cap. */
+#define STROBE_FIRE_PEAK_MAX_SAMPLES 64u
 
 static void u16_insertion_sort(uint16_t *a, uint32_t n) {
     for (uint32_t i = 1u; i < n; ++i) {
@@ -293,25 +290,28 @@ bool strobe_fire_peak(uint16_t *peak_adc_out, uint32_t *samples_out) {
 
     strobe_kick_dma(true /* loop context — pre-trigger delay allowed */);
 
-    /* Sample CUR_SENSE only while PIN_STROBE_OUT is HIGH (LED actually driven),
-     * and drop the first sample of each pulse: the boost/gate-driver turn-on
-     * transient there is a rail-slew artifact whose amplitude barely tracks the
-     * DAC. The old global running-max latched that spike (and sampled the dark
-     * gaps too), so it read a near-constant ~12.5 A regardless of drive. Take the
-     * median of the steady in-pulse samples instead. 60 ms deadline keeps a
-     * wedged DMA from chewing through the 2 s watchdog. RP2040 ADC ~2 us/sample. */
+    /* First pulse only — full boost, no across-train droop. A sample counts only
+     * if the pin was HIGH both before and after the conversion, so neither edge is
+     * included; stop once the pulse ends but keep looping so the train drains.
+     * 60 ms deadline guards the 2 s watchdog. RP2040 ADC ~2 us/sample. */
     static uint16_t in_pulse[STROBE_FIRE_PEAK_MAX_SAMPLES];
     const uint64_t adc_deadline = time_us_64() + 60000ull;
     uint32_t n = 0u;
     uint32_t samples = 0u;
-    bool prev_high = false;
+    bool seen_high = false;
+    bool first_pulse_done = false;
     while (dma_channel_is_busy(STROBE_DMA_CHAN) && time_us_64() < adc_deadline) {
-        bool high = gpio_get(PIN_STROBE_OUT);
+        bool high_before = gpio_get(PIN_STROBE_OUT);
         uint16_t v = adc_read();
-        if (high && prev_high && n < STROBE_FIRE_PEAK_MAX_SAMPLES) {
-            in_pulse[n++] = v;
+        bool high_after = gpio_get(PIN_STROBE_OUT);
+        if (!first_pulse_done) {
+            if (high_before && high_after) {
+                seen_high = true;
+                if (n < STROBE_FIRE_PEAK_MAX_SAMPLES) in_pulse[n++] = v;
+            } else if (seen_high && !high_before) {
+                first_pulse_done = true;
+            }
         }
-        prev_high = high;
         ++samples;
         if ((samples & 0x3FFu) == 0u) watchdog_update();
     }
