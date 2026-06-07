@@ -35,6 +35,7 @@ class _FakeOGS:
     """Minimal asyncio TCP server that records newline-delimited JSON it receives."""
     def __init__(self):
         self.messages = []
+        self.connection_count = 0
         self._server = None
         self.port = None
 
@@ -43,6 +44,7 @@ class _FakeOGS:
         self.port = self._server.sockets[0].getsockname()[1]
 
     async def _handle(self, reader, writer):
+        self.connection_count += 1
         while True:
             line = await reader.readline()
             if not line:
@@ -80,6 +82,21 @@ async def test_connect_sends_ready_then_shot():
     types = [m["type"] for m in fake.messages]
     assert types[0] == "device" and fake.messages[0]["status"] == "ready"
     assert "shot" in types
+
+
+@pytest.mark.asyncio
+async def test_double_connect_does_not_leak():
+    fake = _FakeOGS()
+    await fake.start()
+    sim = OGSSim(host="127.0.0.1", port=fake.port, keepalive_sec=999)
+    await sim.connect()
+    first_task = sim._keepalive_task
+    await sim.connect()  # second connect must be a no-op
+    await asyncio.sleep(0.05)
+    assert sim._keepalive_task is first_task      # keepalive task not replaced
+    assert fake.connection_count == 1             # only one socket opened
+    await sim.disconnect()
+    await fake.stop()
 
 
 @pytest.mark.asyncio

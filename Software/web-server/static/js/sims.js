@@ -28,8 +28,10 @@
         list.innerHTML = sims
             .map((s) => {
                 const connected = s.status === 'connected';
+                const connecting = s.status === 'connecting';
                 const action = connected ? 'disconnect' : 'connect';
-                const label = connected ? 'Disconnect' : 'Connect';
+                const label = connecting ? 'Connecting…' : connected ? 'Disconnect' : 'Connect';
+                const disabled = connecting ? 'disabled' : '';
                 return `
                 <div class="border border-base-300 rounded-box p-3 mb-2">
                     <div class="flex items-center gap-2">
@@ -38,7 +40,7 @@
                         <span class="opacity-60 text-xs ml-auto">${s.status}</span>
                     </div>
                     <div class="opacity-70 text-xs mt-1">${s.target || ''} ${s.detail ? '· ' + s.detail : ''}</div>
-                    <button class="btn btn-xs mt-2" data-sim="${s.name}" data-action="${action}">${label}</button>
+                    <button class="btn btn-xs mt-2" data-sim="${s.name}" data-action="${action}" ${disabled}>${label}</button>
                 </div>`;
             })
             .join('');

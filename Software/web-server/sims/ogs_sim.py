@@ -56,6 +56,7 @@ class OGSSim(SimInterface):
         self._keepalive_task: Optional[asyncio.Task] = None
         self._reconnect_task: Optional[asyncio.Task] = None
         self._want_connected = False
+        self._conn_lock = asyncio.Lock()
 
     def info(self) -> Dict[str, str]:
         data = super().info()
@@ -67,20 +68,23 @@ class OGSSim(SimInterface):
         await self._open()
 
     async def _open(self) -> None:
-        if not self.host:
-            await self._set_status(STATUS_ERROR, "no host configured")
-            return
-        await self._set_status(STATUS_CONNECTING, f"{self.host}:{self.port}")
-        try:
-            self._reader, self._writer = await asyncio.open_connection(self.host, self.port)
-        except Exception as e:
-            logger.warning(f"OGS connect failed: {e}")
-            await self._set_status(STATUS_ERROR, str(e))
-            self._schedule_reconnect()
-            return
-        await self._send_obj({"type": "device", "status": "ready"})
-        await self._set_status(STATUS_CONNECTED, f"{self.host}:{self.port}")
-        self._keepalive_task = asyncio.create_task(self._keepalive_loop())
+        async with self._conn_lock:
+            if self._writer is not None:
+                return
+            if not self.host:
+                await self._set_status(STATUS_ERROR, "no host configured")
+                return
+            await self._set_status(STATUS_CONNECTING, f"{self.host}:{self.port}")
+            try:
+                self._reader, self._writer = await asyncio.open_connection(self.host, self.port)
+            except Exception as e:
+                logger.warning(f"OGS connect failed: {e}")
+                await self._set_status(STATUS_ERROR, str(e))
+                self._schedule_reconnect()
+                return
+            await self._send_obj({"type": "device", "status": "ready"})
+            await self._set_status(STATUS_CONNECTED, f"{self.host}:{self.port}")
+            self._keepalive_task = asyncio.create_task(self._keepalive_loop())
 
     async def _send_obj(self, obj: Dict[str, object]) -> None:
         if self._writer is None:
