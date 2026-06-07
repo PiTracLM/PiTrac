@@ -177,3 +177,14 @@ class TestStorageUsageEndpoint:
 
         resp = history_client.get("/api/storage/usage")
         assert resp.json()["used_mb"] >= 2
+
+
+@pytest.mark.unit
+class TestHistoryPageSmoke:
+
+    def test_history_page_returns_200(self, history_client):
+        resp = history_client.get("/history")
+        assert resp.status_code == 200
+        assert "text/html" in resp.headers["content-type"]
+        assert "Shot History" in resp.text
+        assert "history.js" in resp.text

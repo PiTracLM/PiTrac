@@ -1198,6 +1198,11 @@ class PiTracServer:
         async def update_status() -> Dict[str, Any]:
             return self.update_manager.get_status()
 
+        @self.app.get("/history", response_class=HTMLResponse)
+        async def history_page(request: Request) -> Response:
+            """Serve shot history page"""
+            return self.templates.TemplateResponse(request, "history.html")
+
         @self.app.get("/logs", response_class=HTMLResponse)
         async def logs_page(request: Request) -> Response:
             """Serve logs viewer page"""

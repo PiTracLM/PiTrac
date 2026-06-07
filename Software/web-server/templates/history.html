@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}PiTrac Shot History{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-4 mx-2 sm:mx-4 mb-4">
+
+    <!-- Header + storage usage -->
+    <div class="card bg-base-200 border border-base-300 shadow-sm p-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <i data-lucide="list" class="icon-md opacity-60"></i>
+                <h1 class="text-lg font-semibold">Shot History</h1>
+            </div>
+            <div id="storage-usage" class="text-sm opacity-60">Loading storage...</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        <!-- Sessions column -->
+        <div class="card bg-base-200 border border-base-300 shadow-sm flex flex-col">
+            <div class="p-3 border-b border-base-300">
+                <h2 class="font-semibold text-sm uppercase tracking-wide opacity-60">Sessions</h2>
+            </div>
+            <div id="sessions-list" class="flex flex-col gap-2 p-3 overflow-y-auto" style="max-height: 70vh;">
+                <div class="text-sm opacity-40 text-center py-4">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Shots column -->
+        <div class="card bg-base-200 border border-base-300 shadow-sm flex flex-col">
+            <div class="p-3 border-b border-base-300">
+                <h2 class="font-semibold text-sm uppercase tracking-wide opacity-60" id="shots-heading">Shots</h2>
+            </div>
+            <div id="shots-list" class="overflow-auto" style="max-height: 70vh;">
+                <div class="text-sm opacity-40 text-center py-4 p-3">Select a session to view shots.</div>
+            </div>
+        </div>
+
+        <!-- Shot detail column -->
+        <div class="card bg-base-200 border border-base-300 shadow-sm flex flex-col">
+            <div class="p-3 border-b border-base-300">
+                <h2 class="font-semibold text-sm uppercase tracking-wide opacity-60">Shot Detail</h2>
+            </div>
+            <div id="shot-detail" class="p-3 flex flex-col gap-3 overflow-y-auto" style="max-height: 70vh;">
+                <div class="text-sm opacity-40 text-center py-4">Select a shot to view details.</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/history.js"></script>
+{% endblock %}
