@@ -45,6 +45,8 @@ class SimManager:
 
     async def on_shot(self, shot: ShotData) -> None:
         for name, sim in self._sims.items():
+            if sim.status != "connected":
+                continue
             try:
                 await sim.send_shot(shot)
             except Exception as e:
