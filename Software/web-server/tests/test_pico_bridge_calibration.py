@@ -143,12 +143,16 @@ class TestPicoModeGetLedCurrent:
         mock_adc = MagicMock()
         mock_spidev_mod.SpiDev.side_effect = [mock_dac, mock_adc]
         serial_instance = mock_serial_mod.Serial.return_value
-        # Simulate three firmware replies with noise — one spike, two stable.
-        # Median should pick the stable value.
+        # One warm-up fire (low, discarded) then five measured replies with a
+        # spike; the median should pick the stable value.
         serial_instance.read.side_effect = [
-            b"EVENT PEAK timestamp=1000 adc=1240 samples=6100\n", b"",
-            b"EVENT PEAK timestamp=2000 adc=1500 samples=6100\n", b"",  # outlier
-            b"EVENT PEAK timestamp=3000 adc=1235 samples=6100\n", b"",
+            b"EVENT PEAK timestamp=500 adc=900 samples=18\n",   # warm-up, discarded
+            b"EVENT PEAK timestamp=1000 adc=1235 samples=18\n",
+            b"EVENT PEAK timestamp=2000 adc=1240 samples=18\n",
+            b"EVENT PEAK timestamp=3000 adc=1500 samples=18\n",  # outlier
+            b"EVENT PEAK timestamp=4000 adc=1238 samples=18\n",
+            b"EVENT PEAK timestamp=5000 adc=1240 samples=18\n",
+            b"", b"",
         ]
 
         cm = MagicMock()
@@ -157,14 +161,14 @@ class TestPicoModeGetLedCurrent:
         mgr._open_hardware()
         current = mgr.get_led_current()
 
-        # Pico path uses FIRE_PEAK and sends it 3 times for median.
+        # Pico path uses FIRE_PEAK: one warm-up + PICO_PEAK_REPEATS reads.
         writes = [c.args[0] for c in serial_instance.write.call_args_list]
         fire_peak_count = sum(1 for w in writes if w == b"FIRE_PEAK\n")
-        assert fire_peak_count == 3
+        assert fire_peak_count == 1 + StrobeCalibrationManager.PICO_PEAK_REPEATS
         assert b"CFG STROBE_HOLD=1\n" not in writes
         # ADC SPI not used in Pico path — Pico samples its own ADC.
         mock_adc.xfer2.assert_not_called()
-        # Median of [1240, 1500, 1235] sorted = [1235, 1240, 1500] -> 1240
+        # Median of [1235, 1240, 1500, 1238, 1240] -> 1240
         # Current at adc=1240: (3.3/4096) * 1240 * 10 = 9.99 A
         assert 9.9 < current < 10.1
 
