@@ -601,7 +601,7 @@ class ConfigurationManager:
             for key, setting_info in settings_metadata.items():
                 # Skip non-JSON routed settings
                 passed_via = setting_info.get("passedVia", "json")  # Default to json if not specified
-                if passed_via in ["cli", "environment"]:
+                if passed_via in ["cli", "environment", "python"]:
                     continue
 
                 # Get the merged value (default + calibration + user override)
