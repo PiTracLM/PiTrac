@@ -23,6 +23,15 @@ from constants import (
     MPS_TO_MPH,
 )
 from db.database import Database
+from log_files import (
+    follow,
+    latest_run_log,
+    list_run_logs,
+    prune_run_logs,
+    read_chunk_before,
+    tail_lines,
+    truncate_if_over,
+)
 from db.repositories import SessionRepository, ShotRepository
 from managers import ConnectionManager, ShotDataStore
 from models import ShotData
@@ -1254,6 +1263,55 @@ class PiTracServer:
 
             return {"services": services}
 
+        @self.app.get("/api/logs/history")
+        async def logs_history(
+            service: str = "pitrac",
+            file: Optional[str] = None,
+            before: Optional[int] = None,
+            lines: int = 200,
+        ) -> Dict[str, Any]:
+            """Scrollback for the per-run logs: page backwards across run files via a cursor."""
+            lines = max(1, min(lines, 1000))
+
+            # journald scrollback is out of scope; only the file-backed pitrac log pages.
+            if service != "pitrac":
+                return {"lines": [], "next": None}
+
+            log_dir = self.pitrac_manager.log_dir
+            run_logs = await asyncio.to_thread(list_run_logs, log_dir)  # oldest → newest
+            if not run_logs:
+                return {"lines": [], "next": None}
+
+            by_name = {p.name: p for p in run_logs}
+            if file is not None:
+                path = by_name.get(file)
+                if path is None:  # unknown name → don't serve (also blocks traversal)
+                    return {"lines": [], "next": None}
+            else:
+                path = run_logs[-1]
+
+            def _prev_cursor() -> Optional[Dict[str, Any]]:
+                idx = run_logs.index(path)
+                if idx == 0:
+                    return None  # reached the very beginning
+                prev = run_logs[idx - 1]
+                return {"file": prev.name, "offset": prev.stat().st_size}
+
+            if before is None:
+                result_lines, offset = await asyncio.to_thread(tail_lines, path, lines)
+                next_cursor = {"file": path.name, "offset": offset} if offset > 0 else _prev_cursor()
+                return {"lines": result_lines, "next": next_cursor}
+
+            # Stale cursor: the truncate backstop shrank the file under us; tell the client
+            # to re-anchor from the tail rather than serving lines past the new end.
+            size = await asyncio.to_thread(lambda: path.stat().st_size)
+            if before > size:
+                return {"lines": [], "next": {"file": path.name, "offset": size}, "reset": True}
+
+            result_lines, new_offset = await asyncio.to_thread(read_chunk_before, path, before, lines)
+            next_cursor = {"file": path.name, "offset": new_offset} if new_offset > 0 else _prev_cursor()
+            return {"lines": result_lines, "next": next_cursor}
+
     async def _stream_service_logs(self, websocket: WebSocket, service: str) -> None:
         """Stream logs for a specific service via WebSocket"""
         try:
@@ -1340,49 +1398,69 @@ class PiTracServer:
             logger.error(f"Error streaming systemd logs: {e}")
 
     async def _stream_file_logs(self, websocket: WebSocket, log_file: Path) -> None:
-        """Stream logs from a file"""
+        """Stream the active per-run log: anchor + historical tail, then follow new lines.
+
+        Tracks the latest run file rather than a fixed path — a pitrac restart rolls a new
+        per-run log, so when latest_run_log changes mid-view we re-anchor on the new file.
+        """
+        log_dir = self.pitrac_manager.log_dir
         try:
-            if not log_file.exists():
-                await websocket.send_json({"message": f"Log file not found: {log_file}", "level": "warning"})
+            current = await asyncio.to_thread(latest_run_log, log_dir)
+            if current is None:
+                current = self.pitrac_manager.log_file
+            if not current.exists():
+                await websocket.send_json({"message": f"Log file not found: {current}", "level": "warning"})
                 return
 
-            with open(log_file, "r") as f:
-                lines = f.readlines()
-                recent = lines[-100:] if len(lines) > 100 else lines
-                for line in recent:
-                    await websocket.send_json({"message": line.rstrip(), "historical": True})
+            # Outer loop: each pass anchors on `current`, then follows it until the
+            # latest run file changes (restart) — then breaks out to re-resolve.
+            poll = 0.5
+            while True:
+                lines, offset = await asyncio.to_thread(tail_lines, current, 100)
+                await websocket.send_json({"type": "anchor", "file": current.name, "offset": offset})
+                for line in lines:
+                    await websocket.send_json({"message": line, "historical": True})
 
-            follow_proc = await asyncio.create_subprocess_exec(
-                "tail",
-                "-f",
-                str(log_file),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-            )
-
-            if follow_proc.stdout:
-                async for line in follow_proc.stdout:
+                follower = follow(current, poll_interval=poll)
+                switched = False
+                while not switched:
                     try:
-                        await websocket.send_json(
-                            {
-                                "message": line.decode("utf-8", errors="replace").rstrip(),
-                                "historical": False,
-                            }
-                        )
-                    except WebSocketDisconnect:
-                        follow_proc.terminate()
-                        return
+                        # Bound the wait so an idle old file still lets us notice a restart.
+                        line = await asyncio.wait_for(follower.__anext__(), timeout=poll + 0.25)
+                        await websocket.send_json({"message": line, "historical": False})
+                    except asyncio.TimeoutError:
+                        pass
+                    latest = await asyncio.to_thread(latest_run_log, log_dir)
+                    if latest is not None and latest != current:
+                        current = latest
+                        switched = True
+                await follower.aclose()
 
+        except WebSocketDisconnect:
+            return
         except Exception as e:
             logger.error(f"Error streaming file logs: {e}")
 
     async def _maintenance_loop(self) -> None:
         while not self.shutdown_flag:
             await asyncio.sleep(300)
+            # Each backstop runs independently; one failing must not skip the others.
             try:
                 await asyncio.to_thread(self.retention.prune)
             except Exception:
                 logger.exception("retention prune failed; will retry next cycle")
+            try:
+                await asyncio.to_thread(
+                    prune_run_logs, self.pitrac_manager.log_dir, self.pitrac_manager.log_dir_cap_bytes
+                )
+            except Exception:
+                logger.exception("run-log dir prune failed; will retry next cycle")
+            try:
+                await asyncio.to_thread(
+                    truncate_if_over, self.pitrac_manager.log_file, self.pitrac_manager.run_log_cap_bytes
+                )
+            except Exception:
+                logger.exception("run-log truncate failed; will retry next cycle")
 
     async def startup_event(self) -> None:
         logger.info("Starting PiTrac Web Server...")

@@ -1,3 +1,4 @@
+import asyncio
 import os
 import re
 from datetime import datetime
@@ -81,3 +82,25 @@ def truncate_if_over(path: Path, cap_bytes: int) -> bool:
         os.truncate(path, 0)
         return True
     return False
+
+
+async def follow(path: Path, poll_interval: float = 0.5):
+    """Yield new lines appended to `path`, polling for growth. Resets on truncate."""
+    pos = path.stat().st_size if path.exists() else 0
+    pending = b""
+    while True:
+        if path.exists():
+            size = path.stat().st_size
+            if size < pos:        # truncate backstop fired (marathon-run cap)
+                pos = 0
+                pending = b""
+            if size > pos:
+                with open(path, "rb") as f:
+                    f.seek(pos)
+                    pending += f.read(size - pos)
+                    pos = size
+                # hold back any trailing partial line until its newline arrives
+                *complete, pending = pending.split(b"\n")
+                for line in complete:
+                    yield line.decode("utf-8", errors="replace")
+        await asyncio.sleep(poll_interval)
