@@ -4,7 +4,15 @@ let isPaused = false;
 let currentService = null;
 let logBuffer = [];
 const maxLogLines = 2000;
+// Hard ceiling for scrollback growth; trims from the newest end so live-tail trimming stays unaffected
+const maxTotalLines = 5000;
 let stats = { lines: 0, errors: 0, warnings: 0 };
+
+// Scrollback state — reset on every anchor message or service switch
+let currentAnchor = null;
+let oldestCursor = null;
+let reachedStart = false;
+let historyLoading = false;
 
 async function loadServices() {
     try {
@@ -53,10 +61,41 @@ function changeService() {
     statusEl.className = 'service-status ' + status;
     statusEl.style.display = 'inline-flex';
 
+    resetScrollbackState(null);
     clearLogs();
     document.getElementById('logViewer').className = 'log-viewer loading';
 
     connectWebSocket(currentService);
+}
+
+function resetScrollbackState(anchor) {
+    currentAnchor = anchor;
+    oldestCursor = anchor ? { file: anchor.file, offset: anchor.offset } : null;
+    reachedStart = false;
+    historyLoading = false;
+}
+
+// Shared line→div renderer used by both appendLog and history prepend
+function makeLogEntry(content) {
+    const logEntry = document.createElement('div');
+    logEntry.className = 'log-entry';
+
+    if (content.includes('ERROR') || content.includes('[error]')) {
+        logEntry.classList.add('error');
+    } else if (content.includes('WARN') || content.includes('[warning]')) {
+        logEntry.classList.add('warning');
+    } else if (content.includes('INFO') || content.includes('[info]')) {
+        logEntry.classList.add('info');
+    } else if (content.includes('DEBUG') || content.includes('[debug]')) {
+        logEntry.classList.add('debug');
+    }
+
+    const logContent = document.createElement('span');
+    logContent.className = 'log-content';
+    logContent.textContent = content;
+    logEntry.appendChild(logContent);
+
+    return logEntry;
 }
 
 function connectWebSocket(service) {
@@ -68,7 +107,7 @@ function connectWebSocket(service) {
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.warn('WebSocket connected');
         updateConnectionStatus(true);
 
         ws.send(JSON.stringify({ service: service }));
@@ -78,8 +117,26 @@ function connectWebSocket(service) {
     };
 
     ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'anchor') {
+            const isRestart = currentAnchor !== null;
+            resetScrollbackState({ file: data.file, offset: data.offset });
+            if (isRestart) {
+                // Insert a separator so the user knows pitrac restarted
+                const sep = document.createElement('div');
+                sep.className = 'log-entry info';
+                const sepContent = document.createElement('span');
+                sepContent.className = 'log-content';
+                sepContent.textContent = '— pitrac restarted —';
+                sep.appendChild(sepContent);
+                document.getElementById('logViewer').appendChild(sep);
+                logBuffer.push(sep);
+            }
+            return;
+        }
+
         if (!isPaused) {
-            const data = JSON.parse(event.data);
             appendLog(data);
         }
     };
@@ -90,7 +147,7 @@ function connectWebSocket(service) {
     };
 
     ws.onclose = () => {
-        console.log('WebSocket disconnected');
+        console.warn('WebSocket disconnected');
         updateConnectionStatus(false);
 
         if (currentService) {
@@ -128,20 +185,14 @@ function updateConnectionStatus(connected) {
 
 function appendLog(logData) {
     const viewer = document.getElementById('logViewer');
-    const logEntry = document.createElement('div');
-    logEntry.className = 'log-entry';
-
     const content = logData.message || logData.content || '';
+    const logEntry = makeLogEntry(content);
+
+    // Track error/warning stats on live append
     if (content.includes('ERROR') || content.includes('[error]')) {
-        logEntry.classList.add('error');
         stats.errors++;
     } else if (content.includes('WARN') || content.includes('[warning]')) {
-        logEntry.classList.add('warning');
         stats.warnings++;
-    } else if (content.includes('INFO') || content.includes('[info]')) {
-        logEntry.classList.add('info');
-    } else if (content.includes('DEBUG') || content.includes('[debug]')) {
-        logEntry.classList.add('debug');
     }
 
     if (logData.timestamp) {
@@ -163,17 +214,13 @@ function appendLog(logData) {
             timestamp.textContent = '';
         }
 
-        logEntry.appendChild(timestamp);
+        logEntry.insertBefore(timestamp, logEntry.firstChild);
     }
-
-    const logContent = document.createElement('span');
-    logContent.className = 'log-content';
-    logContent.textContent = content;
-    logEntry.appendChild(logContent);
 
     viewer.appendChild(logEntry);
 
     logBuffer.push(logEntry);
+    // Trim oldest (front) when live tail grows past the cap
     if (logBuffer.length > maxLogLines) {
         const oldEntry = logBuffer.shift();
         oldEntry.remove();
@@ -185,6 +232,54 @@ function appendLog(logData) {
     if (!isPaused) {
         viewer.scrollTop = viewer.scrollHeight;
     }
+}
+
+async function loadOlderHistory() {
+    if (historyLoading || reachedStart || !oldestCursor || !currentService) return;
+
+    historyLoading = true;
+    const viewer = document.getElementById('logViewer');
+    const prevScrollHeight = viewer.scrollHeight;
+
+    try {
+        const url = `/api/logs/history?service=${encodeURIComponent(currentService)}&file=${encodeURIComponent(oldestCursor.file)}&before=${oldestCursor.offset}&lines=200`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.reset) {
+            // Server says cursor is stale (file truncated) — clear and let live stream re-anchor
+            clearLogs();
+            resetScrollbackState(null);
+            historyLoading = false;
+            return;
+        }
+
+        const lines = data.lines || [];
+        if (lines.length > 0) {
+            const fragment = document.createDocumentFragment();
+            const newEntries = lines.map(line => makeLogEntry(line));
+            newEntries.forEach(entry => fragment.appendChild(entry));
+
+            viewer.insertBefore(fragment, viewer.firstChild);
+
+            // Prepend to buffer (oldest first); trim from newest end if over ceiling
+            logBuffer.unshift(...newEntries);
+            while (logBuffer.length > maxTotalLines) {
+                const trimmed = logBuffer.pop();
+                trimmed.remove();
+            }
+        }
+
+        oldestCursor = data.next || null;
+        if (data.next === null) reachedStart = true;
+
+        // Restore scroll so the previously visible content stays in place
+        viewer.scrollTop = viewer.scrollHeight - prevScrollHeight;
+    } catch (err) {
+        console.error('Failed to load log history:', err);
+    }
+
+    historyLoading = false;
 }
 
 function updateStats() {
@@ -242,6 +337,13 @@ function downloadLogs() {
 
 document.addEventListener('DOMContentLoaded', () => {
     loadServices();
+
+    const viewer = document.getElementById('logViewer');
+    viewer.addEventListener('scroll', () => {
+        if (viewer.scrollTop < 50) {
+            loadOlderHistory();
+        }
+    });
 });
 
 window.addEventListener('beforeunload', () => {
