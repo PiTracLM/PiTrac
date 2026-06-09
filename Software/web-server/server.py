@@ -1316,8 +1316,7 @@ class PiTracServer:
         """Stream logs for a specific service via WebSocket"""
         try:
             if service == "pitrac":
-                log_file = self.pitrac_manager.log_file
-                await self._stream_file_logs(websocket, log_file)
+                await self._stream_file_logs(websocket)
             elif service == "pitrac-web":
                 await self._stream_systemd_logs(websocket, "pitrac-web")
             else:
@@ -1397,7 +1396,7 @@ class PiTracServer:
         except Exception as e:
             logger.error(f"Error streaming systemd logs: {e}")
 
-    async def _stream_file_logs(self, websocket: WebSocket, log_file: Path) -> None:
+    async def _stream_file_logs(self, websocket: WebSocket) -> None:
         """Stream the active per-run log: anchor + historical tail, then follow new lines.
 
         Tracks the latest run file rather than a fixed path — a pitrac restart rolls a new

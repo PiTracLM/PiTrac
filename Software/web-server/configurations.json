@@ -174,9 +174,9 @@
     },
     "runLogCapMB": {
       "displayName": "Run Log Cap MB",
-      "description": "Maximum size for a single per-run log file before truncation",
+      "description": "Maximum size for a single per-run log file before truncation; kept under the directory cap so the live file can't exceed it",
       "type": "number",
-      "default": 50,
+      "default": 20,
       "internal": true
     }
   },
