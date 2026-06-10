@@ -23,8 +23,8 @@
             <div class="p-3 border-b border-base-300">
                 <h2 class="font-semibold text-sm uppercase tracking-wide opacity-60">Sessions</h2>
             </div>
-            <div id="sessions-list" class="flex flex-col gap-2 p-3 overflow-y-auto" style="max-height: 70vh;">
-                <div class="text-sm opacity-40 text-center py-4">Loading...</div>
+            <div id="sessions-list" class="overflow-y-auto max-h-none lg:max-h-[70vh] p-2">
+                <div class="flex justify-center py-6"><span class="loading loading-spinner loading-md text-primary"></span></div>
             </div>
         </div>
 
@@ -33,7 +33,7 @@
             <div class="p-3 border-b border-base-300">
                 <h2 class="font-semibold text-sm uppercase tracking-wide opacity-60" id="shots-heading">Shots</h2>
             </div>
-            <div id="shots-list" class="overflow-auto" style="max-height: 70vh;">
+            <div id="shots-list" class="overflow-auto max-h-none lg:max-h-[70vh]">
                 <div class="text-sm opacity-40 text-center py-4 p-3">Select a session to view shots.</div>
             </div>
         </div>
@@ -43,7 +43,7 @@
             <div class="p-3 border-b border-base-300">
                 <h2 class="font-semibold text-sm uppercase tracking-wide opacity-60">Shot Detail</h2>
             </div>
-            <div id="shot-detail" class="p-3 flex flex-col gap-3 overflow-y-auto" style="max-height: 70vh;">
+            <div id="shot-detail" class="p-3 flex flex-col gap-3 overflow-y-auto max-h-none lg:max-h-[70vh]">
                 <div class="text-sm opacity-40 text-center py-4">Select a shot to view details.</div>
             </div>
         </div>

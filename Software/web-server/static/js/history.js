@@ -1,6 +1,15 @@
 // Shot history page
 let selectedSessionId = null;
 
+function emptyState(msg, isError = false) {
+    const tone = isError ? 'text-error' : 'opacity-40';
+    return `<div class="text-sm ${tone} text-center py-4">${escapeHtml(msg)}</div>`;
+}
+
+function loadingState() {
+    return '<div class="flex justify-center py-6"><span class="loading loading-spinner loading-md text-primary"></span></div>';
+}
+
 async function loadStorageUsage() {
     try {
         const resp = await fetch('/api/storage/usage');
@@ -26,42 +35,44 @@ async function loadSessions() {
         const sessions = await resp.json();
 
         if (sessions.length === 0) {
-            container.innerHTML = '<div class="text-sm opacity-40 text-center py-4">No sessions yet.</div>';
+            container.innerHTML = emptyState('No sessions yet.');
             return;
         }
 
-        container.innerHTML = '';
+        const list = document.createElement('ul');
+        list.className = 'list bg-base-100 rounded-box';
+
         sessions.forEach(session => {
-            const card = document.createElement('div');
-            card.className = 'card bg-base-300 border border-base-300 p-3 cursor-pointer hover:border-primary transition-colors';
-            card.dataset.sessionId = session.id;
+            const row = document.createElement('li');
+            row.className = 'list-row items-center cursor-pointer hover:bg-base-200 transition-colors';
+            row.dataset.sessionId = session.id;
 
             const started = new Date(session.started_at).toLocaleString();
             const label = session.label ? `<div class="font-medium text-sm">${escapeHtml(session.label)}</div>` : '';
 
-            card.innerHTML = `
-                <div class="flex items-start justify-between gap-2">
-                    <div class="flex-1 min-w-0">
-                        ${label}
-                        <div class="text-xs opacity-60">${started}</div>
-                        <div class="text-xs opacity-50 mt-0.5">${session.shot_count} shot${session.shot_count !== 1 ? 's' : ''}</div>
-                    </div>
-                    <button class="btn btn-xs btn-ghost text-error delete-session-btn flex-shrink-0" data-session-id="${session.id}" title="Delete session">
-                        <i data-lucide="trash-2" class="w-3 h-3"></i>
-                    </button>
+            row.innerHTML = `
+                <div class="list-col-grow min-w-0">
+                    ${label}
+                    <div class="text-xs opacity-60">${started}</div>
+                    <div class="text-xs opacity-50 mt-0.5">${session.shot_count} shot${session.shot_count !== 1 ? 's' : ''}</div>
                 </div>
+                <button class="btn btn-xs btn-ghost text-error delete-session-btn" data-session-id="${session.id}" title="Delete session" aria-label="Delete session">
+                    <i data-lucide="trash-2" class="icon-sm"></i>
+                </button>
             `;
 
-            container.appendChild(card);
+            list.appendChild(row);
         });
+
+        container.innerHTML = '';
+        container.appendChild(list);
 
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
         // re-select the previously selected session if it still exists
         if (selectedSessionId !== null) {
-            const existing = container.querySelector(`[data-session-id="${selectedSessionId}"]`);
-            if (existing) {
-                existing.classList.add('border-primary');
+            if (container.querySelector(`[data-session-id="${selectedSessionId}"]`)) {
+                highlightSession(selectedSessionId);
             } else {
                 selectedSessionId = null;
                 clearShots();
@@ -69,30 +80,28 @@ async function loadSessions() {
         }
     } catch (err) {
         console.error('Failed to load sessions:', err);
-        container.innerHTML = '<div class="text-sm text-error text-center py-4">Failed to load sessions.</div>';
+        container.innerHTML = emptyState('Failed to load sessions.', true);
     }
 }
 
 function clearShots() {
     document.getElementById('shots-heading').textContent = 'Shots';
-    document.getElementById('shots-list').innerHTML =
-        '<div class="text-sm opacity-40 text-center py-4 p-3">Select a session to view shots.</div>';
+    document.getElementById('shots-list').innerHTML = emptyState('Select a session to view shots.');
     clearDetail();
 }
 
 function clearDetail() {
-    document.getElementById('shot-detail').innerHTML =
-        '<div class="text-sm opacity-40 text-center py-4">Select a shot to view details.</div>';
+    document.getElementById('shot-detail').innerHTML = emptyState('Select a shot to view details.');
 }
 
 async function loadShots(sessionId) {
     const container = document.getElementById('shots-list');
-    container.innerHTML = '<div class="text-sm opacity-40 text-center py-4 p-3">Loading...</div>';
+    container.innerHTML = loadingState();
 
     try {
         const resp = await fetch(`/api/sessions/${sessionId}/shots`);
         if (!resp.ok) {
-            container.innerHTML = '<div class="text-sm text-error text-center py-4 p-3">Session not found.</div>';
+            container.innerHTML = emptyState('Session not found.', true);
             return;
         }
 
@@ -100,7 +109,7 @@ async function loadShots(sessionId) {
         document.getElementById('shots-heading').textContent = `Shots (${shots.length})`;
 
         if (shots.length === 0) {
-            container.innerHTML = '<div class="text-sm opacity-40 text-center py-4 p-3">No shots in this session.</div>';
+            container.innerHTML = emptyState('No shots in this session.');
             return;
         }
 
@@ -126,7 +135,7 @@ async function loadShots(sessionId) {
         const tbody = document.getElementById('shots-tbody');
         shots.forEach(shot => {
             const tr = document.createElement('tr');
-            tr.className = 'cursor-pointer hover';
+            tr.className = 'cursor-pointer hover:bg-base-300';
             tr.dataset.shotId = shot.id;
 
             const t = new Date(shot.created_at).toLocaleTimeString();
@@ -137,7 +146,7 @@ async function loadShots(sessionId) {
 
             tr.innerHTML = `
                 <td class="text-xs">${t}</td>
-                <td class="text-xs">${escapeHtml(shot.result_type || '--')}</td>
+                <td class="text-xs"><span class="badge badge-sm badge-ghost">${escapeHtml(shot.result_type || '--')}</span></td>
                 <td class="text-xs">${speed}</td>
                 <td class="text-xs">${carry}</td>
                 <td class="text-xs">${launch}</td>
@@ -149,18 +158,18 @@ async function loadShots(sessionId) {
 
     } catch (err) {
         console.error('Failed to load shots:', err);
-        container.innerHTML = '<div class="text-sm text-error text-center py-4 p-3">Failed to load shots.</div>';
+        container.innerHTML = emptyState('Failed to load shots.', true);
     }
 }
 
 async function loadShotDetail(shotId) {
     const container = document.getElementById('shot-detail');
-    container.innerHTML = '<div class="text-sm opacity-40 text-center py-4">Loading...</div>';
+    container.innerHTML = loadingState();
 
     try {
         const resp = await fetch(`/api/shots/${shotId}`);
         if (!resp.ok) {
-            container.innerHTML = '<div class="text-sm text-error text-center py-4">Shot not found.</div>';
+            container.innerHTML = emptyState('Shot not found.', true);
             return;
         }
 
@@ -219,7 +228,7 @@ async function loadShotDetail(shotId) {
 
     } catch (err) {
         console.error('Failed to load shot detail:', err);
-        container.innerHTML = '<div class="text-sm text-error text-center py-4">Failed to load shot.</div>';
+        container.innerHTML = emptyState('Failed to load shot.', true);
     }
 }
 
@@ -254,22 +263,13 @@ function escapeHtml(str) {
 
 function highlightSession(sessionId) {
     document.querySelectorAll('#sessions-list [data-session-id]').forEach(el => {
-        if (!el.dataset.sessionId) return;
-        if (parseInt(el.dataset.sessionId, 10) === sessionId) {
-            el.classList.add('border-primary');
-        } else {
-            el.classList.remove('border-primary');
-        }
+        el.classList.toggle('bg-primary/10', parseInt(el.dataset.sessionId, 10) === sessionId);
     });
 }
 
 function highlightShot(shotId) {
     document.querySelectorAll('#shots-tbody tr').forEach(tr => {
-        if (parseInt(tr.dataset.shotId, 10) === shotId) {
-            tr.classList.add('active');
-        } else {
-            tr.classList.remove('active');
-        }
+        tr.classList.toggle('bg-primary/10', parseInt(tr.dataset.shotId, 10) === shotId);
     });
 }
 
@@ -288,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const card = e.target.closest('[data-session-id]');
-        if (!card || card.classList.contains('delete-session-btn')) return;
+        if (!card) return;
 
         const sid = parseInt(card.dataset.sessionId, 10);
         selectedSessionId = sid;
