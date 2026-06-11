@@ -137,6 +137,12 @@ namespace golf_sim {
     }
 
 
+    bool CameraHardware::camera_requires_external_trigger_setup(CameraModel model) {
+        return (model == CameraModel::PiGS ||
+                model == CameraModel::InnoMakerIMX296GS_Mono);
+    }
+
+
     void CameraHardware::load_test_images() {
 
         // There are a couple of stationary pictures to simulate slight vibrations

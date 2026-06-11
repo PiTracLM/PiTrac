@@ -121,6 +121,11 @@ namespace golf_sim {
 
         bool camera_is_mono() const;
 
+        // True for IMX296-based cameras whose external (XTR) trigger is switched
+        // at runtime over I2C.  Both the official Pi GS camera and the InnoMaker
+        // variant need the trigger mode set after the camera has started streaming.
+        static bool camera_requires_external_trigger_setup(CameraModel model);
+
         // Used when using test images instead of live photos
         // Pre-loads the test images to allow for faster simulated returns of them
         void load_test_images();

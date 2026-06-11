@@ -82,7 +82,7 @@ void SetExternalTrigger(bool& flag) {
 	const gs::CameraHardware::CameraModel  camera_model = gs::GolfSimCamera::kSystemSlot2CameraType;
 
 	// This will take a moment to complete, so the waiting time to deal with it is dealt with elsehwere in the code
-	if (!flag && camera_model == gs::CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+	if (!flag && gs::CameraHardware::camera_requires_external_trigger_setup(camera_model)) {
 
 		flag = true;
 
@@ -116,10 +116,10 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	// This should be slightly more time than it takes to get all of the timing pulses
 	long kQuiesceTimeMs = (gs::PulseStrobe::kNumberPrimingPulses ) * (1000 / gs::PulseStrobe::kPrimingPulseFPS) + 10;
 
-	// If appropriate, add the time we allow to setup external trigginer for the InnoMaker cameras
+	// If appropriate, add the time we allow to setup external trigginer for the IMX296 cameras
 	const gs::CameraHardware::CameraModel  camera_model = gs::GolfSimCamera::kSystemSlot2CameraType;
 
-	if (camera_model == gs::CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+	if (gs::CameraHardware::camera_requires_external_trigger_setup(camera_model)) {
 		kQuiesceTimeMs += gs::PulseStrobe::kPauseToSetUpInnoMakerExternalTriggerMilliseconds;
 	}
 
@@ -138,12 +138,12 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 												golf_sim::GolfSimCamera::kUsePreImageSubtraction);
 
 
-    // True if the InnoMaker camera external trigger script has not been called yet
-    // Note - The InnoMaker camera needs its trigger script to be called AFTER the camera
+    // True if the camera external trigger script has not been called yet
+    // Note - The camera needs its trigger script to be called AFTER the camera
     // has already started up.  No idea why.
-	bool innomaker_first_external_trigger_is_set = false;
+	bool first_external_trigger_is_set = false;
 
-	// We want to make sure we are externally triggered here every time just in case we're using an InnoMaker camera
+	// We want to make sure we are externally triggered here every time just in case we're using an IMX296 camera
 
 	bool dummy = false;
 	SetExternalTrigger(dummy);
@@ -347,7 +347,7 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 			CompletedRequestPtr& completed_request = std::get<CompletedRequestPtr>(msg.payload);
 
 			// (Re)set external triggering if we have not already done so
-			SetExternalTrigger(innomaker_first_external_trigger_is_set);
+			SetExternalTrigger(first_external_trigger_is_set);
 
 			state = kWaitingForFirstPrimingTimeEnd;
 			break;

@@ -417,6 +417,17 @@ namespace golf_sim {
         return state::BallHitNowWaitingForCam2Image{ waitingForBallHit.cam1_ball_, waitingForBallHit.ball_image_, waitingForBallHit.camera2_pre_image_ };
     }
 
+    GolfSimState onEvent(const state::WaitingForBallHit& waitingForBallHit,
+        const GolfSimEvent::Camera2ImageReceived& cam2ImageReceived) {
+
+        // If a camera 2 image shows up before the ball has even been hit, the camera
+        // fired early - usually because it was free-running instead of waiting for
+        // the external trigger.  Nothing useful in the image, so just ignore it.
+        GS_LOG_MSG(warning, "Received Camera2ImageReceived before ball was hit - ignoring image.");
+
+        return waitingForBallHit;
+    }
+
     /*********** BallHitNowWaitingForCam2Image ************/
 
     GolfSimState onEvent(const state::BallHitNowWaitingForCam2Image& BallHitNowWaitingForCam2Image,
@@ -731,6 +742,14 @@ namespace golf_sim {
                 GS_LOG_TRACE_MSG(trace, "Exception! - " + std::string(ex.what()) + ".  Restarting...");
                 state::InitializingCamera1System state;
                 golfSim.restartSim(state);
+
+                // The reset leaves the FSM in InitializingCamera1System, which only moves
+                // forward when a Restart event arrives.  If the queue has drained, nothing
+                // else will ever queue one and the FSM would idle forever.
+                if (GolfSimEventQueue::GetQueueLength() == 0) {
+                    GolfSimEventElement restartEvent{ new GolfSimEvent::Restart{ } };
+                    GolfSimEventQueue::QueueEvent(restartEvent);
+                }
             }
 
             // If there is another event, we won't pause before processing it in the next loop

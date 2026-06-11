@@ -638,13 +638,13 @@ namespace golf_sim {
 			SendOnOffPulse(kShutterSpeed - kShutterOffset);
 			usleep(kOnTimeWidth);
 
-			// If we are running an InnoMaker camera, the camera 2 system needs a moment
+			// If we are running an externally-triggered camera, the camera 2 system needs a moment
 			// to (re)setup the external trigger after the first image is received
 			const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot2CameraType;
 
-			// The camera 2 system only needs to set up an InnoMaker camera external trigger once after the camera has started running
-			if (i == 0 && camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
-				GS_LOG_TRACE_MSG(trace, "Pausing for InnoMaker external trigger setup: " + std::to_string(kPauseToSetUpInnoMakerExternalTriggerMilliseconds) + " ms");
+			// The camera 2 system only needs to set up the camera external trigger once after the camera has started running
+			if (i == 0 && CameraHardware::camera_requires_external_trigger_setup(camera_model)) {
+				GS_LOG_TRACE_MSG(trace, "Pausing for external trigger setup: " + std::to_string(kPauseToSetUpInnoMakerExternalTriggerMilliseconds) + " ms");
 				usleep(kPauseToSetUpInnoMakerExternalTriggerMilliseconds * 1000);
 			}
 		}
