@@ -7,7 +7,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="logs-container flex flex-col gap-4" style="height: calc(100vh - 90px);">
+<div class="logs-container flex flex-col gap-4 h-[calc(100vh-90px)]">
 
     <!-- Header / controls -->
     <div class="card bg-base-200 border border-base-300 shadow-sm p-4 mx-2 sm:mx-4">
@@ -16,7 +16,7 @@
             <!-- Service picker -->
             <div class="flex items-center gap-3 min-w-[220px] max-md:w-full max-md:flex-col max-md:items-stretch">
                 <label for="serviceSelect" class="font-semibold whitespace-nowrap">Service:</label>
-                <select id="serviceSelect" class="select select-sm select-bordered flex-1" onchange="changeService()">
+                <select id="serviceSelect" class="select select-sm flex-1">
                     <option value="">Loading services...</option>
                 </select>
             </div>
@@ -34,15 +34,15 @@
 
             <!-- Action buttons -->
             <div class="flex gap-2 max-md:w-full max-md:mt-2">
-                <button id="pauseButton" class="btn btn-sm btn-ghost max-md:flex-1" onclick="togglePause()">
+                <button id="pauseButton" class="btn btn-sm btn-ghost max-md:flex-1">
                     <i data-lucide="pause" class="icon-sm" id="pauseIcon"></i>
                     <span class="btn-text max-md:hidden">Pause</span>
                 </button>
-                <button id="clearButton" class="btn btn-sm btn-ghost text-error max-md:flex-1" onclick="clearLogs()">
+                <button id="clearButton" class="btn btn-sm btn-ghost text-error max-md:flex-1">
                     <i data-lucide="trash-2" class="icon-sm"></i>
                     <span class="btn-text max-md:hidden">Clear</span>
                 </button>
-                <button class="btn btn-sm btn-ghost max-md:flex-1" onclick="downloadLogs()">
+                <button id="downloadButton" class="btn btn-sm btn-ghost max-md:flex-1">
                     <i data-lucide="download" class="icon-sm"></i>
                     <span class="btn-text max-md:hidden">Download</span>
                 </button>

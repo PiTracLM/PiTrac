@@ -338,6 +338,11 @@ function downloadLogs() {
 document.addEventListener('DOMContentLoaded', () => {
     loadServices();
 
+    document.getElementById('serviceSelect').addEventListener('change', changeService);
+    document.getElementById('pauseButton').addEventListener('click', togglePause);
+    document.getElementById('clearButton').addEventListener('click', clearLogs);
+    document.getElementById('downloadButton').addEventListener('click', downloadLogs);
+
     const viewer = document.getElementById('logViewer');
     viewer.addEventListener('scroll', () => {
         if (viewer.scrollTop < 50) {
