@@ -41,16 +41,16 @@ function createToolCard(tool) {
     card.innerHTML = `
         <div class="tool-header">
             <h3 class="tool-name">${tool.name}</h3>
-            ${tool.requires_sudo ? '<span class="sudo-badge">sudo</span>' : ''}
+            ${tool.requires_sudo ? '<span class="badge badge-error badge-sm uppercase">sudo</span>' : ''}
         </div>
         <p class="tool-description">${tool.description}</p>
         <div class="tool-actions">
-            <button class="btn btn-primary run-btn" 
+            <button class="btn btn-primary btn-sm run-btn"
                     onclick="runTool('${tool.id}')"
                     ${isRunning ? 'disabled' : ''}>
                 ${isRunning ? 'Running...' : 'Run Test'}
             </button>
-            ${isRunning ? `<button class="btn btn-danger" onclick="stopTool('${tool.id}')">Stop</button>` : ''}
+            ${isRunning ? `<button class="btn btn-error btn-sm stop-btn" onclick="stopTool('${tool.id}')">Stop</button>` : ''}
         </div>
     `;
 
@@ -83,9 +83,9 @@ async function runTool(toolId) {
             runBtn.textContent = 'Running...';
 
             const actionsDiv = card.querySelector('.tool-actions');
-            if (!actionsDiv.querySelector('.btn-danger')) {
+            if (!actionsDiv.querySelector('.stop-btn')) {
                 const stopBtn = document.createElement('button');
-                stopBtn.className = 'btn btn-danger';
+                stopBtn.className = 'btn btn-error btn-sm stop-btn';
                 stopBtn.textContent = 'Stop';
                 stopBtn.onclick = () => stopTool(toolId);
                 actionsDiv.appendChild(stopBtn);
@@ -156,7 +156,7 @@ function updateToolCard(toolId) {
     if (!card) return;
 
     const runBtn = card.querySelector('.run-btn');
-    const stopBtn = card.querySelector('.btn-danger');
+    const stopBtn = card.querySelector('.stop-btn');
 
     card.classList.remove('running');
     runBtn.disabled = false;
@@ -247,7 +247,7 @@ function showImageResult(toolId, imageUrl) {
         </div>
     `;
 
-    modal.style.display = 'block';
+    modal.showModal();
 }
 
 function showError(message) {
