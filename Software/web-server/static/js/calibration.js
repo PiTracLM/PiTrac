@@ -106,10 +106,12 @@ class CalibrationManager {
                 const statusElement = document.getElementById('pitrac-status');
                 if (status.running) {
                     statusElement.textContent = 'Running';
-                    statusElement.style.color = '#4CAF50';
+                    statusElement.classList.add('text-success');
+                    statusElement.classList.remove('text-error');
                 } else {
                     statusElement.textContent = 'Stopped';
-                    statusElement.style.color = '#f44336';
+                    statusElement.classList.add('text-error');
+                    statusElement.classList.remove('text-success');
                 }
             }
         } catch (error) {
@@ -430,11 +432,11 @@ class CalibrationManager {
                     }
 
                     if (details.length > 0) {
-                        detailsDiv.innerHTML = `<small style="color: #ff9800;">${details.join(' | ')}</small>`;
+                        detailsDiv.innerHTML = `<small class="text-warning">${details.join(' | ')}</small>`;
                     }
 
                     progressBar.style.width = '100%';
-                    progressBar.style.background = '#f44336';
+                    progressBar.style.background = 'var(--color-error)';
                     statusText.textContent = 'Failed';
                 }
             } else {
@@ -447,7 +449,7 @@ class CalibrationManager {
             const progressBar = document.getElementById(`${camera}-progress`);
             const statusText = document.getElementById(`${camera}-status`);
             progressBar.style.width = '100%';
-            progressBar.style.background = '#f44336';
+            progressBar.style.background = 'var(--color-error)';
             statusText.textContent = 'Error';
         }
     }
@@ -801,7 +803,7 @@ class CalibrationManager {
         // Show results
         const resultArea = document.getElementById('strobe-result-area');
         const resultCard = document.getElementById('strobe-result-card');
-        resultCard.style.borderColor = 'var(--success)';
+        resultCard.style.borderColor = 'var(--color-success)';
         document.getElementById('strobe-result-title').textContent = 'Calibration Successful';
 
         if (status.dac_setting !== undefined) {
@@ -827,7 +829,7 @@ class CalibrationManager {
         this.loadStrobeSettings();
 
         document.getElementById('strobe-progress-fill').style.width = '100%';
-        document.getElementById('strobe-progress-fill').style.background = 'var(--error)';
+        document.getElementById('strobe-progress-fill').style.background = 'var(--color-error)';
         document.getElementById('strobe-state').textContent = 'Failed';
         document.getElementById('strobe-progress-message').textContent =
             status.message || 'Calibration failed';

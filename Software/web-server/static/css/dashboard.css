@@ -53,9 +53,9 @@
     animation: pulse 2s infinite;
 }
 
-.status-strip.stabilizing { border-left-color: #fbbf24; }
+.status-strip.stabilizing { border-left-color: var(--color-warning); }
 .status-strip.stabilizing .ball-icon {
-    background-color: #fbbf24;
+    background-color: var(--color-warning);
     animation: bounce 1s infinite;
 }
 

@@ -84,7 +84,7 @@ html[data-theme="light"] {
 /* Active theme button highlight */
 .theme-btn.active {
     background: linear-gradient(135deg, oklch(59% 0.17 270), oklch(47% 0.17 300));
-    color: white !important;
+    color: var(--color-primary-content) !important;
     border-color: transparent;
 }
 

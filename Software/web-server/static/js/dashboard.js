@@ -212,11 +212,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateBallStatus(null, null, false);
 
-    // Best-effort pre-per-shot-dir fallback: try to restore the last shot image on refresh
-    const img = new Image();
-    img.onload = () => handleImageReady('ball_exposure_candidates.png');
-    img.src = '/images/ball_exposure_candidates.png?t=' + Date.now();
-
     if (window.checkPiTracStatus) {
         originalCheckPiTracStatus = window.checkPiTracStatus;
         window.checkPiTracStatus = dashboardCheckPiTracStatus;
