@@ -1,18 +1,5 @@
 /* Update page — only styles daisyUI/Tailwind can't handle */
 
-/* Loading dots animation on action buttons (JS toggles .loading) */
-.action-btn.loading span::after {
-    content: "...";
-    animation: dots 1.5s steps(3, end) infinite;
-}
-
-@keyframes dots {
-    0% { content: ""; }
-    33% { content: "."; }
-    66% { content: ".."; }
-    100% { content: "..."; }
-}
-
 /* Commit list items (built dynamically by JS) */
 .commit-item {
     display: flex;
@@ -76,34 +63,9 @@
 .log-line.git { color: #b5cea8; }
 .log-line.build { color: #d4d4d4; }
 
-/* Update banner (JS creates this dynamically) */
+/* Update banner — position hook only; colours come from DaisyUI alert variants */
 .update-banner {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    border-radius: 0.375rem;
     margin-bottom: 1.25rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-}
-
-.update-banner.info {
-    background: rgba(66, 153, 225, 0.1);
-    color: var(--color-info);
-    border: 1px solid rgba(66, 153, 225, 0.2);
-}
-
-.update-banner.success {
-    background: rgba(72, 187, 120, 0.1);
-    color: var(--color-success);
-    border: 1px solid rgba(72, 187, 120, 0.2);
-}
-
-.update-banner.error {
-    background: rgba(245, 101, 101, 0.1);
-    color: var(--color-error);
-    border: 1px solid rgba(245, 101, 101, 0.2);
 }
 
 /* Mobile */

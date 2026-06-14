@@ -44,8 +44,7 @@ function onBranchChange() {
 
 async function checkForUpdates() {
     const btn = document.getElementById('checkBtn');
-    btn.disabled = true;
-    btn.classList.add('loading');
+    setBtnLoading(btn, true);
 
     try {
         const resp = await fetch('/api/update/check');
@@ -79,8 +78,7 @@ async function checkForUpdates() {
     } catch (e) {
         showBanner('Check failed: ' + e.message, 'error');
     } finally {
-        btn.disabled = false;
-        btn.classList.remove('loading');
+        setBtnLoading(btn, false);
     }
 }
 
@@ -245,12 +243,25 @@ function showBanner(message, type) {
     let banner = document.querySelector('.update-banner');
     if (!banner) {
         banner = document.createElement('div');
-        banner.className = 'update-banner';
         const section = document.querySelector('.update-section');
         section.insertBefore(banner, section.querySelector('.status-card'));
     }
-    banner.className = 'update-banner ' + type;
+    banner.className = 'update-banner alert alert-' + type;
     banner.textContent = message;
+}
+
+function setBtnLoading(btn, loading) {
+    if (loading) {
+        btn.disabled = true;
+        btn._savedInner = btn.innerHTML;
+        btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span>';
+    } else {
+        btn.disabled = false;
+        if (btn._savedInner) {
+            btn.innerHTML = btn._savedInner;
+            btn._savedInner = null;
+        }
+    }
 }
 
 async function loadStatus() {
