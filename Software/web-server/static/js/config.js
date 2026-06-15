@@ -105,18 +105,24 @@ async function loadConfiguration() {
     }
 }
 
+// Build a DaisyUI menu item (<li><a>) for a category
+function createCategoryMenuItem(category, label) {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.dataset.category = category;
+    a.textContent = label;
+    a.onclick = () => selectCategory(category);
+    li.appendChild(a);
+    return li;
+}
+
 // Render category list
 function renderCategories() {
     const categoryList = document.getElementById('categoryList');
     categoryList.innerHTML = '';
 
     // Add "All Settings" option first
-    const allItem = document.createElement('li');
-    allItem.className = 'category-item';
-    allItem.dataset.category = 'all';
-    allItem.textContent = 'All Settings';
-    allItem.onclick = () => selectCategory('all');
-    categoryList.appendChild(allItem);
+    categoryList.appendChild(createCategoryMenuItem('all', 'All Settings'));
 
     // Add each category with its settings count
     Object.keys(categories).forEach(category => {
@@ -126,12 +132,9 @@ function renderCategories() {
         const totalCount = basicCount + advancedCount;
 
         if (totalCount > 0) {
-            const li = document.createElement('li');
-            li.className = 'category-item';
-            li.dataset.category = category;
-            li.textContent = `${category} (${totalCount})`;
-            li.onclick = () => selectCategory(category);
-            categoryList.appendChild(li);
+            categoryList.appendChild(
+                createCategoryMenuItem(category, `${category} (${totalCount})`)
+            );
         }
     });
 
@@ -144,10 +147,10 @@ function renderCategories() {
 // Select category
 function selectCategory(category) {
     // Update active category
-    document.querySelectorAll('.category-item').forEach(item => {
-        item.classList.remove('active');
+    document.querySelectorAll('#categoryList a[data-category]').forEach(item => {
+        item.classList.remove('menu-active');
         if (item.dataset.category === category) {
-            item.classList.add('active');
+            item.classList.add('menu-active');
         }
     });
 
@@ -345,7 +348,7 @@ function createConfigItem(key, value, defaultValue, isModified) {
 
     // Note: isUserSet already defined above
     if (!isUserSet) {
-        labelHTML += ' <span class="default-badge" title="Using default value">DEFAULT</span>';
+        labelHTML += ' <span class="default-badge badge badge-ghost badge-sm" title="Using default value">DEFAULT</span>';
     }
 
     if (metadata.requiresRestart) {
@@ -367,7 +370,7 @@ function createConfigItem(key, value, defaultValue, isModified) {
     inputContainer.className = 'input-container';
 
     const input = createInput(key, value, defaultValue, isUserSet);
-    input.className = 'config-input';
+    input.classList.add('config-input');
     input.dataset.key = key;
     input.dataset.original = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : String(value);
     input.dataset.default = (typeof defaultValue === 'object' && defaultValue !== null) ? JSON.stringify(defaultValue) : String(defaultValue);
@@ -385,7 +388,7 @@ function createConfigItem(key, value, defaultValue, isModified) {
 
     if (isUserSet || isModified) {
         const clearBtn = document.createElement('button');
-        clearBtn.className = 'clear-value-btn';
+        clearBtn.className = 'clear-value-btn btn btn-ghost btn-xs btn-circle';
         clearBtn.innerHTML = '×';
         clearBtn.title = 'Reset to default';
         clearBtn.onclick = (e) => {
@@ -411,7 +414,7 @@ function createConfigItem(key, value, defaultValue, isModified) {
 
                 if (!inputWrapper.querySelector('.clear-value-btn')) {
                     const clearBtn = document.createElement('button');
-                    clearBtn.className = 'clear-value-btn';
+                    clearBtn.className = 'clear-value-btn btn btn-ghost btn-xs btn-circle';
                     clearBtn.innerHTML = '×';
                     clearBtn.title = 'Reset to default';
                     clearBtn.onclick = (e) => {
@@ -435,14 +438,11 @@ function createConfigItem(key, value, defaultValue, isModified) {
 
     if (key === 'cameras.slot1.type' || key === 'cameras.slot2.type' ||
         key === 'cameras.slot1_type' || key === 'cameras.slot2_type') {
-        inputContainer.style.display = 'flex';
-        inputContainer.style.alignItems = 'center';
-        inputContainer.style.gap = '0.75rem';
+        inputContainer.classList.add('flex', 'items-center', 'gap-3');
 
         const detectBtn = document.createElement('button');
-        detectBtn.className = 'btn btn-secondary btn-small';
+        detectBtn.className = 'btn btn-secondary btn-xs shrink-0';
         detectBtn.textContent = 'Detect';
-        detectBtn.style.flexShrink = '0';
         detectBtn.title = 'Auto-detect connected camera';
         detectBtn.onclick = async () => {
             detectBtn.disabled = true;
@@ -467,7 +467,7 @@ function createConfigItem(key, value, defaultValue, isModified) {
     // Only show reset button for user-set values (not for defaults)
     if (isUserSet && !isModified) {
         const resetBtn = document.createElement('button');
-        resetBtn.className = 'btn btn-secondary btn-small';
+        resetBtn.className = 'btn btn-secondary btn-xs';
         resetBtn.textContent = 'Reset';
         resetBtn.title = 'Reset to default value';
         resetBtn.onclick = () => resetValue(key);
@@ -548,9 +548,7 @@ function createInput(key, value, defaultValue, isUserSet) {
         const textarea = document.createElement('textarea');
         textarea.value = JSON.stringify(value, null, 2);
         textarea.rows = 3;
-        textarea.style.width = '100%';
-        textarea.style.fontFamily = 'Monaco, Menlo, monospace';
-        textarea.style.fontSize = '0.875rem';
+        textarea.classList.add('font-mono', 'text-sm', 'w-full');
         if (!isUserSet) {
             textarea.placeholder = `Default: ${JSON.stringify(defaultValue, null, 2)}`;
         }
@@ -661,7 +659,7 @@ async function handleValueChange(key, currentValue, originalValue) {
                 const inputWrapper = item.querySelector('.input-wrapper');
                 if (inputWrapper && !inputWrapper.querySelector('.clear-value-btn')) {
                     const clearBtn = document.createElement('button');
-                    clearBtn.className = 'clear-value-btn';
+                    clearBtn.className = 'clear-value-btn btn btn-ghost btn-xs btn-circle';
                     clearBtn.innerHTML = '×';
                     clearBtn.title = 'Reset to default';
                     clearBtn.onclick = (e) => {
@@ -683,7 +681,7 @@ async function handleValueChange(key, currentValue, originalValue) {
                 if (!badge) {
                     const labelName = item.querySelector('.config-label-name');
                     if (labelName && !labelName.querySelector('.default-badge')) {
-                        const badgeHtml = ' <span class="default-badge" title="Using default value">DEFAULT</span>';
+                        const badgeHtml = ' <span class="default-badge badge badge-ghost badge-sm" title="Using default value">DEFAULT</span>';
                         labelName.insertAdjacentHTML('beforeend', badgeHtml);
                     }
                 }
@@ -920,7 +918,7 @@ async function resetValue(key) {
                 if (!badge) {
                     const labelName = item.querySelector('.config-label-name');
                     if (labelName) {
-                        const badgeHtml = ' <span class="default-badge" title="Using default value">DEFAULT</span>';
+                        const badgeHtml = ' <span class="default-badge badge badge-ghost badge-sm" title="Using default value">DEFAULT</span>';
                         labelName.insertAdjacentHTML('beforeend', badgeHtml);
                     }
                 }
@@ -1026,7 +1024,7 @@ async function showDiff() {
 
         diffHtml += `
                 <div class="diff-content">
-                    <table class="diff-table">
+                    <table class="diff-table table table-sm">
                         <thead>
                             <tr>
                                 <th>Setting</th>
@@ -1048,7 +1046,7 @@ async function showDiff() {
                 : '';
 
             diffHtml += `
-                <tr class="diff-row">
+                <tr class="diff-row hover:bg-base-300">
                     <td class="diff-key">
                         <div class="diff-key-name">${displayName}${unsavedTag}</div>
                         <div class="diff-key-path">${key}</div>
@@ -1060,7 +1058,7 @@ async function showDiff() {
                         <code>${userVal}</code>
                     </td>
                     <td class="diff-actions">
-                        <button class="btn btn-small" onclick="resetValueFromDiff('${key}')">Reset</button>
+                        <button class="btn btn-xs" onclick="resetValueFromDiff('${key}')">Reset</button>
                     </td>
                 </tr>
             `;
@@ -1250,30 +1248,22 @@ function checkDependencies(key, value) {
 }
 
 function showDependencyWarning(key, warnings) {
-    const message = `<strong>Changing ${key} affects:</strong><br>` + warnings.join('<br>');
+    let container = document.getElementById('dependencyToast');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'dependencyToast';
+        container.className = 'toast toast-top toast-end';
+        document.body.appendChild(container);
+    }
 
-    const notification = document.createElement('div');
-    notification.className = 'dependency-warning';
-    notification.innerHTML = message;
-    notification.style.cssText = `
-        position: fixed;
-        top: 80px;
-        right: 20px;
-        background: var(--warning-bg, #fef3c7);
-        color: var(--warning-text, #92400e);
-        padding: 1rem;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        max-width: 300px;
-        z-index: 1000;
-        animation: slideIn 0.3s ease;
-    `;
-
-    document.body.appendChild(notification);
+    const alert = document.createElement('div');
+    alert.className = 'alert alert-warning dependency-warning max-w-xs';
+    alert.innerHTML = `<span><strong>Changing ${key} affects:</strong><br>${warnings.join('<br>')}</span>`;
+    container.appendChild(alert);
 
     setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease';
-        setTimeout(() => notification.remove(), 300);
+        alert.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => alert.remove(), 300);
     }, 5000);
 }
 
@@ -1367,9 +1357,9 @@ function updateModifiedCount() {
 
     if (counterEl) {
         counterEl.innerHTML = `
-            <span class="counter-custom" title="Settings you've customized">${userSetCount} custom</span>
-            <span class="counter-default" title="Settings using default values">${defaultCount} defaults</span>
-            <span class="counter-total" title="Total number of settings">${totalSettings} total</span>
+            <span class="badge badge-primary" title="Settings you've customized">${userSetCount} custom</span>
+            <span class="badge badge-outline" title="Settings using default values">${defaultCount} defaults</span>
+            <span class="badge badge-outline" title="Total number of settings">${totalSettings} total</span>
         `;
     }
 }
@@ -1497,11 +1487,11 @@ async function detectAndSetCameras(targetKey = null) {
                 showModal('Camera Detection Failed',
                     `<p><strong>${errorMsg}</strong></p>` +
                     '<p>Warnings:</p>' +
-                    '<ul style="text-align: left; margin: 10px 20px;">' +
+                    '<ul class="text-left mx-5 my-2">' +
                     result.warnings.map(w => `<li>${w}</li>`).join('') +
                     '</ul>' +
-                    '<p style="margin-top: 15px;">Troubleshooting:</p>' +
-                    '<ul style="text-align: left; margin: 10px 20px;">' +
+                    '<p class="mt-4">Troubleshooting:</p>' +
+                    '<ul class="text-left mx-5 my-2">' +
                     '<li>Check ribbon cable connections and orientation</li>' +
                     '<li>Verify camera_auto_detect=1 in /boot/firmware/config.txt</li>' +
                     '<li>Power cycle the Raspberry Pi</li>' +
@@ -1516,8 +1506,8 @@ async function detectAndSetCameras(targetKey = null) {
         showModal('Connection Error',
             '<p>Failed to connect to camera detection service.</p>' +
             `<p>Error: ${error.message}</p>` +
-            '<p style="margin-top: 15px;">Please ensure:</p>' +
-            '<ul style="text-align: left; margin: 10px 20px;">' +
+            '<p class="mt-4">Please ensure:</p>' +
+            '<ul class="text-left mx-5 my-2">' +
             '<li>The PiTrac web service is running</li>' +
             '<li>You have a stable network connection</li>' +
             '<li>Try refreshing the page</li>' +

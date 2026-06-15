@@ -7,37 +7,19 @@
 .status-message.warning { color: var(--color-warning); }
 .status-message.info    { color: var(--color-info); }
 
-/* Category sidebar items — JS creates these dynamically */
-.category-item {
-    padding: 0.6rem 1rem;
-    margin-bottom: 0.125rem;
-    border-radius: 0.5rem;
-    cursor: pointer;
-    color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
-    transition: background 0.15s, color 0.15s;
-}
-
-.category-item:hover {
-    background: var(--color-base-300);
-    color: var(--color-base-content);
-}
-
-.category-item.active {
-    background: var(--color-primary);
-    color: var(--color-primary-content);
-}
-
-.category-item[data-category="Basic"] {
+/* Category sidebar — DaisyUI menu handles padding/hover/active.
+   Keep only the "Basic" emphasis + asterisk marker on the menu link. */
+#categoryList a[data-category="Basic"] {
     font-weight: 600;
 }
 
-.category-item[data-category="Basic"]::after {
+#categoryList a[data-category="Basic"]::after {
     content: "*";
-    float: right;
+    margin-left: auto;
     color: var(--color-warning);
 }
 
-.category-item.active[data-category="Basic"]::after {
+#categoryList a.menu-active[data-category="Basic"]::after {
     color: var(--color-primary-content);
 }
 
@@ -218,40 +200,10 @@ select.config-input {
 .input-wrapper .config-input { padding-right: 2rem; }
 .input-wrapper select.config-input { padding-right: 2.5rem; }
 
+/* Clear-value button is a daisyUI btn; only the overlay position is custom */
 .clear-value-btn {
     position: absolute;
     right: 0.4rem;
-    background: transparent;
-    border: none;
-    color: color-mix(in oklch, var(--color-base-content) 35%, transparent);
-    font-size: 1.2rem;
-    cursor: pointer;
-    width: 1.4rem;
-    height: 1.4rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    transition: background 0.15s, color 0.15s;
-}
-.clear-value-btn:hover {
-    background: color-mix(in oklch, var(--color-error) 10%, transparent);
-    color: var(--color-error);
-}
-
-/* Default badge */
-.default-badge {
-    display: inline-block;
-    padding: 0.1rem 0.35rem;
-    margin-left: 0.4rem;
-    background: var(--color-base-300);
-    color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
-    font-size: 0.6rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    border-radius: 0.2rem;
-    border: 1px solid var(--color-base-300);
-    vertical-align: middle;
 }
 
 /* Restart indicator */
@@ -262,25 +214,11 @@ select.config-input {
     cursor: help;
 }
 
-/* Config actions column */
+/* Config actions column — buttons are daisyUI .btn, just lay them out */
 .config-actions {
     display: flex;
     gap: 0.4rem;
     align-items: center;
-}
-.config-actions button {
-    padding: 0.3rem 0.6rem;
-    background: color-mix(in oklch, var(--color-base-300) 50%, transparent);
-    border: 1px solid var(--color-base-300);
-    border-radius: 0.3rem;
-    color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
-    font-size: 0.75rem;
-    cursor: pointer;
-    transition: background 0.15s;
-}
-.config-actions button:hover {
-    background: var(--color-base-300);
-    color: var(--color-base-content);
 }
 
 /* Validation errors */
@@ -305,19 +243,7 @@ select.config-input {
     align-items: center;
 }
 
-.settings-counter span {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.2rem 0.6rem;
-    border-radius: 1rem;
-    background: var(--color-base-100);
-    cursor: help;
-}
-
-.counter-custom  { border: 1px solid var(--color-primary);  color: var(--color-primary); }
-.counter-default { border: 1px solid color-mix(in oklch, var(--color-base-content) 30%, transparent); color: color-mix(in oklch, var(--color-base-content) 40%, transparent); }
-.counter-total   { border: 1px solid var(--color-base-300);  color: color-mix(in oklch, var(--color-base-content) 50%, transparent); }
+/* Counter pills are daisyUI badges; the container just lays them out. */
 
 /* Loading overlay — use specific class to avoid colliding with daisyUI's .loading */
 .config-loading-overlay {
@@ -350,22 +276,7 @@ select.config-input {
 .diff-header { margin-bottom: 1.25rem; text-align: center; }
 .diff-summary { opacity: 0.5; font-size: 0.85rem; margin-top: 0.4rem; }
 
-.diff-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 0.75rem 0;
-}
-.diff-table th {
-    background: color-mix(in oklch, var(--color-base-300) 50%, transparent);
-    padding: 0.6rem;
-    text-align: left;
-    font-weight: 600;
-    border-bottom: 2px solid var(--color-base-300);
-}
-.diff-table td {
-    padding: 0.6rem;
-    border-bottom: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
-}
+/* Table structure handled by daisyUI .table .table-sm */
 
 .diff-key-name { font-weight: 500; }
 .diff-key-path {
@@ -390,15 +301,8 @@ select.config-input {
     border-top: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
 }
 
-/* Dependency warning toast */
+/* Dependency warning toast (daisyUI alert inside a toast container) */
 .dependency-warning { animation: slideIn 0.3s ease; }
-
-/* Small button variant used by JS (detect, reset, etc.) */
-.btn-small {
-    padding: 0.3rem 0.7rem;
-    font-size: 0.8rem;
-    white-space: nowrap;
-}
 
 /* Animations */
 @keyframes slideIn {
