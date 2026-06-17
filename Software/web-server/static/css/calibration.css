@@ -6,79 +6,7 @@
     box-shadow: 0 0 12px oklch(59% 0.17 270 / 0.3);
 }
 
-/* ---- Wizard steps ---- */
-.wizard-steps {
-    position: relative;
-    z-index: 0;
-}
-
-/* Connecting line behind the circles */
-.wizard-line {
-    position: absolute;
-    top: 20px;
-    left: 10%;
-    right: 10%;
-    height: 2px;
-    background: var(--color-base-300);
-    z-index: 0;
-}
-
-.wizard-steps .step {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    z-index: 1;
-    flex: 1;
-}
-
-.step-circle {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 0.9rem;
-    background: var(--color-base-300);
-    color: var(--color-base-content);
-    border: 2px solid var(--color-base-300);
-    transition: all 0.3s;
-}
-
-.step-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    opacity: 0.6;
-    transition: all 0.3s;
-}
-
-.wizard-steps .step.active .step-circle {
-    background: var(--color-primary);
-    color: var(--color-primary-content);
-    border-color: var(--color-primary);
-    box-shadow: 0 0 12px rgba(102, 126, 234, 0.4);
-}
-
-.wizard-steps .step.active .step-label {
-    opacity: 1;
-    color: var(--color-primary);
-}
-
-.wizard-steps .step.completed .step-circle {
-    background: var(--color-success);
-    color: var(--color-primary-content);
-    border-color: var(--color-success);
-}
-
-.wizard-steps .step.completed .step-label {
-    opacity: 0.7;
-}
-
-/* ---- Progress bars ---- */
+/* ---- Progress bars (distortion calibration) ---- */
 div.progress-bar {
     display: block;
     width: 100%;
@@ -122,31 +50,6 @@ div.progress-bar > .progress-fill {
     justify-content: center;
     height: 100%;
     opacity: 0.5;
-}
-
-/* ---- Ball status ---- */
-.ball-status {
-    padding: 0.75rem;
-    border-radius: 0.25rem;
-    font-size: 0.875rem;
-}
-
-.ball-status.success {
-    background: oklch(70% 0.14 160 / 0.15);
-    border: 1px solid oklch(70% 0.14 160);
-    color: oklch(70% 0.14 160);
-}
-
-.ball-status.error {
-    background: oklch(65% 0.19 25 / 0.15);
-    border: 1px solid oklch(65% 0.19 25);
-    color: oklch(65% 0.19 25);
-}
-
-/* ---- Completion details ---- */
-.completion-details {
-    color: oklch(70% 0.14 160);
-    line-height: 1.4;
 }
 
 /* ---- Terminal log ---- */

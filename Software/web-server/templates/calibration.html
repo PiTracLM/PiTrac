@@ -183,25 +183,12 @@
         <div class="tab-content bg-base-200 border-base-300 p-4 sm:p-6">
 
             {# -- Wizard step indicators -- #}
-            <div class="wizard-steps flex items-center justify-between w-full mb-6 relative">
-                <div class="wizard-line"></div>
-                <div class="step active" data-step="1">
-                    <div class="step-circle">1</div>
-                    <div class="step-label">Setup</div>
-                </div>
-                <div class="step" data-step="2">
-                    <div class="step-circle">2</div>
-                    <div class="step-label">Verify</div>
-                </div>
-                <div class="step" data-step="3">
-                    <div class="step-circle">3</div>
-                    <div class="step-label">Calibrate</div>
-                </div>
-                <div class="step" data-step="4">
-                    <div class="step-circle">4</div>
-                    <div class="step-label">Complete</div>
-                </div>
-            </div>
+            <ul class="steps w-full mb-6">
+                <li class="step step-primary" data-step="1">Setup</li>
+                <li class="step" data-step="2">Verify</li>
+                <li class="step" data-step="3">Calibrate</li>
+                <li class="step" data-step="4">Complete</li>
+            </ul>
 
             {# ---- Step 1: Setup ---- #}
             <div class="wizard-content" id="step1">
@@ -281,7 +268,7 @@
                                     Check Ball Location
                                 </button>
                             </div>
-                            <div class="ball-status" id="camera1-ball-status"></div>
+                            <div id="camera1-ball-status"></div>
                         </div>
                     </div>
 
@@ -303,7 +290,7 @@
                                     Check Ball Location
                                 </button>
                             </div>
-                            <div class="ball-status" id="camera2-ball-status"></div>
+                            <div id="camera2-ball-status"></div>
                         </div>
                     </div>
                 </div>
@@ -353,19 +340,15 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div id="progress-camera1">
                             <h4 class="text-sm font-semibold mb-2">Camera 1</h4>
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="camera1-progress"></div>
-                            </div>
+                            <progress class="progress progress-primary w-full" id="camera1-progress" value="0" max="100"></progress>
                             <div class="text-xs opacity-60 mt-1" id="camera1-status">Waiting...</div>
-                            <div class="completion-details text-xs mt-1" id="camera1-details"></div>
+                            <div class="text-success text-xs mt-1" id="camera1-details"></div>
                         </div>
                         <div id="progress-camera2">
                             <h4 class="text-sm font-semibold mb-2">Camera 2</h4>
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="camera2-progress"></div>
-                            </div>
+                            <progress class="progress progress-primary w-full" id="camera2-progress" value="0" max="100"></progress>
                             <div class="text-xs opacity-60 mt-1" id="camera2-status">Waiting...</div>
-                            <div class="completion-details text-xs mt-1" id="camera2-details"></div>
+                            <div class="text-success text-xs mt-1" id="camera2-details"></div>
                         </div>
                     </div>
 
@@ -500,9 +483,7 @@
             {# Progress #}
             <div id="strobe-progress-area" style="display: none;" class="mb-4">
                 <h4 class="text-sm font-semibold mb-2">Calibration Progress</h4>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="strobe-progress-fill"></div>
-                </div>
+                <progress class="progress progress-primary w-full" id="strobe-progress-fill" value="0" max="100"></progress>
                 <div class="text-xs opacity-60 mt-1" id="strobe-progress-message">Starting...</div>
             </div>
 

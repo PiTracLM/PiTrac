@@ -198,16 +198,7 @@ class CalibrationManager {
         document.getElementById(`step${stepNumber}`).style.display = 'block';
 
         document.querySelectorAll('.step').forEach(step => {
-            const stepNum = parseInt(step.dataset.step);
-            if (stepNum < stepNumber) {
-                step.classList.add('completed');
-                step.classList.remove('active');
-            } else if (stepNum === stepNumber) {
-                step.classList.add('active');
-                step.classList.remove('completed');
-            } else {
-                step.classList.remove('active', 'completed');
-            }
+            step.classList.toggle('step-primary', parseInt(step.dataset.step) <= stepNumber);
         });
 
         this.currentStep = stepNumber;
@@ -303,7 +294,7 @@ class CalibrationManager {
                 const statusDiv = document.getElementById(`${camera}-ball-status`);
 
                 if (result.ball_found) {
-                    statusDiv.className = 'ball-status success';
+                    statusDiv.className = 'alert alert-success';
                     statusDiv.textContent = `Ball detected at position (${result.ball_info?.x || 0}, ${result.ball_info?.y || 0})`;
                     this.ballVerified[camera] = true;
 
@@ -315,7 +306,7 @@ class CalibrationManager {
                             '✅ Ball placement verified! Ready to proceed with calibration.';
                     }
                 } else {
-                    statusDiv.className = 'ball-status error';
+                    statusDiv.className = 'alert alert-error';
                     statusDiv.textContent = 'Ball not detected - please adjust placement';
                     this.ballVerified[camera] = false;
                 }
@@ -363,7 +354,8 @@ class CalibrationManager {
             const statusText = document.getElementById(`${camera}-status`);
             const detailsDiv = document.getElementById(`${camera}-details`);
 
-            progressBar.style.width = '10%';
+            progressBar.value = 10;
+            progressBar.classList.remove('progress-error');
             statusText.textContent = 'Initializing...';
             detailsDiv.innerHTML = '';
 
@@ -378,7 +370,7 @@ class CalibrationManager {
             if (response.ok) {
                 const result = await response.json();
 
-                progressBar.style.width = '50%';
+                progressBar.value = 50;
                 statusText.textContent = 'Calibrating...';
 
                 const finalResult = await this.pollForCompletion(camera);
@@ -400,7 +392,7 @@ class CalibrationManager {
 
                     detailsDiv.innerHTML = `<small>${details.join(' | ')}</small>`;
 
-                    progressBar.style.width = '100%';
+                    progressBar.value = 100;
                     statusText.textContent = 'Completed';
 
                     if (!this.calibrationResults) {
@@ -435,8 +427,8 @@ class CalibrationManager {
                         detailsDiv.innerHTML = `<small class="text-warning">${details.join(' | ')}</small>`;
                     }
 
-                    progressBar.style.width = '100%';
-                    progressBar.style.background = 'var(--color-error)';
+                    progressBar.value = 100;
+                    progressBar.classList.add('progress-error');
                     statusText.textContent = 'Failed';
                 }
             } else {
@@ -448,8 +440,8 @@ class CalibrationManager {
 
             const progressBar = document.getElementById(`${camera}-progress`);
             const statusText = document.getElementById(`${camera}-status`);
-            progressBar.style.width = '100%';
-            progressBar.style.background = 'var(--color-error)';
+            progressBar.value = 100;
+            progressBar.classList.add('progress-error');
             statusText.textContent = 'Error';
         }
     }
@@ -467,7 +459,7 @@ class CalibrationManager {
                 const statusText = document.getElementById(`${camera}-status`);
 
                 if (cameraStatus && cameraStatus.progress) {
-                    progressBar.style.width = `${cameraStatus.progress}%`;
+                    progressBar.value = parseFloat(cameraStatus.progress);
                 }
 
                 if (cameraStatus && cameraStatus.message) {
@@ -602,14 +594,20 @@ class CalibrationManager {
             placeholder.style.display = 'flex';
         });
 
-        document.querySelectorAll('.ball-status').forEach(status => {
-            status.textContent = '';
-            status.className = 'ball-status';
+        ['camera1-ball-status', 'camera2-ball-status'].forEach(id => {
+            const status = document.getElementById(id);
+            if (status) {
+                status.textContent = '';
+                status.className = '';
+            }
         });
 
-        document.querySelectorAll('.progress-fill').forEach(bar => {
-            bar.style.width = '0%';
-            bar.style.background = '';
+        ['camera1-progress', 'camera2-progress'].forEach(id => {
+            const bar = document.getElementById(id);
+            if (bar) {
+                bar.value = 0;
+                bar.classList.remove('progress-error');
+            }
         });
     }
 
@@ -722,8 +720,8 @@ class CalibrationManager {
             // Reset and show progress area, hide stale results
             document.getElementById('strobe-progress-area').style.display = 'block';
             document.getElementById('strobe-result-area').style.display = 'none';
-            document.getElementById('strobe-progress-fill').style.width = '0%';
-            document.getElementById('strobe-progress-fill').style.background = '';
+            document.getElementById('strobe-progress-fill').value = 0;
+            document.getElementById('strobe-progress-fill').classList.remove('progress-error');
             document.getElementById('strobe-progress-message').textContent = 'Starting...';
             document.getElementById('strobe-state').textContent = 'Running';
 
@@ -768,7 +766,7 @@ class CalibrationManager {
                 const progressMsg = document.getElementById('strobe-progress-message');
 
                 if (status.progress !== undefined) {
-                    progressFill.style.width = status.progress + '%';
+                    progressFill.value = parseFloat(status.progress);
                 }
                 if (status.message) {
                     progressMsg.textContent = status.message;
@@ -797,7 +795,7 @@ class CalibrationManager {
         btn.textContent = 'Recalibrate';
         cancelBtn.style.display = 'none';
 
-        document.getElementById('strobe-progress-fill').style.width = '100%';
+        document.getElementById('strobe-progress-fill').value = 100;
         document.getElementById('strobe-state').textContent = 'Complete';
 
         // Show results
@@ -828,8 +826,8 @@ class CalibrationManager {
         cancelBtn.style.display = 'none';
         this.loadStrobeSettings();
 
-        document.getElementById('strobe-progress-fill').style.width = '100%';
-        document.getElementById('strobe-progress-fill').style.background = 'var(--color-error)';
+        document.getElementById('strobe-progress-fill').value = 100;
+        document.getElementById('strobe-progress-fill').classList.add('progress-error');
         document.getElementById('strobe-state').textContent = 'Failed';
         document.getElementById('strobe-progress-message').textContent =
             status.message || 'Calibration failed';
