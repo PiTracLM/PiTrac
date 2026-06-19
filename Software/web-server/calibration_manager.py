@@ -21,6 +21,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from constants import SERVER_PORT
+
 logger = logging.getLogger(__name__)
 
 CAMERA1_CALIBRATION_TIMEOUT = 40.0  # Camera1 has faster hardware detection
@@ -460,9 +462,6 @@ class CalibrationManager:
 
         """
 
-        generated_config_path = self.config_manager.generate_golf_sim_config()
-        logger.info(f"Generated config file at: {generated_config_path}")
-
         return await self._run_auto_calibration(camera)
 
     async def _run_auto_calibration(self, camera: str = "camera1") -> Dict[str, Any]:
@@ -809,7 +808,7 @@ class CalibrationManager:
             "--output_filename",
             "--show_images",
             "--config_file",
-        }  # We handle config_file specially below
+        }  # config_file is handled via the web server port instead
 
         for param in cli_params:
             key = param["key"]
@@ -843,8 +842,8 @@ class CalibrationManager:
                 # Use --key=value format for consistency
                 args.append(f"{cli_arg}={value}")
 
-        # Always add the generated config file path
-        args.append(f"--config_file={self.config_manager.generated_config_path}")
+        # The binary fetches config over HTTP from the web server
+        args.append(f"--web_server_port={SERVER_PORT}")
 
         return args
 

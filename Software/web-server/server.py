@@ -447,10 +447,6 @@ class PiTracServer:
                 success, message, requires_restart = self.config_manager.set_config(key, value)
 
                 if success:
-                    # Rebuild the generated config so the C++ process picks up changes
-                    generated_config_path = self.config_manager.generate_golf_sim_config()
-                    logger.info(f"Generated config file at: {generated_config_path}")
-
                     # Broadcast update to WebSocket clients
                     await self.connection_manager.broadcast(
                         {
@@ -479,7 +475,6 @@ class PiTracServer:
             success, message = self.config_manager.reset_all()
 
             if success:
-                self.config_manager.generate_golf_sim_config()
                 await self.connection_manager.broadcast({"type": "config_reset"})
                 return {"success": True, "message": message}
 
@@ -490,7 +485,6 @@ class PiTracServer:
             """Reload configuration from disk"""
             try:
                 self.config_manager.reload()
-                self.config_manager.generate_golf_sim_config()
                 return {"status": "Configuration reloaded"}
             except Exception as e:
                 logger.error(f"Failed to reload config: {e}")
@@ -509,7 +503,6 @@ class PiTracServer:
                 success, message = self.config_manager.import_config(config_data)
 
                 if success:
-                    self.config_manager.generate_golf_sim_config()
                     await self.connection_manager.broadcast({"type": "config_import"})
                     return {"success": True, "message": message}
 

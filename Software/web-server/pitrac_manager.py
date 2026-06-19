@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 from config_manager import ConfigurationManager
 from log_files import run_log_path, latest_run_log, prune_run_logs, tail_lines
+from constants import SERVER_PORT
 
 logger = logging.getLogger(__name__)
 
@@ -87,14 +88,10 @@ class PiTracProcessManager:
                 args.append(f"{cli_arg}={value}")
         return args
 
-    def _build_command(self, config_file_path: Optional[Path] = None) -> list:
+    def _build_command(self) -> list:
         cmd = [self.pitrac_binary]
         cmd.append("--system_mode=camera1")
-
-        if config_file_path and Path(config_file_path).exists():
-            cmd.append(f"--config_file={config_file_path}")
-        else:
-            logger.error("No config file path provided!")
+        cmd.append(f"--web_server_port={SERVER_PORT}")
 
         cmd.extend(self._build_cli_args_from_metadata())
 
@@ -119,13 +116,6 @@ class PiTracProcessManager:
         try:
             Path(self.log_file).parent.mkdir(parents=True, exist_ok=True)
             Path(self.pid_file).parent.mkdir(parents=True, exist_ok=True)
-
-            try:
-                generated_config_path = self.config_manager.generate_golf_sim_config()
-                logger.info(f"Generated config file at: {generated_config_path}")
-            except RuntimeError as e:
-                logger.error(f"Failed to generate config: {e}")
-                return {"status": "error", "message": f"Failed to generate configuration: {e}", "error": str(e)}
 
             env = os.environ.copy()
             home_dir = str(Path.home())
@@ -152,7 +142,7 @@ class PiTracProcessManager:
             Path(env["PITRAC_BASE_IMAGE_LOGGING_DIR"]).mkdir(parents=True, exist_ok=True)
             Path(env["PITRAC_WEBSERVER_SHARE_DIR"]).mkdir(parents=True, exist_ok=True)
 
-            cmd = self._build_command(config_file_path=generated_config_path)
+            cmd = self._build_command()
 
             self.log_file = run_log_path(self.log_dir, datetime.now())
             prune_run_logs(self.log_dir, self.log_dir_cap_bytes)

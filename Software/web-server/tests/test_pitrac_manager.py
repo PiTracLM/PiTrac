@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch, AsyncMock, mock_open
 
 from pitrac_manager import PiTracProcessManager
+from constants import SERVER_PORT
 
 
 class TestPiTracProcessManager:
@@ -176,12 +177,7 @@ class TestPiTracProcessManager:
                     with patch("pitrac_manager.Path.mkdir"):
                         with patch("pitrac_manager.Path.unlink"):
                             with patch.object(manager, "is_running", return_value=False):
-                                with patch.object(
-                                    manager.config_manager,
-                                    "generate_golf_sim_config",
-                                    return_value="/tmp/test_config.json",
-                                ):
-                                    result = await manager.start()
+                                result = await manager.start()
 
         assert result.get("status") in ["started", "failed"]
         if result["status"] == "started":
@@ -209,13 +205,16 @@ class TestPiTracProcessManager:
         """Test start with exception during process creation"""
         with patch("subprocess.Popen", side_effect=Exception("Test error")):
             with patch.object(manager, "is_running", return_value=False):
-                with patch.object(
-                    manager.config_manager, "generate_golf_sim_config", return_value="/tmp/test_config.json"
-                ):
-                    result = await manager.start()
+                result = await manager.start()
 
         assert result["status"] == "error"
         assert "Test error" in result["message"]
+
+    def test_command_has_web_server_port_not_config_file(self, manager):
+        """The binary fetches config over HTTP, so no --config_file is passed."""
+        cmd = manager._build_command()
+        assert not any(a.startswith("--config_file") for a in cmd)
+        assert f"--web_server_port={SERVER_PORT}" in cmd
 
 
 
@@ -283,13 +282,8 @@ class TestPiTracProcessManager:
                         with patch("pitrac_manager.Path.exists", return_value=True):
                             with patch("pitrac_manager.Path.mkdir"):
                                 with patch("pitrac_manager.Path.unlink"):
-                                    with patch.object(
-                                        manager.config_manager,
-                                        "generate_golf_sim_config",
-                                        return_value="/tmp/test_config.json",
-                                    ):
-                                        with patch("asyncio.sleep", new_callable=AsyncMock):
-                                            result = await manager.restart()
+                                    with patch("asyncio.sleep", new_callable=AsyncMock):
+                                        result = await manager.restart()
 
         assert result.get("status") in ["started", "restarted", "failed"]
         if result["status"] in ["started", "restarted"]:
@@ -311,12 +305,7 @@ class TestPiTracProcessManager:
                     with patch("pitrac_manager.Path.mkdir"):
                         with patch("pitrac_manager.Path.unlink"):
                             with patch.object(manager, "is_running", return_value=False):
-                                with patch.object(
-                                    manager.config_manager,
-                                    "generate_golf_sim_config",
-                                    return_value="/tmp/test_config.json",
-                                ):
-                                    result = await manager.restart()
+                                result = await manager.restart()
 
         assert result.get("status") in ["started", "restarted", "failed"]
         if result["status"] in ["started", "restarted"]:
@@ -340,11 +329,8 @@ class TestPiTracProcessManager:
                 with patch("pitrac_manager.Path.unlink"):
                     with patch("pitrac_manager.Path.exists", return_value=True):
                         with patch("pitrac_manager.Path.mkdir"):
-                            with patch.object(
-                                manager.config_manager, "generate_golf_sim_config", return_value="/tmp/test_config.json"
-                            ):
-                                with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-                                    result = await manager.restart()
+                            with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+                                result = await manager.restart()
 
         mock_sleep.assert_called()
         assert result.get("status") in ["started", "restarted", "failed"]
@@ -388,10 +374,9 @@ class TestPiTracProcessManagerIntegration:
     async def test_start_stop_cycle(self, manager):
         """Test complete start/stop cycle with subprocess"""
 
-        with patch.object(manager.config_manager, "generate_golf_sim_config", return_value="/tmp/test_config.json"):
-            with patch("pitrac_manager.Path.exists", return_value=True):
-                with patch("pathlib.Path.mkdir"):
-                    result = await manager.start()
+        with patch("pitrac_manager.Path.exists", return_value=True):
+            with patch("pathlib.Path.mkdir"):
+                result = await manager.start()
 
         assert result["status"] in ["started", "failed"]
 
