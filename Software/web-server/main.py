@@ -20,6 +20,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
+from constants import SERVER_PORT  # noqa: E402
 from server import app  # noqa: E402
 
 if __name__ == "__main__":
@@ -29,4 +30,4 @@ if __name__ == "__main__":
     elif uvicorn_level == "critical":
         uvicorn_level = "error"
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True, log_level=uvicorn_level)
+    uvicorn.run("main:app", host="0.0.0.0", port=SERVER_PORT, reload=True, log_level=uvicorn_level)

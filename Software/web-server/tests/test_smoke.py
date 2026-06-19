@@ -209,3 +209,11 @@ class TestSmoke:
         assert server_instance.app is not None
         assert server_instance.shot_store is not None
         assert server_instance.connection_manager is not None
+
+
+def test_server_port_defaults_to_8080(monkeypatch):
+    monkeypatch.delenv("PITRAC_WEB_PORT", raising=False)
+    import importlib
+    import constants
+    importlib.reload(constants)
+    assert constants.SERVER_PORT == 8080
