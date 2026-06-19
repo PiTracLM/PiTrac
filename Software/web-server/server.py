@@ -336,6 +336,11 @@ class PiTracServer:
                 })
             return {"status": "ok"}
 
+        @self.app.get("/api/internal/config")
+        async def internal_config() -> Dict[str, Any]:
+            """Merged config consumed by pitrac_lm at startup (replaces the generated JSON file)."""
+            return await asyncio.to_thread(self.config_manager.build_generated_config)
+
         @self.app.get("/health")
         async def health_check() -> Dict[str, Union[str, bool, int]]:
             pitrac_running = False

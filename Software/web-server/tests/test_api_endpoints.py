@@ -163,3 +163,10 @@ class TestAPIEndpoints:
         """Test CORS headers are present if needed"""
         response = client.get("/api/shot")
         assert response.status_code == 200
+
+    def test_internal_config_returns_merged_config(self, client, server_instance):
+        resp = client.get("/api/internal/config")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body == server_instance.config_manager.build_generated_config()
+        assert "gs_config" in body
