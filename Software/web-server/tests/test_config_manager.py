@@ -648,3 +648,29 @@ class TestSetCalibrationBatch:
             "gs_config.cameras.kCamera1DistortionVector": [0.0] * 5,
         })
         assert any(k == "gs_config.cameras.kCamera1CalibrationMatrix" for k, _ in seen)
+
+
+class TestBuildGeneratedConfig:
+    """Tests for the extracted config dict builder."""
+
+    @pytest.fixture
+    def temp_config_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    @pytest.fixture
+    def config_manager(self, temp_config_dir):
+        manager = ConfigManager()
+        manager.user_settings_path = temp_config_dir / "user_settings.json"
+        manager.calibration_data_path = temp_config_dir / "calibration_data.json"
+        return manager
+
+    def test_build_generated_config_returns_merged_dict(self, config_manager):
+        cfg = config_manager.build_generated_config()
+        assert isinstance(cfg, dict)
+        assert "gs_config" in cfg
+
+    def test_generate_golf_sim_config_matches_builder(self, config_manager):
+        import json
+        path = config_manager.generate_golf_sim_config()
+        assert json.loads(path.read_text()) == config_manager.build_generated_config()

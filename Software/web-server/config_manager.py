@@ -574,6 +574,32 @@ class ConfigurationManager:
 
         return True, ""
 
+    def build_generated_config(self) -> Dict[str, Any]:
+        """Build the merged config dict served to pitrac_lm (defaults + calibration + user settings,
+        excluding cli/env-passed settings)."""
+        config = {}
+        metadata = self.load_configurations_metadata()
+        settings_metadata = metadata.get("settings", {})
+
+        if not settings_metadata:
+            raise RuntimeError("No settings found in configurations metadata")
+
+        json_settings_count = 0
+        for key, setting_info in settings_metadata.items():
+            passed_via = setting_info.get("passedVia", "json")
+            if passed_via in ["cli", "environment"]:
+                continue
+
+            value = self.get_config(key)
+            if value is not None:
+                self._set_nested_json(config, key, value)
+                json_settings_count += 1
+
+        if json_settings_count == 0:
+            raise RuntimeError("No JSON settings found to generate config")
+
+        return config
+
     def generate_golf_sim_config(self) -> Path:
         """Generate golf_sim_config.json from configurations metadata and user settings
 
@@ -589,37 +615,14 @@ class ConfigurationManager:
             RuntimeError: If generation fails
         """
         try:
-            config = {}
-            metadata = self.load_configurations_metadata()
-            settings_metadata = metadata.get("settings", {})
-
-            if not settings_metadata:
-                raise RuntimeError("No settings found in configurations metadata")
-
-            # Process all settings and build the JSON structure
-            json_settings_count = 0
-            for key, setting_info in settings_metadata.items():
-                # Skip non-JSON routed settings
-                passed_via = setting_info.get("passedVia", "json")  # Default to json if not specified
-                if passed_via in ["cli", "environment"]:
-                    continue
-
-                # Get the merged value (default + calibration + user override)
-                value = self.get_config(key)
-                if value is not None:
-                    # Build nested structure from dot notation key
-                    self._set_nested_json(config, key, value)
-                    json_settings_count += 1
-
-            if json_settings_count == 0:
-                raise RuntimeError("No JSON settings found to generate config")
+            config = self.build_generated_config()
 
             # Save to generated location
             generated_path = self.user_settings_path.parent / "generated_golf_sim_config.json"
             if not self._save_json(generated_path, config):
                 raise RuntimeError(f"Failed to save generated config to {generated_path}")
 
-            logger.info(f"Generated golf_sim_config.json with {json_settings_count} settings at {generated_path}")
+            logger.info(f"Generated golf_sim_config.json with {len(config.get('gs_config', {}))} top-level gs_config keys at {generated_path}")
             return generated_path
 
         except Exception as e:
