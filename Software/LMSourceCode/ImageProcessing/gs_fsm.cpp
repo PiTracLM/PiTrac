@@ -841,7 +841,7 @@ namespace golf_sim {
             GS_LOG_MSG(info, "Skipping camera initialization for test mode: " + std::to_string(mode));
         }
 
-        GsHttpClient::Init();
+        GsHttpClient::Init("localhost", GolfSimOptions::GetCommandLineOptions().web_server_port_);
         GsUISystem::SendIPCStatusMessage(GsIPCResultType::kInitializing);
 
         if (!PulseStrobe::InitGPIOSystem(default_signal_handler)) {

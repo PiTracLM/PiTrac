@@ -19,6 +19,26 @@ void GsHttpClient::Init(const std::string& host, int port) {
     port_ = port;
 }
 
+std::string GsHttpClient::FetchConfig() {
+    try {
+        httplib::Client cli(host_, port_);
+        cli.set_connection_timeout(2);
+        cli.set_read_timeout(5);
+
+        auto res = cli.Get("/api/internal/config");
+
+        if (!res || res->status != 200) {
+            GS_LOG_MSG(error, "Config fetch failed (status " +
+                std::to_string(res ? res->status : 0) + ")");
+            return "";
+        }
+        return res->body;
+    } catch (const std::exception& e) {
+        GS_LOG_MSG(error, "Config fetch exception: " + std::string(e.what()));
+        return "";
+    }
+}
+
 void GsHttpClient::PostResult(const std::string& json_body) {
     try {
         httplib::Client cli(host_, port_);

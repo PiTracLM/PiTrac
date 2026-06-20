@@ -122,6 +122,8 @@ namespace golf_sim {
 					"Specify the name or IP address of the host PC that is running the GSPro simulator.  Default is: <empty string>, indicating no GSPro sim is connected.")
 				("config_file", value<std::string>(&config_file_)->default_value("golf_sim_config.json"),
 					"Specify the filename with the JSON configuration.  Default is: golf_sim_config.json")
+				("web_server_port", value<int>(&web_server_port_)->default_value(8080),
+					"Port of the PiTrac web server (on localhost) to fetch configuration from and post results to.")
 				("cmd_file,cmd", value<std::string>(&command_line_file_)->implicit_value("config.txt"),
 					"Read the options from a file. If no filename is specified, default to config.txt. "
 					"In case of duplicate options, the ones provided on the command line will be used. "
@@ -171,6 +173,7 @@ namespace golf_sim {
 		unsigned int search_center_x_ = 0;
 		unsigned int search_center_y_ = 0;
 		double camera_gain_ = 0.0;   // 1.0 might seem more appropriate, but we want to be able to see if this is set or not
+		int web_server_port_ = 8080;
 
 		virtual bool Parse(int argc, char* argv[]);
 		virtual void Print() const;

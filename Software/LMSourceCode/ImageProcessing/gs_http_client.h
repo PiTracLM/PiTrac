@@ -16,6 +16,7 @@ namespace golf_sim {
 class GsHttpClient {
 public:
     static void Init(const std::string& host = "localhost", int port = 8080);
+    static std::string FetchConfig();  // GET /api/internal/config; returns body or "" on failure
     static void PostResult(const std::string& json_body);
     static void PostImageReady(const std::string& filename);
 

@@ -1174,7 +1174,7 @@ void run_main(int argc, char* argv[])
             GS_LOG_MSG(info, "Running in kCamera1Calibrate or kCamera2Calibrate mode.");
 
             // We will want to send a calibration message to any monitor UIs
-            GsHttpClient::Init();
+            GsHttpClient::Init("localhost", GolfSimOptions::GetCommandLineOptions().web_server_port_);
 
             GolfBall ball;
             cv::Mat img;
@@ -1493,6 +1493,9 @@ int main(int argc, char *argv[])
         }
 
         GS_LOG_MSG(info, "Loading configuration from: " + config_file_name);
+
+        // Point the HTTP client at the web server before config load — Initialize fetches config from it.
+        GsHttpClient::Init("localhost", GolfSimOptions::GetCommandLineOptions().web_server_port_);
 
         if (!GolfSimConfiguration::Initialize(config_file_name)) {
             GS_LOG_MSG(error, "Could not initialize configuration module using config file: " + config_file_name + ".  Exiting.");
