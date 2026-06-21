@@ -1486,13 +1486,12 @@ int main(int argc, char *argv[])
 
         GolfSimOptions::GetCommandLineOptions().Print();
 
-        std::string config_file_name = ".pitrac/config/generated_golf_sim_config.json";
+        // Empty unless --config_file was explicitly given; empty => fetch config over HTTP.
+        std::string config_file_name = GolfSimOptions::GetCommandLineOptions().config_file_;
 
-        if (!GolfSimOptions::GetCommandLineOptions().config_file_.empty()) {
-            config_file_name = GolfSimOptions::GetCommandLineOptions().config_file_;
-        }
-
-        GS_LOG_MSG(info, "Loading configuration from: " + config_file_name);
+        GS_LOG_MSG(info, config_file_name.empty()
+            ? "Loading configuration from the web server over HTTP"
+            : "Loading configuration from file: " + config_file_name);
 
         // Point the HTTP client at the web server before config load — Initialize fetches config from it.
         GsHttpClient::Init("localhost", GolfSimOptions::GetCommandLineOptions().web_server_port_);

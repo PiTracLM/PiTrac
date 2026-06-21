@@ -11,6 +11,8 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <filesystem>
+#include "gs_http_client.h"
 #include "logging_tools.h"
 #include "gs_camera.h"
 #include "gs_ui_system.h"
@@ -32,8 +34,30 @@ namespace golf_sim {
 
 	bool GolfSimConfiguration::Initialize(const std::string& configuration_filename) {
 
+		// Obtain the config body ONCE: read the file when a path is explicitly given
+		// (e.g. the testing tools that inject runtime keys), otherwise fetch it from the
+		// web server over HTTP. Both ConfigurationManager and configuration_root_ parse
+		// this same body — a single read, no second file/HTTP fetch.
+		std::string config_body;
+		if (!configuration_filename.empty() && std::filesystem::exists(configuration_filename)) {
+			std::ifstream f(configuration_filename);
+			std::stringstream ss;
+			ss << f.rdbuf();
+			config_body = ss.str();
+		} else {
+#ifdef __unix__
+			config_body = GsHttpClient::FetchConfig();
+#endif
+		}
+
+		if (config_body.empty()) {
+			GS_LOG_MSG(error, "GolfSimConfiguration::Initialize failed: no config. The web server must be running to serve /api/internal/config, or pass --config_file=<path> to read from a file.");
+			return false;
+		}
+
 		try {
-			boost::property_tree::read_json(configuration_filename, configuration_root_);
+			std::istringstream config_stream(config_body);
+			boost::property_tree::read_json(config_stream, configuration_root_);
 		}
 		catch (std::exception const& e)
 		{
@@ -41,9 +65,9 @@ namespace golf_sim {
 			return false;
 		}
 
-		// Initialize new ConfigurationManager for override support
+		// Initialize ConfigurationManager (override support) from the SAME body — single read.
 		ConfigurationManager& config_mgr = ConfigurationManager::GetInstance();
-		if (!config_mgr.Initialize(configuration_filename)) {
+		if (!config_mgr.Initialize(configuration_filename, "", {}, config_body)) {
 			GS_LOG_MSG(warning, "ConfigurationManager initialization failed, using JSON only");
 		} else {
 			GS_LOG_MSG(info, "ConfigurationManager initialized with override support");

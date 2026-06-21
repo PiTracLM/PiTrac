@@ -48,7 +48,8 @@ public:
     bool Initialize(
         const std::string& json_config_file = ".pitrac/config/generated_golf_sim_config.json",
         const std::string& yaml_config_file = "",
-        const std::map<std::string, std::string>& cli_overrides = {}
+        const std::map<std::string, std::string>& cli_overrides = {},
+        const std::string& json_config_body = ""   // when non-empty, parse this instead of reading json_config_file
     );
 
     /**
@@ -167,6 +168,7 @@ private:
     // File paths for reloading
     std::string json_config_file_;
     std::string yaml_config_file_;
+    std::string json_config_body_;   // cached config body (from HTTP) so Reload re-parses it instead of re-reading a file
 
     // Thread safety
     mutable std::mutex config_mutex_;
