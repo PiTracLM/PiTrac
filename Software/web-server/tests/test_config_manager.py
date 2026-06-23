@@ -674,3 +674,10 @@ class TestBuildGeneratedConfig:
         import json
         path = config_manager.generate_golf_sim_config()
         assert json.loads(path.read_text()) == config_manager.build_generated_config()
+
+    def test_build_generated_config_includes_former_cli_and_env(self, config_manager):
+        cfg = config_manager.build_generated_config()
+        # former CLI setting — gs_config.player.kGolferOrientation
+        assert "kGolferOrientation" in cfg.get("gs_config", {}).get("player", {})
+        # former environment setting — cameras.slot1.type
+        assert "type" in cfg.get("cameras", {}).get("slot1", {})

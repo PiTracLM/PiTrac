@@ -576,7 +576,7 @@ class ConfigurationManager:
 
     def build_generated_config(self) -> Dict[str, Any]:
         """Build the merged config dict served to pitrac_lm (defaults + calibration + user settings,
-        excluding cli/env-passed settings)."""
+        all settings regardless of passedVia)."""
         config = {}
         metadata = self.load_configurations_metadata()
         settings_metadata = metadata.get("settings", {})
@@ -586,10 +586,6 @@ class ConfigurationManager:
 
         json_settings_count = 0
         for key, setting_info in settings_metadata.items():
-            passed_via = setting_info.get("passedVia", "json")
-            if passed_via in ["cli", "environment"]:
-                continue
-
             value = self.get_config(key)
             if value is not None:
                 self._set_nested_json(config, key, value)
