@@ -57,43 +57,10 @@ class PiTracProcessManager:
         self.log_file.parent.mkdir(parents=True, exist_ok=True)
         self.pid_file.parent.mkdir(parents=True, exist_ok=True)
 
-    def _build_cli_args_from_metadata(self) -> list:
-        args = []
-        merged_config = self.config_manager.get_config()
-        skip_args = {"--system_mode", "--web_server_share_dir"}
-
-        for param in self.config_manager.get_cli_parameters():
-            cli_arg = param["cliArgument"]
-            param_type = param["type"]
-            if cli_arg in skip_args:
-                continue
-            key = param["key"]
-            value = merged_config
-            for part in key.split("."):
-                if isinstance(value, dict):
-                    value = value.get(part)
-                else:
-                    value = None
-                    break
-            if value is None:
-                continue
-            if param_type != "boolean" and value == "":
-                continue
-            if param_type == "boolean":
-                if value:
-                    args.append(cli_arg)
-            else:
-                if param_type == "path" and value:
-                    value = str(value).replace("~", str(Path.home()))
-                args.append(f"{cli_arg}={value}")
-        return args
-
     def _build_command(self) -> list:
         cmd = [self.pitrac_binary]
         cmd.append("--system_mode=camera1")
         cmd.append(f"--web_server_port={SERVER_PORT}")
-
-        cmd.extend(self._build_cli_args_from_metadata())
 
         config = self.config_manager.get_config()
         web_share_dir = (
@@ -124,20 +91,6 @@ class PiTracProcessManager:
             env["OMP_WAIT_POLICY"] = "PASSIVE"
             env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = "~/LM_Shares/Images/".replace("~", home_dir)
             env["PITRAC_WEBSERVER_SHARE_DIR"] = "~/LM_Shares/WebShare/".replace("~", home_dir)
-
-            merged_config = self.config_manager.get_config()
-            for param in self.config_manager.get_environment_parameters():
-                key = param["key"]
-                env_var = param["envVariable"]
-                value = merged_config
-                for part in key.split("."):
-                    if isinstance(value, dict):
-                        value = value.get(part)
-                    else:
-                        value = None
-                        break
-                if value is not None and value != "":
-                    env[env_var] = str(value)
 
             Path(env["PITRAC_BASE_IMAGE_LOGGING_DIR"]).mkdir(parents=True, exist_ok=True)
             Path(env["PITRAC_WEBSERVER_SHARE_DIR"]).mkdir(parents=True, exist_ok=True)

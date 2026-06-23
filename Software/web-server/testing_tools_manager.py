@@ -232,20 +232,6 @@ class TestingToolsManager:
             env["DISPLAY"] = ":0.0"
             env["OMP_WAIT_POLICY"] = "PASSIVE"
 
-            merged_config = self.config_manager.get_config()
-            for param in self.config_manager.get_environment_parameters():
-                key = param["key"]
-                env_var = param["envVariable"]
-                value = merged_config
-                for part in key.split("."):
-                    if isinstance(value, dict):
-                        value = value.get(part)
-                    else:
-                        value = None
-                        break
-                if value is not None and value != "":
-                    env[env_var] = str(value)
-
             if tool_info["requires_sudo"]:
                 cmd = ["sudo", "-E"] + cmd
 

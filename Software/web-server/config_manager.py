@@ -718,38 +718,6 @@ class ConfigurationManager:
             logger.error(f"Error loading configurations.json: {e}")
             return {"settings": {}}
 
-    def get_cli_parameters(self) -> List[Dict[str, Any]]:
-        """Get all CLI parameters to pass to the pitrac_lm process."""
-        metadata = self.load_configurations_metadata()
-        settings = metadata.get("settings", {})
-
-        cli_params = []
-        for key, info in settings.items():
-            if info.get("passedVia") == "cli":
-                cli_params.append({
-                    "key": key,
-                    "cliArgument": info.get("cliArgument"),
-                    "type": info.get("type"),
-                    "default": info.get("default"),
-                })
-        return cli_params
-
-    def get_environment_parameters(self) -> List[Dict[str, Any]]:
-        """Get all environment parameters to set for the pitrac_lm process."""
-        metadata = self.load_configurations_metadata()
-        settings = metadata.get("settings", {})
-
-        env_params = []
-        for key, info in settings.items():
-            if info.get("passedVia") == "environment":
-                env_params.append({
-                    "key": key,
-                    "envVariable": info.get("envVariable"),
-                    "type": info.get("type"),
-                    "default": info.get("default"),
-                })
-        return env_params
-
     def flatten_config(self, config: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
         """Flatten nested config dict into dot-notation keys."""
         result = {}

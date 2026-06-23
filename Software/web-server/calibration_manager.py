@@ -395,38 +395,8 @@ class CalibrationManager:
             "last_run": datetime.now().isoformat(),
         }
 
-        config = self.config_manager.get_config()
-
         cmd = [self.pitrac_binary, f"--system_mode={camera}_ball_location"]
-
-        if camera == "camera1":
-            search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
-            if search_x is None:
-                search_x = 850  # Default from configurations.json
-            search_y = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterY")
-            if search_y is None:
-                search_y = 500  # Default from configurations.json
-        else:
-            search_x = 700
-            search_y = 500
-
-        logging_level = config.get("logging", {}).get("level", "warn")
-
-        camera_gain_key = "kCamera1Gain" if camera == "camera1" else "kCamera2Gain"
-        camera_gain = self.config_manager.get_config(f"gs_config.cameras.{camera_gain_key}")
-        if camera_gain is None:
-            camera_gain = 6.0
-
-        cmd.extend(
-            [
-                f"--search_center_x={search_x}",
-                f"--search_center_y={search_y}",
-                f"--logging_level={logging_level}",
-                "--artifact_save_level=all",
-                f"--camera_gain={camera_gain}",
-            ]
-        )
-        cmd.extend(self._build_cli_args_from_metadata(camera))
+        cmd.extend(self._build_web_server_args())
 
         try:
             result = await self._run_calibration_command(cmd, camera, timeout=30)
@@ -484,34 +454,8 @@ class CalibrationManager:
             self._active_calibrations[session_id] = session_data
             logger.info(f"Pre-registered calibration session {session_id} for {camera}")
 
-        config = self.config_manager.get_config()
         cmd = [self.pitrac_binary, f"--system_mode={camera}AutoCalibrate"]
-
-        search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
-        if search_x is None:
-            search_x = 850  # Default from configurations.json
-
-        search_y = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterY")
-        if search_y is None:
-            search_y = 500  # Default from configurations.json
-
-        logging_level = config.get("logging", {}).get("level", "warn")
-
-        camera_gain = self.config_manager.get_config("gs_config.cameras.kCamera1Gain")
-        if camera_gain is None:
-            camera_gain = 6.0
-
-        cmd.extend(
-            [
-                f"--search_center_x={search_x}",
-                f"--search_center_y={search_y}",
-                f"--logging_level={logging_level}",
-                "--artifact_save_level=all",
-                "--show_images=0",
-                f"--camera_gain={camera_gain}",
-            ]
-        )
-        cmd.extend(self._build_cli_args_from_metadata(camera))
+        cmd.extend(self._build_web_server_args())
 
         log_file = self.log_dir / f"calibration_{camera}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 
@@ -659,37 +603,8 @@ class CalibrationManager:
             "last_run": datetime.now().isoformat(),
         }
 
-        config = self.config_manager.get_config()
         cmd = [self.pitrac_binary, f"--system_mode={camera}Calibrate"]
-
-        if camera == "camera1":
-            search_x = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX")
-            if search_x is None:
-                search_x = 850  # Default from configurations.json
-            search_y = self.config_manager.get_config("gs_config.cameras.kCamera1SearchCenterY")
-            if search_y is None:
-                search_y = 500  # Default from configurations.json
-        else:
-            search_x = 700
-            search_y = 500
-
-        logging_level = config.get("logging", {}).get("level", "warn")
-
-        camera_gain_key = "kCamera1Gain" if camera == "camera1" else "kCamera2Gain"
-        camera_gain = self.config_manager.get_config(f"gs_config.cameras.{camera_gain_key}")
-        if camera_gain is None:
-            camera_gain = 6.0
-
-        cmd.extend(
-            [
-                f"--search_center_x={search_x}",
-                f"--search_center_y={search_y}",
-                f"--logging_level={logging_level}",
-                "--artifact_save_level=all",
-                f"--camera_gain={camera_gain}",
-            ]
-        )
-        cmd.extend(self._build_cli_args_from_metadata(camera))
+        cmd.extend(self._build_web_server_args())
 
         try:
             result = await self._run_calibration_command(cmd, camera, timeout=180)
@@ -734,7 +649,6 @@ class CalibrationManager:
         """
         logger.info(f"Capturing still image for {camera}")
 
-        config = self.config_manager.get_config()
         cmd = [self.pitrac_binary, f"--system_mode={camera}", "--cam_still_mode"]
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -743,8 +657,8 @@ class CalibrationManager:
         images_dir.mkdir(parents=True, exist_ok=True)
         output_path = images_dir / output_file
 
-        cmd.extend([f"--output_filename={output_path}", "--artifact_save_level=final_results_only"])
-        cmd.extend(self._build_cli_args_from_metadata(camera))
+        cmd.append(f"--output_filename={output_path}")
+        cmd.extend(self._build_web_server_args())
 
         try:
             await self._run_calibration_command(cmd, camera, timeout=10)
@@ -786,66 +700,13 @@ class CalibrationManager:
             },
         }
 
-    def _build_cli_args_from_metadata(self, camera: str = "camera1") -> list:
-        """Build CLI arguments using metadata from configurations.json
+    def _build_web_server_args(self) -> list:
+        """Args telling the binary where to fetch its merged config over HTTP.
 
-        This method uses the passedVia metadata to automatically
-        build CLI arguments, similar to pitrac_manager.py
+        Everything else (search center, gain, logging level, etc.) now lives
+        in the served config tree, so we no longer pass it on the command line.
         """
-        args = []
-        merged_config = self.config_manager.get_config()
-
-        cli_params = self.config_manager.get_cli_parameters()
-
-        # Skip args that we handle separately or need special handling
-        skip_args = {
-            "--system_mode",
-            "--search_center_x",
-            "--search_center_y",
-            "--logging_level",
-            "--artifact_save_level",
-            "--cam_still_mode",
-            "--output_filename",
-            "--show_images",
-            "--config_file",
-        }  # config_file is handled via the web server port instead
-
-        for param in cli_params:
-            key = param["key"]
-            cli_arg = param["cliArgument"]
-            param_type = param["type"]
-
-            if cli_arg in skip_args:
-                continue
-
-            value = merged_config
-            for part in key.split("."):
-                if isinstance(value, dict):
-                    value = value.get(part)
-                else:
-                    value = None
-                    break
-
-            if value is None:
-                continue
-
-            # Skip empty string values for non-boolean parameters
-            if param_type != "boolean" and value == "":
-                continue
-
-            if param_type == "boolean":
-                if value:
-                    args.append(cli_arg)
-            else:
-                if param_type == "path" and value:
-                    value = str(value).replace("~", str(Path.home()))
-                # Use --key=value format for consistency
-                args.append(f"{cli_arg}={value}")
-
-        # The binary fetches config over HTTP from the web server
-        args.append(f"--web_server_port={SERVER_PORT}")
-
-        return args
+        return [f"--web_server_port={SERVER_PORT}"]
 
     def _build_environment(self, camera: str = "camera1") -> dict:
         """Build environment variables from config
@@ -865,24 +726,6 @@ class CalibrationManager:
         env["OMP_WAIT_POLICY"] = "PASSIVE"
         env.setdefault("LIBPISP_LOG_LEVEL", "4")
         env.setdefault("LIBCAMERA_LOG_LEVELS", "*:ERROR")
-
-        # Camera types come from cameras.slot1.type and cameras.slot2.type (default 5 = InnoMaker IMX296)
-        slot1_type = config.get("cameras", {}).get("slot1", {}).get("type", 5)
-        slot2_type = config.get("cameras", {}).get("slot2", {}).get("type", 5)
-        env["PITRAC_SLOT1_CAMERA_TYPE"] = str(slot1_type)
-        env["PITRAC_SLOT2_CAMERA_TYPE"] = str(slot2_type)
-
-        # Lens types come from cameras.slot1.lens and cameras.slot2.lens (default 1 = 6mm)
-        slot1_lens = config.get("cameras", {}).get("slot1", {}).get("lens", 1)
-        slot2_lens = config.get("cameras", {}).get("slot2", {}).get("lens", 1)
-        env["PITRAC_SLOT1_LENS_TYPE"] = str(slot1_lens)
-        env["PITRAC_SLOT2_LENS_TYPE"] = str(slot2_lens)
-
-        # Orientation types come from cameras.slot1.orientation and cameras.slot2.orientation (default 1 = UpsideUp)
-        slot1_orientation = config.get("cameras", {}).get("slot1", {}).get("orientation", 1)
-        slot2_orientation = config.get("cameras", {}).get("slot2", {}).get("orientation", 1)
-        env["PITRAC_SLOT1_CAMERA_ORIENTATION"] = str(slot1_orientation)
-        env["PITRAC_SLOT2_CAMERA_ORIENTATION"] = str(slot2_orientation)
 
         base_dir = config.get("gs_config", {}).get("logging", {}).get("kPCBaseImageLoggingDir", "~/LM_Shares/Images/")
         env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = str(base_dir).replace("~", str(Path.home()))

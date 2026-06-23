@@ -17,9 +17,6 @@ def mock_config_manager():
         },
     }
     manager.generate_golf_sim_config.return_value = "/tmp/test_config.json"
-    manager.get_environment_parameters.return_value = [
-        {"key": "camera1.slot1_camera_type", "envVariable": "PITRAC_SLOT1_CAMERA_TYPE"}
-    ]
     return manager
 
 

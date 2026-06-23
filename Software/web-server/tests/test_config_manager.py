@@ -149,25 +149,6 @@ class TestConfigManager:
         assert config_manager.calibration_data == {}
         assert isinstance(config_manager.merged_config, dict)
 
-    def test_cli_parameters(self, config_manager):
-        """Test getting CLI parameters from config"""
-        config_manager.system_config = {
-            "gs_config": {"cameras": {"kCamera1Gain": "2.0"}, "modes": {"kStartInPuttingMode": "1"}}
-        }
-
-        cli_params = config_manager.get_cli_parameters()
-        assert isinstance(cli_params, list)
-
-    def test_environment_parameters(self, config_manager):
-        """Test getting environment parameters from config"""
-        config_manager.system_config = {
-            "gs_config": {"ipc_interface": {"kWebServerShareDirectory": "~/LM_Shares/WebShare"}}
-        }
-        config_manager.reload()
-
-        env_params = config_manager.get_environment_parameters()
-        assert isinstance(env_params, list)
-
     def test_nested_config_access(self, config_manager):
         """Test accessing deeply nested configuration values"""
         config_manager.user_settings = {

@@ -102,9 +102,6 @@ class MockConfigManagerFactory:
             "settings": {},
         }
 
-        manager.get_cli_parameters.return_value = []
-        manager.get_environment_parameters.return_value = []
-
         return manager
 
 
