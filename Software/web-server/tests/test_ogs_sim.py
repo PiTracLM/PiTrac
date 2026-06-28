@@ -55,8 +55,17 @@ class _FakeOGS:
         await self._server.wait_closed()
 
 
+@pytest.fixture(autouse=True)
+def _enable_sockets_if_plugin_present():
+    try:
+        import pytest_socket
+        pytest_socket.enable_socket()
+    except ImportError:
+        pass
+
+
 @pytest.mark.asyncio
-async def test_connect_sends_ready_then_shot(socket_enabled):
+async def test_connect_sends_ready_then_shot():
     fake = _FakeOGS()
     await fake.start()
     sim = OGSSim(host="127.0.0.1", port=fake.port, keepalive_sec=999)
@@ -74,7 +83,7 @@ async def test_connect_sends_ready_then_shot(socket_enabled):
 
 
 @pytest.mark.asyncio
-async def test_connect_failure_sets_error_status(socket_enabled):
+async def test_connect_failure_sets_error_status():
     # Nothing listening on this port.
     sim = OGSSim(host="127.0.0.1", port=1, keepalive_sec=999)
     await sim.connect()
