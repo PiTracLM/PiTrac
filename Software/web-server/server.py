@@ -37,6 +37,7 @@ from managers import ConnectionManager, ShotDataStore
 from models import ShotData
 from parsers import ShotDataParser
 from pitrac_manager import PiTracProcessManager
+from sim_manager import SimManager
 from strobe_calibration_manager import StrobeCalibrationManager
 from testing_tools_manager import TestingToolsManager
 from update_manager import UpdateManager
@@ -206,6 +207,11 @@ class PiTracServer:
         self.session_timeout_minutes = metadata.get("storage", {}).get("sessionTimeoutMinutes", {}).get("default", 30)
         self.image_cap_mb = metadata.get("storage", {}).get("imageStorageCapMB", {}).get("default", 5000)
         self.retention = ImageRetention(self.session_repo, self.shot_repo, IMAGES_DIR, self.image_cap_mb)
+        self.sim_connection_manager = ConnectionManager()
+        self.sim_manager = SimManager(
+            self.config_manager,
+            broadcast=self.sim_connection_manager.broadcast,
+        )
         self.shutdown_flag = False
         self.background_tasks: set[asyncio.Task] = set()
         self._active_cameras: Dict[int, str] = {}  # camera_index -> endpoint name
@@ -274,6 +280,38 @@ class PiTracServer:
             logger.info("Shot data reset via API")
             return {"status": "reset", "timestamp": shot_data.timestamp}
 
+        @self.app.get("/api/sims")
+        async def get_sims() -> Dict[str, Any]:
+            return {"sims": self.sim_manager.status()}
+
+        @self.app.post("/api/sims/{name}/connect")
+        async def connect_sim(name: str) -> Dict[str, Any]:
+            try:
+                await self.sim_manager.connect(name)
+            except KeyError:
+                raise HTTPException(status_code=404, detail=f"Unknown sim: {name}")
+            return {"sims": self.sim_manager.status()}
+
+        @self.app.post("/api/sims/{name}/disconnect")
+        async def disconnect_sim(name: str) -> Dict[str, Any]:
+            try:
+                await self.sim_manager.disconnect(name)
+            except KeyError:
+                raise HTTPException(status_code=404, detail=f"Unknown sim: {name}")
+            return {"sims": self.sim_manager.status()}
+
+        @self.app.websocket("/ws/sims")
+        async def websocket_sims(websocket: WebSocket) -> None:
+            await self.sim_connection_manager.connect(websocket)
+            try:
+                await websocket.send_json({"type": "sim_status", "sims": self.sim_manager.status()})
+                while True:
+                    await websocket.receive_text()
+            except WebSocketDisconnect:
+                self.sim_connection_manager.disconnect(websocket)
+            except Exception:
+                self.sim_connection_manager.disconnect(websocket)
+
         @self.app.post("/api/internal/shot-result")
         async def receive_shot_result(request: Request) -> Dict[str, str]:
             """Receives shot results from the C++ pitrac_lm process via HTTP POST."""
@@ -323,6 +361,9 @@ class PiTracServer:
 
             self.shot_store.update(shot_data)
             await self.connection_manager.broadcast(shot_data.to_dict())
+            task = asyncio.create_task(self.sim_manager.on_shot(shot_data))
+            self.background_tasks.add(task)
+            task.add_done_callback(self.background_tasks.discard)
             return {"status": "ok"}
 
         @self.app.post("/api/internal/image-ready")
@@ -1476,6 +1517,8 @@ class PiTracServer:
         self.background_tasks.add(task)
         task.add_done_callback(self.background_tasks.discard)
 
+        await self.sim_manager.start()
+
         logger.info("PiTrac Web Server ready — receiving results via HTTP POST")
 
     async def _run_tool_async(self, tool_id: str) -> None:
@@ -1516,6 +1559,8 @@ class PiTracServer:
         logger.info("Shutting down PiTrac Web Server...")
 
         self.shutdown_flag = True
+
+        await self.sim_manager.stop()
 
         loop = asyncio.get_event_loop()
         current_tasks = {t for t in self.background_tasks if t.get_loop() is loop}
