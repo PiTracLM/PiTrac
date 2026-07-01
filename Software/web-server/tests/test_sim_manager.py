@@ -31,11 +31,15 @@ class _StubSim:
     async def disconnect(self):
         self.connected = False
 
+    @property
+    def status(self):
+        return "connected" if self.connected else "off"
+
     async def send_shot(self, shot):
         self.shots.append(shot)
 
     def info(self):
-        return {"name": self.name, "status": "connected" if self.connected else "off"}
+        return {"name": self.name, "status": self.status}
 
 
 @pytest.mark.asyncio
@@ -63,16 +67,22 @@ async def test_enabled_ogs_is_built():
 async def test_on_shot_fans_out_and_isolates_failures():
     mgr = SimManager(_StubConfig({}), broadcast=None)
     good = _StubSim()
+    good.connected = True
 
     class _Boom(_StubSim):
         async def send_shot(self, shot):
             raise RuntimeError("dead sim")
 
-    bad = _Boom()
-    mgr._sims = {"good": good, "boom": bad}
+    boom = _Boom()
+    boom.connected = True
+
+    skipped = _StubSim()  # left disconnected — should receive nothing
+
+    mgr._sims = {"good": good, "boom": boom, "skipped": skipped}
     shot = ShotData(speed=100)
-    await mgr.on_shot(shot)  # must not raise
+    await mgr.on_shot(shot)  # must not raise even though boom raises
     assert good.shots == [shot]
+    assert skipped.shots == []
 
 
 @pytest.mark.asyncio
