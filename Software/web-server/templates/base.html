@@ -44,6 +44,14 @@
                 {{ pitrac_btn("restart", "rotate-cw", "Restart", "desktop", "btn-warning") }}
             </div>
 
+            <!-- Simulators -->
+            <div class="relative">
+                <button id="sims-nav-btn" class="btn btn-ghost btn-square btn-sm" title="Simulators">
+                    <i data-lucide="radio" class="icon-md"></i>
+                    <span id="sims-status-dot" class="absolute top-1 right-1 w-2 h-2 rounded-full" style="background:var(--color-neutral, #9ca3af)"></span>
+                </button>
+            </div>
+
             <!-- Menu -->
             <details class="dropdown dropdown-end" id="nav-dropdown">
                 <summary class="btn btn-ghost btn-square btn-sm">
@@ -85,6 +93,15 @@
             </details>
         </div>
 
+        <!-- Simulators drawer (toggled by #sims-nav-btn) -->
+        <div id="sims-drawer" class="hidden bg-base-200 rounded-box border border-base-300 shadow-md mb-4 p-4">
+            <h3 class="font-semibold mb-3 flex items-center gap-2">
+                <i data-lucide="radio" class="icon-sm"></i>
+                Simulators
+            </h3>
+            <div id="sims-list"></div>
+        </div>
+
         {% block content %}{% endblock %}
     </div>
 
@@ -108,6 +125,7 @@
 
     <script src="/static/js/lucide.min.js"></script>
     <script src="/static/js/common.js"></script>
+    <script src="/static/js/sims.js"></script>
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>
