@@ -1501,7 +1501,24 @@ int main(int argc, char *argv[])
             return 0;
         }
 
-        LoggingTools::logging_tool_wait_for_keypress_ = GolfSimOptions::GetCommandLineOptions().wait_for_key_on_images_;
+        LoggingTools::ApplyLogLevel();
+
+        const GolfSimOptions& options = GolfSimOptions::GetCommandLineOptions();
+        GS_LOG_MSG(info, "Options from config: golfer_orientation=" + options.golfer_orientation_string_ +
+            ", logging_level=" + options.logging_level_string_ +
+            ", artifact_save_level=" + options.artifact_save_level_string_ +
+            ", show_images=" + std::to_string(options.show_images_) +
+            ", wait_keys=" + std::to_string(options.wait_for_key_on_images_) +
+            ", practice_ball=" + std::to_string(options.practice_ball_) +
+            ", search_center=" + std::to_string(options.search_center_x_) + "," + std::to_string(options.search_center_y_) +
+            ", gspro_host_address=" + options.gspro_host_address_ +
+            ", e6_host_address=" + options.e6_host_address_ +
+            ", slot1 type/lens/orientation=" + std::to_string(GolfSimCamera::kSystemSlot1CameraType) + "/" +
+                std::to_string(GolfSimCamera::kSystemSlot1LensType) + "/" + std::to_string(GolfSimCamera::kSystemSlot1CameraOrientation) +
+            ", slot2 type/lens/orientation=" + std::to_string(GolfSimCamera::kSystemSlot2CameraType) + "/" +
+                std::to_string(GolfSimCamera::kSystemSlot2LensType) + "/" + std::to_string(GolfSimCamera::kSystemSlot2CameraOrientation));
+
+        LoggingTools::logging_tool_wait_for_keypress_ = options.wait_for_key_on_images_;
 
         // We prefer the command-line setting even if there's one in the .json config file
         if (!GolfSimOptions::GetCommandLineOptions().base_image_logging_dir_.empty()) {

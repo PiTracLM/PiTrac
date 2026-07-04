@@ -74,34 +74,14 @@ bool GolfSimOptions::Parse(int argc, char *argv[])
 	system_mode_ = (SystemMode)mode_table[system_mode_string_];
 
 
-	std::map<std::string, int> artifact_save_level_table =
-	{	{ "none", ArtifactSaveLevel::kNoArtifacts },
-		{ "final_results_only", ArtifactSaveLevel::kFinalResultsOnly },
-		{ "all", ArtifactSaveLevel::kAll },
-	};
-	if (artifact_save_level_table.count(artifact_save_level_string_) == 0)
-		throw std::runtime_error("Invalid system_mode: " + artifact_save_level_string_);
-	artifact_save_level_ = (ArtifactSaveLevel)artifact_save_level_table[artifact_save_level_string_];
+	if (!SetArtifactSaveLevel(artifact_save_level_string_))
+		throw std::runtime_error("Invalid artifact_save_level: " + artifact_save_level_string_);
 
-
-	std::map<std::string, int> log_level_table =
-	{	{ "trace", LoggingLevel::kTrace },
-		{ "debug", LoggingLevel::kDebug },
-		{ "info", LoggingLevel::kInfo },
-		{ "warn", LoggingLevel::kWarn },
-		{ "error", LoggingLevel::kError },
-		{ "none", LoggingLevel::kNone },
-	};
-	if (log_level_table.count(logging_level_string_) == 0)
+	if (!SetLoggingLevel(logging_level_string_))
 		throw std::runtime_error("Invalid log_level: " + logging_level_string_);
-	logging_level_ = (LoggingLevel)log_level_table[logging_level_string_];
 
-	std::map<std::string, int> orientation_table =
-	{ { "right_handed", GolferOrientation::kRightHanded },
-		{ "left_handed", GolferOrientation::kLeftHanded } };
-	if (mode_table.count(system_mode_string_) == 0)
+	if (!SetGolferOrientation(golfer_orientation_string_))
 		throw std::runtime_error("Invalid golfer_orientation: " + golfer_orientation_string_);
-	golfer_orientation_ = (GolferOrientation)orientation_table[golfer_orientation_string_];
 
 	if (help_)
 	{
@@ -116,6 +96,53 @@ bool GolfSimOptions::Parse(int argc, char *argv[])
 	}
 
 
+	return true;
+}
+
+bool GolfSimOptions::SetArtifactSaveLevel(const std::string& level)
+{
+	static const std::map<std::string, ArtifactSaveLevel> table =
+	{	{ "none", ArtifactSaveLevel::kNoArtifacts },
+		{ "final_results_only", ArtifactSaveLevel::kFinalResultsOnly },
+		{ "all", ArtifactSaveLevel::kAll },
+	};
+	auto it = table.find(level);
+	if (it == table.end())
+		return false;
+	artifact_save_level_string_ = level;
+	artifact_save_level_ = it->second;
+	return true;
+}
+
+bool GolfSimOptions::SetLoggingLevel(const std::string& level)
+{
+	static const std::map<std::string, LoggingLevel> table =
+	{	{ "trace", LoggingLevel::kTrace },
+		{ "debug", LoggingLevel::kDebug },
+		{ "info", LoggingLevel::kInfo },
+		{ "warn", LoggingLevel::kWarn },
+		{ "error", LoggingLevel::kError },
+		{ "none", LoggingLevel::kNone },
+	};
+	auto it = table.find(level);
+	if (it == table.end())
+		return false;
+	logging_level_string_ = level;
+	logging_level_ = it->second;
+	return true;
+}
+
+bool GolfSimOptions::SetGolferOrientation(const std::string& orientation)
+{
+	static const std::map<std::string, GolferOrientation> table =
+	{	{ "right_handed", GolferOrientation::kRightHanded },
+		{ "left_handed", GolferOrientation::kLeftHanded },
+	};
+	auto it = table.find(orientation);
+	if (it == table.end())
+		return false;
+	golfer_orientation_string_ = orientation;
+	golfer_orientation_ = it->second;
 	return true;
 }
 

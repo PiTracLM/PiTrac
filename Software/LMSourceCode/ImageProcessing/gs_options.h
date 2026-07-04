@@ -178,6 +178,11 @@ namespace golf_sim {
 		virtual bool Parse(int argc, char* argv[]);
 		virtual void Print() const;
 
+		// Each returns false and leaves the option unchanged if the string is not a recognized value
+		bool SetArtifactSaveLevel(const std::string& level);
+		bool SetLoggingLevel(const std::string& level);
+		bool SetGolferOrientation(const std::string& orientation);
+
 	protected:
 		boost::program_options::options_description options_;
 		static GolfSimOptions the_command_line_options_;

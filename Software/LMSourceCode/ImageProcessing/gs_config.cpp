@@ -32,6 +32,48 @@ namespace golf_sim {
 	GolfSimConfiguration::EnclosureType GolfSimConfiguration::kEnclosureVersion = GolfSimConfiguration::EnclosureType::kEnclosureVersion_Unknown;
 
 
+static std::string GetConfigString(const std::string& tag_name) {
+	std::string value;
+	GolfSimConfiguration::SetConstant(tag_name, value);
+	return value;
+}
+
+template <typename T>
+static void SetIfPresent(const std::string& tag_name, T& value) {
+	if (GolfSimConfiguration::PropertyExists(tag_name)) {
+		GolfSimConfiguration::SetConstant(tag_name, value);
+	}
+}
+
+static void PopulateOptionsFromConfig() {
+	GolfSimOptions& options = GolfSimOptions::GetCommandLineOptions();
+
+	auto apply_enum = [&options](const std::string& tag_name, bool (GolfSimOptions::*setter)(const std::string&)) {
+		std::string value = GetConfigString(tag_name);
+		if (!value.empty() && !(options.*setter)(value)) {
+			GS_LOG_MSG(warning, "Ignoring unrecognized value for " + tag_name + ": " + value);
+		}
+	};
+	apply_enum("gs_config.player.kGolferOrientation", &GolfSimOptions::SetGolferOrientation);
+	apply_enum("logging.level", &GolfSimOptions::SetLoggingLevel);
+	apply_enum("gs_config.logging.kArtifactSaveLevel", &GolfSimOptions::SetArtifactSaveLevel);
+
+	SetIfPresent("gs_config.debug.kShowDebugImages", options.show_images_);
+	SetIfPresent("gs_config.debug.kWaitForKeyOnImages", options.wait_for_key_on_images_);
+	SetIfPresent("gs_config.player.kUsePracticeBalls", options.practice_ball_);
+	SetIfPresent("gs_config.cameras.kCamera1SearchCenterX", options.search_center_x_);
+	SetIfPresent("gs_config.cameras.kCamera1SearchCenterY", options.search_center_y_);
+
+	std::string gspro_address = GetConfigString("gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress");
+	if (!gspro_address.empty()) {
+		options.gspro_host_address_ = gspro_address;
+	}
+	std::string e6_address = GetConfigString("gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress");
+	if (!e6_address.empty()) {
+		options.e6_host_address_ = e6_address;
+	}
+}
+
 	bool GolfSimConfiguration::Initialize(const std::string& configuration_filename) {
 
 		// Obtain the config body ONCE: read the file when a path is explicitly given
@@ -77,6 +119,8 @@ namespace golf_sim {
 		if (!ReadValues()) {
 			return false;
 		}
+
+		PopulateOptionsFromConfig();
 
 		return true;
 	}
@@ -175,12 +219,6 @@ GolfSimConfiguration::PiModel GolfSimConfiguration::GetPiModel() {
     return pi_model;
 }
 
-
-static std::string GetConfigString(const std::string& tag_name) {
-	std::string value;
-	GolfSimConfiguration::SetConstant(tag_name, value);
-	return value;
-}
 
 bool GolfSimConfiguration::ReadValues() {
 
