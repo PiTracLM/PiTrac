@@ -176,6 +176,12 @@ GolfSimConfiguration::PiModel GolfSimConfiguration::GetPiModel() {
 }
 
 
+static std::string GetConfigString(const std::string& tag_name) {
+	std::string value;
+	GolfSimConfiguration::SetConstant(tag_name, value);
+	return value;
+}
+
 bool GolfSimConfiguration::ReadValues() {
 
 	// Many constants are read in the modules that own those constants.  But some are better 
@@ -246,87 +252,41 @@ bool GolfSimConfiguration::ReadValues() {
 
 #endif
 
-    // Read any environment variables that we may need
-
-    std::string slot1_env = safe_getenv("PITRAC_SLOT1_CAMERA_TYPE");
-    GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT1_CAMERA_TYPE environment variable was: " + slot1_env );
-    if (slot1_env.empty()) {
-        GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT1_CAMERA_TYPE environment variable was not set.  Assuming default of: " + std::to_string(GolfSimCamera::kSystemSlot1CameraType));
-    } else {
-#ifndef __unix__  // Ignore in Windows environment
-		// Ensure we don't have any trailing spaces.  Visual Studio seems to add them?
-		slot1_env = slot1_env.substr(0,1);
-#endif
-        GolfSimCamera::kSystemSlot1CameraType = CameraHardware::string_to_camera_model(slot1_env);
-    }
-
-    std::string slot2_env = safe_getenv("PITRAC_SLOT2_CAMERA_TYPE");
-    GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT2_CAMERA_TYPE environment variable was: " + slot2_env );
-    if (slot2_env.empty()) {
-        GS_LOG_TRACE_MSG(error, "PITRAC_SLOT2_CAMERA_TYPE must be set. Exiting.");
-        return false;
-    } else {
-#ifndef __unix__  // Ignore in Windows environment
-        // Ensure we don't have any trailing spaces.  Visual Studio seems to add them?
-        slot2_env = slot2_env.substr(0, 1);
-#endif
-        GolfSimCamera::kSystemSlot2CameraType = CameraHardware::string_to_camera_model(slot2_env);
-    }
-
-	std::string slot1_lens_env = safe_getenv("PITRAC_SLOT1_LENS_TYPE");
-	GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT1_LENS_TYPE environment variable was: " + slot1_lens_env);
-	if (slot1_lens_env.empty()) {
-		GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT1_LENS_TYPE environment variable was not set.  Assuming default of: " + std::to_string(GolfSimCamera::kSystemSlot1LensType));
-	}
-	else {
-#ifndef __unix__  // Ignore in Windows environment
-		// Ensure we don't have any trailing spaces.  Visual Studio seems to add them?
-		slot1_lens_env = slot1_lens_env.substr(0, 1);
-#endif
-		GolfSimCamera::kSystemSlot1LensType = CameraHardware::string_to_lens_type(slot1_lens_env);
+	std::string slot1_type = GetConfigString("cameras.slot1.type");
+	if (!slot1_type.empty()) {
+		GolfSimCamera::kSystemSlot1CameraType = CameraHardware::string_to_camera_model(slot1_type);
 	}
 
-	std::string slot2_lens_env = safe_getenv("PITRAC_SLOT2_LENS_TYPE");
-	GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT2_LENS_TYPE environment variable was: " + slot2_lens_env);
-	if (slot2_lens_env.empty()) {
-		GS_LOG_TRACE_MSG(error, "PITRAC_SLOT2_LENS_TYPE must be set. Exiting.");
+	std::string slot2_type = GetConfigString("cameras.slot2.type");
+	if (slot2_type.empty()) {
+		GS_LOG_MSG(error, "cameras.slot2.type must be set. Exiting.");
 		return false;
 	}
-	else {
-#ifndef __unix__  // Ignore in Windows environment
-		// Ensure we don't have any trailing spaces
-		slot2_lens_env = slot2_lens_env.substr(0, 1);
-#endif
-		GolfSimCamera::kSystemSlot2LensType = CameraHardware::string_to_lens_type(slot2_lens_env);
+	GolfSimCamera::kSystemSlot2CameraType = CameraHardware::string_to_camera_model(slot2_type);
+
+	std::string slot1_lens = GetConfigString("cameras.slot1.lens");
+	if (!slot1_lens.empty()) {
+		GolfSimCamera::kSystemSlot1LensType = CameraHardware::string_to_lens_type(slot1_lens);
 	}
 
-
-	std::string slot1_camera_orientation_env = safe_getenv("PITRAC_SLOT1_CAMERA_ORIENTATION");
-	GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT1_CAMERA_ORIENTATION environment variable was: " + slot1_camera_orientation_env);
-	if (slot1_camera_orientation_env.empty()) {
-		GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT1_CAMERA_ORIENTATION environment variable was not set.  Assuming default of: " + std::to_string(GolfSimCamera::kSystemSlot1CameraOrientation));
-	}
-	else {
-#ifndef __unix__  // Ignore in Windows environment
-		// Ensure we don't have any trailing spaces.  Visual Studio seems to add them?
-		slot1_camera_orientation_env = slot1_camera_orientation_env.substr(0, 1);
-#endif
-		GolfSimCamera::kSystemSlot1CameraOrientation = CameraHardware::string_to_camera_orientation(slot1_camera_orientation_env);
-	}
-
-	std::string slot2_camera_orientation_env = safe_getenv("PITRAC_SLOT2_CAMERA_ORIENTATION");
-	GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT2_CAMERA_ORIENTATION environment variable was: " + slot2_camera_orientation_env);
-	if (slot2_camera_orientation_env.empty()) {
-		GS_LOG_TRACE_MSG(error, "PITRAC_SLOT2_CAMERA_ORIENTATION must be set. Exiting.");
+	std::string slot2_lens = GetConfigString("cameras.slot2.lens");
+	if (slot2_lens.empty()) {
+		GS_LOG_MSG(error, "cameras.slot2.lens must be set. Exiting.");
 		return false;
 	}
-	else {
-#ifndef __unix__  // Ignore in Windows environment
-		// Ensure we don't have any trailing spaces
-		slot2_camera_orientation_env = slot2_camera_orientation_env.substr(0, 1);
-#endif
-		GolfSimCamera::kSystemSlot2CameraOrientation = CameraHardware::string_to_camera_orientation(slot2_camera_orientation_env);
+	GolfSimCamera::kSystemSlot2LensType = CameraHardware::string_to_lens_type(slot2_lens);
+
+	std::string slot1_orientation = GetConfigString("cameras.slot1.orientation");
+	if (!slot1_orientation.empty()) {
+		GolfSimCamera::kSystemSlot1CameraOrientation = CameraHardware::string_to_camera_orientation(slot1_orientation);
 	}
+
+	std::string slot2_orientation = GetConfigString("cameras.slot2.orientation");
+	if (slot2_orientation.empty()) {
+		GS_LOG_MSG(error, "cameras.slot2.orientation must be set. Exiting.");
+		return false;
+	}
+	GolfSimCamera::kSystemSlot2CameraOrientation = CameraHardware::string_to_camera_orientation(slot2_orientation);
 
 
 	return true;
