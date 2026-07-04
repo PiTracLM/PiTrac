@@ -23,10 +23,6 @@ Each configuration entry is a key-value pair where the key is a dot-notation pat
 | `showInBasic` | boolean | Whether to show in basic/simple configuration view |
 | `basicSubcategory` | string | Subcategory for basic view organization |
 | `requiresRestart` | boolean | Whether changing this setting requires system restart |
-| `passedVia` | string | How parameter is passed: `cli`, `environment`, or omitted (config file) |
-| `passedTo` | string | Target component(s): `camera1`, `camera2`, `both`, `system` |
-| `cliArgument` | string | Command-line argument name (when `passedVia: "cli"`) |
-| `envVariable` | string | Environment variable name (when `passedVia: "environment"`) |
 | `visibleWhen` | object | Conditional visibility based on other settings |
 | `affectsSettings` | array | List of other settings affected by this one |
 
@@ -59,34 +55,6 @@ Available categories for organizing settings:
 - `Spin Analysis` - Spin calculation settings
 - `Advanced` - Expert-level parameters
 
-## Parameter Passing Methods
-
-### 1. CLI Arguments (`passedVia: "cli"`)
-Parameters passed as command-line arguments to the pitrac_lm binary.
-- Requires `cliArgument` field
-- Format: `--parameter_name=value` or `--flag` (for booleans)
-- Target specified by `passedTo` field
-
-### 2. Environment Variables (`passedVia: "environment"`)
-Parameters set as environment variables before process startup.
-- Requires `envVariable` field  
-- Format: `PITRAC_VARIABLE_NAME=value`
-- Target specified by `passedTo` field
-
-### 3. Config File (no `passedVia` field)
-Parameters written to `/etc/pitrac/golf_sim_config.json`.
-- Default method when `passedVia` is omitted
-- Accessible to all components
-
-## Target Components (`passedTo`)
-
-| Value | Description | Usage |
-|-------|-------------|--------|
-| `camera1` | Camera 1 process only | Settings specific to first camera |
-| `camera2` | Camera 2 process only | Settings specific to second camera (single Pi mode) |
-| `both` | Both camera processes | Settings that apply to both cameras |
-| `system` | System-wide | Non-camera settings (simulators, storage, etc.) |
-
 ## Conditional Visibility
 
 Use `visibleWhen` to show/hide settings based on other configuration values:
@@ -118,10 +86,7 @@ Use `affectsSettings` to indicate which other settings are impacted:
   "max": 1920,
   "step": 10,
   "default": 850,
-  "requiresRestart": true,
-  "passedVia": "cli",
-  "passedTo": "camera1",
-  "cliArgument": "--search_center_x"
+  "requiresRestart": true
 }
 ```
 
@@ -140,7 +105,5 @@ Settings shown in basic view are organized into subcategories with display order
 
 ## Notes
 
-- Settings without `passedVia` are stored in the config file and accessible to all components
-- Boolean CLI arguments are passed as flags without values (e.g., `--practice_ball`)
-- Environment variables are set per-process when `passedTo` specifies a target
+- pitrac_lm reads every setting from the merged config served at `/api/internal/config`
 - The `requiresRestart` flag triggers automatic process restart when changed via web UI

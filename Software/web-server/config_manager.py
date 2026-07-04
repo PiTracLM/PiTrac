@@ -575,8 +575,7 @@ class ConfigurationManager:
         return True, ""
 
     def build_generated_config(self) -> Dict[str, Any]:
-        """Build the merged config dict served to pitrac_lm (defaults + calibration + user settings,
-        all settings regardless of passedVia)."""
+        """Build the merged config dict served to pitrac_lm (defaults + calibration + user settings)."""
         config = {}
         metadata = self.load_configurations_metadata()
         settings_metadata = metadata.get("settings", {})
@@ -600,7 +599,7 @@ class ConfigurationManager:
         """Generate golf_sim_config.json from configurations metadata and user settings
 
         This method creates a complete golf_sim_config.json file by:
-        1. Taking all settings marked with passedVia: "json"
+        1. Taking every setting in the configurations metadata
         2. Getting their values (default + user overrides)
         3. Building the nested JSON structure expected by pitrac_lm
 

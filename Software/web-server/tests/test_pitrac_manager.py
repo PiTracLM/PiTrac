@@ -30,8 +30,8 @@ class TestPiTracProcessManager:
 
         config_manager.load_configurations_metadata.return_value = {
             "cameraDefinitions": {
-                "camera1": {"displayName": "Camera 1", "slot": "slot1", "defaultIndex": 0, "envPrefix": "PITRAC_SLOT1"},
-                "camera2": {"displayName": "Camera 2", "slot": "slot2", "defaultIndex": 1, "envPrefix": "PITRAC_SLOT2"},
+                "camera1": {"displayName": "Camera 1", "slot": "slot1", "defaultIndex": 0},
+                "camera2": {"displayName": "Camera 2", "slot": "slot2", "defaultIndex": 1},
             },
             "systemDefaults": {
                 "configStructure": {"systemKey": "system", "camerasKey": "cameras"},
