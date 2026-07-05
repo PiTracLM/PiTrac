@@ -58,7 +58,6 @@ class TestPiTracAPI:
                 "is_running": True,
                 "pid": 12345,
                 "log_file": "/home/test/.pitrac/logs/pitrac.log",
-                "generated_config_path": "/home/test/.pitrac/config/generated_golf_sim_config.json",
                 "binary": "/usr/lib/pitrac/pitrac_lm",
             }
         )
@@ -76,7 +75,6 @@ class TestPiTracAPI:
                 "is_running": False,
                 "pid": None,
                 "log_file": "/home/test/.pitrac/logs/pitrac.log",
-                "generated_config_path": "/home/test/.pitrac/config/generated_golf_sim_config.json",
                 "binary": "/usr/lib/pitrac/pitrac_lm",
             }
         )

@@ -198,7 +198,6 @@ class TestCommandBuilding:
                 "camera2_search_center_y": 500,
             },
         }
-        mock.generated_config_path = "/tmp/test_config.yaml"
         mock.get_cli_parameters.return_value = []  # Return empty list for CLI params
         mock.register_callback = Mock()  # Mock callback registration
         return mock
@@ -225,7 +224,6 @@ class TestCommandBuilding:
                 "camera2_search_center_y": 450,
             },
         }
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -350,7 +348,6 @@ class TestStillImageCapture:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -375,7 +372,6 @@ class TestStillImageCapture:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -398,7 +394,6 @@ class TestStillImageCapture:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -436,7 +431,6 @@ class TestLogFileHandling:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"calibration": {}}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -481,7 +475,6 @@ class TestErrorHandling:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"calibration": {}}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -505,7 +498,6 @@ class TestErrorHandling:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"calibration": {}}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -649,7 +641,6 @@ class TestRealCalibrationWorkflows:
                 "camera1_search_center_y": 600,
             },
         }
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
         mock_config_manager.reload = Mock()
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
@@ -694,7 +685,6 @@ class TestRealCalibrationWorkflows:
                 "camera2_search_center_y": 450,
             },
         }
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
         mock_config_manager.reload = Mock()
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
@@ -725,7 +715,6 @@ class TestRealCalibrationWorkflows:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"calibration": {}}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -767,7 +756,6 @@ class TestRealCalibrationWorkflows:
                 "camera1_search_center_y": 600,
             },
         }
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -792,7 +780,6 @@ class TestRealCalibrationWorkflows:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -825,7 +812,6 @@ class TestIntegrationScenarios:
                 "camera1_search_center_y": 600,
             },
         }
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
         mock_config_manager.reload = Mock()
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
@@ -873,7 +859,6 @@ class TestIntegrationScenarios:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"calibration": {}}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -983,7 +968,6 @@ class TestConfigurationHandling:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"calibration": {}}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
         mock_config_manager.reload = Mock()
 
         manager = CalibrationManager(mock_config_manager)

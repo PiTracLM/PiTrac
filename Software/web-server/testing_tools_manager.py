@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
+from constants import SERVER_PORT
+
 logger = logging.getLogger(__name__)
 
 
@@ -140,74 +142,43 @@ class TestingToolsManager:
         tool_info = self.tools[tool_id]
 
         try:
-            config_path = self.config_manager.generate_golf_sim_config()
+            testing: Dict[str, str] = {}
 
-            # For image test tool, update config with uploaded image
             if tool_info.get("uses_uploaded_image"):
                 test_images = list(self.test_images_dir.glob("*"))
                 if not test_images:
                     return {"status": "error", "message": "No test images found. Please upload an image first."}
 
-                # Use the most recent image
                 latest_image = max(test_images, key=lambda p: p.stat().st_mtime)
                 logger.info(f"Using test image: {latest_image}")
 
-                # Modify the generated config to add test image path
-                import json
+                testing["kBaseTestImageDir"] = str(self.test_images_dir) + "/"
+                testing["kTwoImageTestTeedBallImage"] = latest_image.name
+                testing["kTwoImageTestStrobedBallImage"] = latest_image.name
+                testing["kTwoImageTestPreImage"] = ""
 
-                with open(config_path, "r") as f:
-                    config_json = json.load(f)
-
-                # Add test configuration section for SystemMode::kTest
-                if "gs_config" not in config_json:
-                    config_json["gs_config"] = {}
-                if "testing" not in config_json["gs_config"]:
-                    config_json["gs_config"]["testing"] = {}
-
-                image_filename = latest_image.name
-
-                # Set the base directory to where our test images are
-                config_json["gs_config"]["testing"]["kBaseTestImageDir"] = str(self.test_images_dir) + "/"
-                config_json["gs_config"]["testing"]["kTwoImageTestTeedBallImage"] = image_filename
-                config_json["gs_config"]["testing"]["kTwoImageTestStrobedBallImage"] = image_filename
-                config_json["gs_config"]["testing"]["kTwoImageTestPreImage"] = ""  # Optional
-
-                with open(config_path, "w") as f:
-                    json.dump(config_json, f, indent=2)
-
-            # For sample image test or automated testing, set up test suite paths
             if tool_id in ("test_images", "automated_testing"):
-                import json
-
                 test_suite_dir = Path("/usr/share/pitrac/test-suites/TestSuite_2025_02_07")
-                with open(config_path, "r") as f:
-                    config_json = json.load(f)
-
-                if "gs_config" not in config_json:
-                    config_json["gs_config"] = {}
-                if "testing" not in config_json["gs_config"]:
-                    config_json["gs_config"]["testing"] = {}
 
                 if tool_id == "test_images" and test_suite_dir.exists():
-                    # Use a matched pair from the test suite (Shot 1)
                     teed_files = sorted(test_suite_dir.glob("*log_ball_final_found_ball_img_Shot_1_*"))
                     strobed_files = sorted(test_suite_dir.glob("*log_cam2_last_strobed_img_Shot_1_*"))
                     if teed_files and strobed_files:
-                        config_json["gs_config"]["testing"]["kBaseTestImageDir"] = str(test_suite_dir) + "/"
-                        config_json["gs_config"]["testing"]["kTwoImageTestTeedBallImage"] = teed_files[0].name
-                        config_json["gs_config"]["testing"]["kTwoImageTestStrobedBallImage"] = strobed_files[0].name
+                        testing["kBaseTestImageDir"] = str(test_suite_dir) + "/"
+                        testing["kTwoImageTestTeedBallImage"] = teed_files[0].name
+                        testing["kTwoImageTestStrobedBallImage"] = strobed_files[0].name
 
                 if tool_id == "automated_testing":
-                    config_json["gs_config"]["testing"]["kAutomatedTestSuiteDirectory"] = str(test_suite_dir) + "/"
-                    config_json["gs_config"]["testing"]["kAutomatedTestExpectedResultsCSV"] = "Uneekor Comparison 2025-02-07_Small_Test.csv"
+                    testing["kAutomatedTestSuiteDirectory"] = str(test_suite_dir) + "/"
+                    testing["kAutomatedTestExpectedResultsCSV"] = "Uneekor Comparison 2025-02-07_Small_Test.csv"
 
-                with open(config_path, "w") as f:
-                    json.dump(config_json, f, indent=2)
+            # Trace keeps the info-level lines _parse_timing_output reads, whatever the UI level is
+            self.config_manager.transient_overrides = {"gs_config": {"testing": testing}, "logging": {"level": "trace"}}
 
             cmd = [self.pitrac_binary]
 
             cmd.extend(tool_info["args"])
-            cmd.append(f"--config_file={config_path}")
+            cmd.append(f"--web_server_port={SERVER_PORT}")
 
             config = self.config_manager.get_config()
 
@@ -221,8 +192,6 @@ class TestingToolsManager:
 
             base_image_dir = str(Path.home() / "LM_Shares/Images")
             cmd.append(f"--base_image_logging_dir={base_image_dir}")
-
-            cmd.append("--logging_level=trace")
 
             env = os.environ.copy()
             env["LD_LIBRARY_PATH"] = "/usr/lib/pitrac"
@@ -303,10 +272,11 @@ class TestingToolsManager:
                         "message": f"Tool {tool_id} timed out after {tool_info['timeout']} seconds",
                     }
             finally:
-                if tool_id in self.running_processes:
-                    del self.running_processes[tool_id]
+                self.running_processes.pop(tool_id, None)
+                self.config_manager.transient_overrides = {}
 
         except Exception as e:
+            self.config_manager.transient_overrides = {}
             logger.error(f"Error running tool {tool_id}: {e}")
             return {"status": "error", "message": str(e)}
 

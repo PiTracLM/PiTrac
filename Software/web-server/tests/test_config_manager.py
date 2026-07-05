@@ -651,10 +651,15 @@ class TestBuildGeneratedConfig:
         assert isinstance(cfg, dict)
         assert "gs_config" in cfg
 
-    def test_generate_golf_sim_config_matches_builder(self, config_manager):
-        import json
-        path = config_manager.generate_golf_sim_config()
-        assert json.loads(path.read_text()) == config_manager.build_generated_config()
+    def test_build_generated_config_merges_transient_overrides(self, config_manager):
+        config_manager.transient_overrides = {"gs_config": {"testing": {"kBaseTestImageDir": "/tmp/x/"}}}
+        cfg = config_manager.build_generated_config()
+        assert cfg["gs_config"]["testing"]["kBaseTestImageDir"] == "/tmp/x/"
+        assert "kGolferOrientation" in cfg["gs_config"]["player"]
+
+        config_manager.transient_overrides = {}
+        cfg = config_manager.build_generated_config()
+        assert cfg["gs_config"].get("testing", {}).get("kBaseTestImageDir") != "/tmp/x/"
 
     def test_build_generated_config_includes_former_cli_and_env(self, config_manager):
         cfg = config_manager.build_generated_config()

@@ -3,7 +3,8 @@ import asyncio
 import os
 import time
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, Mock, patch, mock_open
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from constants import SERVER_PORT
 from testing_tools_manager import TestingToolsManager
 
 
@@ -16,7 +17,7 @@ def mock_config_manager():
             "ipc_interface": {"kWebServerShareDirectory": "~/LM_Shares/Images/"}
         },
     }
-    manager.generate_golf_sim_config.return_value = "/tmp/test_config.json"
+    manager.transient_overrides = {}
     return manager
 
 
@@ -173,33 +174,25 @@ class TestRunTool:
     @pytest.mark.asyncio
     async def test_run_tool_with_sudo(self, testing_manager, mock_config_manager, tmp_path):
         """Test running a tool that requires sudo"""
-        config_file = tmp_path / "test_config.json"
-        config_file.write_text('{"gs_config": {"testing": {}}}')
-        mock_config_manager.generate_golf_sim_config.return_value = str(config_file)
-
         mock_process = AsyncMock()
         mock_process.returncode = 0
         mock_process.communicate.return_value = (b"Output", b"")
 
-        config_content = '{"gs_config": {}}'
-
         with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
-            with patch("builtins.open", mock_open(read_data=config_content)):
-                with patch.object(testing_manager, "_find_and_read_test_log", return_value=None):
-                    await testing_manager.run_tool("test_images")
+            with patch.object(testing_manager, "_find_and_read_test_log", return_value=None):
+                await testing_manager.run_tool("test_images")
 
-                    args, kwargs = mock_exec.call_args
-                    assert args[0] == "sudo"
-                    assert "-E" in args
+                args, kwargs = mock_exec.call_args
+                assert args[0] == "sudo"
+                assert "-E" in args
 
     @pytest.mark.asyncio
     async def test_run_tool_exception(self, testing_manager, mock_config_manager):
         """Test exception handling during tool run"""
-        mock_config_manager.generate_golf_sim_config.side_effect = Exception("Config error")
-
-        result = await testing_manager.run_tool("camera1_still")
+        with patch("asyncio.create_subprocess_exec", side_effect=Exception("Spawn error")):
+            result = await testing_manager.run_tool("camera1_still")
         assert result["status"] == "error"
-        assert "Config error" in result["message"]
+        assert "Spawn error" in result["message"]
 
     @pytest.mark.asyncio
     async def test_run_tool_with_test_image(self, testing_manager, mock_config_manager, tmp_path):
@@ -208,18 +201,39 @@ class TestRunTool:
         test_image = testing_manager.test_images_dir / "test_flight.jpg"
         test_image.touch()
 
-        # Mock config file operations
-        config_content = '{"gs_config": {}}'
-
         mock_process = AsyncMock()
         mock_process.returncode = 0
         mock_process.communicate.return_value = (b"Test completed", b"")
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_process):
-            with patch("builtins.open", mock_open(read_data=config_content)):
-                result = await testing_manager.run_tool("test_uploaded_image")
+            result = await testing_manager.run_tool("test_uploaded_image")
 
         assert result["status"] == "success"
+
+    @pytest.mark.asyncio
+    async def test_run_tool_sets_transient_overrides_and_clears_them(self, testing_manager, mock_config_manager):
+        """Test overrides are served while the tool runs and dropped afterwards"""
+        (testing_manager.test_images_dir / "test_flight.jpg").touch()
+        seen = {}
+
+        async def communicate():
+            seen["overrides"] = mock_config_manager.transient_overrides
+            return (b"ok", b"")
+
+        mock_process = AsyncMock()
+        mock_process.returncode = 0
+        mock_process.communicate = communicate
+
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+            await testing_manager.run_tool("test_uploaded_image")
+
+        testing = seen["overrides"]["gs_config"]["testing"]
+        assert testing["kTwoImageTestTeedBallImage"] == "test_flight.jpg"
+        assert seen["overrides"]["logging"] == {"level": "trace"}
+        cmd = mock_exec.call_args.args
+        assert f"--web_server_port={SERVER_PORT}" in cmd
+        assert not any(a.startswith(("--config_", "--logging_level")) for a in cmd)
+        assert mock_config_manager.transient_overrides == {}
 
     @pytest.mark.asyncio
     async def test_run_tool_no_test_image(self, testing_manager):

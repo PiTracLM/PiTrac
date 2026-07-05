@@ -218,7 +218,6 @@ class PiTracProcessManager:
             "is_running": pid is not None,
             "pid": pid,
             "log_file": str(self.log_file),
-            "generated_config_path": str(Path.home() / ".pitrac/config/generated_golf_sim_config.json"),
             "binary": self.pitrac_binary,
         }
 

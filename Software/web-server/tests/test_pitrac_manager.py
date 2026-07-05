@@ -211,9 +211,9 @@ class TestPiTracProcessManager:
         assert "Test error" in result["message"]
 
     def test_command_has_web_server_port_not_config_file(self, manager):
-        """The binary fetches config over HTTP, so no --config_file is passed."""
+        """The binary fetches config over HTTP, so no config file flag is passed."""
         cmd = manager._build_command()
-        assert not any(a.startswith("--config_file") for a in cmd)
+        assert not any(a.startswith("--config_") for a in cmd)
         assert f"--web_server_port={SERVER_PORT}" in cmd
 
 

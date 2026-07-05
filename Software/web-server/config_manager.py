@@ -18,6 +18,17 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
+def _deep_merge(base: Dict, override: Dict) -> Dict:
+    """Recursively merge override into base"""
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
 class ConfigurationManager:
     """Manages PiTrac configuration with JSON-based system"""
 
@@ -36,11 +47,11 @@ class ConfigurationManager:
             sys_paths.get("userSettingsPath", {}).get("default", "~/.pitrac/config/user_settings.json")
         )
         self.calibration_data_path = expand_path("~/.pitrac/config/calibration_data.json")
-        self.generated_config_path = self.user_settings_path.parent / "generated_golf_sim_config.json"
 
         self.user_settings: Dict[str, Any] = {}
         self.calibration_data: Dict[str, Any] = {}
         self.merged_config: Dict[str, Any] = {}
+        self.transient_overrides: Dict[str, Any] = {}
 
         self.restart_required_params = self._load_restart_required_params()
 
@@ -150,22 +161,11 @@ class ConfigurationManager:
                 # Set the default value
                 current[parts[-1]] = setting_info["default"]
 
-        # Helper function for deep merging
-        def deep_merge(base: Dict, override: Dict) -> Dict:
-            """Recursively merge override into base"""
-            result = base.copy()
-            for key, value in override.items():
-                if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-                    result[key] = deep_merge(result[key], value)
-                else:
-                    result[key] = value
-            return result
-
         # Apply calibration data (persistent layer)
-        config = deep_merge(config, self.calibration_data)
+        config = _deep_merge(config, self.calibration_data)
 
         # Then apply user overrides (highest priority)
-        return deep_merge(config, self.user_settings)
+        return _deep_merge(config, self.user_settings)
 
     def register_callback(self, key_pattern: str, callback: Callable[[str, Any], None]) -> None:
         """Register callback for configuration updates matching pattern
@@ -593,36 +593,7 @@ class ConfigurationManager:
         if json_settings_count == 0:
             raise RuntimeError("No JSON settings found to generate config")
 
-        return config
-
-    def generate_golf_sim_config(self) -> Path:
-        """Generate golf_sim_config.json from configurations metadata and user settings
-
-        This method creates a complete golf_sim_config.json file by:
-        1. Taking every setting in the configurations metadata
-        2. Getting their values (default + user overrides)
-        3. Building the nested JSON structure expected by pitrac_lm
-
-        Returns:
-            Path to the generated configuration file
-
-        Raises:
-            RuntimeError: If generation fails
-        """
-        try:
-            config = self.build_generated_config()
-
-            # Save to generated location
-            generated_path = self.user_settings_path.parent / "generated_golf_sim_config.json"
-            if not self._save_json(generated_path, config):
-                raise RuntimeError(f"Failed to save generated config to {generated_path}")
-
-            logger.info(f"Generated golf_sim_config.json with {len(config.get('gs_config', {}))} top-level gs_config keys at {generated_path}")
-            return generated_path
-
-        except Exception as e:
-            logger.error(f"Failed to generate golf_sim_config.json: {e}")
-            raise RuntimeError(f"Config generation failed: {e}")
+        return _deep_merge(config, self.transient_overrides)
 
     def _set_nested_json(self, config: dict, key: str, value: Any):
         """Set value in nested JSON structure based on dot notation key
