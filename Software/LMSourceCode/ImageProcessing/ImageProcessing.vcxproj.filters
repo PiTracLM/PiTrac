@@ -258,9 +258,6 @@
     <ClCompile Include="onnx_runtime_detector.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="gs_web_api.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="gs_shot_parameters.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

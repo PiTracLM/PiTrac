@@ -268,7 +268,6 @@
     <ClCompile Include="gs_shot_parameters.cpp" />
     <ClCompile Include="gs_sim_interface.cpp" />
     <ClCompile Include="gs_sim_socket_interface.cpp" />
-    <ClCompile Include="gs_web_api.cpp" />
     <ClCompile Include="lm_main.cpp" />
     <ClCompile Include="gs_options.cpp" />
     <ClCompile Include="gs_ui_system.cpp" />

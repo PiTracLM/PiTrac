@@ -5,6 +5,9 @@
 
 #ifdef __unix__
 
+#include <iomanip>
+#include <sstream>
+
 #include "gs_http_client.h"
 #include "logging_tools.h"
 #include "httplib.h"
@@ -72,6 +75,54 @@ void GsHttpClient::PostImageReady(const std::string& filename) {
     } catch (const std::exception& e) {
         GS_LOG_MSG(warning, "HTTP POST image-ready exception: " + std::string(e.what()));
     }
+}
+
+bool GsHttpClient::PutJson(const std::string& path, const std::string& json_body) {
+    try {
+        httplib::Client cli(host_, port_);
+        cli.set_connection_timeout(2);
+        cli.set_read_timeout(5);
+
+        auto res = cli.Put(path, json_body, "application/json");
+        return res && res->status == 200;
+    } catch (const std::exception& e) {
+        GS_LOG_MSG(warning, "HTTP PUT exception: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool GsHttpClient::PutConfigValue(const std::string& key, const std::string& json_value) {
+    if (!PutJson("/api/config/" + key, "{\"value\": " + json_value + "}")) {
+        GS_LOG_MSG(error, "Failed to save calibration value " + key + " to the web server.");
+        return false;
+    }
+    GS_LOG_MSG(info, "Saved calibration: " + key + " = " + json_value);
+    return true;
+}
+
+bool GsHttpClient::UpdateCalibration(const std::string& key, double value) {
+    return PutConfigValue(key, FormatAsJson(value));
+}
+
+bool GsHttpClient::UpdateCalibration(const std::string& key, const std::vector<double>& values) {
+    return PutConfigValue(key, FormatAsJson(values));
+}
+
+std::string GsHttpClient::FormatAsJson(double value) {
+    std::stringstream ss;
+    ss << std::setprecision(10) << value;
+    return ss.str();
+}
+
+std::string GsHttpClient::FormatAsJson(const std::vector<double>& values) {
+    std::stringstream ss;
+    ss << "[";
+    for (size_t i = 0; i < values.size(); ++i) {
+        if (i > 0) ss << ", ";
+        ss << std::setprecision(10) << values[i];
+    }
+    ss << "]";
+    return ss.str();
 }
 
 } // namespace golf_sim

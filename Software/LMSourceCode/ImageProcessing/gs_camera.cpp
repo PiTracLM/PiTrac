@@ -18,7 +18,6 @@
 #include "libcamera_interface.h"
 
 #include "gs_camera.h"
-#include "gs_web_api.h"
 
 
 namespace golf_sim {
