@@ -1181,7 +1181,7 @@ void run_main(int argc, char* argv[])
             // In addition to checking for the ball, this method will send results
             // to the web server if we are in calibration mode.
 
-            GS_LOG_MSG(info, "Calibration Results (Distance of kCamera (1 OR 2) CalibrationDistanceToBall):");
+            GS_LOG_MSG(info, "Calibration Results (distance from kCamera (1 OR 2) PositionsFromExpectedBallMeters):");
             double average_focal_length = 0.0;
             const int number_attempts = 20;
             int number_samples = 0;

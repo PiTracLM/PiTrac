@@ -37,13 +37,6 @@ static std::string GetConfigString(const std::string& tag_name) {
 	return value;
 }
 
-template <typename T>
-static void SetIfPresent(const std::string& tag_name, T& value) {
-	if (GolfSimConfiguration::PropertyExists(tag_name)) {
-		GolfSimConfiguration::SetConstant(tag_name, value);
-	}
-}
-
 static void PopulateOptionsFromConfig() {
 	GolfSimOptions& options = GolfSimOptions::GetCommandLineOptions();
 
@@ -57,11 +50,11 @@ static void PopulateOptionsFromConfig() {
 	apply_enum("logging.level", &GolfSimOptions::SetLoggingLevel);
 	apply_enum("gs_config.logging.kArtifactSaveLevel", &GolfSimOptions::SetArtifactSaveLevel);
 
-	SetIfPresent("gs_config.debug.kShowDebugImages", options.show_images_);
-	SetIfPresent("gs_config.debug.kWaitForKeyOnImages", options.wait_for_key_on_images_);
-	SetIfPresent("gs_config.player.kUsePracticeBalls", options.practice_ball_);
-	SetIfPresent("gs_config.cameras.kCamera1SearchCenterX", options.search_center_x_);
-	SetIfPresent("gs_config.cameras.kCamera1SearchCenterY", options.search_center_y_);
+	GolfSimConfiguration::SetConstant("gs_config.debug.kShowDebugImages", options.show_images_);
+	GolfSimConfiguration::SetConstant("gs_config.debug.kWaitForKeyOnImages", options.wait_for_key_on_images_);
+	GolfSimConfiguration::SetConstant("gs_config.player.kUsePracticeBalls", options.practice_ball_);
+	GolfSimConfiguration::SetConstant("gs_config.cameras.kCamera1SearchCenterX", options.search_center_x_);
+	GolfSimConfiguration::SetConstant("gs_config.cameras.kCamera1SearchCenterY", options.search_center_y_);
 
 	std::string gspro_address = GetConfigString("gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress");
 	if (!gspro_address.empty()) {
@@ -327,135 +320,72 @@ bool GolfSimConfiguration::ReadValues() {
 
 
 	void GolfSimConfiguration::SetConstant(const std::string& tag_name, bool& constant_value) {
-		// Try ConfigurationManager first for override support
 		ConfigurationManager& config_mgr = ConfigurationManager::GetInstance();
 		if (config_mgr.HasKey(tag_name)) {
-			bool val = config_mgr.GetBool(tag_name, constant_value);
-			if (val != constant_value) {
-				GS_LOG_TRACE_MSG(trace, "Override from ConfigurationManager: " + tag_name + " = " + (val ? "true" : "false"));
-				constant_value = val;
-				return;
-			}
-		}
-
-		// Fall back to original JSON behavior
-		try {
-			constant_value = configuration_root_.get<bool>(tag_name, false);
-		}
-		catch (std::exception const& e)
-		{
-			GS_LOG_MSG(error, "GolfSimConfiguration::SetConstant failed. ERROR: *** " + std::string(e.what()) + " ***");
-			constant_value = false;
+			constant_value = config_mgr.GetBool(tag_name, constant_value);
+		} else if (auto v = configuration_root_.get_optional<bool>(tag_name)) {
+			constant_value = *v;
+		} else {
+			GS_LOG_TRACE_MSG(trace, "No config value for " + tag_name + ", keeping default");
 		}
 	}
 
 	void GolfSimConfiguration::SetConstant(const std::string& tag_name, int& constant_value) {
-		// Try ConfigurationManager first for override support
 		ConfigurationManager& config_mgr = ConfigurationManager::GetInstance();
 		if (config_mgr.HasKey(tag_name)) {
-			int val = config_mgr.GetInt(tag_name, constant_value);
-			if (val != constant_value) {
-				GS_LOG_TRACE_MSG(trace, "Override from ConfigurationManager: " + tag_name + " = " + std::to_string(val));
-				constant_value = val;
-				return;
-			}
-		}
-
-		// Fall back to original JSON behavior
-		try {
-			constant_value = configuration_root_.get<int>(tag_name, 0);
-		}
-		catch (std::exception const& e)
-		{
-			GS_LOG_MSG(error, "GolfSimConfiguration::SetConstant failed. ERROR: *** " + std::string(e.what()) + " ***");
-			constant_value = false;
+			constant_value = config_mgr.GetInt(tag_name, constant_value);
+		} else if (auto v = configuration_root_.get_optional<int>(tag_name)) {
+			constant_value = *v;
+		} else {
+			GS_LOG_TRACE_MSG(trace, "No config value for " + tag_name + ", keeping default");
 		}
 	}
 
 	void GolfSimConfiguration::SetConstant(const std::string& tag_name, long& constant_value) {
-		try {
-			constant_value = configuration_root_.get<long>(tag_name, 0);
-		}
-		catch (std::exception const& e)
-		{
-			GS_LOG_MSG(error, "GolfSimConfiguration::SetConstant failed. ERROR: *** " + std::string(e.what()) + " ***");
-			constant_value = false;
+		if (auto v = configuration_root_.get_optional<long>(tag_name)) {
+			constant_value = *v;
+		} else {
+			GS_LOG_TRACE_MSG(trace, "No config value for " + tag_name + ", keeping default");
 		}
 	}
 
 	void GolfSimConfiguration::SetConstant(const std::string& tag_name, unsigned int& constant_value) {
-		try {
-			constant_value = configuration_root_.get<uint>(tag_name, 0);
-		}
-		catch (std::exception const& e)
-		{
-			GS_LOG_MSG(error, "GolfSimConfiguration::SetConstant failed. ERROR: *** " + std::string(e.what()) + " ***");
-			constant_value = false;
+		if (auto v = configuration_root_.get_optional<unsigned int>(tag_name)) {
+			constant_value = *v;
+		} else {
+			GS_LOG_TRACE_MSG(trace, "No config value for " + tag_name + ", keeping default");
 		}
 	}
 
-	 void GolfSimConfiguration::SetConstant(const std::string& tag_name, float& constant_value) {
-		// Try ConfigurationManager first for override support
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, float& constant_value) {
 		ConfigurationManager& config_mgr = ConfigurationManager::GetInstance();
 		if (config_mgr.HasKey(tag_name)) {
-			float val = config_mgr.GetFloat(tag_name, constant_value);
-			if (val != constant_value) {
-				GS_LOG_TRACE_MSG(trace, "Override from ConfigurationManager: " + tag_name + " = " + std::to_string(val));
-				constant_value = val;
-				return;
-			}
-		}
-
-		// Fall back to original JSON behavior
-		try {
-			constant_value = configuration_root_.get<float>(tag_name, 0.0);
-		}
-		catch (std::exception const& e)
-		{
-			GS_LOG_MSG(error, "GolfSimConfiguration::SetConstant failed. ERROR: *** " + std::string(e.what()) + " ***");
-			constant_value = false;
+			constant_value = config_mgr.GetFloat(tag_name, constant_value);
+		} else if (auto v = configuration_root_.get_optional<float>(tag_name)) {
+			constant_value = *v;
+		} else {
+			GS_LOG_TRACE_MSG(trace, "No config value for " + tag_name + ", keeping default");
 		}
 	}
 
-	 void GolfSimConfiguration::SetConstant(const std::string& tag_name, double& constant_value) {
-		try {
-			constant_value = configuration_root_.get<double>(tag_name, 0.0);
-		}
-		catch (std::exception const& e)
-		{
-			GS_LOG_MSG(error, "GolfSimConfiguration::SetConstant failed. ERROR: *** " + std::string(e.what()) + " ***");
-			constant_value = false;
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, double& constant_value) {
+		if (auto v = configuration_root_.get_optional<double>(tag_name)) {
+			constant_value = *v;
+		} else {
+			GS_LOG_TRACE_MSG(trace, "No config value for " + tag_name + ", keeping default");
 		}
 	}
 
-	 void GolfSimConfiguration::SetConstant(const std::string& tag_name, std::string& constant_value) {
-		// Try ConfigurationManager first for override support
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, std::string& constant_value) {
 		ConfigurationManager& config_mgr = ConfigurationManager::GetInstance();
-		
-		// First check if there's a mapped YAML key
-		std::string yaml_key = tag_name;
-		// Convert JSON path to potential YAML key (simplified mapping)
-		// e.g., "gs_config.cameras.kCamera1Gain" -> "cameras.camera1_gain"
-		
-		if (config_mgr.HasKey(yaml_key)) {
-			std::string val = config_mgr.GetString(yaml_key, constant_value);
-			if (val != constant_value) {
-				GS_LOG_TRACE_MSG(trace, "Override from ConfigurationManager: " + tag_name + " = " + val);
-				constant_value = val;
-				return;
-			}
+		if (config_mgr.HasKey(tag_name)) {
+			constant_value = config_mgr.GetString(tag_name, constant_value);
+		} else if (auto v = configuration_root_.get_optional<std::string>(tag_name)) {
+			constant_value = *v;
+		} else {
+			GS_LOG_TRACE_MSG(trace, "No config value for " + tag_name + ", keeping default");
 		}
-
-		// Fall back to original JSON behavior
-		 try {
-			 constant_value = configuration_root_.get<std::string>(tag_name, constant_value);
-		 }
-		 catch (std::exception const& e)
-		 {
-			 GS_LOG_MSG(error, "GolfSimConfiguration::SetConstant failed. ERROR: *** " + std::string(e.what()) + " ***");
-			 constant_value = "";
-		 }
-	 }
+	}
 
 	 void GolfSimConfiguration::SetConstant(const std::string& tag_name, cv::Vec3d& vec) {
 		 try {

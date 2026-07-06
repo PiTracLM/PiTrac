@@ -62,17 +62,12 @@ namespace golf_sim {
     double GolfSimCamera::kPreImageWeightingRed = 1.0;
 
     float GolfSimCamera::kTeedBallSearchAreaMaskRadiusRatio = 5.0f;
-    double GolfSimCamera::kCamera1CalibrationDistanceToBall = 0.5;
-    double GolfSimCamera::kCamera2CalibrationDistanceToBall = 0.5;
 
     double GolfSimCamera::kCamera1XOffsetForTilt = 0.0;
     double GolfSimCamera::kCamera1YOffsetForTilt = 0.0;
     double GolfSimCamera::kCamera2XOffsetForTilt = 0.0;
     double GolfSimCamera::kCamera2YOffsetForTilt = 0.0;
 
-    double GolfSimCamera::kExpectedBallPositionXcm = -50.0;
-    double GolfSimCamera::kExpectedBallPositionYcm = -28.0;
-    double GolfSimCamera::kExpectedBallPositionZcm = 50.0;
     double GolfSimCamera::kExpectedBallRadiusPixelsAt40cm = 50;
     float GolfSimCamera::kMaxMovedBallRadiusRatio = 1.40f;
     float GolfSimCamera::kMinMovedBallRadiusRatio = 0.50f;
@@ -171,9 +166,6 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.ball_exposure_selection.kMaxOverlappedBallRadiusChangeRatio", kMaxOverlappedBallRadiusChangeRatio);
         GolfSimConfiguration::SetConstant("gs_config.ball_exposure_selection.kMaxRadiusDifferencePercentageFromBest", kMaxRadiusDifferencePercentageFromBest);
         
-        GolfSimConfiguration::SetConstant("gs_config.calibration.kCamera1CalibrationDistanceToBall", kCamera1CalibrationDistanceToBall);
-        GolfSimConfiguration::SetConstant("gs_config.calibration.kCamera2CalibrationDistanceToBall", kCamera2CalibrationDistanceToBall);
-
         GolfSimConfiguration::SetConstant("gs_config.ball_position.kTeedBallSearchAreaMaskRadiusRatio", kTeedBallSearchAreaMaskRadiusRatio);
         
         GolfSimConfiguration::SetConstant("gs_config.cameras.kCamera1XOffsetForTilt", kCamera1XOffsetForTilt);
@@ -181,9 +173,6 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.cameras.kCamera2XOffsetForTilt", kCamera2XOffsetForTilt);
         GolfSimConfiguration::SetConstant("gs_config.cameras.kCamera2YOffsetForTilt", kCamera2YOffsetForTilt);
 
-        GolfSimConfiguration::SetConstant("gs_config.ball_position.kExpectedBallPositionXcm", kExpectedBallPositionXcm);
-        GolfSimConfiguration::SetConstant("gs_config.ball_position.kExpectedBallPositionYcm", kExpectedBallPositionYcm);
-        GolfSimConfiguration::SetConstant("gs_config.ball_position.kExpectedBallPositionZcm", kExpectedBallPositionZcm);
         GolfSimConfiguration::SetConstant("gs_config.ball_position.kExpectedBallRadiusPixelsAt40cm", kExpectedBallRadiusPixelsAt40cm);
         GolfSimConfiguration::SetConstant("gs_config.ball_position.kMaxMovedBallRadiusRatio", kMaxMovedBallRadiusRatio);
         GolfSimConfiguration::SetConstant("gs_config.ball_position.kMinMovedBallRadiusRatio", kMinMovedBallRadiusRatio);
@@ -444,25 +433,6 @@ namespace golf_sim {
             GS_LOG_TRACE_MSG(trace, "GetCalibratedBall called for camera2 (usually used for camera1 images).");
         }
 
-        // If we are calibrating the focal length, then override the distance to that specified in 
-        // the JSON file
-        if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1Calibrate ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2Calibrate ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1BallLocation ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2BallLocation ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1TestStandalone) {
-
-            if (kCamera1CalibrationDistanceToBall > 0.01) {
-                if (GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera1) {
-                    expected_distance = kCamera1CalibrationDistanceToBall;
-                }
-                else {
-                    expected_distance = kCamera2CalibrationDistanceToBall;
-                }
-                GS_LOG_TRACE_MSG(trace, "GetCalibratedBall overriding expected_distance.  Setting to: " + std::to_string(expected_distance));
-            }
-        }
-
         GS_LOG_TRACE_MSG(trace, "GetCalibratedBall using expected ball distance of: " + std::to_string(expected_distance));
 
         double expectedRadius = GetExpectedBallRadiusPixels(camera.camera_hardware_, rgbImg.cols, expected_distance);
@@ -576,12 +546,10 @@ namespace golf_sim {
         if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1Calibrate ||
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2Calibrate) {
 
-            if (GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera1) {
-                distance_direct_to_ball = kCamera1CalibrationDistanceToBall;
-            }
-            else {
-                distance_direct_to_ball = kCamera2CalibrationDistanceToBall;
-            }
+            distance_direct_to_ball = CvUtils::GetDistance(
+                GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera1
+                    ? kCamera1PositionsFromExpectedBallMeters
+                    : kCamera2PositionsFromExpectedBallMeters);
             
             b.distance_to_z_plane_from_lens_ = distance_direct_to_ball;
 

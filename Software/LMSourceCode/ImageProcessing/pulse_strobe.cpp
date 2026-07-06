@@ -67,7 +67,6 @@ namespace golf_sim {
 	long PulseStrobe::kCam2SetupPeriodMilliseconds = 2000;
 	int PulseStrobe::kNumberPrimingPulses = 12;
 	int PulseStrobe::kPrimingPulseFPS = 15;
-	long PulseStrobe::kPauseBeforeReadyForTriggerMicroSeconds = 100;
 	int PulseStrobe::kPauseToSetUpInnoMakerExternalTriggerMilliseconds = 1000;
 	int PulseStrobe::kPauseBeforeReadyForFinalPrimingPulseMs = 100;
 
@@ -437,7 +436,6 @@ namespace golf_sim {
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kCam2SetupPeriodMilliseconds", kCam2SetupPeriodMilliseconds);
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kNumberPrimingPulses", kNumberPrimingPulses);
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kPrimingPulseFPS", kPrimingPulseFPS);
-		GolfSimConfiguration::SetConstant("gs_config.strobing.kPauseBeforeReadyForTriggerMicroSeconds", kPauseBeforeReadyForTriggerMicroSeconds);
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kPauseToSetUpInnoMakerExternalTriggerMilliseconds", kPauseToSetUpInnoMakerExternalTriggerMilliseconds);
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kPauseBeforeReadyForFinalPrimingPulseMs", kPauseBeforeReadyForFinalPrimingPulseMs);
 
@@ -505,11 +503,6 @@ namespace golf_sim {
 				GS_LOG_MSG(trace, "PulseStrobe::InitGPIOSystem - Will be using an active-LOW camera");
 				lgGpioWrite(lggpio_chip_handle_, kPulseTriggerOutputPin, kOFF);
 			}
-
-			// The cnclosure version will affect where the ball on the auto-calibration target is located relative to the cameras
-			int kEnclosureVersionIntValue = 0;
-			GolfSimConfiguration::SetConstant("gs_config.strobing.kEnclosureVersion", kEnclosureVersionIntValue);
-			GolfSimConfiguration::EnclosureType knclosureVersion = (GolfSimConfiguration::EnclosureType)kEnclosureVersionIntValue;
 
 			if (callback_function != nullptr) {
 				/* TBD

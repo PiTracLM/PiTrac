@@ -134,7 +134,7 @@ namespace golf_sim {
         case GsIPCResultType::kWaitingForBallToAppear:
             if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1Calibrate ||
                 GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2Calibrate) {
-                msg = "Waiting for ball to be teed up at " + std::to_string(GolfSimCamera::kCamera1CalibrationDistanceToBall) + "cm in order to perform calibration.";
+                msg = "Waiting for ball to be teed up in order to perform calibration.";
             } else {
                 msg = "Waiting for ball to be teed up.";
             }

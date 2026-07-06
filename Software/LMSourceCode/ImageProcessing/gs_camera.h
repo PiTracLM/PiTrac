@@ -129,17 +129,11 @@ namespace golf_sim {
         static double kMaxOverlappedBallRadiusChangeRatio;
         static double kMaxRadiusDifferencePercentageFromBest;
 
-        static double kCamera1CalibrationDistanceToBall;
-        static double kCamera2CalibrationDistanceToBall;
-
         static double kCamera1XOffsetForTilt;
         static double kCamera1YOffsetForTilt;
         static double kCamera2XOffsetForTilt;
         static double kCamera2YOffsetForTilt;
 
-        static double kExpectedBallPositionXcm;
-        static double kExpectedBallPositionYcm;
-        static double kExpectedBallPositionZcm;
         static double kExpectedBallRadiusPixelsAt40cm;
         static double kMinRadiusRatio;
         static double kMaxRadiusRatio;
