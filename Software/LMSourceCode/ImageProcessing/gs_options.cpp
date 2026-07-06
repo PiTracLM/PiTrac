@@ -166,8 +166,6 @@ void GolfSimOptions::Print() const
 		std::cout << "    e6_host_address: " << e6_host_address_ << std::endl;
 	if (!gspro_host_address_.empty())
 		std::cout << "    gspro_host_address: " << gspro_host_address_ << std::endl;
-	if (!config_file_.empty())
-		std::cout << "    configuration file: " << config_file_ << std::endl;
 	std::cout << "    web_server_port: " << std::to_string(web_server_port_) << std::endl;
 	std::cout << "    pulse_test: " << std::to_string(perform_pulse_test_) << std::endl;
 	std::cout << "    golfer_orientation: " << golfer_orientation_string_ << std::endl;

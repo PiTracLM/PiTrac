@@ -11,7 +11,6 @@
 #include <fstream>
 #include <string>
 #include <sstream>
-#include <filesystem>
 #include "gs_http_client.h"
 #include "logging_tools.h"
 #include "gs_camera.h"
@@ -74,26 +73,16 @@ static void PopulateOptionsFromConfig() {
 	}
 }
 
-	bool GolfSimConfiguration::Initialize(const std::string& configuration_filename) {
+	bool GolfSimConfiguration::Initialize() {
 
-		// Obtain the config body ONCE: read the file when a path is explicitly given
-		// (e.g. the testing tools that inject runtime keys), otherwise fetch it from the
-		// web server over HTTP. Both ConfigurationManager and configuration_root_ parse
-		// this same body — a single read, no second file/HTTP fetch.
+		// ConfigurationManager and configuration_root_ both parse this one body.
 		std::string config_body;
-		if (!configuration_filename.empty() && std::filesystem::exists(configuration_filename)) {
-			std::ifstream f(configuration_filename);
-			std::stringstream ss;
-			ss << f.rdbuf();
-			config_body = ss.str();
-		} else {
 #ifdef __unix__
-			config_body = GsHttpClient::FetchConfig();
+		config_body = GsHttpClient::FetchConfig();
 #endif
-		}
 
 		if (config_body.empty()) {
-			GS_LOG_MSG(error, "GolfSimConfiguration::Initialize failed: no config. The web server must be running to serve /api/internal/config, or pass --config_file=<path> to read from a file.");
+			GS_LOG_MSG(error, "GolfSimConfiguration::Initialize failed: no config. The web server must be running to serve /api/internal/config.");
 			return false;
 		}
 
@@ -107,9 +96,8 @@ static void PopulateOptionsFromConfig() {
 			return false;
 		}
 
-		// Initialize ConfigurationManager (override support) from the SAME body — single read.
 		ConfigurationManager& config_mgr = ConfigurationManager::GetInstance();
-		if (!config_mgr.Initialize(configuration_filename, "", {}, config_body)) {
+		if (!config_mgr.Initialize(config_body)) {
 			GS_LOG_MSG(warning, "ConfigurationManager initialization failed, using JSON only");
 		} else {
 			GS_LOG_MSG(info, "ConfigurationManager initialized with override support");

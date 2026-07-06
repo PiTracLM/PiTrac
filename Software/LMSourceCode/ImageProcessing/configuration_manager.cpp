@@ -11,27 +11,7 @@
 #include <regex>
 #include <cstdlib>
 
-// Helper function to merge property trees (user overrides defaults)
 namespace {
-    void merge_ptree(const boost::property_tree::ptree& from, boost::property_tree::ptree& to) {
-        for (const auto& [key, value] : from) {
-            if (value.empty()) {
-                // Leaf node - copy value
-                to.put(key, value.data());
-            } else {
-                // Non-leaf node - recursive merge
-                auto child = to.get_child_optional(key);
-                if (child) {
-                    boost::property_tree::ptree merged = *child;
-                    merge_ptree(value, merged);
-                    to.put_child(key, merged);
-                } else {
-                    to.put_child(key, value);
-                }
-            }
-        }
-    }
-    
     // Helper function to convert YAML to property tree
     void yaml_to_ptree(const YAML::Node& node, boost::property_tree::ptree& pt, const std::string& key = "") {
         if (node.IsScalar()) {
@@ -62,59 +42,23 @@ namespace {
 namespace golf_sim {
 
 bool ConfigurationManager::Initialize(
-    const std::string& json_config_file,
+    const std::string& json_config_body,
     const std::string& yaml_config_file,
-    const std::map<std::string, std::string>& cli_overrides,
-    const std::string& json_config_body) {
+    const std::map<std::string, std::string>& cli_overrides) {
 
     GS_LOG_TRACE_MSG(trace, "Initializing ConfigurationManager");
 
-    json_config_file_ = json_config_file;
     json_config_body_ = json_config_body;
 
-    // Load system defaults: from the supplied body (fetched over HTTP — single read) when given,
-    // otherwise from the json_config_file on disk.
-    if (!json_config_body.empty()) {
-        try {
-            std::istringstream body_stream(json_config_body);
-            boost::property_tree::read_json(body_stream, json_config_);
-            GS_LOG_MSG(info, "Loaded system defaults from web server config body");
-        } catch (const boost::property_tree::json_parser_error& e) {
-            GS_LOG_MSG(error, "Failed to parse system config body: " + std::string(e.what()));
-            return false;
-        }
-    } else if (std::filesystem::exists(json_config_file)) {
-        try {
-            boost::property_tree::read_json(json_config_file, json_config_);
-            GS_LOG_MSG(info, "Loaded system defaults from: " + json_config_file);
-        } catch (const boost::property_tree::json_parser_error& e) {
-            GS_LOG_MSG(error, "Failed to parse system config: " + std::string(e.what()));
-            return false;
-        }
-    } else {
-        GS_LOG_MSG(warning, "System configuration file not found: " + json_config_file);
+    try {
+        std::istringstream body_stream(json_config_body);
+        boost::property_tree::read_json(body_stream, json_config_);
+        GS_LOG_MSG(info, "Loaded system defaults from web server config body");
+    } catch (const boost::property_tree::json_parser_error& e) {
+        GS_LOG_MSG(error, "Failed to parse system config body: " + std::string(e.what()));
+        return false;
     }
-    
-    // Load user settings from user_settings.json (new JSON-only approach)
-    std::string user_settings_file = std::string(std::getenv("HOME") ? std::getenv("HOME") : "") + "/.pitrac/config/user_settings.json";
-    
-    if (std::filesystem::exists(user_settings_file)) {
-        try {
-            boost::property_tree::ptree user_settings;
-            boost::property_tree::read_json(user_settings_file, user_settings);
-            
-            // Merge user settings into json_config (user overrides defaults)
-            merge_ptree(user_settings, json_config_);
-            
-            GS_LOG_MSG(info, "Loaded user settings from: " + user_settings_file);
-        } catch (const boost::property_tree::json_parser_error& e) {
-            GS_LOG_MSG(error, "Failed to parse user settings: " + std::string(e.what()));
-            // Continue with defaults if user settings are corrupt
-        }
-    } else {
-        GS_LOG_MSG(debug, "No user settings found at: " + user_settings_file);
-    }
-    
+
     // DEPRECATED: Support legacy YAML for migration period only
     // This will be removed in future versions
     if (!yaml_config_file.empty() && yaml_config_file != "none") {
@@ -322,8 +266,7 @@ bool ConfigurationManager::Reload() {
     yaml_config_.clear();
     // Keep CLI overrides
     
-    // Reload — re-parse the cached HTTP body if we have one, else re-read the file
-    return Initialize(json_config_file_, yaml_config_file_, {}, json_config_body_);
+    return Initialize(json_config_body_, yaml_config_file_, {});
 }
 
 bool ConfigurationManager::LoadMappings(const std::string& mappings_file) {

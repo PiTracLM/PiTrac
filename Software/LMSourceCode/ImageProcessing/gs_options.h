@@ -120,8 +120,6 @@ namespace golf_sim {
 					"Specify the name or IP address of the host PC that is running the E6 simulator.  Default is: <empty string>, indicating no TruGolf sim is connected.")
 				("gspro_host_address", value<std::string>(&gspro_host_address_)->default_value(""),
 					"Specify the name or IP address of the host PC that is running the GSPro simulator.  Default is: <empty string>, indicating no GSPro sim is connected.")
-				("config_file", value<std::string>(&config_file_)->default_value(""),
-					"Read configuration from this JSON file instead of fetching it from the web server. Default is empty (fetch over HTTP).")
 				("web_server_port", value<int>(&web_server_port_)->default_value(8080),
 					"Port of the PiTrac web server (on localhost) to fetch configuration from and post results to.")
 				("cmd_file,cmd", value<std::string>(&command_line_file_)->implicit_value("config.txt"),
@@ -161,7 +159,6 @@ namespace golf_sim {
 		std::string web_server_share_dir_;
 		std::string e6_host_address_;
 		std::string gspro_host_address_;
-		std::string config_file_;
 		std::string golfer_orientation_string_;
 		SystemMode system_mode_ = kTest;
 		LoggingLevel logging_level_ = kInfo;

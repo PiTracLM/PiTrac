@@ -40,16 +40,15 @@ public:
 
     /**
      * Initialize the configuration system
-     * @param json_config_file Path to golf_sim_config.json (defaults)
+     * @param json_config_body Config JSON served by the web server
      * @param yaml_config_file Path to pitrac.yaml (user overrides)
      * @param cli_overrides Command-line overrides
      * @return true if initialization successful
      */
     bool Initialize(
-        const std::string& json_config_file = ".pitrac/config/generated_golf_sim_config.json",
+        const std::string& json_config_body,
         const std::string& yaml_config_file = "",
-        const std::map<std::string, std::string>& cli_overrides = {},
-        const std::string& json_config_body = ""   // when non-empty, parse this instead of reading json_config_file
+        const std::map<std::string, std::string>& cli_overrides = {}
     );
 
     /**
@@ -165,10 +164,9 @@ private:
     boost::property_tree::ptree mappings_;        // Parameter mappings
     boost::property_tree::ptree presets_;         // Configuration presets
 
-    // File paths for reloading
-    std::string json_config_file_;
+    // Inputs for reloading
     std::string yaml_config_file_;
-    std::string json_config_body_;   // cached config body (from HTTP) so Reload re-parses it instead of re-reading a file
+    std::string json_config_body_;
 
     // Thread safety
     mutable std::mutex config_mutex_;

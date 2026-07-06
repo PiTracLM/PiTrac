@@ -1486,18 +1486,13 @@ int main(int argc, char *argv[])
 
         GolfSimOptions::GetCommandLineOptions().Print();
 
-        // Empty unless --config_file was explicitly given; empty => fetch config over HTTP.
-        std::string config_file_name = GolfSimOptions::GetCommandLineOptions().config_file_;
+        GS_LOG_MSG(info, "Loading configuration from the web server over HTTP");
 
-        GS_LOG_MSG(info, config_file_name.empty()
-            ? "Loading configuration from the web server over HTTP"
-            : "Loading configuration from file: " + config_file_name);
-
-        // Point the HTTP client at the web server before config load — Initialize fetches config from it.
+        // Initialize fetches config through the HTTP client, so point it at the web server first.
         GsHttpClient::Init("localhost", GolfSimOptions::GetCommandLineOptions().web_server_port_);
 
-        if (!GolfSimConfiguration::Initialize(config_file_name)) {
-            GS_LOG_MSG(error, "Could not initialize configuration module using config file: " + config_file_name + ".  Exiting.");
+        if (!GolfSimConfiguration::Initialize()) {
+            GS_LOG_MSG(error, "Could not initialize configuration module.  Exiting.");
             return 0;
         }
 
@@ -1555,7 +1550,7 @@ int main(int argc, char *argv[])
             	GS_LOG_MSG(trace, "PiTrac is using a Version 3 Control Board, checking calibration.");
 
 		// If the board has been calibrated, there will be a value
-		// in the user_settings.json file
+		// in the config
 
         	int connector_board_dac_setting = -1;
 	        GolfSimConfiguration::SetConstant("gs_config.strobing.kDAC_setting", connector_board_dac_setting);
