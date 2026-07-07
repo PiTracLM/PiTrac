@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -118,3 +119,24 @@ class ShotRepository:
     def shot_ids_for_session(self, session_id: int) -> list:
         rows = self.db.query("SELECT id FROM shots WHERE session_id = ?", (session_id,))
         return [r["id"] for r in rows]
+
+
+class KeyValueRepository:
+    def __init__(self, db: Database, table: str):
+        if table not in ("settings", "calibration"):
+            raise ValueError(f"Unknown key-value table: {table}")
+        self.db = db
+        self.table = table
+
+    def load(self) -> Dict[str, Any]:
+        rows = self.db.query(f"SELECT key, value FROM {self.table}")
+        return {r["key"]: json.loads(r["value"]) for r in rows}
+
+    def replace_all(self, flat: Dict[str, Any]) -> None:
+        now = datetime.now().isoformat()
+        with self.db.transaction() as conn:
+            conn.execute(f"DELETE FROM {self.table}")
+            conn.executemany(
+                f"INSERT INTO {self.table} (key, value, updated_at) VALUES (?, ?, ?)",
+                [(key, json.dumps(value), now) for key, value in flat.items()],
+            )

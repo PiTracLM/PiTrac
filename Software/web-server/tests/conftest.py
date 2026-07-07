@@ -14,6 +14,11 @@ os.environ["TESTING"] = "true"
 
 import tempfile
 os.environ.setdefault("PITRAC_DB_PATH", str(Path(tempfile.mkdtemp()) / "import-time.db"))
+# server.py builds a server at import, which imports ~/.pitrac/config/*.json and renames them
+os.environ["HOME"] = tempfile.mkdtemp()
+# pitrac_manager tests patch Path.exists to True, so prune_run_logs stats the legacy log
+(Path(os.environ["HOME"]) / ".pitrac" / "logs").mkdir(parents=True)
+(Path(os.environ["HOME"]) / ".pitrac" / "logs" / "pitrac.log").touch()
 
 from models import ShotData
 from managers import ConnectionManager, ShotDataStore

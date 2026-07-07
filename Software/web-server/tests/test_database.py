@@ -22,16 +22,16 @@ class TestDatabase:
             row["name"]
             for row in db.query("SELECT name FROM sqlite_master WHERE type='table'")
         }
-        assert {"sessions", "shots", "shot_images"} <= tables
+        assert {"sessions", "shots", "shot_images", "settings", "calibration"} <= tables
 
     def test_user_version_matches_latest_migration(self, db):
         version = db.query("PRAGMA user_version")[0][0]
-        assert version == 1
+        assert version == 2
 
     def test_reopening_is_idempotent(self, tmp_path):
         Database(tmp_path / "test.db").close()
         again = Database(tmp_path / "test.db")
-        assert again.query("PRAGMA user_version")[0][0] == 1
+        assert again.query("PRAGMA user_version")[0][0] == 2
         again.close()
 
     def test_wal_mode_enabled(self, db):
@@ -44,7 +44,7 @@ class TestDatabase:
         assert rowid == 1
 
     def test_crash_recovery(self, tmp_path):
-        # First open — runs migrations, sets user_version=1
+        # First open runs migrations
         db1 = Database(tmp_path / "test.db")
         db1.close()
 
@@ -59,7 +59,7 @@ class TestDatabase:
         version = db2.query("PRAGMA user_version")[0][0]
         db2.close()
 
-        assert version == 1
+        assert version == 2
 
     def test_fk_enforcement(self, db):
         # Inserting a shot with a session_id that doesn't exist must fail
@@ -68,3 +68,10 @@ class TestDatabase:
                 "INSERT INTO shots (id, session_id, created_at, result_type) VALUES (?, ?, ?, ?)",
                 (1699999999000, 999, "2026-06-01T10:00:00", "Normal"),
             )
+
+    def test_transaction_rolls_back_on_exception(self, db):
+        with pytest.raises(RuntimeError):
+            with db.transaction() as conn:
+                conn.execute("INSERT INTO sessions (started_at) VALUES (?)", ("2026-06-01T10:00:00",))
+                raise RuntimeError("boom")
+        assert db.query("SELECT COUNT(*) FROM sessions")[0][0] == 0

@@ -6,7 +6,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from db.database import Database
-from db.repositories import SessionRepository, ShotRepository
+from db.repositories import KeyValueRepository, SessionRepository, ShotRepository
 from models import ShotData
 
 
@@ -138,3 +138,17 @@ class TestShotRepository:
         remaining = db.query("SELECT file_path FROM shot_images")
         assert len(remaining) == 1
         assert remaining[0]["file_path"] == "s2.png"
+
+
+@pytest.mark.unit
+class TestKeyValueRepository:
+    def test_replace_all_round_trips_values_and_drops_old_rows(self, db):
+        repo = KeyValueRepository(db, "calibration")
+        repo.replace_all({"stale.key": 1})
+        flat = {"gs_config.cameras.kCamera1Angles": [2.14, -26.42], "gs_config.cameras.kCamera1FocalLength": 5.9}
+        repo.replace_all(flat)
+        assert repo.load() == flat
+
+    def test_rejects_unknown_table(self, db):
+        with pytest.raises(ValueError):
+            KeyValueRepository(db, "shots")

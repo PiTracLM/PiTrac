@@ -1,7 +1,8 @@
 import sqlite3
 import threading
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Iterator, List, Optional
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
@@ -44,6 +45,11 @@ class Database:
         with self._lock:
             self._conn.executemany(sql, rows)
             self._conn.commit()
+
+    @contextmanager
+    def transaction(self) -> Iterator[sqlite3.Connection]:
+        with self._lock, self._conn:
+            yield self._conn
 
     def close(self) -> None:
         self._conn.close()
