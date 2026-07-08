@@ -133,6 +133,40 @@ class TestImageRetention:
         # image still there
         assert (images_dir / "shots" / "20" / "spin1.png").exists()
 
+    def test_open_session_prunes_oldest_keeps_newest(self, session_repo, shot_repo, images_dir):
+        files = []
+        for shot_id in (1, 2, 3):
+            _, f = _make_session(session_repo, shot_repo, images_dir,
+                                 shot_id=shot_id, size_bytes=300 * 1024)
+            files.append(f)
+
+        r = ImageRetention(session_repo, shot_repo, images_dir, cap_mb=0)
+        r._cap_bytes = 400 * 1024
+        r.prune()
+
+        assert not files[0].exists() and not files[1].exists()
+        assert not files[0].parent.exists()
+        assert files[2].exists(), "newest shot images must survive"
+        assert len(shot_repo.get(3)["images"]) == 1
+        assert shot_repo.get(1)["images"] == []
+        assert shot_repo.get(2)["images"] == []
+
+    def test_ended_sessions_pruned_before_open_session(self, session_repo, shot_repo, images_dir):
+        _, ended = _make_session(session_repo, shot_repo, images_dir, shot_id=1,
+                                 ts="2026-06-01T09:00:00", size_bytes=300 * 1024)
+        session_repo.close_open("2026-06-01T09:30:00")
+        _, old_open = _make_session(session_repo, shot_repo, images_dir, shot_id=2,
+                                    ts="2026-06-01T10:00:00", size_bytes=300 * 1024)
+        _, newest = _make_session(session_repo, shot_repo, images_dir, shot_id=3,
+                                  ts="2026-06-01T10:01:00", size_bytes=300 * 1024)
+
+        r = ImageRetention(session_repo, shot_repo, images_dir, cap_mb=0)
+        r._cap_bytes = 700 * 1024
+        r.prune()
+
+        assert not ended.exists()
+        assert old_open.exists() and newest.exists()
+
     def test_orphan_dir_pruned_when_old_and_over_cap(self, session_repo, shot_repo, images_dir):
         # create an orphan dir — no shot_images row
         orphan_dir = images_dir / "shots" / "999"

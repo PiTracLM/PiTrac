@@ -111,6 +111,16 @@ class ShotRepository:
             (session_id,),
         )
 
+    def oldest_shot_with_images_excluding_latest(self) -> Optional[int]:
+        rows = self.db.query(
+            """SELECT MIN(shot_id) AS id FROM shot_images
+               WHERE shot_id != (SELECT MAX(id) FROM shots)"""
+        )
+        return rows[0]["id"]
+
+    def delete_images_for_shot(self, shot_id: int) -> None:
+        self.db.execute("DELETE FROM shot_images WHERE shot_id = ?", (shot_id,))
+
     def shot_ids_with_images(self) -> set:
         """Set of shot ids that have at least one shot_images row."""
         rows = self.db.query("SELECT DISTINCT shot_id FROM shot_images")

@@ -45,6 +45,21 @@ class ImageRetention:
             total = _dir_bytes(shots_dir)
             logger.info(f"pruned session {sid} images; remaining {total // (1024*1024)}MB")
 
+        # Open session: oldest shots first, never the newest (the dashboard shows it).
+        while total > self._cap_bytes:
+            shot_id = self._shots.oldest_shot_with_images_excluding_latest()
+            if shot_id is None:
+                break
+            for img in self._shots.get(shot_id)["images"]:
+                (self._images_dir / img["file_path"]).unlink(missing_ok=True)
+            try:
+                (shots_dir / str(shot_id)).rmdir()
+            except OSError:
+                pass
+            self._shots.delete_images_for_shot(shot_id)
+            total = _dir_bytes(shots_dir)
+            logger.info(f"pruned shot {shot_id} images; remaining {total // (1024*1024)}MB")
+
         # Step 3: orphan sweep — shots/<id> dirs with no shot_images rows.
         # C++ may write images for error-status shots that never get persisted.
         if total > self._cap_bytes and shots_dir.is_dir():
