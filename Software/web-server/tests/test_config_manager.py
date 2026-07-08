@@ -195,7 +195,7 @@ class TestConfigManager:
     def test_imports_json_files_once(self, config_manager, db, tmp_path):
         config_manager.user_settings_path.write_text(json.dumps({
             "gs_config": {"golf_simulator_interfaces": {"GSPro": {"kGSProConnectAddress": "10.0.0.5"}}},
-            "cameras.slot1.type": "4",
+            "cameras": {"slot1": {"type": "4"}},
         }))
         config_manager.calibration_data_path.write_text(json.dumps({
             "gs_config": {"cameras": {"kCamera1FocalLength": 5.9, "kCamera1Angles": [2.14, -26.42]}},
@@ -230,13 +230,49 @@ class TestConfigManager:
     def test_later_user_settings_file_merges_over_rows(self, config_manager, db, tmp_path):
         settings = KeyValueRepository(db, "settings")
         settings.replace_all({"cameras.slot1.type": "4", "gs_config.cameras.kCamera1Gain": "3.0"})
-        (tmp_path / "user_settings.json.imported").write_text("{}")
-        config_manager.user_settings_path.write_text(json.dumps({"cameras.slot1.type": "5"}))
+        config_manager.user_settings_path.write_text(json.dumps({"cameras": {"slot1": {"type": "5"}}}))
 
         config_manager.reload()
 
         assert settings.load() == {"cameras.slot1.type": "5", "gs_config.cameras.kCamera1Gain": "3.0"}
         assert not config_manager.user_settings_path.exists()
+
+    def test_second_import_keeps_first_backup(self, config_manager, tmp_path):
+        first_backup = tmp_path / "user_settings.json.imported"
+        first_backup.write_text('{"original": true}')
+        config_manager.user_settings_path.write_text("{}")
+
+        config_manager.reload()
+
+        assert first_backup.read_text() == '{"original": true}'
+        assert len(list(tmp_path.glob("user_settings.json.imported.*"))) == 1
+
+    def test_import_drops_dotted_top_level_keys(self, config_manager, db):
+        config_manager.user_settings_path.write_text(json.dumps({
+            "cameras": {"slot1": {"type": "5"}},
+            "cameras.slot1.type": "4",
+        }))
+
+        config_manager.reload()
+
+        assert KeyValueRepository(db, "settings").load() == {"cameras.slot1.type": "5"}
+        assert config_manager.get_config("cameras.slot1.type") == "5"
+
+    def test_import_config_failure_leaves_settings_untouched(self, config_manager, db):
+        config_manager.set_config("gs_config.cameras.kCamera1Gain", "3.5")
+
+        def fail(conn, flat):
+            raise RuntimeError("disk full")
+
+        config_manager._calibration.replace_all_in = fail
+        ok, _ = config_manager.import_config({
+            "user_settings": {"gs_config": {"cameras": {"kCamera1Gain": "9.0"}}},
+            "calibration_data": {"gs_config": {"cameras": {"kCamera1FocalLength": 6.1}}},
+        })
+
+        assert not ok
+        assert KeyValueRepository(db, "settings").load() == {"gs_config.cameras.kCamera1Gain": "3.5"}
+        assert config_manager.get_config("gs_config.cameras.kCamera1Gain") == "3.5"
 
     @patch.dict(os.environ, {"HOME": "/test/home"})
     def test_default_paths(self):

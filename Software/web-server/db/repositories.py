@@ -133,10 +133,13 @@ class KeyValueRepository:
         return {r["key"]: json.loads(r["value"]) for r in rows}
 
     def replace_all(self, flat: Dict[str, Any]) -> None:
-        now = datetime.now().isoformat()
         with self.db.transaction() as conn:
-            conn.execute(f"DELETE FROM {self.table}")
-            conn.executemany(
-                f"INSERT INTO {self.table} (key, value, updated_at) VALUES (?, ?, ?)",
-                [(key, json.dumps(value), now) for key, value in flat.items()],
-            )
+            self.replace_all_in(conn, flat)
+
+    def replace_all_in(self, conn, flat: Dict[str, Any]) -> None:
+        now = datetime.now().isoformat()
+        conn.execute(f"DELETE FROM {self.table}")
+        conn.executemany(
+            f"INSERT INTO {self.table} (key, value, updated_at) VALUES (?, ?, ?)",
+            [(key, json.dumps(value), now) for key, value in flat.items()],
+        )

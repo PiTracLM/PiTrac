@@ -174,7 +174,13 @@ class TestAPIEndpoints:
     def test_internal_config_reflects_calibration_put(self, client, server_instance):
         resp = client.put("/api/config/gs_config.cameras.kCamera1FocalLength", json={"value": 6.25})
         assert resp.status_code == 200
+        resp = client.put("/api/config/gs_config.cameras.kCamera1Angles", json={"value": [2.1, -26.4]})
+        assert resp.status_code == 200
 
         body = client.get("/api/internal/config").json()
         assert body["gs_config"]["cameras"]["kCamera1FocalLength"] == "6.25"
-        assert server_instance.config_manager._calibration.load() == {"gs_config.cameras.kCamera1FocalLength": 6.25}
+        assert body["gs_config"]["cameras"]["kCamera1Angles"] == [2.1, -26.4]
+        assert server_instance.config_manager._calibration.load() == {
+            "gs_config.cameras.kCamera1FocalLength": 6.25,
+            "gs_config.cameras.kCamera1Angles": [2.1, -26.4],
+        }

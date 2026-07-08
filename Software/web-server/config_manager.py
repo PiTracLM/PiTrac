@@ -13,6 +13,7 @@ import copy
 import json
 import logging
 import os
+from datetime import datetime
 from pathlib import Path
 from threading import RLock
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -97,9 +98,9 @@ class ConfigurationManager:
 
         self._config_callbacks: Dict[str, List[Callable[[str, Any], None]]] = {}
 
-        db = db or Database(DB_PATH)
-        self._settings = KeyValueRepository(db, "settings")
-        self._calibration = KeyValueRepository(db, "calibration")
+        self._db = db or Database(DB_PATH)
+        self._settings = KeyValueRepository(self._db, "settings")
+        self._calibration = KeyValueRepository(self._db, "calibration")
 
         self.reload()
 
@@ -167,11 +168,23 @@ class ConfigurationManager:
             logger.warning(f"Not importing {path}: it is not a readable JSON object, keeping the stored values")
             return
 
-        # configure-cameras.sh writes dotted keys at the top level, so normalize before merging
-        merged = _deep_merge(_unflatten(repo.load()), _unflatten(_flatten(data)))
-        repo.replace_all(_flatten(merged))
-        path.rename(path.with_name(path.name + ".imported"))
-        logger.info(f"Imported {path} into the {repo.table} table")
+        # get_config never resolved dotted top-level keys, so importing them would change behavior
+        dotted = [key for key in data if "." in key]
+        if dotted:
+            logger.info(f"Dropping dotted top-level keys from {path}: {', '.join(dotted)}")
+        data = {key: value for key, value in data.items() if "." not in key}
+
+        repo.replace_all(_flatten(_deep_merge(_unflatten(repo.load()), data)))
+
+        target = path.with_name(path.name + ".imported")
+        if target.exists():
+            target = path.with_name(f"{target.name}.{datetime.now():%Y%m%d-%H%M%S}")
+        try:
+            path.rename(target)
+        except OSError as e:
+            logger.error(f"Imported {path} but could not rename it to {target}: {e}")
+            raise
+        logger.info(f"Imported {path} into the {repo.table} table, renamed to {target.name}")
 
     def _build_config_from_metadata(self) -> Dict[str, Any]:
         """Build configuration from metadata defaults, calibration data, and user overrides"""
@@ -819,11 +832,15 @@ class ConfigurationManager:
                     if isinstance(val, dict):
                         new_cal = copy.deepcopy(val)
 
+                with self._db.transaction() as conn:
+                    if new_user is not None:
+                        self._settings.replace_all_in(conn, _flatten(new_user))
+                    if new_cal is not None:
+                        self._calibration.replace_all_in(conn, _flatten(new_cal))
+
                 if new_user is not None:
-                    self._settings.replace_all(_flatten(new_user))
                     self.user_settings = new_user
                 if new_cal is not None:
-                    self._calibration.replace_all(_flatten(new_cal))
                     self.calibration_data = new_cal
 
                 self._rebuild_merged_config()
