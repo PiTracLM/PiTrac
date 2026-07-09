@@ -1505,6 +1505,7 @@ class PiTracServer:
         logger.info("Starting PiTrac Web Server...")
         loop = asyncio.get_event_loop()
         self.calibration_manager.loop = loop
+        self.sim_manager.loop = loop
         await self.calibration_manager._replay_pending_updates()
 
         # V3 boards: write calibrated DAC value to hardware before any strobe fires.

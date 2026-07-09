@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Awaitable, Callable, Dict, List, Optional
 
@@ -13,10 +14,15 @@ BroadcastFn = Callable[[Dict[str, object]], Awaitable[None]]
 
 
 class SimManager:
+    RELOAD_DEBOUNCE_SEC = 0.5
+
     def __init__(self, config_manager, broadcast: Optional[BroadcastFn] = None) -> None:
         self.config_manager = config_manager
         self._broadcast = broadcast
         self._sims: Dict[str, SimInterface] = {}
+        self.loop: Optional[asyncio.AbstractEventLoop] = None
+        self._reload_task: Optional[asyncio.Task] = None
+        config_manager.register_callback("simulators.", self._on_config_change)
 
     def build_sims(self) -> None:
         self._sims = {}
@@ -37,6 +43,27 @@ class SimManager:
         await self._broadcast_status()
 
     async def stop(self) -> None:
+        if self._reload_task is not None:
+            self._reload_task.cancel()
+            self._reload_task = None
+        await self._disconnect_all()
+
+    def _on_config_change(self, key: str, value: object) -> None:
+        # Runs on the config writer's thread; startup builds the sims, so ignore until the loop is set.
+        if self.loop is not None:
+            self.loop.call_soon_threadsafe(self._schedule_reload)
+
+    def _schedule_reload(self) -> None:
+        if self._reload_task is not None:
+            self._reload_task.cancel()
+        self._reload_task = asyncio.create_task(self._reload_after_debounce())
+
+    async def _reload_after_debounce(self) -> None:
+        await asyncio.sleep(self.RELOAD_DEBOUNCE_SEC)
+        await self._disconnect_all()
+        await self.start()
+
+    async def _disconnect_all(self) -> None:
         for sim in self._sims.values():
             try:
                 await sim.disconnect()

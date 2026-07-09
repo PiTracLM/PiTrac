@@ -13,6 +13,9 @@ class _StubConfig:
     def get_config(self, key):
         return self._v.get(key)
 
+    def register_callback(self, pattern, callback):
+        self.callbacks = getattr(self, "callbacks", []) + [(pattern, callback)]
+
 
 class _StubSim:
     def __init__(self):
@@ -94,3 +97,54 @@ async def test_connect_disconnect_by_name():
     assert sim.connected is True
     await mgr.disconnect("stub")
     assert sim.connected is False
+
+
+def _ogs_config(enabled):
+    return _StubConfig({
+        "simulators.ogs.enabled": enabled, "simulators.ogs.auto_connect": False,
+        "simulators.ogs.host": "1.2.3.4", "simulators.ogs.port": 3111,
+        "simulators.ogs.keepalive_sec": 5,
+    })
+
+
+@pytest.mark.asyncio
+async def test_config_change_rebuilds_sims(monkeypatch):
+    monkeypatch.setattr(SimManager, "RELOAD_DEBOUNCE_SEC", 0.01)
+    cfg = _ogs_config(False)
+    mgr = SimManager(cfg, broadcast=None)
+    mgr.loop = asyncio.get_running_loop()
+    mgr.build_sims()
+    assert mgr.status() == []
+    assert cfg.callbacks[0][0] == "simulators."
+    cfg._v["simulators.ogs.enabled"] = True
+    mgr._on_config_change("simulators.ogs.enabled", True)
+    await asyncio.sleep(0.1)
+    assert [s["name"] for s in mgr.status()] == ["ogs"]
+
+
+@pytest.mark.asyncio
+async def test_burst_of_changes_reloads_once(monkeypatch):
+    monkeypatch.setattr(SimManager, "RELOAD_DEBOUNCE_SEC", 0.05)
+    mgr = SimManager(_ogs_config(True), broadcast=None)
+    mgr.loop = asyncio.get_running_loop()
+    builds = []
+    mgr.build_sims = lambda: builds.append(1)
+    for key in ("host", "port", "keepalive_sec"):
+        mgr._on_config_change(f"simulators.ogs.{key}", 1)
+        await asyncio.sleep(0.01)
+    await asyncio.sleep(0.2)
+    assert len(builds) == 1
+
+
+@pytest.mark.asyncio
+async def test_stop_cancels_pending_reload(monkeypatch):
+    monkeypatch.setattr(SimManager, "RELOAD_DEBOUNCE_SEC", 0.05)
+    mgr = SimManager(_ogs_config(True), broadcast=None)
+    mgr.loop = asyncio.get_running_loop()
+    builds = []
+    mgr.build_sims = lambda: builds.append(1)
+    mgr._on_config_change("simulators.ogs.host", "x")
+    await asyncio.sleep(0)
+    await mgr.stop()
+    await asyncio.sleep(0.15)
+    assert builds == []
