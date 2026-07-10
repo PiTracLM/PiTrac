@@ -1519,9 +1519,31 @@ class PiTracServer:
         self.background_tasks.add(task)
         task.add_done_callback(self.background_tasks.discard)
 
+        task = asyncio.create_task(self._detect_cameras_if_unset())
+        self.background_tasks.add(task)
+        task.add_done_callback(self.background_tasks.discard)
+
         await self.sim_manager.start()
 
         logger.info("PiTrac Web Server ready — receiving results via HTTP POST")
+
+    async def _detect_cameras_if_unset(self) -> None:
+        if "cameras.slot1.type" in self.config_manager._settings.load():
+            return
+        try:
+            result = await asyncio.to_thread(lambda: CameraDetector().detect())
+        except Exception:
+            logger.exception("Camera detection failed; using default camera settings")
+            return
+        cameras = result.get("cameras", [])
+        if not cameras:
+            logger.info("No cameras detected; using default camera settings")
+            return
+        for slot in range(1, min(len(cameras), 2) + 1):
+            detected = result["configuration"][f"slot{slot}"]
+            self.config_manager.set_config(f"cameras.slot{slot}.type", str(detected["type"]))
+            self.config_manager.set_config(f"cameras.slot{slot}.lens", str(detected["lens"]))
+        logger.info(f"Saved detected settings for {len(cameras)} camera(s)")
 
     async def _run_tool_async(self, tool_id: str) -> None:
         """Helper method to run a testing tool asynchronously"""

@@ -291,70 +291,6 @@ dtoverlay=vc_mipi_imx296"
     log_warn "IMPORTANT: System must be rebooted for camera configuration changes to take effect"
 }
 
-# Configure user_settings.json based on detected cameras
-configure_user_settings() {
-    local camera_json="$1"
-    local user_settings_path="${2:-${HOME}/.pitrac/config/user_settings.json}"
-
-    mkdir -p "$(dirname "$user_settings_path")"
-
-    # Parse camera configuration
-    local slot1_type=$(echo "$camera_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('configuration', {}).get('slot1', {}).get('type', ''))" 2>/dev/null || echo "")
-    local slot1_lens=$(echo "$camera_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('configuration', {}).get('slot1', {}).get('lens', '1'))" 2>/dev/null || echo "1")
-    local slot2_type=$(echo "$camera_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('configuration', {}).get('slot2', {}).get('type', ''))" 2>/dev/null || echo "")
-    local slot2_lens=$(echo "$camera_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('configuration', {}).get('slot2', {}).get('lens', '1'))" 2>/dev/null || echo "1")
-
-    log_info "Configuring user settings at ${user_settings_path}..."
-
-    # Create or update user_settings.json using Python for proper JSON handling
-    python3 <<EOF
-import json
-import os
-from pathlib import Path
-
-settings_path = "${user_settings_path}"
-slot1_type = "${slot1_type}"
-slot1_lens = "${slot1_lens}"
-slot2_type = "${slot2_type}"
-slot2_lens = "${slot2_lens}"
-
-# Load existing settings if present
-if os.path.exists(settings_path):
-    try:
-        with open(settings_path, 'r') as f:
-            settings = json.load(f)
-    except (json.JSONDecodeError, IOError):
-        settings = {}
-else:
-    settings = {}
-
-# Update camera settings if cameras were detected
-if slot1_type:
-    settings["cameras.slot1.type"] = slot1_type
-    settings["cameras.slot1.lens"] = slot1_lens
-    print(f"  Setting camera 1: type={slot1_type}, lens={slot1_lens}")
-
-if slot2_type:
-    settings["cameras.slot2.type"] = slot2_type
-    settings["cameras.slot2.lens"] = slot2_lens
-    print(f"  Setting camera 2: type={slot2_type}, lens={slot2_lens}")
-
-# Write back the settings
-Path(settings_path).parent.mkdir(parents=True, exist_ok=True)
-with open(settings_path, 'w') as f:
-    json.dump(settings, f, indent=2)
-
-print(f"  Wrote settings to {settings_path}")
-EOF
-
-    if [[ $EUID -eq 0 ]] && [[ -n "${SUDO_USER:-}" ]]; then
-        chown -R "${SUDO_USER}:${SUDO_USER}" "$(dirname "$user_settings_path")"
-        log_info "  Set ownership to ${SUDO_USER}"
-    fi
-
-    log_success "User settings configuration complete"
-}
-
 main() {
     log_info "PiTrac Camera Configuration"
     log_info "============================"
@@ -398,15 +334,6 @@ for cam in data.get('cameras', []):
     fi
 
     configure_boot_config "$camera_json"
-
-    if [[ "$num_cameras" -gt 0 ]]; then
-        if [[ -n "${SUDO_USER:-}" ]]; then
-            user_home=$(eval echo ~${SUDO_USER})
-        else
-            user_home="${HOME}"
-        fi
-        configure_user_settings "$camera_json" "${user_home}/.pitrac/config/user_settings.json"
-    fi
 
     log_success "Configuration completed successfully"
     log_warn "Please reboot the system for changes to take effect"
