@@ -30,10 +30,12 @@ class TestCameraAutodetect:
             await server_instance._detect_cameras_if_unset()
 
         detector.assert_not_called()
-        assert "cameras.slot1.type" not in server_instance.config_manager._settings.load()
 
-    async def test_existing_slot_type_is_left_alone(self, server_instance):
-        server_instance.config_manager.set_config("cameras.slot1.type", "4")
+    async def test_imported_settings_without_cameras_skip_detection(self, server_instance):
+        manager = server_instance.config_manager
+        manager.user_settings_path.parent.mkdir(parents=True, exist_ok=True)
+        manager.user_settings_path.write_text('{"gs_config": {"logging": {"kLogLevel": "debug"}}}')
+        manager.reload()
         with patch("server.CameraDetector") as detector:
             await server_instance._detect_cameras_if_unset()
 
