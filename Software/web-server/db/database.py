@@ -21,6 +21,7 @@ class Database:
 
     def _migrate(self) -> None:
         current = self._conn.execute("PRAGMA user_version").fetchone()[0]
+        self.created = current == 0
         for script in sorted(MIGRATIONS_DIR.glob("*.sql"), key=lambda p: int(p.name.split("_")[0])):
             version = int(script.name.split("_")[0])
             if version <= current:

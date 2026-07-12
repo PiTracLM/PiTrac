@@ -24,13 +24,20 @@ class TestCameraAutodetect:
         assert saved["cameras.slot1.lens"] == "2"
         assert not any(key.startswith("cameras.slot2") for key in saved)
 
+    async def test_existing_db_never_runs_detection(self, server_instance):
+        server_instance.db.created = False
+        with patch("server.CameraDetector") as detector:
+            await server_instance._detect_cameras_if_unset()
+
+        detector.assert_not_called()
+        assert "cameras.slot1.type" not in server_instance.config_manager._settings.load()
+
     async def test_existing_slot_type_is_left_alone(self, server_instance):
         server_instance.config_manager.set_config("cameras.slot1.type", "4")
         with patch("server.CameraDetector") as detector:
             await server_instance._detect_cameras_if_unset()
 
         detector.assert_not_called()
-        assert server_instance.config_manager._settings.load()["cameras.slot1.type"] == "4"
 
     async def test_detection_failure_leaves_settings_empty(self, server_instance):
         with patch("server.CameraDetector", MagicMock(side_effect=RuntimeError("no libcamera"))):

@@ -1528,7 +1528,7 @@ class PiTracServer:
         logger.info("PiTrac Web Server ready — receiving results via HTTP POST")
 
     async def _detect_cameras_if_unset(self) -> None:
-        if "cameras.slot1.type" in self.config_manager._settings.load():
+        if not self.db.created or "cameras.slot1.type" in self.config_manager._settings.load():
             return
         try:
             result = await asyncio.to_thread(lambda: CameraDetector().detect())
