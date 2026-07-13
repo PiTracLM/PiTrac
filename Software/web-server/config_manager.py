@@ -102,6 +102,7 @@ class ConfigurationManager:
         self._settings = KeyValueRepository(self._db, "settings")
         self._calibration = KeyValueRepository(self._db, "calibration")
 
+        self.found_legacy_json = False
         self.reload()
 
     def _load_raw_metadata(self) -> Dict[str, Any]:
@@ -131,6 +132,7 @@ class ConfigurationManager:
         """Reload configuration from metadata, calibration data, and user settings"""
         with self._lock:
             self._metadata_cache = None
+            self.found_legacy_json |= self.user_settings_path.exists() or self.calibration_data_path.exists()
             self._import_json(self._settings, self.user_settings_path)
             self._import_json(self._calibration, self.calibration_data_path)
             self.user_settings = _unflatten(self._settings.load())
