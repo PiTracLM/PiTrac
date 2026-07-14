@@ -1541,8 +1541,13 @@ class PiTracServer:
             return
         for slot in range(1, min(len(cameras), 2) + 1):
             detected = result["configuration"][f"slot{slot}"]
-            self.config_manager.set_config(f"cameras.slot{slot}.type", str(detected["type"]))
-            self.config_manager.set_config(f"cameras.slot{slot}.lens", str(detected["lens"]))
+            for field in ("type", "lens"):
+                key, value = f"cameras.slot{slot}.{field}", str(detected[field])
+                valid, _ = self.config_manager.validate_config(key, value)
+                if valid:
+                    self.config_manager.set_config(key, value)
+                else:
+                    logger.warning(f"Detected {key} = {value} is not a supported option; keeping the default")
         logger.info(f"Saved detected settings for {len(cameras)} camera(s)")
 
     async def _run_tool_async(self, tool_id: str) -> None:

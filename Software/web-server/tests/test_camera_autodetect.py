@@ -46,3 +46,13 @@ class TestCameraAutodetect:
             await server_instance._detect_cameras_if_unset()
 
         assert "cameras.slot1.type" not in server_instance.config_manager._settings.load()
+
+    async def test_unsupported_detected_type_is_not_saved(self, server_instance):
+        with patch("server.CameraDetector") as detector:
+            detector.return_value.detect.return_value = detection(1)
+            detector.return_value.detect.return_value["configuration"]["slot1"].update(type=0, lens=2)
+            await server_instance._detect_cameras_if_unset()
+
+        saved = server_instance.config_manager._settings.load()
+        assert "cameras.slot1.type" not in saved
+        assert saved["cameras.slot1.lens"] == "2"
