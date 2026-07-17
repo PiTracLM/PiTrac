@@ -123,7 +123,7 @@ namespace golf_sim {
             { "100", CameraOrientation::kCameraOrientationUnknown },
         };
         if (orientation_table.count(lens_enum_value_string) == 0)
-            throw std::runtime_error("Invalid camera lens_enum_value_string: " + lens_enum_value_string + ".  Expected an integer. Check the cameras.slotN.lens setting.");
+            throw std::runtime_error("Invalid camera lens_enum_value_string: " + lens_enum_value_string + ".  Expected an integer. Check the cameras.slotN.orientation setting.");
 
         CameraHardware::CameraOrientation orientation_type = (CameraHardware::CameraOrientation)orientation_table[lens_enum_value_string];
 
