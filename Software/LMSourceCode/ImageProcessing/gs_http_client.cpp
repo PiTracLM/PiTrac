@@ -84,7 +84,15 @@ bool GsHttpClient::PutJson(const std::string& path, const std::string& json_body
         cli.set_read_timeout(5);
 
         auto res = cli.Put(path, json_body, "application/json");
-        return res && res->status == 200;
+        if (!res) {
+            GS_LOG_MSG(error, "HTTP PUT " + path + " failed (no response)");
+            return false;
+        }
+        if (res->status != 200) {
+            GS_LOG_MSG(error, "HTTP PUT " + path + " returned " + std::to_string(res->status) + ": " + res->body);
+            return false;
+        }
+        return true;
     } catch (const std::exception& e) {
         GS_LOG_MSG(warning, "HTTP PUT exception: " + std::string(e.what()));
         return false;

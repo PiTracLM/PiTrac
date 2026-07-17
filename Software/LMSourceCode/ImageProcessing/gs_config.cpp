@@ -261,7 +261,7 @@ bool GolfSimConfiguration::ReadValues() {
 	}
 	else {
 		// Attempt to get the image logging directory from the .json config file
-		SetConstant("gs_config.user_interface.kWebServerShareDirectory", GsUISystem::kWebServerShareDirectory);
+		SetConstant("gs_config.ipc_interface.kWebServerShareDirectory", GsUISystem::kWebServerShareDirectory);
 	}
 
 	// If the configuration file forgot to add a "/" at the end of the logging directory, we should add it here ourselves

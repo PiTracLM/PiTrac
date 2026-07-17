@@ -91,7 +91,7 @@ namespace golf_sim {
             { "100", CameraModel::kCameraUnknown },
         };
         if (camera_table.count(model_enum_value_string) == 0)
-            throw std::runtime_error("Invalid camera model_enum_value_string: " + model_enum_value_string + ".  Expected an integer. Check environment variables.");
+            throw std::runtime_error("Invalid camera model_enum_value_string: " + model_enum_value_string + ".  Expected an integer. Check the cameras.slotN.type setting.");
         
         CameraHardware::CameraModel camera_model = (CameraHardware::CameraModel)camera_table[model_enum_value_string];
 
@@ -107,7 +107,7 @@ namespace golf_sim {
             { "100", LensType::kLensUnknown },
         };
         if (lens_table.count(lens_enum_value_string) == 0)
-            throw std::runtime_error("Invalid camera lens_enum_value_string: " + lens_enum_value_string + ".  Expected an integer. Check environment variables.");
+            throw std::runtime_error("Invalid camera lens_enum_value_string: " + lens_enum_value_string + ".  Expected an integer. Check the cameras.slotN.lens setting.");
 
         CameraHardware::LensType lens_type = (CameraHardware::LensType)lens_table[lens_enum_value_string];
 
@@ -123,7 +123,7 @@ namespace golf_sim {
             { "100", CameraOrientation::kCameraOrientationUnknown },
         };
         if (orientation_table.count(lens_enum_value_string) == 0)
-            throw std::runtime_error("Invalid camera lens_enum_value_string: " + lens_enum_value_string + ".  Expected an integer. Check environment variables.");
+            throw std::runtime_error("Invalid camera lens_enum_value_string: " + lens_enum_value_string + ".  Expected an integer. Check the cameras.slotN.lens setting.");
 
         CameraHardware::CameraOrientation orientation_type = (CameraHardware::CameraOrientation)orientation_table[lens_enum_value_string];
 
