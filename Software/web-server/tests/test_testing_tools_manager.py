@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from constants import SERVER_PORT
-from testing_tools_manager import TestingToolsManager
+from testing_tools_manager import TestingToolsManager as ToolsManager
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def mock_config_manager():
 def testing_manager(mock_config_manager, tmp_path):
     """Create TestingToolsManager instance for testing"""
     with patch("testing_tools_manager.Path.home", return_value=tmp_path):
-        manager = TestingToolsManager(mock_config_manager)
+        manager = ToolsManager(mock_config_manager)
         return manager
 
 
@@ -146,7 +146,7 @@ class TestRunTool:
         """Test tool timeout handling"""
         mock_process = AsyncMock()
         mock_process.communicate.side_effect = asyncio.TimeoutError()
-        mock_process.terminate = AsyncMock()
+        mock_process.terminate = Mock()
         mock_process.wait = AsyncMock()
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_process):
@@ -161,7 +161,7 @@ class TestRunTool:
         """Test continuous test timeout behavior"""
         mock_process = AsyncMock()
         mock_process.communicate.side_effect = asyncio.TimeoutError()
-        mock_process.terminate = AsyncMock()
+        mock_process.terminate = Mock()
         mock_process.wait = AsyncMock()
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_process):

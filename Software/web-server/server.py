@@ -4,6 +4,7 @@ import logging
 import os
 import shutil
 import subprocess
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -188,7 +189,7 @@ class PiTracServer:
     _BASE_DIR = Path(__file__).resolve().parent
 
     def __init__(self):
-        self.app = FastAPI(title="PiTrac Dashboard")
+        self.app = FastAPI(title="PiTrac Dashboard", lifespan=self._lifespan)
         self.templates = Jinja2Templates(directory=str(self._BASE_DIR / "templates"))
         self.connection_manager = ConnectionManager()
         self.shot_store = ShotDataStore()
@@ -222,12 +223,12 @@ class PiTracServer:
 
         self._setup_routes()
 
-        @self.app.on_event("startup")
-        async def _startup():
-            await self.startup_event()
-
-        @self.app.on_event("shutdown")
-        async def _shutdown():
+    @asynccontextmanager
+    async def _lifespan(self, app: FastAPI):
+        await self.startup_event()
+        try:
+            yield
+        finally:
             await self.shutdown_event()
 
     def _setup_routes(self) -> None:

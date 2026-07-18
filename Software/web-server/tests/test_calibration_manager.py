@@ -481,7 +481,7 @@ class TestErrorHandling:
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
             mock_process.communicate.side_effect = asyncio.TimeoutError()
-            mock_process.terminate = AsyncMock()
+            mock_process.terminate = Mock()
             mock_process.wait = AsyncMock()
             mock_subprocess.return_value = mock_process
 
@@ -564,7 +564,7 @@ class TestErrorHandling:
         manager = CalibrationManager(mock_config_manager)
 
         mock_process = AsyncMock()
-        mock_process.terminate = AsyncMock()
+        mock_process.terminate = Mock()
         mock_process.wait = AsyncMock()
         mock_process.returncode = None
         manager.current_processes["camera1"] = mock_process
@@ -585,7 +585,7 @@ class TestErrorHandling:
         manager = CalibrationManager(mock_config_manager)
 
         mock_process = AsyncMock()
-        mock_process.terminate.side_effect = Exception("Permission denied")
+        mock_process.terminate = Mock(side_effect=Exception("Permission denied"))
         mock_process.wait.side_effect = Exception("Wait failed")
         mock_process.returncode = None
         manager.current_processes["camera1"] = mock_process
