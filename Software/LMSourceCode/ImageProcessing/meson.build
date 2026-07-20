@@ -31,7 +31,7 @@ add_global_arguments('-DHAS_NCNN', language : 'cpp')
 fs = import('fs')
 
 # TBD FIX - The following may be redundant of the above options
-cpp_arguments = ['-pedantic', '-Wno-unused-parameter', '-faligned-new', '-DBOOST_LOG_DYN_LINK', '-Wno-error', '-Wno-deprecated-enum-enum-conversion', '-Wno-decprecated-declarations']
+cpp_arguments = ['-pedantic', '-Wno-unused-parameter', '-faligned-new', '-DBOOST_LOG_DYN_LINK', '-Wno-error']
 
 # Needed for file sizes > 32-bits.
 cpp_arguments += '-D_FILE_OFFSET_BITS=64'
