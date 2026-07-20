@@ -577,14 +577,9 @@ print_configuration() {
 
     echo -e "${BOLD}PiTrac Configuration:${NC}"
     echo
-    echo "YAML Configuration (/etc/pitrac/pitrac.yaml):"
-    echo "  cameras:"
-    echo "    slot1_type: $slot1_type"
-    echo "    slot2_type: $slot2_type"
-    echo
-    echo "Environment Variables:"
-    echo "  export PITRAC_SLOT1_CAMERA_TYPE=$slot1_type"
-    echo "  export PITRAC_SLOT2_CAMERA_TYPE=$slot2_type"
+    echo "Web UI settings (Config page, Cameras section, or its Detect button):"
+    echo "  cameras.slot1.type = $slot1_type"
+    echo "  cameras.slot2.type = $slot2_type"
     echo
 
     # Recommendations
