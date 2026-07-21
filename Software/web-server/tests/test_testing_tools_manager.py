@@ -113,6 +113,18 @@ class TestRunTool:
         assert "already running" in result["message"]
 
     @pytest.mark.asyncio
+    async def test_run_tool_refused_while_other_tool_running(self, testing_manager, mock_config_manager):
+        testing_manager.running_processes["pulse_test"] = MagicMock()
+        mock_config_manager.transient_overrides = {"logging": {"level": "trace"}}
+
+        with patch("asyncio.create_subprocess_exec") as create:
+            result = await testing_manager.run_tool("camera1_still")
+
+        assert result == {"status": "error", "message": "Tool pulse_test is already running"}
+        create.assert_not_called()
+        assert mock_config_manager.transient_overrides == {"logging": {"level": "trace"}}
+
+    @pytest.mark.asyncio
     async def test_run_tool_success(self, testing_manager, mock_config_manager):
         """Test successfully running a tool"""
         mock_process = AsyncMock()

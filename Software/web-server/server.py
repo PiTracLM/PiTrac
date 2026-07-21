@@ -561,6 +561,8 @@ class PiTracServer:
             safety = self.strobe_calibration_manager.is_strobe_safe()
             if not safety["safe"]:
                 return {"status": "error", "message": safety["reason"]}
+            if refusal := self._testing_tool_refusal():
+                return refusal
             result = await self.pitrac_manager.start()
             logger.info(f"PiTrac start request: {result}")
             return result
@@ -580,6 +582,8 @@ class PiTracServer:
             safety = self.strobe_calibration_manager.is_strobe_safe()
             if not safety["safe"]:
                 return {"status": "error", "message": safety["reason"]}
+            if refusal := self._testing_tool_refusal():
+                return refusal
             result = await self.pitrac_manager.restart()
             logger.info(f"PiTrac restart request: {result}")
             return result
@@ -1550,6 +1554,12 @@ class PiTracServer:
                 else:
                     logger.warning(f"Detected {key} = {value} is not a supported option; keeping the default")
         logger.info(f"Saved detected settings for {len(cameras)} camera(s)")
+
+    def _testing_tool_refusal(self) -> Optional[Dict[str, Any]]:
+        running = self.testing_manager.get_running_tools()
+        if not running:
+            return None
+        return {"status": "error", "message": f"Testing tool {running[0]} is running. Stop it before starting PiTrac."}
 
     async def _run_tool_async(self, tool_id: str) -> None:
         """Helper method to run a testing tool asynchronously"""

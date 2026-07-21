@@ -136,8 +136,10 @@ class TestingToolsManager:
         if tool_id not in self.tools:
             return {"status": "error", "message": f"Unknown tool: {tool_id}"}
 
-        if tool_id in self.running_processes:
-            return {"status": "error", "message": f"Tool {tool_id} is already running"}
+        # One tool at a time: they share config_manager.transient_overrides
+        running = next(iter(self.running_processes), None)
+        if running:
+            return {"status": "error", "message": f"Tool {running} is already running"}
 
         tool_info = self.tools[tool_id]
 

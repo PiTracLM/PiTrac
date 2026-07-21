@@ -51,6 +51,18 @@ class TestPiTracAPI:
         data = response.json()
         assert data["status"] in ["restarted", "started"]
 
+    @pytest.mark.parametrize("action", ["start", "restart"])
+    def test_start_refused_while_testing_tool_runs(self, client, server_instance, action):
+        server_instance.testing_manager.running_processes["pulse_test"] = MagicMock()
+        launch = AsyncMock()
+        setattr(server_instance.pitrac_manager, action, launch)
+
+        response = client.post(f"/api/pitrac/{action}")
+
+        assert response.json()["status"] == "error"
+        assert "pulse_test" in response.json()["message"]
+        launch.assert_not_called()
+
     def test_pitrac_status(self, client, server_instance):
         """Test getting PiTrac process status"""
         server_instance.pitrac_manager.get_status = MagicMock(
