@@ -3,6 +3,7 @@
 import json
 import os
 import pytest
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -257,6 +258,56 @@ class TestConfigManager:
 
         assert KeyValueRepository(db, "settings").load() == {"cameras.slot1.type": "5"}
         assert config_manager.get_config("cameras.slot1.type") == "5"
+
+    def test_backups_from_the_same_second_are_all_kept(self, config_manager, tmp_path):
+        stamp = "user_settings.json.imported.20260101-120000"
+        (tmp_path / "user_settings.json.imported").write_text("first")
+        (tmp_path / stamp).write_text("second")
+        config_manager.user_settings_path.write_text("{}")
+
+        with patch("config_manager.datetime") as clock:
+            clock.now.return_value = datetime(2026, 1, 1, 12, 0, 0)
+            config_manager.reload()
+
+        assert (tmp_path / "user_settings.json.imported").read_text() == "first"
+        assert (tmp_path / stamp).read_text() == "second"
+        assert (tmp_path / f"{stamp}.1").read_text() == "{}"
+
+    def test_failed_rename_keeps_imported_rows_and_starts(self, config_manager, db):
+        config_manager.user_settings_path.write_text(json.dumps({"cameras": {"slot1": {"type": "5"}}}))
+
+        with patch.object(Path, "rename", side_effect=OSError("read-only")):
+            config_manager.reload()
+
+        assert KeyValueRepository(db, "settings").load() == {"cameras.slot1.type": "5"}
+        assert config_manager.get_config("cameras.slot1.type") == "5"
+
+    def test_import_drops_nested_dotted_keys(self, config_manager, db):
+        config_manager.user_settings_path.write_text(json.dumps({
+            "gs_config": {"cameras": {"kCamera1Gain": "2.5"}, "a.b": 1},
+        }))
+
+        config_manager.reload()
+
+        assert KeyValueRepository(db, "settings").load() == {"gs_config.cameras.kCamera1Gain": "2.5"}
+
+    def test_reset_all_notifies_changed_keys(self, config_manager):
+        config_manager.set_config("simulators.ogs.host", "10.0.0.9")
+        seen = []
+        config_manager.register_callback("simulators.", lambda k, v: seen.append((k, v)))
+
+        config_manager.reset_all()
+
+        assert seen == [("simulators.ogs.host", config_manager.get_default("simulators.ogs.host"))]
+
+    def test_import_config_notifies_changed_keys(self, config_manager):
+        seen = []
+        config_manager.register_callback("simulators.", lambda k, v: seen.append((k, v)))
+
+        ok, _ = config_manager.import_config({"user_settings": {"simulators": {"ogs": {"host": "10.0.0.9"}}}})
+
+        assert ok
+        assert seen == [("simulators.ogs.host", "10.0.0.9")]
 
     def test_import_config_failure_leaves_settings_untouched(self, config_manager, db):
         config_manager.set_config("gs_config.cameras.kCamera1Gain", "3.5")
@@ -713,7 +764,7 @@ class TestBuildGeneratedConfig:
 
         config_manager.transient_overrides = {}
         cfg = config_manager.build_generated_config()
-        assert cfg["gs_config"].get("testing", {}).get("kBaseTestImageDir") != "/tmp/x/"
+        assert cfg["gs_config"]["testing"]["kBaseTestImageDir"] == "./Images/"
 
     def test_build_generated_config_includes_former_cli_and_env(self, config_manager):
         cfg = config_manager.build_generated_config()

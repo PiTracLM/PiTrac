@@ -63,6 +63,19 @@ def _flatten(nested: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
     return flat
 
 
+def _without_dotted_keys(nested: Dict[str, Any], dropped: List[str], prefix: str = "") -> Dict[str, Any]:
+    clean = {}
+    for key, value in nested.items():
+        full_key = f"{prefix}.{key}" if prefix else key
+        if "." in key:
+            dropped.append(full_key)
+        elif isinstance(value, dict):
+            clean[key] = _without_dotted_keys(value, dropped, full_key)
+        else:
+            clean[key] = value
+    return clean
+
+
 def _unflatten(flat: Dict[str, Any]) -> Dict[str, Any]:
     nested: Dict[str, Any] = {}
     for key, value in flat.items():
@@ -170,22 +183,28 @@ class ConfigurationManager:
             logger.warning(f"Not importing {path}: it is not a readable JSON object, keeping the stored values")
             return
 
-        # get_config never resolved dotted top-level keys, so importing them would change behavior
-        dotted = [key for key in data if "." in key]
+        # get_config never resolved dotted keys, so importing them would change behavior
+        dotted: List[str] = []
+        data = _without_dotted_keys(data, dotted)
         if dotted:
-            logger.info(f"Dropping dotted top-level keys from {path}: {', '.join(dotted)}")
-        data = {key: value for key, value in data.items() if "." not in key}
+            logger.info(f"Dropping dotted keys from {path}: {', '.join(dotted)}")
 
         repo.replace_all(_flatten(_deep_merge(_unflatten(repo.load()), data)))
 
         target = path.with_name(path.name + ".imported")
         if target.exists():
-            target = path.with_name(f"{target.name}.{datetime.now():%Y%m%d-%H%M%S}")
+            stamped = f"{target.name}.{datetime.now():%Y%m%d-%H%M%S}"
+            target = path.with_name(stamped)
+            n = 0
+            while target.exists():
+                n += 1
+                target = path.with_name(f"{stamped}.{n}")
         try:
             path.rename(target)
         except OSError as e:
-            logger.error(f"Imported {path} but could not rename it to {target}: {e}")
-            raise
+            # The rows are written and a re-import is idempotent, so failing here would only crash-loop the service
+            logger.error(f"Imported {path} but could not rename it to {target}, will import it again next start: {e}")
+            return
         logger.info(f"Imported {path} into the {repo.table} table, renamed to {target.name}")
 
     def _build_config_from_metadata(self) -> Dict[str, Any]:
@@ -265,6 +284,12 @@ class ConfigurationManager:
                         callback(key, value)
                     except Exception as e:
                         logger.error(f"Callback error for {key}: {e}", exc_info=True)
+
+    def _notify_changed(self, before: Dict[str, Any], after: Dict[str, Any]) -> None:
+        before, after = _flatten(before), _flatten(after)
+        for key in sorted(before.keys() | after.keys()):
+            if before.get(key) != after.get(key):
+                self._notify_callbacks(key, after.get(key))
 
     def get_config(self, key: Optional[str] = None) -> Any:
         """Get configuration value or entire config
@@ -491,10 +516,13 @@ class ConfigurationManager:
     def reset_all(self) -> Tuple[bool, str]:
         """Reset all user settings to defaults"""
         with self._lock:
+            before = self.merged_config
             self._settings.replace_all({})
             self.user_settings = {}
             self._rebuild_merged_config()
-            return True, "Reset all settings to defaults"
+            after = self.merged_config
+        self._notify_changed(before, after)
+        return True, "Reset all settings to defaults"
 
     def get_diff(self) -> Dict[str, Any]:
         """Get differences between user settings and defaults
@@ -845,10 +873,13 @@ class ConfigurationManager:
                 if new_cal is not None:
                     self.calibration_data = new_cal
 
+                before = self.merged_config
                 self._rebuild_merged_config()
-
-                return True, "Configuration imported successfully"
+                after = self.merged_config
 
             except Exception as e:
                 logger.error(f"Error importing configuration: {e}")
                 return False, f"Import failed: {e}"
+
+        self._notify_changed(before, after)
+        return True, "Configuration imported successfully"
