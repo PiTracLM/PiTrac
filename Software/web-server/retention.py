@@ -37,10 +37,8 @@ class ImageRetention:
             if session is None:
                 break  # only open sessions or image-less sessions remain; stop
             sid = session["id"]
-            for rel in self._shots.image_paths_for_session(sid):
-                (self._images_dir / rel).unlink(missing_ok=True)
-            # Remove emptied per-shot dirs
-            self._rmdir_if_empty_for_session(sid)
+            for shot_id in self._shots.shot_ids_for_session(sid):
+                self._remove_shot_dir(shot_id)
             self._shots.delete_images_for_session(sid)
             total = _dir_bytes(shots_dir)
             logger.info(f"pruned session {sid} images; remaining {total // (1024*1024)}MB")
@@ -50,12 +48,7 @@ class ImageRetention:
             shot_id = self._shots.oldest_shot_with_images_excluding_latest()
             if shot_id is None:
                 break
-            for img in self._shots.get(shot_id)["images"]:
-                (self._images_dir / img["file_path"]).unlink(missing_ok=True)
-            try:
-                (shots_dir / str(shot_id)).rmdir()
-            except OSError:
-                pass
+            self._remove_shot_dir(shot_id)
             self._shots.delete_images_for_shot(shot_id)
             total = _dir_bytes(shots_dir)
             logger.info(f"pruned shot {shot_id} images; remaining {total // (1024*1024)}MB")
@@ -79,14 +72,11 @@ class ImageRetention:
                     shutil.rmtree(d, ignore_errors=True)
                     logger.info(f"pruned orphan dir {d.name}")
 
-    def _rmdir_if_empty_for_session(self, session_id: int) -> None:
-        """Remove shots/<shot_id> dirs that are now empty for a given session's shots."""
-        shot_ids = self._shots.shot_ids_for_session(session_id)
-        shots_dir = self._images_dir / "shots"
-        for sid in shot_ids:
-            d = shots_dir / str(sid)
-            if d.is_dir():
-                try:
-                    d.rmdir()  # only removes if empty
-                except OSError:
-                    pass  # non-empty or already gone; leave it
+    def _remove_shot_dir(self, shot_id: int) -> None:
+        # Deletes by shot id, never by shot_images.file_path, so a stored path cannot point the delete elsewhere.
+        shots_dir = (self._images_dir / "shots").resolve()
+        d = shots_dir / str(shot_id)
+        if d.resolve() != d:
+            logger.warning(f"not pruning {d}: it resolves outside {shots_dir}")
+            return
+        shutil.rmtree(d, ignore_errors=True)

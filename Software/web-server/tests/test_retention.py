@@ -209,6 +209,32 @@ class TestImageRetention:
         # images column is empty (rows deleted) but shot exists
         assert shot["images"] == []
 
+    def test_pruned_session_removes_unknown_files_in_shot_dir(self, session_repo, shot_repo, images_dir):
+        _, fpath = _make_session(session_repo, shot_repo, images_dir, shot_id=1, size_bytes=600 * 1024)
+        _write_file(fpath.parent / "extra.bin")
+        session_repo.close_open("2026-06-01T10:30:00")
+
+        make_retention(session_repo, shot_repo, images_dir, cap_mb=0).prune()
+
+        assert not fpath.parent.exists()
+
+    def test_open_session_prune_ignores_row_paths_outside_shots(self, session_repo, shot_repo, images_dir, tmp_path):
+        sid = session_repo.ensure_open("2026-06-01T10:00:00", timeout_minutes=30)
+        outside = tmp_path / "x"
+        _write_file(outside)
+        _write_file(images_dir / "shots/1/spin1.png", 600 * 1024)
+        _write_file(images_dir / "shots/1/extra.bin")
+        shot_repo.add(1, sid, _hit(), [("spin1", "shots/1/spin1.png"), ("x", "../x")])
+        _make_session(session_repo, shot_repo, images_dir, shot_id=2, size_bytes=100)
+
+        r = make_retention(session_repo, shot_repo, images_dir, cap_mb=0)
+        r._cap_bytes = 1024
+        r.prune()
+
+        assert outside.exists()
+        assert not (images_dir / "shots" / "1").exists()
+        assert shot_repo.get(1)["images"] == []
+
     def test_empty_shots_dir_counts_as_zero(self, session_repo, shot_repo, images_dir):
         # no shots dir at all → noop, no crash
         r = make_retention(session_repo, shot_repo, images_dir, cap_mb=1)
