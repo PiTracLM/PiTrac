@@ -43,6 +43,7 @@ class SimManager:
         await self._broadcast_status()
 
     async def stop(self) -> None:
+        self.loop = None
         if self._reload_task is not None:
             self._reload_task.cancel()
             self._reload_task = None

@@ -148,3 +148,16 @@ async def test_stop_cancels_pending_reload(monkeypatch):
     await mgr.stop()
     await asyncio.sleep(0.15)
     assert builds == []
+
+
+@pytest.mark.asyncio
+async def test_change_after_stop_does_not_reload(monkeypatch):
+    monkeypatch.setattr(SimManager, "RELOAD_DEBOUNCE_SEC", 0.01)
+    mgr = SimManager(_ogs_config(True), broadcast=None)
+    mgr.loop = asyncio.get_running_loop()
+    builds = []
+    mgr.build_sims = lambda: builds.append(1)
+    await mgr.stop()
+    mgr._on_config_change("simulators.ogs.host", "x")
+    await asyncio.sleep(0.05)
+    assert builds == []

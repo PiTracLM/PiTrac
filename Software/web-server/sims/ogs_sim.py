@@ -45,6 +45,7 @@ def build_shot_payload(shot: ShotData) -> Dict[str, object]:
 class OGSSim(SimInterface):
     name = "ogs"
     display_name = "OpenGolfSim"
+    CONNECT_TIMEOUT_SEC = 5
 
     def __init__(self, host: str, port: int = 3111, keepalive_sec: int = 5) -> None:
         super().__init__()
@@ -76,13 +77,19 @@ class OGSSim(SimInterface):
                 return
             await self._set_status(STATUS_CONNECTING, f"{self.host}:{self.port}")
             try:
-                self._reader, self._writer = await asyncio.open_connection(self.host, self.port)
+                self._reader, self._writer = await asyncio.wait_for(
+                    asyncio.open_connection(self.host, self.port), self.CONNECT_TIMEOUT_SEC
+                )
+                await self._send_obj({"type": "device", "status": "ready"})
+            except asyncio.CancelledError:
+                self._teardown_socket()
+                await self._set_status(STATUS_OFF, "")
+                raise
             except Exception as e:
-                logger.warning(f"OGS connect failed: {e}")
-                await self._set_status(STATUS_ERROR, str(e))
+                logger.warning(f"OGS connect failed: {e!r}")
+                await self._set_status(STATUS_ERROR, str(e) or type(e).__name__)
                 self._schedule_reconnect()
                 return
-            await self._send_obj({"type": "device", "status": "ready"})
             await self._set_status(STATUS_CONNECTED, f"{self.host}:{self.port}")
             self._keepalive_task = asyncio.create_task(self._keepalive_loop())
 

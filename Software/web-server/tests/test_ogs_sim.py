@@ -1,5 +1,6 @@
 import asyncio
 import json
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -107,3 +108,46 @@ async def test_connect_failure_sets_error_status():
     await asyncio.sleep(0.05)
     assert sim.status in ("error", "connecting")
     await sim.disconnect()
+
+
+@pytest.mark.asyncio
+async def test_connect_timeout_is_a_connect_failure(monkeypatch):
+    async def never_connects(host, port):
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(asyncio, "open_connection", never_connects)
+    sim = OGSSim(host="10.255.255.1", port=3111, keepalive_sec=999)
+    sim.CONNECT_TIMEOUT_SEC = 0.05
+
+    await asyncio.wait_for(sim.connect(), 1)
+
+    assert sim.status == "error"
+    assert sim._writer is None
+    assert sim._reconnect_task is not None
+    await sim.disconnect()
+
+
+@pytest.mark.asyncio
+async def test_cancel_during_first_send_closes_socket(monkeypatch):
+    async def stalled_drain():
+        await asyncio.Event().wait()
+
+    writer = MagicMock()
+    writer.drain = stalled_drain
+
+    async def opens(host, port):
+        return MagicMock(), writer
+
+    monkeypatch.setattr(asyncio, "open_connection", opens)
+    sim = OGSSim(host="127.0.0.1", port=3111, keepalive_sec=999)
+    task = asyncio.create_task(sim.connect())
+    while not writer.write.called:
+        await asyncio.sleep(0)
+
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    writer.close.assert_called_once()
+    assert sim._writer is None
+    assert sim.status == "off"
