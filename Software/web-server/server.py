@@ -1193,11 +1193,10 @@ class PiTracServer:
             session = await asyncio.to_thread(self.session_repo.get, session_id)
             if session is None:
                 raise HTTPException(status_code=404, detail="Session not found")
-            image_paths = await asyncio.to_thread(
-                self.shot_repo.image_paths_for_session, session_id
-            )
+            shot_ids = await asyncio.to_thread(self.shot_repo.shot_ids_for_session, session_id)
             await asyncio.to_thread(self.session_repo.delete, session_id)
-            await asyncio.to_thread(self._delete_session_files, image_paths)
+            for shot_id in shot_ids:
+                await asyncio.to_thread(self.retention.remove_shot_dir, shot_id)
             return {"status": "deleted", "session_id": session_id}
 
         @self.app.get("/api/storage/usage")
@@ -1580,20 +1579,6 @@ class PiTracServer:
     def _persist_shot(self, shot_id, shot_data, images):
         session_id = self.session_repo.ensure_open(shot_data.timestamp, self.session_timeout_minutes)
         self.shot_repo.add(shot_id, session_id, shot_data, images)
-
-    def _delete_session_files(self, image_paths: List[str]) -> None:
-        """Unlink image files and remove emptied per-shot dirs."""
-        parent_dirs: set[Path] = set()
-        for rel in image_paths:
-            p = IMAGES_DIR / rel
-            p.unlink(missing_ok=True)
-            parent_dirs.add(p.parent)
-        for d in parent_dirs:
-            if d.is_dir():
-                try:
-                    d.rmdir()
-                except OSError:
-                    pass
 
     async def shutdown_event(self) -> None:
         logger.info("Shutting down PiTrac Web Server...")

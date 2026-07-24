@@ -38,7 +38,7 @@ class ImageRetention:
                 break  # only open sessions or image-less sessions remain; stop
             sid = session["id"]
             for shot_id in self._shots.shot_ids_for_session(sid):
-                self._remove_shot_dir(shot_id)
+                self.remove_shot_dir(shot_id)
             self._shots.delete_images_for_session(sid)
             total = _dir_bytes(shots_dir)
             logger.info(f"pruned session {sid} images; remaining {total // (1024*1024)}MB")
@@ -48,7 +48,7 @@ class ImageRetention:
             shot_id = self._shots.oldest_shot_with_images_excluding_latest()
             if shot_id is None:
                 break
-            self._remove_shot_dir(shot_id)
+            self.remove_shot_dir(shot_id)
             self._shots.delete_images_for_shot(shot_id)
             total = _dir_bytes(shots_dir)
             logger.info(f"pruned shot {shot_id} images; remaining {total // (1024*1024)}MB")
@@ -72,7 +72,7 @@ class ImageRetention:
                     shutil.rmtree(d, ignore_errors=True)
                     logger.info(f"pruned orphan dir {d.name}")
 
-    def _remove_shot_dir(self, shot_id: int) -> None:
+    def remove_shot_dir(self, shot_id: int) -> None:
         # Deletes by shot id, never by shot_images.file_path, so a stored path cannot point the delete elsewhere.
         shots_dir = (self._images_dir / "shots").resolve()
         d = shots_dir / str(shot_id)

@@ -154,6 +154,24 @@ class TestDeleteSessionEndpoint:
         # parent dir also removed since it's now empty
         assert not shots_dir.exists()
 
+    def test_delete_removes_shot_dir_by_id_not_stored_path(self, history_client, history_server, tmp_path):
+        shot_id = 4003
+        shot_dir = tmp_path / "images" / "shots" / str(shot_id)
+        shot_dir.mkdir(parents=True)
+        (shot_dir / "spin1.png").write_bytes(b"fake")
+        (shot_dir / "extra.bin").write_bytes(b"fake")
+        outside = tmp_path / "outside.png"
+        outside.write_bytes(b"keep")
+        payload = make_hit_payload(shot_id)
+        payload["images"] = [f"shots/{shot_id}/spin1.png", "../outside.png"]
+
+        history_client.post("/api/internal/shot-result", json=payload)
+        session_id = history_server.session_repo.list()[0]["id"]
+        history_client.delete(f"/api/sessions/{session_id}")
+
+        assert not shot_dir.exists()
+        assert outside.exists()
+
     def test_delete_unknown_session_returns_404(self, history_client):
         resp = history_client.delete("/api/sessions/99999")
         assert resp.status_code == 404

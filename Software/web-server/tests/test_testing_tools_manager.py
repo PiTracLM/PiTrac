@@ -125,6 +125,27 @@ class TestRunTool:
         assert mock_config_manager.transient_overrides == {"logging": {"level": "trace"}}
 
     @pytest.mark.asyncio
+    async def test_run_tool_refused_while_another_is_spawning(self, testing_manager):
+        spawning = asyncio.Event()
+        release = asyncio.Event()
+
+        async def slow_spawn(*args, **kwargs):
+            spawning.set()
+            await release.wait()
+            raise OSError("spawn failed")
+
+        with patch("asyncio.create_subprocess_exec", side_effect=slow_spawn):
+            first = asyncio.create_task(testing_manager.run_tool("pulse_test"))
+            await spawning.wait()
+            second = await asyncio.wait_for(testing_manager.run_tool("camera1_still"), 1)
+            release.set()
+            first_result = await first
+
+        assert second == {"status": "error", "message": "Tool pulse_test is already running"}
+        assert first_result == {"status": "error", "message": "spawn failed"}
+        assert testing_manager.running_processes == {}
+
+    @pytest.mark.asyncio
     async def test_run_tool_success(self, testing_manager, mock_config_manager):
         """Test successfully running a tool"""
         mock_process = AsyncMock()

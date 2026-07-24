@@ -140,6 +140,8 @@ class TestingToolsManager:
         running = next(iter(self.running_processes), None)
         if running:
             return {"status": "error", "message": f"Tool {running} is already running"}
+        # Reserved with no await since the check, so a run arriving during the spawn sees it
+        self.running_processes[tool_id] = None
 
         tool_info = self.tools[tool_id]
 
@@ -273,14 +275,13 @@ class TestingToolsManager:
                         "status": "timeout",
                         "message": f"Tool {tool_id} timed out after {tool_info['timeout']} seconds",
                     }
-            finally:
-                self.running_processes.pop(tool_id, None)
-                self.config_manager.transient_overrides = {}
 
         except Exception as e:
-            self.config_manager.transient_overrides = {}
             logger.error(f"Error running tool {tool_id}: {e}")
             return {"status": "error", "message": str(e)}
+        finally:
+            self.running_processes.pop(tool_id, None)
+            self.config_manager.transient_overrides = {}
 
     async def stop_tool(self, tool_id: str) -> Dict[str, Any]:
         """Stop a running tool
@@ -293,9 +294,11 @@ class TestingToolsManager:
         """
         if tool_id not in self.running_processes:
             return {"status": "error", "message": f"Tool {tool_id} is not running"}
+        process = self.running_processes[tool_id]
+        if process is None:
+            return {"status": "error", "message": f"Tool {tool_id} is still starting"}
 
         try:
-            process = self.running_processes[tool_id]
             process.terminate()
 
             try:
