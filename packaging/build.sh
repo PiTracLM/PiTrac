@@ -671,7 +671,7 @@ SUDOEOF
         update_web_server() {
             log_info "Syncing web server files..."
             mkdir -p /usr/lib/pitrac/web-server
-            rsync -a --checksum --delete \
+            rsync -a --checksum --delete --exclude .venv \
                 "$WEB_SERVER_DIR"/ /usr/lib/pitrac/web-server/
 
             install_python_dependencies "/usr/lib/pitrac/web-server"
