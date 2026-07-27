@@ -307,8 +307,7 @@ class TestingToolsManager:
                 process.kill()
                 await process.wait()
 
-            del self.running_processes[tool_id]
-
+            # run_tool's finally releases the slot and the overrides once its cleanup is done
             return {"status": "success", "message": f"Tool {tool_id} stopped"}
 
         except Exception as e:

@@ -76,15 +76,15 @@ def make_retention(session_repo, shot_repo, images_dir, cap_mb):
 class TestImageRetention:
 
     def test_under_cap_is_noop(self, session_repo, shot_repo, images_dir):
-        sid, fpath = _make_session(session_repo, shot_repo, images_dir,
-                                   shot_id=1, size_bytes=100)
+        _, fpath = _make_session(session_repo, shot_repo, images_dir,
+                                 shot_id=1, size_bytes=100)
         session_repo.close_open("2026-06-01T10:30:00")
 
         r = make_retention(session_repo, shot_repo, images_dir, cap_mb=500)
         r.prune()
 
         assert fpath.exists()
-        assert len(shot_repo.image_paths_for_session(sid)) == 1
+        assert len(shot_repo.get(1)["images"]) == 1
 
     def test_prunes_oldest_ended_session_first(self, session_repo, shot_repo, images_dir):
         # session 1 (older) — 600 KB
@@ -106,21 +106,21 @@ class TestImageRetention:
 
         assert not f1.exists(), "oldest session image should be pruned"
         assert f2.exists(), "newer session image should survive"
-        assert shot_repo.image_paths_for_session(sid1) == []
-        assert len(shot_repo.image_paths_for_session(sid2)) == 1
+        assert shot_repo.get(1)["images"] == []
+        assert len(shot_repo.get(2)["images"]) == 1
         # shot ROW for sid1 still present — rows are never deleted
         assert shot_repo.get(1) is not None
 
     def test_open_session_never_pruned(self, session_repo, shot_repo, images_dir):
-        sid, fpath = _make_session(session_repo, shot_repo, images_dir,
-                                   shot_id=10, size_bytes=600 * 1024)
+        _, fpath = _make_session(session_repo, shot_repo, images_dir,
+                                 shot_id=10, size_bytes=600 * 1024)
         # session is still OPEN
 
         r = make_retention(session_repo, shot_repo, images_dir, cap_mb=0)
         r.prune()
 
         assert fpath.exists(), "open session image must survive"
-        assert len(shot_repo.image_paths_for_session(sid)) == 1
+        assert len(shot_repo.get(10)["images"]) == 1
 
     def test_terminates_when_only_unprunable_remains(self, session_repo, shot_repo, images_dir):
         # open session only; over cap → prune should return cleanly

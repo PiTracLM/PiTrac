@@ -119,12 +119,6 @@ class TestShotRepository:
         assert shot["images"] == [{"kind": "spin1", "file_path": "a.png"}]
         assert shots.get(999) is None
 
-    def test_image_paths_for_session(self, sessions, shots):
-        s = sessions.ensure_open("2026-06-01T10:00:00", timeout_minutes=30)
-        shots.add(1, s, hit(), [("spin1", "a.png"), ("spin2", "b.png")])
-        paths = shots.image_paths_for_session(s)
-        assert set(paths) == {"a.png", "b.png"}
-
     def test_delete_images_for_session_removes_only_that_session(self, sessions, shots, db):
         s1 = sessions.ensure_open("2026-06-01T09:00:00", timeout_minutes=30)
         shots.add(1, s1, hit(), [("spin1", "s1.png")])

@@ -315,7 +315,41 @@ class TestStopTool:
         assert result["status"] == "success"
         assert "stopped" in result["message"]
         mock_process.terminate.assert_called_once()
-        assert "pulse_test" not in testing_manager.running_processes
+        assert testing_manager.running_processes["pulse_test"] is mock_process
+
+    @pytest.mark.asyncio
+    async def test_run_refused_until_stopped_run_cleans_up(self, testing_manager, mock_config_manager):
+        exited = asyncio.Event()
+        log_read = asyncio.Event()
+        process = Mock(returncode=-15)
+        process.terminate = Mock(side_effect=exited.set)
+
+        async def communicate():
+            await exited.wait()
+            return b"", b""
+
+        async def wait():
+            await exited.wait()
+
+        async def slow_log_read(start_time):
+            await log_read.wait()
+
+        process.communicate = communicate
+        process.wait = wait
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with patch.object(testing_manager, "_find_and_read_test_log", side_effect=slow_log_read):
+                first = asyncio.create_task(testing_manager.run_tool("pulse_test"))
+                while testing_manager.running_processes.get("pulse_test") is not process:
+                    await asyncio.sleep(0)
+                await testing_manager.stop_tool("pulse_test")
+                second = await asyncio.wait_for(testing_manager.run_tool("camera1_still"), 1)
+                log_read.set()
+                await first
+
+        assert second == {"status": "error", "message": "Tool pulse_test is already running"}
+        assert testing_manager.running_processes == {}
+        assert mock_config_manager.transient_overrides == {}
 
     @pytest.mark.asyncio
     async def test_stop_tool_kill_on_timeout(self, testing_manager):

@@ -97,14 +97,6 @@ class ShotRepository:
         )
         return [self._attach_images(dict(r)) for r in rows]
 
-    def image_paths_for_session(self, session_id: int) -> List[str]:
-        rows = self.db.query(
-            """SELECT si.file_path FROM shot_images si
-               JOIN shots s ON s.id = si.shot_id WHERE s.session_id = ?""",
-            (session_id,),
-        )
-        return [r["file_path"] for r in rows]
-
     def delete_images_for_session(self, session_id: int) -> None:
         self.db.execute(
             "DELETE FROM shot_images WHERE shot_id IN (SELECT id FROM shots WHERE session_id = ?)",
