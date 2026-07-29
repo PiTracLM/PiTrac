@@ -479,19 +479,13 @@ namespace golf_sim {
             // Only if we are using a custom focal length, then use that length
             if (lens_type == Lens_Custom) {
                 tag = "gs_config.cameras.kSlot" + std::to_string(camera_number_) + "CustomLensFocalLength";
-                if (GolfSimConfiguration::PropertyExists(tag)) {
-                    GolfSimConfiguration::SetConstant(tag, focal_length_);
-                    GS_LOG_TRACE_MSG(trace, "Setting custom focal length (from JSON file) = " + std::to_string(focal_length_));
-                }
             }
             else {
 				// Otherwise, for non-custom lenses, just use the standard focal length parameter
                 tag = "gs_config.cameras.kCamera" + std::to_string(camera_number_) + "FocalLength";
-                if (GolfSimConfiguration::PropertyExists(tag)) {
-                    GolfSimConfiguration::SetConstant(tag, focal_length_);
-                    GS_LOG_TRACE_MSG(trace, "Setting focal length (from JSON file) = " + std::to_string(focal_length_));
-                }
             }
+            GolfSimConfiguration::SetConstant(tag, focal_length_);
+            GS_LOG_TRACE_MSG(trace, "Focal length = " + std::to_string(focal_length_));
         }
 
 
