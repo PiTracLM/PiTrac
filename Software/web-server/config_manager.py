@@ -5,8 +5,8 @@ Builds configuration from a three-tier system:
 2. Calibration data: calibration table in the SQLite database
 3. User overrides: settings table in the SQLite database (sparse)
 
-~/.pitrac/config/user_settings.json and calibration_data.json are merged into
-those tables on load and renamed to *.imported.
+~/.pitrac/config/user_settings.json and calibration_data.json are imported once at
+startup into whichever of those tables is still empty, then renamed to *.imported.
 """
 
 import copy
@@ -115,7 +115,9 @@ class ConfigurationManager:
         self._settings = KeyValueRepository(self._db, "settings")
         self._calibration = KeyValueRepository(self._db, "calibration")
 
-        self.found_legacy_json = False
+        self.found_legacy_json = self.user_settings_path.exists() or self.calibration_data_path.exists()
+        self._import_json(self._settings, self.user_settings_path)
+        self._import_json(self._calibration, self.calibration_data_path)
         self.reload()
 
     def _load_raw_metadata(self) -> Dict[str, Any]:
@@ -145,9 +147,6 @@ class ConfigurationManager:
         """Reload configuration from metadata, calibration data, and user settings"""
         with self._lock:
             self._metadata_cache = None
-            self.found_legacy_json |= self.user_settings_path.exists() or self.calibration_data_path.exists()
-            self._import_json(self._settings, self.user_settings_path)
-            self._import_json(self._calibration, self.calibration_data_path)
             self.user_settings = _unflatten(self._settings.load())
             self.calibration_data = _unflatten(self._calibration.load())
             # Build merged config from metadata defaults + calibration + user overrides
@@ -174,8 +173,11 @@ class ConfigurationManager:
         return data if isinstance(data, dict) else None
 
     def _import_json(self, repo: KeyValueRepository, path: Path) -> None:
-        """Merge a legacy JSON file over the table rows (file keys win), then rename it"""
+        """Import a legacy JSON file into an empty table, then rename it"""
         if not path.exists():
+            return
+        if repo.load():
+            logger.info(f"Not importing {path}: the {repo.table} table already has values")
             return
 
         data = self._load_json(path)
@@ -189,7 +191,7 @@ class ConfigurationManager:
         if dotted:
             logger.info(f"Dropping dotted keys from {path}: {', '.join(dotted)}")
 
-        repo.replace_all(_flatten(_deep_merge(_unflatten(repo.load()), data)))
+        repo.replace_all(_flatten(data))
 
         target = path.with_name(path.name + ".imported")
         if target.exists():

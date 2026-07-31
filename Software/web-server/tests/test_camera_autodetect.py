@@ -31,13 +31,17 @@ class TestCameraAutodetect:
 
         detector.assert_not_called()
 
-    async def test_legacy_settings_file_skips_detection(self, server_instance):
-        manager = server_instance.config_manager
-        manager.user_settings_path.parent.mkdir(parents=True, exist_ok=True)
-        manager.user_settings_path.write_text('{"cameras.slot1.type": "5"}')
-        manager.reload()
+    async def test_legacy_settings_file_skips_detection(self, monkeypatch, tmp_path):
+        import server as server_module
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setattr(server_module, "DB_PATH", tmp_path / "test.db")
+        legacy = tmp_path / ".pitrac" / "config" / "user_settings.json"
+        legacy.parent.mkdir(parents=True)
+        legacy.write_text('{"cameras": {"slot1": {"type": "5"}}}')
+        srv = server_module.PiTracServer()
         with patch("server.CameraDetector") as detector:
-            await server_instance._detect_cameras_if_unset()
+            await srv._detect_cameras_if_unset()
 
         detector.assert_not_called()
 

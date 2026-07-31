@@ -20,6 +20,14 @@ def db(tmp_path):
 
 
 @pytest.fixture
+def legacy_dir(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    d = tmp_path / ".pitrac" / "config"
+    d.mkdir(parents=True)
+    return d
+
+
+@pytest.fixture
 def config_manager(db, tmp_path):
     manager = ConfigManager(db)
     manager.user_settings_path = tmp_path / "user_settings.json"
@@ -130,16 +138,14 @@ class TestConfigManager:
         gain_value = config_manager.get_config("gs_config.cameras.kCamera1Gain")
         assert gain_value is not None
 
-    def test_invalid_json_file_is_left_alone(self, config_manager, db):
-        settings = KeyValueRepository(db, "settings")
-        settings.replace_all({"gs_config.cameras.kCamera1Gain": "3.0"})
-        config_manager.user_settings_path.write_text("{ invalid json }")
+    def test_invalid_json_file_is_left_alone(self, db, legacy_dir):
+        (legacy_dir / "user_settings.json").write_text("{ invalid json }")
 
-        config_manager.reload()
+        manager = ConfigManager(db)
 
-        assert config_manager.user_settings_path.exists()
-        assert settings.load() == {"gs_config.cameras.kCamera1Gain": "3.0"}
-        assert config_manager.user_settings == {"gs_config": {"cameras": {"kCamera1Gain": "3.0"}}}
+        assert (legacy_dir / "user_settings.json").exists()
+        assert KeyValueRepository(db, "settings").load() == {}
+        assert manager.user_settings == {}
 
     def test_missing_file_handling(self, config_manager):
         """Test handling of missing config files"""
@@ -193,12 +199,12 @@ class TestConfigManager:
 
         assert seen == [("gs_config.cameras.kCamera1Gain", "3.5")]
 
-    def test_imports_json_files_once(self, config_manager, db, tmp_path):
-        config_manager.user_settings_path.write_text(json.dumps({
+    def test_imports_json_files_once_at_startup(self, db, legacy_dir):
+        (legacy_dir / "user_settings.json").write_text(json.dumps({
             "gs_config": {"golf_simulator_interfaces": {"GSPro": {"kGSProConnectAddress": "10.0.0.5"}}},
             "cameras": {"slot1": {"type": "4"}},
         }))
-        config_manager.calibration_data_path.write_text(json.dumps({
+        (legacy_dir / "calibration_data.json").write_text(json.dumps({
             "gs_config": {"cameras": {"kCamera1FocalLength": 5.9, "kCamera1Angles": [2.14, -26.42]}},
         }))
 
@@ -213,81 +219,86 @@ class TestConfigManager:
         settings = KeyValueRepository(db, "settings")
         calibration = KeyValueRepository(db, "calibration")
 
-        config_manager.reload()
+        manager = ConfigManager(db)
 
         assert settings.load() == expected_settings
         assert calibration.load() == expected_calibration
-        assert config_manager.get_config("cameras.slot1.type") == "4"
-        assert not config_manager.user_settings_path.exists()
-        assert not config_manager.calibration_data_path.exists()
-        assert (tmp_path / "user_settings.json.imported").exists()
-        assert (tmp_path / "calibration_data.json.imported").exists()
+        assert manager.get_config("cameras.slot1.type") == "4"
+        assert manager.found_legacy_json
+        assert not (legacy_dir / "user_settings.json").exists()
+        assert not (legacy_dir / "calibration_data.json").exists()
+        assert (legacy_dir / "user_settings.json.imported").exists()
+        assert (legacy_dir / "calibration_data.json.imported").exists()
 
-        config_manager.reload()
-
-        assert settings.load() == expected_settings
-        assert calibration.load() == expected_calibration
-
-    def test_later_user_settings_file_merges_over_rows(self, config_manager, db, tmp_path):
-        settings = KeyValueRepository(db, "settings")
-        settings.replace_all({"cameras.slot1.type": "4", "gs_config.cameras.kCamera1Gain": "3.0"})
+    def test_reload_never_imports(self, config_manager, db):
         config_manager.user_settings_path.write_text(json.dumps({"cameras": {"slot1": {"type": "5"}}}))
 
         config_manager.reload()
 
-        assert settings.load() == {"cameras.slot1.type": "5", "gs_config.cameras.kCamera1Gain": "3.0"}
-        assert not config_manager.user_settings_path.exists()
+        assert KeyValueRepository(db, "settings").load() == {}
+        assert config_manager.user_settings_path.exists()
 
-    def test_second_import_keeps_first_backup(self, config_manager, tmp_path):
-        first_backup = tmp_path / "user_settings.json.imported"
+    def test_legacy_file_next_to_rows_is_not_imported(self, db, legacy_dir):
+        settings = KeyValueRepository(db, "settings")
+        settings.replace_all({"cameras.slot1.type": "4"})
+        (legacy_dir / "user_settings.json").write_text(json.dumps({"cameras": {"slot1": {"type": "5"}}}))
+
+        manager = ConfigManager(db)
+
+        assert settings.load() == {"cameras.slot1.type": "4"}
+        assert manager.get_config("cameras.slot1.type") == "4"
+        assert (legacy_dir / "user_settings.json").exists()
+
+    def test_second_import_keeps_first_backup(self, db, legacy_dir):
+        first_backup = legacy_dir / "user_settings.json.imported"
         first_backup.write_text('{"original": true}')
-        config_manager.user_settings_path.write_text("{}")
+        (legacy_dir / "user_settings.json").write_text("{}")
 
-        config_manager.reload()
+        ConfigManager(db)
 
         assert first_backup.read_text() == '{"original": true}'
-        assert len(list(tmp_path.glob("user_settings.json.imported.*"))) == 1
+        assert len(list(legacy_dir.glob("user_settings.json.imported.*"))) == 1
 
-    def test_import_drops_dotted_top_level_keys(self, config_manager, db):
-        config_manager.user_settings_path.write_text(json.dumps({
+    def test_import_drops_dotted_top_level_keys(self, db, legacy_dir):
+        (legacy_dir / "user_settings.json").write_text(json.dumps({
             "cameras": {"slot1": {"type": "5"}},
             "cameras.slot1.type": "4",
         }))
 
-        config_manager.reload()
+        manager = ConfigManager(db)
 
         assert KeyValueRepository(db, "settings").load() == {"cameras.slot1.type": "5"}
-        assert config_manager.get_config("cameras.slot1.type") == "5"
+        assert manager.get_config("cameras.slot1.type") == "5"
 
-    def test_backups_from_the_same_second_are_all_kept(self, config_manager, tmp_path):
+    def test_backups_from_the_same_second_are_all_kept(self, db, legacy_dir):
         stamp = "user_settings.json.imported.20260101-120000"
-        (tmp_path / "user_settings.json.imported").write_text("first")
-        (tmp_path / stamp).write_text("second")
-        config_manager.user_settings_path.write_text("{}")
+        (legacy_dir / "user_settings.json.imported").write_text("first")
+        (legacy_dir / stamp).write_text("second")
+        (legacy_dir / "user_settings.json").write_text("{}")
 
         with patch("config_manager.datetime") as clock:
             clock.now.return_value = datetime(2026, 1, 1, 12, 0, 0)
-            config_manager.reload()
+            ConfigManager(db)
 
-        assert (tmp_path / "user_settings.json.imported").read_text() == "first"
-        assert (tmp_path / stamp).read_text() == "second"
-        assert (tmp_path / f"{stamp}.1").read_text() == "{}"
+        assert (legacy_dir / "user_settings.json.imported").read_text() == "first"
+        assert (legacy_dir / stamp).read_text() == "second"
+        assert (legacy_dir / f"{stamp}.1").read_text() == "{}"
 
-    def test_failed_rename_keeps_imported_rows_and_starts(self, config_manager, db):
-        config_manager.user_settings_path.write_text(json.dumps({"cameras": {"slot1": {"type": "5"}}}))
+    def test_failed_rename_keeps_imported_rows_and_starts(self, db, legacy_dir):
+        (legacy_dir / "user_settings.json").write_text(json.dumps({"cameras": {"slot1": {"type": "5"}}}))
 
         with patch.object(Path, "rename", side_effect=OSError("read-only")):
-            config_manager.reload()
+            manager = ConfigManager(db)
 
         assert KeyValueRepository(db, "settings").load() == {"cameras.slot1.type": "5"}
-        assert config_manager.get_config("cameras.slot1.type") == "5"
+        assert manager.get_config("cameras.slot1.type") == "5"
 
-    def test_import_drops_nested_dotted_keys(self, config_manager, db):
-        config_manager.user_settings_path.write_text(json.dumps({
+    def test_import_drops_nested_dotted_keys(self, db, legacy_dir):
+        (legacy_dir / "user_settings.json").write_text(json.dumps({
             "gs_config": {"cameras": {"kCamera1Gain": "2.5"}, "a.b": 1},
         }))
 
-        config_manager.reload()
+        ConfigManager(db)
 
         assert KeyValueRepository(db, "settings").load() == {"gs_config.cameras.kCamera1Gain": "2.5"}
 
