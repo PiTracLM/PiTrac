@@ -65,11 +65,16 @@ async function controlPiTrac(action) {
             throw new Error(err.error || `Failed to ${action} PiTrac`);
         }
         const data = await res.json();
+        if (data.status === 'error') throw new Error(data.message || `Failed to ${action} PiTrac`);
         if (typeof showStatusMessage === 'function') showStatusMessage(data.message, 'success');
         setTimeout(() => { if (typeof checkSystemStatus === 'function') checkSystemStatus(); }, 2000);
     } catch (err) {
         console.error(`Error ${action}ing PiTrac:`, err);
-        if (typeof showStatusMessage === 'function') showStatusMessage(err.message, 'error');
+        if (typeof showStatusMessage === 'function') {
+            showStatusMessage(err.message, 'error');
+        } else {
+            alert(err.message);
+        }
     } finally {
         getButtons(action).forEach(b => b.classList.remove('loading'));
         setTimeout(() => {
