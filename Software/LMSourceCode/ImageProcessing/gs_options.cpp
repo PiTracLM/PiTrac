@@ -74,15 +74,6 @@ bool GolfSimOptions::Parse(int argc, char *argv[])
 	system_mode_ = (SystemMode)mode_table[system_mode_string_];
 
 
-	if (!SetArtifactSaveLevel(artifact_save_level_string_))
-		throw std::runtime_error("Invalid artifact_save_level: " + artifact_save_level_string_);
-
-	if (!SetLoggingLevel(logging_level_string_))
-		throw std::runtime_error("Invalid log_level: " + logging_level_string_);
-
-	if (!SetGolferOrientation(golfer_orientation_string_))
-		throw std::runtime_error("Invalid golfer_orientation: " + golfer_orientation_string_);
-
 	if (help_)
 	{
 		std::cout << options_;

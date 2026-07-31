@@ -151,7 +151,7 @@ namespace golf_sim {
         bool result = ip->GetBall(color_image, ball, return_balls, nullROI, search_mode);
 
         if (!result || return_balls.empty()) {
-            GS_LOG_MSG(error, "GetBall() failed to get a ball.  Consider setting  --show_images=1  in order to determine why no ball was found.");
+            GS_LOG_MSG(error, "GetBall() failed to get a ball.  Consider enabling Show Debug Images (gs_config.debug.kShowDebugImages) to determine why no ball was found.");
             return -1.0;
         }
 
