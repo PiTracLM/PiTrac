@@ -303,6 +303,15 @@ class TestStopTool:
         assert "not running" in result["message"]
 
     @pytest.mark.asyncio
+    async def test_stop_tool_still_starting(self, testing_manager):
+        testing_manager.running_processes["pulse_test"] = None
+
+        result = await testing_manager.stop_tool("pulse_test")
+
+        assert result == {"status": "error", "message": "Tool pulse_test is still starting"}
+        assert testing_manager.running_processes == {"pulse_test": None}
+
+    @pytest.mark.asyncio
     async def test_stop_tool_success(self, testing_manager):
         """Test successfully stopping a running tool"""
         mock_process = AsyncMock()
