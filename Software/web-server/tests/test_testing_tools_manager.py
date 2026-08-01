@@ -220,6 +220,21 @@ class TestRunTool:
                 assert "-E" in args
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("camera", ["camera1", "camera2"])
+    async def test_ball_location_tool_uses_ball_location_mode(self, testing_manager, camera):
+        mock_process = AsyncMock()
+        mock_process.returncode = 0
+        mock_process.communicate.return_value = (b"", b"")
+
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+            with patch.object(testing_manager, "_find_and_read_test_log", return_value=None):
+                await testing_manager.run_tool(f"{camera}_ball_location")
+
+        args = mock_exec.call_args.args
+        assert args[1:3] == ("--system_mode", f"{camera}_ball_location")
+        assert "--check_ball_location" not in args
+
+    @pytest.mark.asyncio
     async def test_run_tool_exception(self, testing_manager, mock_config_manager):
         """Test exception handling during tool run"""
         with patch("asyncio.create_subprocess_exec", side_effect=Exception("Spawn error")):

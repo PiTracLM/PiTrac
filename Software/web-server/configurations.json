@@ -482,7 +482,7 @@
       "category": "Debugging",
       "subcategory": "advanced",
       "displayName": "Show Debug Images",
-      "description": "Display debug/trace images on screen for troubleshooting (CLI parameter)",
+      "description": "Display debug/trace images on screen for troubleshooting",
       "type": "boolean",
       "default": false,
       "requiresRestart": true
