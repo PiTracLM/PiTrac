@@ -94,7 +94,6 @@ function handleImageReady(filename) {
 function updateBallStatus(resultType, message, isPiTracRunning) {
     const strip = document.getElementById('status-strip');
     const title = document.getElementById('status-strip-title');
-    const msg = document.getElementById('status-strip-message');
     const resetBtn = document.getElementById('btn-reset');
 
     strip.classList.remove('initializing', 'waiting', 'stabilizing', 'ready', 'hit', 'error');
@@ -104,7 +103,7 @@ function updateBallStatus(resultType, message, isPiTracRunning) {
     if (isPiTracRunning === false) {
         strip.classList.add('error');
         title.textContent = 'System Stopped';
-        msg.textContent = 'PiTrac is not running \u2014 click Start to begin';
+        setStripMessage('PiTrac is not running \u2014 click Start to begin');
         return;
     }
 
@@ -114,39 +113,39 @@ function updateBallStatus(resultType, message, isPiTracRunning) {
         if (normalizedType.includes('initializing')) {
             strip.classList.add('initializing');
             title.textContent = 'System Initializing';
-            msg.textContent = message || 'Starting up PiTrac system...';
+            setStripMessage(message || 'Starting up PiTrac system...');
         } else if (normalizedType.includes('waiting for ball')) {
             strip.classList.add('waiting');
             title.textContent = 'Waiting for Ball';
-            msg.textContent = message || 'Please place ball on tee';
+            setStripMessage(message || 'Please place ball on tee');
         } else if (normalizedType.includes('waiting for simulator')) {
             strip.classList.add('waiting');
             title.textContent = 'Waiting for Simulator';
-            msg.textContent = message || 'Waiting for simulator to be ready';
+            setStripMessage(message || 'Waiting for simulator to be ready');
         } else if (normalizedType.includes('pausing') || normalizedType.includes('stabilization')) {
             strip.classList.add('stabilizing');
             title.textContent = 'Ball Detected';
-            msg.textContent = message || 'Waiting for ball to stabilize...';
+            setStripMessage(message || 'Waiting for ball to stabilize...');
         } else if (normalizedType.includes('ball ready') || normalizedType.includes('ready')) {
             strip.classList.add('ready');
             title.textContent = 'Ready to Hit!';
-            msg.textContent = message || 'Ball is ready, take your shot';
+            setStripMessage(message || 'Ball is ready, take your shot');
         } else if (normalizedType.includes('hit')) {
             strip.classList.add('hit');
             title.textContent = 'Ball Hit!';
-            msg.textContent = message || 'Processing shot data...';
+            setStripMessage(message || 'Processing shot data...');
             resetBtn.style.display = '';
         } else if (normalizedType.includes('error')) {
             strip.classList.add('error');
             title.textContent = 'Error';
-            msg.textContent = message || 'An error occurred';
+            setStripMessage(message || 'An error occurred');
         } else if (normalizedType.includes('multiple balls')) {
             strip.classList.add('error');
             title.textContent = 'Multiple Balls Detected';
-            msg.textContent = message || 'Please remove extra balls';
+            setStripMessage(message || 'Please remove extra balls');
         } else {
             title.textContent = 'System Status';
-            msg.textContent = message || resultType;
+            setStripMessage(message || resultType);
         }
     }
 }
@@ -193,18 +192,31 @@ const dashboardCheckPiTracStatus = async function() {
     return isRunning;
 };
 
+// While a showStatusMessage message is up, status updates are held and applied when it ends
+let statusMessageTimer = null;
+let heldStripMessage = '';
+
+function setStripMessage(text) {
+    if (statusMessageTimer) {
+        heldStripMessage = text;
+        return;
+    }
+    document.getElementById('status-strip-message').textContent = text;
+}
+
 function showStatusMessage(message, type = 'info') {
     const statusMessage = document.getElementById('status-strip-message');
-    if (statusMessage) {
-        const originalMessage = statusMessage.textContent;
-        statusMessage.textContent = message;
-        statusMessage.className = `status-strip-message ${type}`;
+    if (!statusMessage) return;
+    if (!statusMessageTimer) heldStripMessage = statusMessage.textContent;
+    clearTimeout(statusMessageTimer);
+    statusMessage.textContent = message;
+    statusMessage.className = `status-strip-message ${type}`;
 
-        setTimeout(() => {
-            statusMessage.textContent = originalMessage;
-            statusMessage.className = 'status-strip-message';
-        }, 3000);
-    }
+    statusMessageTimer = setTimeout(() => {
+        statusMessageTimer = null;
+        statusMessage.textContent = heldStripMessage;
+        statusMessage.className = 'status-strip-message';
+    }, 3000);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
