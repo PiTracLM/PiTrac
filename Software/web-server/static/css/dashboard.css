@@ -39,6 +39,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.status-strip-message.error { color: var(--color-error); }
 
 /* Status strip states */
 .status-strip.initializing { border-left-color: var(--color-info); }
