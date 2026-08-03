@@ -317,7 +317,7 @@
       "subcategory": "basic",
       "basicSubcategory": "System",
       "displayName": "Golfer Orientation",
-      "description": "Golfer handedness - affects ball detection and swing analysis (CLI parameter)",
+      "description": "Golfer handedness - affects ball detection and swing analysis",
       "type": "select",
       "options": {
         "right_handed": "Right Handed",
@@ -331,7 +331,7 @@
       "subcategory": "basic",
       "basicSubcategory": "System",
       "displayName": "Practice Ball Mode",
-      "description": "Enable for lightweight practice/foam balls - adjusts detection parameters (CLI parameter)",
+      "description": "Enable for lightweight practice/foam balls - adjusts detection parameters",
       "type": "boolean",
       "default": false,
       "requiresRestart": true
@@ -468,7 +468,7 @@
       "subcategory": "basic",
       "basicSubcategory": "Storage",
       "displayName": "Diagnostic Image Level",
-      "description": "Control how many diagnostic images are saved (CLI parameter)",
+      "description": "Control how many diagnostic images are saved",
       "type": "select",
       "options": {
         "none": "None - No images saved",
@@ -491,7 +491,7 @@
       "category": "Debugging",
       "subcategory": "advanced",
       "displayName": "Pause on Debug Images",
-      "description": "Wait for keypress after showing debug images (CLI parameter)",
+      "description": "Wait for keypress after showing debug images",
       "type": "boolean",
       "default": false,
       "requiresRestart": true
