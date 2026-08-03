@@ -49,6 +49,9 @@ function getButtons(action) {
         .filter(Boolean);
 }
 
+// Every other status from /api/pitrac/{start,stop,restart} is a failure or a refusal
+const PITRAC_OK_STATUSES = ['started', 'already_running', 'stopped', 'not_running'];
+
 async function controlPiTrac(action) {
     if ((action === 'start' || action === 'restart') && !(await requireStrobeSafe())) {return;}
 
@@ -65,7 +68,7 @@ async function controlPiTrac(action) {
             throw new Error(err.error || `Failed to ${action} PiTrac`);
         }
         const data = await res.json();
-        if (data.status === 'error') throw new Error(data.message || `Failed to ${action} PiTrac`);
+        if (!PITRAC_OK_STATUSES.includes(data.status)) throw new Error(data.message || `Failed to ${action} PiTrac`);
         if (typeof showStatusMessage === 'function') showStatusMessage(data.message, 'success');
         setTimeout(() => { if (typeof checkSystemStatus === 'function') checkSystemStatus(); }, 2000);
     } catch (err) {
