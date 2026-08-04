@@ -1531,6 +1531,7 @@ int main(int argc, char *argv[])
         if (!kBaseTestDir.empty() && kBaseTestDir.back() != '/') {
             kBaseTestDir += '/';
         }
+        LoggingTools::kBaseImageLoggingDir = kBaseTestDir;
 
 
         // TBD - consider if there is a better place for this?

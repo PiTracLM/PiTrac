@@ -85,15 +85,12 @@ class PiTracProcessManager:
             Path(self.pid_file).parent.mkdir(parents=True, exist_ok=True)
 
             env = os.environ.copy()
-            home_dir = str(Path.home())
             env["LD_LIBRARY_PATH"] = "/usr/lib/pitrac"
             env["PITRAC_ROOT"] = "/usr/lib/pitrac"
             env["OMP_WAIT_POLICY"] = "PASSIVE"
-            env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = "~/LM_Shares/Images/".replace("~", home_dir)
-            env["PITRAC_WEBSERVER_SHARE_DIR"] = "~/LM_Shares/WebShare/".replace("~", home_dir)
 
-            Path(env["PITRAC_BASE_IMAGE_LOGGING_DIR"]).mkdir(parents=True, exist_ok=True)
-            Path(env["PITRAC_WEBSERVER_SHARE_DIR"]).mkdir(parents=True, exist_ok=True)
+            (Path.home() / "LM_Shares/Images").mkdir(parents=True, exist_ok=True)
+            (Path.home() / "LM_Shares/WebShare").mkdir(parents=True, exist_ok=True)
 
             cmd = self._build_command()
 

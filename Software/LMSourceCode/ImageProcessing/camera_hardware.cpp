@@ -478,7 +478,7 @@ namespace golf_sim {
 
             // Only if we are using a custom focal length, then use that length
             if (lens_type == Lens_Custom) {
-                tag = "gs_config.cameras.kSlot" + std::to_string(camera_number_) + "CustomLensFocalLength";
+                tag = "cameras.kSlot" + std::to_string(camera_number_) + "CustomLensFocalLength";
             }
             else {
 				// Otherwise, for non-custom lenses, just use the standard focal length parameter
