@@ -69,11 +69,7 @@ namespace golf_sim {
 
     boost::circular_buffer<std::string> LoggingTools::RecentLogMessages(20);
 
-#ifdef __unix__
     std::string LoggingTools::kBaseImageLoggingDir = "VALUE_NOT_SET";
-#else
-    std::string LoggingTools::kBaseImageLoggingDir = "VALUE_NOT_SET";
-#endif
 
 
 
@@ -128,11 +124,7 @@ namespace golf_sim {
             kBaseImageLoggingDir = GolfSimOptions::GetCommandLineOptions().base_image_logging_dir_;
         }
         else {
-#ifdef __unix__
             LoggingTools::kBaseImageLoggingDir = "VALUE_NOT_SET";
-#else
-            LoggingTools::kBaseImageLoggingDir = "VALUE_NOT_SET";
-#endif
         }
 
         ApplyLogLevel();

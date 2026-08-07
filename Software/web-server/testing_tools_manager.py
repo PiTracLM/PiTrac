@@ -200,8 +200,6 @@ class TestingToolsManager:
             env = os.environ.copy()
             env["LD_LIBRARY_PATH"] = "/usr/lib/pitrac"
             env["PITRAC_ROOT"] = "/usr/lib/pitrac"
-            env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = base_image_dir
-            env["PITRAC_WEBSERVER_SHARE_DIR"] = str(Path.home() / "LM_Shares/WebShare")
             env["DISPLAY"] = ":0.0"
             env["OMP_WAIT_POLICY"] = "PASSIVE"
 

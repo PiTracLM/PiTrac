@@ -709,7 +709,7 @@ class CalibrationManager:
         return [f"--web_server_port={SERVER_PORT}"]
 
     def _build_environment(self, camera: str = "camera1") -> dict:
-        """Build environment variables from config
+        """Build environment variables for the pitrac_lm subprocess
 
         Args:
             camera: Which camera is being calibrated
@@ -718,7 +718,6 @@ class CalibrationManager:
             Environment dictionary with required variables
         """
         env = os.environ.copy()
-        config = self.config_manager.get_config()
 
         # Set PITRAC_ROOT if not already set (required by camera discovery)
         if "PITRAC_ROOT" not in env:
@@ -726,16 +725,6 @@ class CalibrationManager:
         env["OMP_WAIT_POLICY"] = "PASSIVE"
         env.setdefault("LIBPISP_LOG_LEVEL", "4")
         env.setdefault("LIBCAMERA_LOG_LEVELS", "*:ERROR")
-
-        base_dir = config.get("gs_config", {}).get("logging", {}).get("kPCBaseImageLoggingDir", "~/LM_Shares/Images/")
-        env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = str(base_dir).replace("~", str(Path.home()))
-
-        web_share_dir = (
-            config.get("gs_config", {})
-            .get("ipc_interface", {})
-            .get("kWebServerShareDirectory", "~/LM_Shares/WebShare/")
-        )
-        env["PITRAC_WEBSERVER_SHARE_DIR"] = str(web_share_dir).replace("~", str(Path.home()))
 
         return env
 
