@@ -74,15 +74,8 @@ Currently, the API does not implement authentication. Future versions may add se
   ```json
   {
     "status": "healthy",              // Overall system status
-    "activemq_connected": true,       // ActiveMQ broker connection
-    "activemq_running": true,         // ActiveMQ service status
     "pitrac_running": true,           // Main PiTrac service status
-    "websocket_clients": 3,           // Active WebSocket connections
-    "listener_stats": {               // ActiveMQ listener metrics
-      "connected": true,
-      "messages_processed": 42,
-      "errors": 0
-    }
+    "websocket_clients": 3            // Active WebSocket connections
   }
   ```
 
@@ -93,28 +86,19 @@ Currently, the API does not implement authentication. Future versions may add se
   ```json
   {
     "websocket_connections": 3,
-    "listener": {
-      "connected": true,
-      "messages_processed": 42,
-      "errors": 0
-    },
+    "transport": "http",
     "shot_history_count": 25
   }
   ```
 
-## ActiveMQ Message Format
+## Shot Result Ingest
 
-### Message Topics
-- Primary Topic: `/topic/Golf.Sim`
-- Message Encoding: MsgPack
-- Supported Formats:
-  1. Array Format: `[speed, launch_angle, side_angle, ...]`
-  2. Dictionary Format: Partial or complete shot data update
-
-### Message Processing
-- Base64 encoding supported
-- Validation performed on each incoming message
-- Errors logged but do not interrupt message processing
+### Internal Endpoint
+- **POST** `/api/internal/shot-result`
+- **Description**: `pitrac_lm` posts each result here as JSON; the server stores it and broadcasts it to WebSocket clients
+- **Fields**: `result_type` (int), `speed_mps`, `carry`, `launch_angle`, `side_angle`, `back_spin`, `side_spin`, `message`, `shot_id`, `images`
+- Status messages keep the previous shot's numbers and only update `result_type` and `message`
+- Hits are saved to shot history
 
 ## Error Handling
 - Most errors are logged internally
@@ -123,7 +107,6 @@ Currently, the API does not implement authentication. Future versions may add se
 
 ## Recommended Clients
 - WebSocket support required
-- MsgPack decoding library recommended
 - Supports both real-time and polling access patterns
 
 ## Limitations

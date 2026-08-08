@@ -89,29 +89,6 @@ def shot_data_instance():
 
 
 @pytest.fixture
-def mock_home_dir(tmp_path):
-    """Mock home directory for testing with simplified structure"""
-    from utils.test_helpers import ConfigTestHelper
-
-    home = ConfigTestHelper.create_temp_config_dir()
-
-    config = {
-        "network": {
-            "username": "test_user",
-            "password": "test_pass",
-        }
-    }
-
-    config_file = home / ".pitrac" / "config" / "pitrac.yaml"
-    import yaml
-
-    with open(config_file, "w") as f:
-        yaml.dump(config, f)
-
-    yield home
-
-
-@pytest.fixture
 def mock_websocket():
     """Mock WebSocket for testing using factory"""
     return MockWebSocketFactory.create_websocket()
