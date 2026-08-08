@@ -74,7 +74,6 @@ fmt_dep = dependency('fmt', required : true)
 
 boost_dep = dependency('boost', method: 'pkg-config', version : '>=1.74.0', modules : ['timer', 'log', 'thread', 'filesystem', 'regex'])
 
-yamlcpp_dep = dependency('yaml-cpp', required : true)
 ncnn_dep = dependency('ncnn', required : true)
 omp_dep = dependency('openmp', language : 'cpp', required : false)
 if not omp_dep.found()
@@ -95,7 +94,7 @@ conf_data = configuration_data()
 
 pitrac_lm_module_deps = [
 	libcamera_dep, thread_dep, opencv_dep, lgpio_dep, rpicam_app_dep,
-	fmt_dep, boost_dep, ssl_dep, yamlcpp_dep, ncnn_dep, omp_dep,]
+	fmt_dep, boost_dep, ssl_dep, ncnn_dep, omp_dep,]
 
 
 subdir('core')
@@ -205,7 +204,6 @@ pitrac_lm_sources += ([
 			'gs_options.cpp',
 			'gs_config.cpp',
 			'gs_shot_parameters.cpp',
-			'configuration_manager.cpp',
 			'gs_sim_interface.cpp',
 			'gs_gspro_interface.cpp',
 			'gs_gspro_response.cpp',

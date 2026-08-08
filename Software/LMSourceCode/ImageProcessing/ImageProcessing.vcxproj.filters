@@ -249,9 +249,6 @@
     <ClCompile Include="gs_automated_testing.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="configuration_manager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="gs_calibration.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -474,9 +471,6 @@
       <Filter>Resource Files</Filter>
     </ClInclude>
     <ClInclude Include="gs_format_lib.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="configuration_manager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gs_calibration.h">

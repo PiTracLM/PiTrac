@@ -16,7 +16,6 @@
 #include "gs_camera.h"
 #include "gs_ui_system.h"
 #include "gs_config.h"
-#include "configuration_manager.h"
 #include "gs_options.h"
 
 // Having to set the constants in this way creates more entanglement than we'd like.  TBD - Re-architect
@@ -68,7 +67,6 @@ static void PopulateOptionsFromConfig() {
 
 	bool GolfSimConfiguration::Initialize() {
 
-		// ConfigurationManager and configuration_root_ both parse this one body.
 		std::string config_body;
 #ifdef __unix__
 		config_body = GsHttpClient::FetchConfig();
@@ -87,13 +85,6 @@ static void PopulateOptionsFromConfig() {
 		{
 			GS_LOG_MSG(error, "GolfSimConfiguration::Initialize failed. ERROR: *** " + std::string(e.what()) + " ***");
 			return false;
-		}
-
-		ConfigurationManager& config_mgr = ConfigurationManager::GetInstance();
-		if (!config_mgr.Initialize(config_body)) {
-			GS_LOG_MSG(warning, "ConfigurationManager initialization failed, using JSON only");
-		} else {
-			GS_LOG_MSG(info, "ConfigurationManager initialized with override support");
 		}
 
 		// Read any values that we want to set early, here at initialization
@@ -319,73 +310,22 @@ bool GolfSimConfiguration::ReadValues() {
 	}
 
 
-	void GolfSimConfiguration::SetConstant(const std::string& tag_name, bool& constant_value) {
-		ConfigurationManager& config_mgr = ConfigurationManager::GetInstance();
-		if (config_mgr.HasKey(tag_name)) {
-			constant_value = config_mgr.GetBool(tag_name, constant_value);
-		} else if (auto v = configuration_root_.get_optional<bool>(tag_name)) {
-			constant_value = *v;
-		} else {
-			GS_LOG_TRACE_MSG(trace, "No config value for " + tag_name + ", keeping default");
-		}
+template <typename T>
+static void ReadScalar(const boost::property_tree::ptree& root, const std::string& tag_name, T& constant_value) {
+	if (auto v = root.get_optional<T>(tag_name)) {
+		constant_value = *v;
+	} else {
+		GS_LOG_TRACE_MSG(trace, "No config value for " + tag_name + ", keeping default");
 	}
+}
 
-	void GolfSimConfiguration::SetConstant(const std::string& tag_name, int& constant_value) {
-		ConfigurationManager& config_mgr = ConfigurationManager::GetInstance();
-		if (config_mgr.HasKey(tag_name)) {
-			constant_value = config_mgr.GetInt(tag_name, constant_value);
-		} else if (auto v = configuration_root_.get_optional<int>(tag_name)) {
-			constant_value = *v;
-		} else {
-			GS_LOG_TRACE_MSG(trace, "No config value for " + tag_name + ", keeping default");
-		}
-	}
-
-	void GolfSimConfiguration::SetConstant(const std::string& tag_name, long& constant_value) {
-		if (auto v = configuration_root_.get_optional<long>(tag_name)) {
-			constant_value = *v;
-		} else {
-			GS_LOG_TRACE_MSG(trace, "No config value for " + tag_name + ", keeping default");
-		}
-	}
-
-	void GolfSimConfiguration::SetConstant(const std::string& tag_name, unsigned int& constant_value) {
-		if (auto v = configuration_root_.get_optional<unsigned int>(tag_name)) {
-			constant_value = *v;
-		} else {
-			GS_LOG_TRACE_MSG(trace, "No config value for " + tag_name + ", keeping default");
-		}
-	}
-
-	void GolfSimConfiguration::SetConstant(const std::string& tag_name, float& constant_value) {
-		ConfigurationManager& config_mgr = ConfigurationManager::GetInstance();
-		if (config_mgr.HasKey(tag_name)) {
-			constant_value = config_mgr.GetFloat(tag_name, constant_value);
-		} else if (auto v = configuration_root_.get_optional<float>(tag_name)) {
-			constant_value = *v;
-		} else {
-			GS_LOG_TRACE_MSG(trace, "No config value for " + tag_name + ", keeping default");
-		}
-	}
-
-	void GolfSimConfiguration::SetConstant(const std::string& tag_name, double& constant_value) {
-		if (auto v = configuration_root_.get_optional<double>(tag_name)) {
-			constant_value = *v;
-		} else {
-			GS_LOG_TRACE_MSG(trace, "No config value for " + tag_name + ", keeping default");
-		}
-	}
-
-	void GolfSimConfiguration::SetConstant(const std::string& tag_name, std::string& constant_value) {
-		ConfigurationManager& config_mgr = ConfigurationManager::GetInstance();
-		if (config_mgr.HasKey(tag_name)) {
-			constant_value = config_mgr.GetString(tag_name, constant_value);
-		} else if (auto v = configuration_root_.get_optional<std::string>(tag_name)) {
-			constant_value = *v;
-		} else {
-			GS_LOG_TRACE_MSG(trace, "No config value for " + tag_name + ", keeping default");
-		}
-	}
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, bool& constant_value) { ReadScalar(configuration_root_, tag_name, constant_value); }
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, int& constant_value) { ReadScalar(configuration_root_, tag_name, constant_value); }
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, long& constant_value) { ReadScalar(configuration_root_, tag_name, constant_value); }
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, unsigned int& constant_value) { ReadScalar(configuration_root_, tag_name, constant_value); }
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, float& constant_value) { ReadScalar(configuration_root_, tag_name, constant_value); }
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, double& constant_value) { ReadScalar(configuration_root_, tag_name, constant_value); }
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, std::string& constant_value) { ReadScalar(configuration_root_, tag_name, constant_value); }
 
 	 void GolfSimConfiguration::SetConstant(const std::string& tag_name, cv::Vec3d& vec) {
 		 try {

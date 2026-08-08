@@ -121,15 +121,6 @@ Currently, the API does not implement authentication. Future versions may add se
 - API endpoints return appropriate HTTP status codes
 - WebSocket connections automatically handle disconnects
 
-## Configuration
-Configuration is loaded from `pitrac.yaml` with the following key network settings:
-```yaml
-network:
-  broker_address: tcp://localhost:61616  # ActiveMQ broker
-  username: pitrac_user                  # Optional credentials
-  password: secure_password              # Optional credentials
-```
-
 ## Recommended Clients
 - WebSocket support required
 - MsgPack decoding library recommended

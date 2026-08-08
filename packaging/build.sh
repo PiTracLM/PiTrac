@@ -227,7 +227,7 @@ build_dev() {
     done
 
     # Boost libraries (dev packages pull in correct runtime versions automatically)
-    for pkg in libboost-dev libboost-all-dev libyaml-cpp-dev; do
+    for pkg in libboost-dev libboost-all-dev; do
         pkg_installed "$pkg" || missing_deps+=("$pkg")
     done
 
