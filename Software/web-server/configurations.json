@@ -954,28 +954,6 @@
       "default": "~/LM_Shares/Images/",
       "requiresRestart": false
     },
-    "gs_config.ipc_interface.kWebServerTomcatShareDirectory": {
-      "category": "Network",
-      "subcategory": "basic",
-      "basicSubcategory": "Storage",
-      "displayName": "Tomcat Share Directory",
-      "description": "Directory for Tomcat web server files",
-      "type": "path",
-      "default": "~/LM_Shares/WebShare",
-      "requiresRestart": false
-    },
-    "gs_config.ipc_interface.kRefreshTimeSeconds": {
-      "category": "Network",
-      "subcategory": "basic",
-      "basicSubcategory": "Network",
-      "displayName": "Web Refresh Interval",
-      "description": "Web interface refresh interval in seconds",
-      "type": "number",
-      "min": 1,
-      "max": 60,
-      "default": 3,
-      "requiresRestart": false
-    },
     "gs_config.golf_simulator_interfaces.kSkipSpinCalculation": {
       "category": "Spin Analysis",
       "subcategory": "basic",
@@ -984,16 +962,6 @@
       "description": "Disable spin calculation (for putting-only or debugging)",
       "type": "boolean",
       "default": false,
-      "requiresRestart": false
-    },
-    "gs_config.golf_simulator_interfaces.kWriteSpinAnalysisCsvFiles": {
-      "category": "Spin Analysis",
-      "subcategory": "basic",
-      "basicSubcategory": "Spin",
-      "displayName": "Write Spin CSV Files",
-      "description": "Save spin analysis data to CSV files",
-      "type": "boolean",
-      "default": true,
       "requiresRestart": false
     },
     "gs_config.ball_identification.kModelConfidenceThreshold": {
@@ -1299,17 +1267,6 @@
       "default": 0.0,
       "requiresRestart": false
     },
-    "gs_config.ball_position.kMinBallRadiusPixelsForProximityWarning": {
-      "category": "Ball Detection",
-      "subcategory": "advanced",
-      "displayName": "Min Ball Radius for Proximity Warning",
-      "description": "Minimum ball radius in pixels to trigger proximity warning",
-      "type": "number",
-      "min": 50,
-      "max": 300,
-      "default": 160,
-      "requiresRestart": false
-    },
     "gs_config.strobing.kBaudRateForFastPulses": {
       "category": "Strobing",
       "subcategory": "advanced",
@@ -1419,17 +1376,6 @@
       "min": 100,
       "max": 1000,
       "default": 300,
-      "requiresRestart": true
-    },
-    "gs_config.strobing.kPauseBeforeSendingFinalImageTriggerMs": {
-      "category": "Strobing",
-      "subcategory": "advanced",
-      "displayName": "Pause Before Final Image Trigger (ms)",
-      "description": "Pause before sending final image trigger in milliseconds",
-      "type": "number",
-      "min": 500,
-      "max": 5000,
-      "default": 2000,
       "requiresRestart": true
     },
     "gs_config.strobing.kPauseToSetUpInnoMakerExternalTriggerMilliseconds": {
@@ -1671,15 +1617,6 @@
       "type": "boolean",
       "default": false,
       "requiresRestart": true
-    },
-    "gs_config.club_data.kClubImageOutputDir": {
-      "category": "Storage",
-      "subcategory": "advanced",
-      "displayName": "Club Image Output Directory",
-      "description": "Directory for saving club images",
-      "type": "path",
-      "default": "~/LM_Shares/Images/",
-      "requiresRestart": false
     },
     "gs_config.club_data.kNumberFramesToSaveBeforeHit": {
       "category": "Club Data",
@@ -2708,17 +2645,6 @@
       "default": 0.9,
       "requiresRestart": false
     },
-    "gs_config.ball_identification.kPlacedNarrowingParam1": {
-      "category": "Ball Detection",
-      "subcategory": "advanced",
-      "displayName": "Placed Narrowing Param1",
-      "description": "Canny edge threshold for placed narrowing",
-      "type": "number",
-      "min": 100,
-      "max": 500,
-      "default": 300,
-      "requiresRestart": false
-    },
     "gs_config.ball_identification.kPlacedNarrowingRadiiDpParam": {
       "category": "Ball Detection",
       "subcategory": "advanced",
@@ -3102,40 +3028,6 @@
       "default": 0,
       "requiresRestart": true
     },
-    "gs_config.strobing.kLastPulsePutterRepeats": {
-      "category": "Strobing",
-      "subcategory": "advanced",
-      "displayName": "Last Pulse Putter Repeats",
-      "description": "Number of times to repeat last pulse in putting mode",
-      "type": "number",
-      "min": 0,
-      "max": 10,
-      "default": 0,
-      "requiresRestart": true
-    },
-    "gs_config.strobing.kLongerStrobePulseVectorDriver": {
-      "category": "Strobing",
-      "subcategory": "advanced",
-      "displayName": "Longer Strobe Pulse Vector Driver",
-      "description": "Extended strobe timing vector for driver shots",
-      "type": "array",
-      "default": [
-        0.175,
-        0.7,
-        1.4,
-        2.45,
-        1.26,
-        2.8,
-        2.1,
-        3.15,
-        3.85,
-        3.85,
-        10.4,
-        3.5,
-        0
-      ],
-      "requiresRestart": true
-    },
     "gs_config.strobing.kDynamicFollowOnPulseVectorPutter": {
       "category": "Strobing",
       "subcategory": "advanced",
@@ -3168,17 +3060,6 @@
       "max": 20,
       "default": 4,
       "requiresRestart": true
-    },
-    "gs_config.user_interface.kRefreshTimeSeconds": {
-      "category": "Network",
-      "subcategory": "advanced",
-      "displayName": "UI Refresh Time",
-      "description": "User interface refresh interval in seconds",
-      "type": "number",
-      "min": 1,
-      "max": 30,
-      "default": 3,
-      "requiresRestart": false
     },
     "gs_config.testing.kAutomatedTestExpectedResultsCSV": {
       "type": "string",
@@ -3242,62 +3123,6 @@
       "description": "Base directory for test images",
       "category": "testing",
       "ui_name": "Test Image Directory"
-    },
-    "gs_config.testing.kExternallyStrobedALTBestCircleCannyLower": {
-      "type": "integer",
-      "default": 35,
-      "description": "Canny lower threshold for externally strobed ALT best circle",
-      "category": "testing",
-      "ui_name": "External Strobe Canny Lower"
-    },
-    "gs_config.testing.kExternallyStrobedALTBestCircleCannyUpper": {
-      "type": "integer",
-      "default": 80,
-      "description": "Canny upper threshold for externally strobed ALT best circle",
-      "category": "testing",
-      "ui_name": "External Strobe Canny Upper"
-    },
-    "gs_config.testing.kExternallyStrobedALTBestCircleHoughDpParam1": {
-      "type": "float",
-      "default": 1.3,
-      "description": "Hough DP parameter 1 for externally strobed ALT best circle",
-      "category": "testing",
-      "ui_name": "External Strobe Hough DP1"
-    },
-    "gs_config.testing.kExternallyStrobedALTBestCircleHoughParam2": {
-      "type": "integer",
-      "default": 13,
-      "description": "Hough parameter 2 for externally strobed ALT best circle",
-      "category": "testing",
-      "ui_name": "External Strobe Hough P2"
-    },
-    "gs_config.testing.kExternallyStrobedALTBestCircleMaxIterations": {
-      "type": "integer",
-      "default": 25,
-      "description": "Max iterations for externally strobed ALT best circle",
-      "category": "testing",
-      "ui_name": "External Strobe Max Iterations"
-    },
-    "gs_config.testing.kExternallyStrobedALTBestCircleMinInliers": {
-      "type": "integer",
-      "default": 25,
-      "description": "Min inliers for externally strobed ALT best circle",
-      "category": "testing",
-      "ui_name": "External Strobe Min Inliers"
-    },
-    "gs_config.testing.kExternallyStrobedBallIdentificationCannyLower": {
-      "type": "integer",
-      "default": 35,
-      "description": "Canny lower threshold for externally strobed ball identification",
-      "category": "testing",
-      "ui_name": "External Ball ID Canny Lower"
-    },
-    "gs_config.testing.kExternallyStrobedBallIdentificationCannyUpper": {
-      "type": "integer",
-      "default": 80,
-      "description": "Canny upper threshold for externally strobed ball identification",
-      "category": "testing",
-      "ui_name": "External Ball ID Canny Upper"
     },
     "gs_config.testing.kCamera2StrobedEnvironmentGain": {
       "category": "testing",
@@ -3785,78 +3610,6 @@
       "category": "calibration",
       "ui_name": "Camera 2 Distortion Vector"
     },
-    "gs_config.cameras.3_6Lens_kCamera1CalibrationMatrix": {
-      "type": "array",
-      "default": [
-        [
-          "1748.506644661262953",
-          "0.0",
-          "632.5374407393054526"
-        ],
-        [
-          "0.0",
-          "1743.341748687922745",
-          "407.5677927449370941"
-        ],
-        [
-          "0.0",
-          "0.0",
-          "1.0"
-        ]
-      ],
-      "description": "Camera 1 calibration matrix for 3.6mm lens",
-      "category": "calibration",
-      "ui_name": "Camera 1 3.6mm Lens Matrix"
-    },
-    "gs_config.cameras.3_6Lens_kCamera1DistortionVector": {
-      "type": "array",
-      "default": [
-        "-0.5323350228082535107",
-        "0.3171607772519656199",
-        "0.0007282375091653870043",
-        "-0.002130459534525419",
-        "0.0"
-      ],
-      "description": "Camera 1 distortion for 3.6mm lens",
-      "category": "calibration",
-      "ui_name": "Camera 1 3.6mm Lens Distortion"
-    },
-    "gs_config.cameras.3_6Lens_kCamera2CalibrationMatrix": {
-      "type": "array",
-      "default": [
-        [
-          "1065.366451276604266",
-          "0.0",
-          "715.3187116996945178"
-        ],
-        [
-          "0.0",
-          "1068.642040947899886",
-          "509.4612905764302582"
-        ],
-        [
-          "0.0",
-          "0.0",
-          "1.0"
-        ]
-      ],
-      "description": "Camera 2 calibration matrix for 3.6mm lens",
-      "category": "calibration",
-      "ui_name": "Camera 2 3.6mm Lens Matrix"
-    },
-    "gs_config.cameras.3_6Lens_kCamera2DistortionVector": {
-      "type": "array",
-      "default": [
-        "-0.4854175692996230418",
-        "0.2637456313607589586",
-        "0.002679639341176350345",
-        "-0.001576282874523095",
-        "0.0"
-      ],
-      "description": "Camera 2 distortion for 3.6mm lens",
-      "category": "calibration",
-      "ui_name": "Camera 2 3.6mm Lens Distortion"
-    },
     "gs_config.cameras.kCamera1Angles": {
       "type": "array",
       "default": [
@@ -4060,13 +3813,6 @@
       "description": "Test file for auto calibration",
       "category": "calibration",
       "ui_name": "Test Auto Cal File"
-    },
-    "gs_config.ball_identification.kStrobedBallsAltPreHoughBlurSize HAS TO BE ODD": {
-      "type": "integer",
-      "default": 0,
-      "description": "Pre-Hough blur size for ALT algorithm (must be odd)",
-      "category": "ball_identification",
-      "ui_name": "ALT Pre-Hough Blur Size"
     }
   },
   "categoryList": [

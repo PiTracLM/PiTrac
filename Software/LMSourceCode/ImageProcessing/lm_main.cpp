@@ -1553,8 +1553,10 @@ int main(int argc, char *argv[])
 		// If the board has been calibrated, there will be a value
 		// in the config
 
-        	int connector_board_dac_setting = -1;
-	        GolfSimConfiguration::SetConstant("gs_config.strobing.kDAC_setting", connector_board_dac_setting);
+		int connector_board_dac_setting = -1;
+		if (GolfSimConfiguration::PropertyExists("gs_config.strobing.kDAC_setting")) {
+			GolfSimConfiguration::SetConstant("gs_config.strobing.kDAC_setting", connector_board_dac_setting);
+		}
 
 		if (connector_board_dac_setting < 0) {
             		GS_LOG_MSG(error, "PiTrac is using a Version 3 Control Board, but the board does not appear to have been calibrated.  Shutting down.");

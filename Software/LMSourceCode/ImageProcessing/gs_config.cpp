@@ -310,14 +310,14 @@ bool GolfSimConfiguration::ReadValues() {
 	}
 
 
-template <typename T>
-static void ReadScalar(const boost::property_tree::ptree& root, const std::string& tag_name, T& constant_value) {
-	if (auto v = root.get_optional<T>(tag_name)) {
-		constant_value = *v;
-	} else {
-		GS_LOG_TRACE_MSG(trace, "No config value for " + tag_name + ", keeping default");
+	template <typename T>
+	static void ReadScalar(const boost::property_tree::ptree& root, const std::string& tag_name, T& constant_value) {
+		if (auto v = root.get_optional<T>(tag_name)) {
+			constant_value = *v;
+		} else {
+			GS_LOG_MSG(warning, "No config value for " + tag_name + ", keeping default");
+		}
 	}
-}
 
 	void GolfSimConfiguration::SetConstant(const std::string& tag_name, bool& constant_value) { ReadScalar(configuration_root_, tag_name, constant_value); }
 	void GolfSimConfiguration::SetConstant(const std::string& tag_name, int& constant_value) { ReadScalar(configuration_root_, tag_name, constant_value); }
