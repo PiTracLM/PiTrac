@@ -654,6 +654,24 @@
       "default": 0.0,
       "requiresRestart": false
     },
+    "gs_config.cameras.kHLAOffsetAngleDegrees": {
+      "category": "Cameras",
+      "subcategory": "advanced",
+      "displayName": "HLA Offset Angle (degrees)",
+      "description": "Read but not applied to results. The HLA correction applied to shots is HLA Offset.",
+      "type": "number",
+      "default": 0.0,
+      "requiresRestart": true
+    },
+    "gs_config.cameras.kVLAOffsetAngleDegrees": {
+      "category": "Cameras",
+      "subcategory": "advanced",
+      "displayName": "VLA Offset Angle (degrees)",
+      "description": "Read but not applied to results. The VLA correction applied to shots is VLA Offset.",
+      "type": "number",
+      "default": 0.0,
+      "requiresRestart": true
+    },
     "gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress": {
       "category": "Simulators",
       "subcategory": "basic",
@@ -917,6 +935,15 @@
       "default": "~/LM_Shares/Images/",
       "requiresRestart": false
     },
+    "gs_config.logging.kPCBaseImageLoggingDir": {
+      "category": "Logging",
+      "subcategory": "advanced",
+      "displayName": "PC Image Logging Directory",
+      "description": "Base image logging directory on Windows builds. Linux builds use Image Directory (kLinuxBaseImageLoggingDir).",
+      "type": "string",
+      "default": "",
+      "requiresRestart": true
+    },
     "gs_config.ipc_interface.kWebServerShareDirectory": {
       "category": "Network",
       "subcategory": "basic",
@@ -1166,6 +1193,15 @@
       "min": 1000,
       "max": 100000,
       "default": 15000,
+      "requiresRestart": true
+    },
+    "gs_config.cameras.kCameraMotionDetectSettings": {
+      "category": "Cameras",
+      "subcategory": "advanced",
+      "displayName": "Camera Motion Detect Settings",
+      "description": "Path to the libcamera motion detect settings file. Not used by the current capture path.",
+      "type": "string",
+      "default": "./assets/motion_detect.json",
       "requiresRestart": true
     },
     "gs_config.physical_constants.kBallRadiusMeters": {
@@ -3262,6 +3298,420 @@
       "description": "Canny upper threshold for externally strobed ball identification",
       "category": "testing",
       "ui_name": "External Ball ID Canny Upper"
+    },
+    "gs_config.testing.kCamera2StrobedEnvironmentGain": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Camera 2 Strobed Environment Gain",
+      "description": "Camera 2 gain in an externally strobed environment",
+      "type": "number",
+      "default": 0.8,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedBestCircleCannyLower": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Best Circle Canny Lower",
+      "description": "Canny lower threshold for best-circle detection with external strobes",
+      "type": "number",
+      "default": 55,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedBestCircleCannyUpper": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Best Circle Canny Upper",
+      "description": "Canny upper threshold for best-circle detection with external strobes",
+      "type": "number",
+      "default": 110,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedBestCircleHoughDpParam1": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Best Circle Hough DP",
+      "description": "Hough dp for best-circle detection with external strobes",
+      "type": "number",
+      "default": 1.5,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedBestCircleParam1": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Best Circle Param1",
+      "description": "Hough param1 for best-circle detection with external strobes",
+      "type": "number",
+      "default": 120.0,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedBestCircleParam2": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Best Circle Param2",
+      "description": "Hough param2 for best-circle detection with external strobes",
+      "type": "number",
+      "default": 35.0,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedBestCirclePreCannyBlurSize": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Best Circle Pre-Canny Blur",
+      "description": "Pre-Canny blur size for best-circle detection with external strobes",
+      "type": "integer",
+      "default": 5,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedBestCirclePreHoughBlurSize": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Best Circle Pre-Hough Blur",
+      "description": "Pre-Hough blur size for best-circle detection with external strobes",
+      "type": "integer",
+      "default": 13,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedCLAHEClipLimit": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe CLAHE Clip Limit",
+      "description": "CLAHE clip limit with external strobes",
+      "type": "integer",
+      "default": 6,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedCLAHETilesGridSize": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe CLAHE Tile Grid Size",
+      "description": "CLAHE tile grid size with external strobes",
+      "type": "integer",
+      "default": 6,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvBottomIgnoreHeight": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Bottom Ignore Height",
+      "description": "Pixels at the bottom of the image blacked out with external strobes",
+      "type": "integer",
+      "default": 70,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvCannyLower": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Canny Lower",
+      "description": "Canny lower threshold with external strobes",
+      "type": "number",
+      "default": 35,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvCannyUpper": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Canny Upper",
+      "description": "Canny upper threshold with external strobes",
+      "type": "number",
+      "default": 80,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvCurrentParam1": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Hough Param1",
+      "description": "Hough param1 with external strobes",
+      "type": "number",
+      "default": 130.0,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvFilterHsvLowerH": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe HSV Lower H",
+      "description": "Lower hue for the external strobe HSV filter",
+      "type": "integer",
+      "default": 14,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvFilterHsvLowerS": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe HSV Lower S",
+      "description": "Lower saturation for the external strobe HSV filter",
+      "type": "integer",
+      "default": 26,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvFilterHsvLowerV": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe HSV Lower V",
+      "description": "Lower value for the external strobe HSV filter",
+      "type": "integer",
+      "default": 114,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvFilterHsvUpperH": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe HSV Upper H",
+      "description": "Upper hue for the external strobe HSV filter",
+      "type": "integer",
+      "default": 48,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvFilterHsvUpperS": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe HSV Upper S",
+      "description": "Upper saturation for the external strobe HSV filter",
+      "type": "integer",
+      "default": 255,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvFilterHsvUpperV": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe HSV Upper V",
+      "description": "Upper value for the external strobe HSV filter",
+      "type": "integer",
+      "default": 255,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvFilterImage": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Filter Image",
+      "description": "Apply the HSV filter to images taken with external strobes",
+      "type": "boolean",
+      "default": true,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvHoughDpParam1": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Hough DP",
+      "description": "Hough dp with external strobes",
+      "type": "number",
+      "default": 1.0,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvHoughLineIntersections": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Hough Line Intersections",
+      "description": "Hough line intersection threshold with external strobes",
+      "type": "integer",
+      "default": 235,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvLinesAngleLower": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Lines Angle Lower",
+      "description": "Lower line angle with external strobes",
+      "type": "integer",
+      "default": 140,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvLinesAngleUpper": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Lines Angle Upper",
+      "description": "Upper line angle with external strobes",
+      "type": "integer",
+      "default": 180,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvMaxHoughReturnCircles": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Max Hough Circles",
+      "description": "Maximum Hough circles returned with external strobes",
+      "type": "integer",
+      "default": 20,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvMaxParam2": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Max Param2",
+      "description": "Maximum Hough param2 with external strobes",
+      "type": "number",
+      "default": 100,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvMaximumHoughLineGap": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Max Hough Line Gap",
+      "description": "Maximum Hough line gap with external strobes",
+      "type": "integer",
+      "default": 7,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvMaximumSearchRadius": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Max Search Radius",
+      "description": "Maximum ball search radius in pixels with external strobes",
+      "type": "integer",
+      "default": 80,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvMinHoughReturnCircles": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Min Hough Circles",
+      "description": "Minimum Hough circles returned with external strobes",
+      "type": "integer",
+      "default": 3,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvMinimumHoughLineLength": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Min Hough Line Length",
+      "description": "Minimum Hough line length with external strobes",
+      "type": "integer",
+      "default": 23,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvMinimumSearchRadius": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Min Search Radius",
+      "description": "Minimum ball search radius in pixels with external strobes",
+      "type": "integer",
+      "default": 60,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvNarrowingDpParam": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Narrowing DP",
+      "description": "Hough dp for the narrowing pass with external strobes",
+      "type": "number",
+      "default": 1.1,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvNarrowingParam2": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Narrowing Param2",
+      "description": "Hough param2 for the narrowing pass with external strobes",
+      "type": "number",
+      "default": 0.6,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvNarrowingPreCannyBlurSize": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Narrowing Pre-Canny Blur",
+      "description": "Pre-Canny blur size for the narrowing pass with external strobes",
+      "type": "integer",
+      "default": 3,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvNarrowingPreHoughBlurSize": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Narrowing Pre-Hough Blur",
+      "description": "Pre-Hough blur size for the narrowing pass with external strobes",
+      "type": "integer",
+      "default": 9,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvNumber_bits_for_fast_on_pulse_": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Fast Pulse On Bits",
+      "description": "Bits per fast strobe on-pulse in comparison mode",
+      "type": "integer",
+      "default": 0,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvParam2Increment": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Param2 Increment",
+      "description": "Hough param2 step with external strobes",
+      "type": "number",
+      "default": 4,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvPreCannyBlurSize": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Pre-Canny Blur",
+      "description": "Pre-Canny blur size with external strobes",
+      "type": "integer",
+      "default": 3,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvPreHoughBlurSize": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Pre-Hough Blur",
+      "description": "Pre-Hough blur size with external strobes",
+      "type": "integer",
+      "default": 11,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvStartingParam2": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Starting Param2",
+      "description": "Starting Hough param2 with external strobes",
+      "type": "number",
+      "default": 65,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedUseCLAHEProcessing": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Use CLAHE",
+      "description": "Apply CLAHE to images taken with external strobes",
+      "type": "boolean",
+      "default": true,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kInterShotInjectionPauseSeconds": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Inter-Shot Injection Pause (s)",
+      "description": "Seconds between injected test shots",
+      "type": "integer",
+      "default": 0,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kTwoImageTestPreImage": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Two Image Test Pre Image",
+      "description": "Pre-image file for the two image test, relative to the test image directory",
+      "type": "string",
+      "default": "",
+      "requiresRestart": true
+    },
+    "gs_config.testing.kTwoImageTestStrobedBallImage": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Two Image Test Strobed Ball Image",
+      "description": "Strobed ball image file for the two image test, relative to the test image directory",
+      "type": "string",
+      "default": "",
+      "requiresRestart": true
+    },
+    "gs_config.testing.kTwoImageTestTeedBallImage": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Two Image Test Teed Ball Image",
+      "description": "Teed ball image file for the two image test, relative to the test image directory",
+      "type": "string",
+      "default": "",
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera1CalibrationMatrix": {
       "type": "array",
