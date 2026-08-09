@@ -7,9 +7,6 @@ data generation, assertions, and test setup/teardown operations.
 
 import random
 from typing import Dict, Any, List, Optional
-from pathlib import Path
-import tempfile
-import json
 
 
 class ShotDataHelper:
@@ -81,74 +78,6 @@ class ShotDataHelper:
             return False
 
         return True
-
-
-class ConfigTestHelper:
-    """Helper class for configuration-related test operations."""
-
-    @staticmethod
-    def create_temp_config_dir() -> Path:
-        """Create a temporary directory with basic config structure."""
-        temp_dir = Path(tempfile.mkdtemp())
-
-        (temp_dir / ".pitrac" / "config").mkdir(parents=True)
-        (temp_dir / "LM_Shares" / "Images").mkdir(parents=True)
-        (temp_dir / "LM_Shares" / "WebShare").mkdir(parents=True)
-
-        return temp_dir
-
-    @staticmethod
-    def create_config_metadata() -> Dict[str, Any]:
-        """Create realistic configuration metadata for testing."""
-        return {
-            "settings": {
-                "gs_config.cameras.kCamera1Gain": {
-                    "type": "number",
-                    "default": 1.0,
-                    "min": 1.0,
-                    "max": 16.0,
-                    "category": "Cameras",
-                    "subcategory": "basic",
-                },
-                "gs_config.cameras.kCamera2Gain": {
-                    "type": "number",
-                    "default": 4.0,
-                    "min": 1.0,
-                    "max": 16.0,
-                    "category": "Cameras",
-                    "subcategory": "basic",
-                },
-                "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectPort": {
-                    "type": "number",
-                    "default": 921,
-                    "min": 1,
-                    "max": 65535,
-                    "category": "Simulators",
-                    "subcategory": "basic",
-                },
-            },
-            "validationRules": {
-                "gain": {"type": "range", "min": 1.0, "max": 16.0, "errorMessage": "Gain must be between 1.0 and 16.0"},
-                "port": {"type": "range", "min": 1, "max": 65535, "errorMessage": "Port must be between 1 and 65535"},
-            },
-            "categoryList": ["Cameras", "Simulators"],
-        }
-
-    @staticmethod
-    def create_user_settings(overrides: Optional[Dict] = None) -> Dict[str, Any]:
-        """Create user settings with optional overrides."""
-        default_settings = {"gs_config": {"cameras": {"kCamera1Gain": 2.0}}}
-
-        if overrides:
-            default_settings.update(overrides)
-
-        return default_settings
-
-    @staticmethod
-    def write_config_file(path: Path, config: Dict[str, Any]) -> None:
-        """Write configuration data to a JSON file."""
-        with open(path, "w") as f:
-            json.dump(config, f, indent=2)
 
 
 class ProcessTestHelper:

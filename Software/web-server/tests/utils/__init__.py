@@ -6,12 +6,11 @@ to reduce code duplication across test modules.
 """
 
 from .mock_factories import MockConfigManagerFactory, MockProcessManagerFactory
-from .test_helpers import ShotDataHelper, ConfigTestHelper, ProcessTestHelper
+from .test_helpers import ShotDataHelper, ProcessTestHelper
 
 __all__ = [
     "MockConfigManagerFactory",
     "MockProcessManagerFactory",
     "ShotDataHelper",
-    "ConfigTestHelper",
     "ProcessTestHelper",
 ]
