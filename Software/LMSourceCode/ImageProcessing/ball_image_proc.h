@@ -140,8 +140,6 @@ public:
     static int kExternallyStrobedEnvMaximumSearchRadius;
     static double kStrobedNarrowingRadiiDpParam;
     static double kStrobedNarrowingRadiiParam2;
-    static int kExternallyStrobedEnvNarrowingPreCannyBlurSize;
-    static int kExternallyStrobedEnvNarrowingPreHoughBlurSize;
 
     static bool kExternallyStrobedUseCLAHEProcessing;
     static int kExternallyStrobedCLAHEClipLimit;
@@ -173,9 +171,6 @@ public:
     static double kBestCircleParam2;
     static double kBestCircleHoughDpParam1;
 
-    static double kExternallyStrobedBestCircleCannyLower;
-    static double kExternallyStrobedBestCircleCannyUpper;
-    static int kExternallyStrobedBestCirclePreCannyBlurSize;
     static int kExternallyStrobedBestCirclePreHoughBlurSize;
     static double kExternallyStrobedBestCircleParam1;
     static double kExternallyStrobedBestCircleParam2;

@@ -104,10 +104,8 @@ namespace golf_sim {
     int GolfSimCamera::kExternallyStrobedEnvPreHoughBlurSize = 13;  // 6 for External Strobe, 9 for normal
     int GolfSimCamera::kExternallyStrobedEnvPreCannyBlurSize = 3;
     
-    int GolfSimCamera::kExternallyStrobedEnvHoughLineIntersections = 235;
     int GolfSimCamera::kExternallyStrobedEnvLinesAngleLower = 140;
     int GolfSimCamera::kExternallyStrobedEnvLinesAngleUpper = 180;
-    int GolfSimCamera::kExternallyStrobedEnvMaximumHoughLineGap = 7;
     int GolfSimCamera::kExternallyStrobedEnvMinimumHoughLineLength = 23;
 
     bool GolfSimCamera::kPlacedBallUseLargestBall = true;
@@ -121,8 +119,6 @@ namespace golf_sim {
     CameraHardware::CameraOrientation GolfSimCamera::kSystemSlot1CameraOrientation = CameraHardware::CameraOrientation::kUpsideUp;
     CameraHardware::CameraOrientation GolfSimCamera::kSystemSlot2CameraOrientation = CameraHardware::CameraOrientation::kUpsideUp;
 
-    float GolfSimCamera::kHLAOffsetAngleDegrees = 0.0;
-    float GolfSimCamera::kVLAOffsetAngleDegrees = 0.0;
 
 
     bool GolfSimCamera::kUseOnlyHighQualityBallImagesForHLA = true;
@@ -204,16 +200,12 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvCannyUpper", kExternallyStrobedEnvCannyUpper);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvPreHoughBlurSize", kExternallyStrobedEnvPreHoughBlurSize);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvPreCannyBlurSize", kExternallyStrobedEnvPreCannyBlurSize);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvHoughLineIntersections", kExternallyStrobedEnvHoughLineIntersections);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvLinesAngleLower", kExternallyStrobedEnvLinesAngleLower);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvLinesAngleUpper", kExternallyStrobedEnvLinesAngleUpper);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvMaximumHoughLineGap", kExternallyStrobedEnvMaximumHoughLineGap);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvMinimumHoughLineLength", kExternallyStrobedEnvMinimumHoughLineLength);
 
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallUseLargestBall", kPlacedBallUseLargestBall);
 
-        GolfSimConfiguration::SetConstant("gs_config.cameras.kHLAOffsetAngleDegrees", kHLAOffsetAngleDegrees);
-        GolfSimConfiguration::SetConstant("gs_config.cameras.kVLAOffsetAngleDegrees", kVLAOffsetAngleDegrees);
     }
 
     GolfSimCamera::~GolfSimCamera() {

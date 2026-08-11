@@ -148,8 +148,6 @@ namespace golf_sim {
     int BallImageProc::kExternallyStrobedEnvPreHoughBlurSize = 11;
     int BallImageProc::kExternallyStrobedEnvPreCannyBlurSize = 3;
     double BallImageProc::kExternallyStrobedEnvHoughDpParam1 = 1.0;
-    int BallImageProc::kExternallyStrobedEnvNarrowingPreCannyBlurSize = 3;
-    int BallImageProc::kExternallyStrobedEnvNarrowingPreHoughBlurSize = 9;
     int BallImageProc::kExternallyStrobedEnvMinimumSearchRadius = 60;
     int BallImageProc::kExternallyStrobedEnvMaximumSearchRadius = 80;
 
@@ -186,9 +184,6 @@ namespace golf_sim {
     double BallImageProc::kBestCircleParam2 = 35.;
     double BallImageProc::kBestCircleHoughDpParam1 = 1.5;
 
-    double BallImageProc::kExternallyStrobedBestCircleCannyLower = 55;
-    double BallImageProc::kExternallyStrobedBestCircleCannyUpper = 110;
-    int BallImageProc::kExternallyStrobedBestCirclePreCannyBlurSize = 5;
     int BallImageProc::kExternallyStrobedBestCirclePreHoughBlurSize = 13;
     double BallImageProc::kExternallyStrobedBestCircleParam1 = 120.;
     double BallImageProc::kExternallyStrobedBestCircleParam2 = 35.;
@@ -315,8 +310,6 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvStartingParam2", kExternallyStrobedEnvStartingParam2);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvNarrowingParam2", kExternallyStrobedEnvNarrowingParam2);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvNarrowingDpParam", kExternallyStrobedEnvNarrowingDpParam);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvNarrowingPreCannyBlurSize", kExternallyStrobedEnvNarrowingPreCannyBlurSize);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvNarrowingPreHoughBlurSize", kExternallyStrobedEnvNarrowingPreHoughBlurSize);
 
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvParam2Increment", kExternallyStrobedEnvParam2Increment);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvMinHoughReturnCircles", kExternallyStrobedEnvMinHoughReturnCircles);
@@ -324,9 +317,6 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvPreHoughBlurSize", kExternallyStrobedEnvPreHoughBlurSize);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvPreCannyBlurSize", kExternallyStrobedEnvPreCannyBlurSize);
 
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCircleCannyLower", kExternallyStrobedBestCircleCannyLower);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCircleCannyUpper", kExternallyStrobedBestCircleCannyUpper);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCirclePreCannyBlurSize", kExternallyStrobedBestCirclePreCannyBlurSize);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCirclePreHoughBlurSize", kExternallyStrobedBestCirclePreHoughBlurSize);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCircleParam1", kExternallyStrobedBestCircleParam1);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCircleParam2", kExternallyStrobedBestCircleParam2);
@@ -1714,9 +1704,6 @@ namespace golf_sim {
             cv::GaussianBlur(cannyOutput_for_balls, finalChoiceSubImg, cv::Size(kBestCirclePreHoughBlurSize, kBestCirclePreHoughBlurSize), 0);   // Nominal is 7x7
         }
         else {
-            // cv::GaussianBlur(finalChoiceSubImg, finalChoiceSubImg, cv::Size(kExternallyStrobedBestCirclePreCannyBlurSize, kExternallyStrobedBestCirclePreCannyBlurSize), 0);
-
-            // cv::Canny(finalChoiceSubImg, cannyOutput_for_balls, kExternallyStrobedBestCircleCannyLower, kExternallyStrobedBestCircleCannyUpper);
             cannyOutput_for_balls = finalChoiceSubImg.clone();
 
             LoggingTools::DebugShowImage("Best Circle (externally-strobed)" + std::to_string(expandedRadiusForHough) + "  cannyOutput for best ball", cannyOutput_for_balls);

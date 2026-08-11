@@ -40,7 +40,6 @@ namespace golf_sim {
 		static uint kClubImageHeightPixels;
 
 		// The fully-qualified output directory
-		static std::string kClubImageOutputDir;
 
 		static uint kNumberFramesToSaveBeforeHit;
 		static uint kNumberFramesToSaveAfterHit;

@@ -29,7 +29,6 @@ namespace golf_sim {
 	 uint GolfSimClubData::kClubImageHeightPixels = 150;
 
 	// The fully-qualified output directory
-	 std::string GolfSimClubData::kClubImageOutputDir;
 
 	 uint GolfSimClubData::kNumberFramesToSaveBeforeHit = 4;
 	 uint GolfSimClubData::kNumberFramesToSaveAfterHit = 4;
@@ -44,7 +43,6 @@ namespace golf_sim {
 		GolfSimConfiguration::SetConstant("gs_config.club_data.kEnableClubImages", kGatherClubData);
 
 		if (kGatherClubData) {
-			GolfSimConfiguration::SetConstant("gs_config.club_data.kEnableClubImages", kClubImageOutputDir);
 			GolfSimConfiguration::SetConstant("gs_config.club_data.kNumberFramesToSaveBeforeHit", kNumberFramesToSaveBeforeHit);
 			GolfSimConfiguration::SetConstant("gs_config.club_data.kNumberFramesToSaveAfterHit", kNumberFramesToSaveAfterHit);
 			GolfSimConfiguration::SetConstant("gs_config.club_data.kClubImageWidthPixels", kClubImageWidthPixels);

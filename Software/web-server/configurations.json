@@ -654,24 +654,6 @@
       "default": 0.0,
       "requiresRestart": false
     },
-    "gs_config.cameras.kHLAOffsetAngleDegrees": {
-      "category": "Cameras",
-      "subcategory": "advanced",
-      "displayName": "HLA Offset Angle (degrees)",
-      "description": "Read but not applied to results. The HLA correction applied to shots is HLA Offset.",
-      "type": "number",
-      "default": 0.0,
-      "requiresRestart": true
-    },
-    "gs_config.cameras.kVLAOffsetAngleDegrees": {
-      "category": "Cameras",
-      "subcategory": "advanced",
-      "displayName": "VLA Offset Angle (degrees)",
-      "description": "Read but not applied to results. The VLA correction applied to shots is VLA Offset.",
-      "type": "number",
-      "default": 0.0,
-      "requiresRestart": true
-    },
     "gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress": {
       "category": "Simulators",
       "subcategory": "basic",
@@ -1161,15 +1143,6 @@
       "min": 1000,
       "max": 100000,
       "default": 15000,
-      "requiresRestart": true
-    },
-    "gs_config.cameras.kCameraMotionDetectSettings": {
-      "category": "Cameras",
-      "subcategory": "advanced",
-      "displayName": "Camera Motion Detect Settings",
-      "description": "Path to the libcamera motion detect settings file. Not used by the current capture path.",
-      "type": "string",
-      "default": "./assets/motion_detect.json",
       "requiresRestart": true
     },
     "gs_config.physical_constants.kBallRadiusMeters": {
@@ -3124,33 +3097,6 @@
       "category": "testing",
       "ui_name": "Test Image Directory"
     },
-    "gs_config.testing.kCamera2StrobedEnvironmentGain": {
-      "category": "testing",
-      "subcategory": "advanced",
-      "displayName": "Camera 2 Strobed Environment Gain",
-      "description": "Camera 2 gain in an externally strobed environment",
-      "type": "number",
-      "default": 0.8,
-      "requiresRestart": true
-    },
-    "gs_config.testing.kExternallyStrobedBestCircleCannyLower": {
-      "category": "testing",
-      "subcategory": "advanced",
-      "displayName": "Ext Strobe Best Circle Canny Lower",
-      "description": "Canny lower threshold for best-circle detection with external strobes",
-      "type": "number",
-      "default": 55,
-      "requiresRestart": true
-    },
-    "gs_config.testing.kExternallyStrobedBestCircleCannyUpper": {
-      "category": "testing",
-      "subcategory": "advanced",
-      "displayName": "Ext Strobe Best Circle Canny Upper",
-      "description": "Canny upper threshold for best-circle detection with external strobes",
-      "type": "number",
-      "default": 110,
-      "requiresRestart": true
-    },
     "gs_config.testing.kExternallyStrobedBestCircleHoughDpParam1": {
       "category": "testing",
       "subcategory": "advanced",
@@ -3176,15 +3122,6 @@
       "description": "Hough param2 for best-circle detection with external strobes",
       "type": "number",
       "default": 35.0,
-      "requiresRestart": true
-    },
-    "gs_config.testing.kExternallyStrobedBestCirclePreCannyBlurSize": {
-      "category": "testing",
-      "subcategory": "advanced",
-      "displayName": "Ext Strobe Best Circle Pre-Canny Blur",
-      "description": "Pre-Canny blur size for best-circle detection with external strobes",
-      "type": "integer",
-      "default": 5,
       "requiresRestart": true
     },
     "gs_config.testing.kExternallyStrobedBestCirclePreHoughBlurSize": {
@@ -3322,15 +3259,6 @@
       "default": 1.0,
       "requiresRestart": true
     },
-    "gs_config.testing.kExternallyStrobedEnvHoughLineIntersections": {
-      "category": "testing",
-      "subcategory": "advanced",
-      "displayName": "Ext Strobe Hough Line Intersections",
-      "description": "Hough line intersection threshold with external strobes",
-      "type": "integer",
-      "default": 235,
-      "requiresRestart": true
-    },
     "gs_config.testing.kExternallyStrobedEnvLinesAngleLower": {
       "category": "testing",
       "subcategory": "advanced",
@@ -3365,15 +3293,6 @@
       "description": "Maximum Hough param2 with external strobes",
       "type": "number",
       "default": 100,
-      "requiresRestart": true
-    },
-    "gs_config.testing.kExternallyStrobedEnvMaximumHoughLineGap": {
-      "category": "testing",
-      "subcategory": "advanced",
-      "displayName": "Ext Strobe Max Hough Line Gap",
-      "description": "Maximum Hough line gap with external strobes",
-      "type": "integer",
-      "default": 7,
       "requiresRestart": true
     },
     "gs_config.testing.kExternallyStrobedEnvMaximumSearchRadius": {
@@ -3428,24 +3347,6 @@
       "description": "Hough param2 for the narrowing pass with external strobes",
       "type": "number",
       "default": 0.6,
-      "requiresRestart": true
-    },
-    "gs_config.testing.kExternallyStrobedEnvNarrowingPreCannyBlurSize": {
-      "category": "testing",
-      "subcategory": "advanced",
-      "displayName": "Ext Strobe Narrowing Pre-Canny Blur",
-      "description": "Pre-Canny blur size for the narrowing pass with external strobes",
-      "type": "integer",
-      "default": 3,
-      "requiresRestart": true
-    },
-    "gs_config.testing.kExternallyStrobedEnvNarrowingPreHoughBlurSize": {
-      "category": "testing",
-      "subcategory": "advanced",
-      "displayName": "Ext Strobe Narrowing Pre-Hough Blur",
-      "description": "Pre-Hough blur size for the narrowing pass with external strobes",
-      "type": "integer",
-      "default": 9,
       "requiresRestart": true
     },
     "gs_config.testing.kExternallyStrobedEnvNumber_bits_for_fast_on_pulse_": {

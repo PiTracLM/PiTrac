@@ -60,12 +60,10 @@ namespace golf_sim {
     double LibCameraInterface::kCamera2Gain = 6.0;
     double LibCameraInterface::kCamera2Saturation = 1.0;
     double LibCameraInterface::kCamera2ComparisonGain = 0.8;
-    double LibCameraInterface::kCamera2StrobedEnvironmentGain = 0.8;
     double LibCameraInterface::kCamera2Contrast = 1.0;
     double LibCameraInterface::kCamera2CalibrateOrLocationGain = 1.0;
     double LibCameraInterface::kCamera2PuttingGain = 4.0;
     double LibCameraInterface::kCamera2PuttingContrast = 1.0;
-    std::string LibCameraInterface::kCameraMotionDetectSettings = "./assets/motion_detect.json";
 
     long LibCameraInterface::kCamera1StillShutterTimeuS = 15000;
     long LibCameraInterface::kCamera2StillShutterTimeuS = 15000;
@@ -795,7 +793,6 @@ bool ConfigureLibCameraOptions(const GolfSimCamera& camera, RPiCamEncoder& app, 
     // TBD - We are switching away from having the post_process_file trigger the
     // dynamic loading of the motion_detection module.  Instead, hop[efully for speed,
     // we will use a statically-bound motion_detection module.  See ball_watcher.cpp
-    // options->Set().post_process_file = LibCameraInterface::kCameraMotionDetectSettings;
 
     if (cropping_window_size[0] > 0 && cropping_window_size[1] > 0) {
         options->Set().width = cropping_window_size[0];
