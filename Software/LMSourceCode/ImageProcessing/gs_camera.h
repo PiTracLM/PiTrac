@@ -170,7 +170,7 @@ namespace golf_sim {
         static int kExternallyStrobedEnvFilterHsvUpperV;
         static int kExternallyStrobedEnvCannyLower;
         static int kExternallyStrobedEnvCannyUpper;
-        static int kExternallyStrobedEnvPreHoughBlurSize;
+        static int kExternallyStrobedEnvCleanupPreHoughBlurSize;
         static int kExternallyStrobedEnvPreCannyBlurSize;
         static int kExternallyStrobedEnvLinesAngleLower;
         static int kExternallyStrobedEnvLinesAngleUpper;
@@ -190,10 +190,6 @@ namespace golf_sim {
 
         static CameraHardware::CameraOrientation kSystemSlot1CameraOrientation;
         static CameraHardware::CameraOrientation kSystemSlot2CameraOrientation;
-
-		// The following angles are used to adjust the final HLA and VLA to account for
-		// problems such as the auto-calibration rig being slightly off.
-		// See the HLA and VLA calculations in gs_camera.cpp for more details on the meaning of negative versus positive angles
 
         static bool kUseOnlyHighQualityBallImagesForHLA;
 

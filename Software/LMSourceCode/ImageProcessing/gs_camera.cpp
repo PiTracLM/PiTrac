@@ -101,7 +101,7 @@ namespace golf_sim {
     int GolfSimCamera::kExternallyStrobedEnvFilterHsvUpperV = 255;
     int GolfSimCamera::kExternallyStrobedEnvCannyLower = 156;
     int GolfSimCamera::kExternallyStrobedEnvCannyUpper = 337;
-    int GolfSimCamera::kExternallyStrobedEnvPreHoughBlurSize = 13;  // 6 for External Strobe, 9 for normal
+    int GolfSimCamera::kExternallyStrobedEnvCleanupPreHoughBlurSize = 13;  // 6 for External Strobe, 9 for normal
     int GolfSimCamera::kExternallyStrobedEnvPreCannyBlurSize = 3;
     
     int GolfSimCamera::kExternallyStrobedEnvLinesAngleLower = 140;
@@ -118,8 +118,6 @@ namespace golf_sim {
 
     CameraHardware::CameraOrientation GolfSimCamera::kSystemSlot1CameraOrientation = CameraHardware::CameraOrientation::kUpsideUp;
     CameraHardware::CameraOrientation GolfSimCamera::kSystemSlot2CameraOrientation = CameraHardware::CameraOrientation::kUpsideUp;
-
-
 
     bool GolfSimCamera::kUseOnlyHighQualityBallImagesForHLA = true;
 
@@ -195,7 +193,7 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvFilterHsvUpperV", kExternallyStrobedEnvFilterHsvUpperV);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvCannyLower", kExternallyStrobedEnvCannyLower);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvCannyUpper", kExternallyStrobedEnvCannyUpper);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvPreHoughBlurSize", kExternallyStrobedEnvPreHoughBlurSize);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvCleanupPreHoughBlurSize", kExternallyStrobedEnvCleanupPreHoughBlurSize);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvPreCannyBlurSize", kExternallyStrobedEnvPreCannyBlurSize);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvLinesAngleLower", kExternallyStrobedEnvLinesAngleLower);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvLinesAngleUpper", kExternallyStrobedEnvLinesAngleUpper);
@@ -3557,11 +3555,11 @@ namespace golf_sim {
 
             LoggingTools::DebugShowImage("Initial cannyOutput", cannyOutput_for_balls);
 
-            if (kExternallyStrobedEnvPreHoughBlurSize > 0) {
-                if (kExternallyStrobedEnvPreHoughBlurSize % 2 != 1) {
-                    kExternallyStrobedEnvPreHoughBlurSize++;
+            if (kExternallyStrobedEnvCleanupPreHoughBlurSize > 0) {
+                if (kExternallyStrobedEnvCleanupPreHoughBlurSize % 2 != 1) {
+                    kExternallyStrobedEnvCleanupPreHoughBlurSize++;
                 }
-                cv::GaussianBlur(cannyOutput_for_balls, cannyOutput_for_balls, cv::Size(kExternallyStrobedEnvPreHoughBlurSize, kExternallyStrobedEnvPreHoughBlurSize), 0);
+                cv::GaussianBlur(cannyOutput_for_balls, cannyOutput_for_balls, cv::Size(kExternallyStrobedEnvCleanupPreHoughBlurSize, kExternallyStrobedEnvCleanupPreHoughBlurSize), 0);
             }
 
             LoggingTools::DebugShowImage("Post-Blur cannyOutput", cannyOutput_for_balls);

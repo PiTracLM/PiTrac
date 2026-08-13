@@ -28,8 +28,6 @@ namespace golf_sim {
 	 uint GolfSimClubData::kClubImageWidthPixels = 200;
 	 uint GolfSimClubData::kClubImageHeightPixels = 150;
 
-	// The fully-qualified output directory
-
 	 uint GolfSimClubData::kNumberFramesToSaveBeforeHit = 4;
 	 uint GolfSimClubData::kNumberFramesToSaveAfterHit = 4;
 

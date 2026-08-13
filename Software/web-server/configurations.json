@@ -786,6 +786,24 @@
       "default": 87,
       "requiresRestart": false
     },
+    "gs_config.cameras.kExpectedBallRadiusPixelsAt40cmCamera1": {
+      "category": "Cameras",
+      "subcategory": "advanced",
+      "displayName": "Camera 1 Expected Ball Radius at 40cm (px)",
+      "description": "Expected ball radius in pixels at 40 cm for camera 1. A value below 1 uses the camera model's built-in value.",
+      "type": "integer",
+      "default": -1,
+      "requiresRestart": true
+    },
+    "gs_config.cameras.kExpectedBallRadiusPixelsAt40cmCamera2": {
+      "category": "Cameras",
+      "subcategory": "advanced",
+      "displayName": "Camera 2 Expected Ball Radius at 40cm (px)",
+      "description": "Expected ball radius in pixels at 40 cm for camera 2. A value below 1 uses the camera model's built-in value.",
+      "type": "integer",
+      "default": -1,
+      "requiresRestart": true
+    },
     "gs_config.strobing.kStandardBallSpeedSlowdownPercentage": {
       "category": "Strobing",
       "subcategory": "basic",
@@ -3163,19 +3181,28 @@
     "gs_config.testing.kExternallyStrobedEnvCannyLower": {
       "category": "testing",
       "subcategory": "advanced",
-      "displayName": "Ext Strobe Canny Lower",
-      "description": "Canny lower threshold with external strobes",
-      "type": "number",
-      "default": 35,
+      "displayName": "Ext Strobe Cleanup Canny Lower",
+      "description": "Canny lower threshold for external strobe artifact cleanup",
+      "type": "integer",
+      "default": 156,
       "requiresRestart": true
     },
     "gs_config.testing.kExternallyStrobedEnvCannyUpper": {
       "category": "testing",
       "subcategory": "advanced",
-      "displayName": "Ext Strobe Canny Upper",
-      "description": "Canny upper threshold with external strobes",
-      "type": "number",
-      "default": 80,
+      "displayName": "Ext Strobe Cleanup Canny Upper",
+      "description": "Canny upper threshold for external strobe artifact cleanup",
+      "type": "integer",
+      "default": 337,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvCleanupPreHoughBlurSize": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Cleanup Pre-Hough Blur",
+      "description": "Pre-Hough blur size for external strobe artifact cleanup",
+      "type": "integer",
+      "default": 13,
       "requiresRestart": true
     },
     "gs_config.testing.kExternallyStrobedEnvCurrentParam1": {
