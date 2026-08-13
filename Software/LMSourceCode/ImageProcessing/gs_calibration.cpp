@@ -55,9 +55,9 @@ namespace golf_sim {
     // Number of pictures to average when determining focal length.  Because the focal length can tend
     // to bounce around a bit due to small variations in ball detection, averaging multiple pictures can help.
 
-    int GolfSimCalibration::kNumberPicturesForFocalLengthAverage = 5;
+    int GolfSimCalibration::kNumberPicturesForFocalLengthAverage = 6;
 
-    int GolfSimCalibration::kNumberOfCalibrationFailuresToTolerate = 2;
+    int GolfSimCalibration::kNumberOfCalibrationFailuresToTolerate = 4;
 
 
     GolfSimCalibration::GolfSimCalibration() {

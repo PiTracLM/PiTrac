@@ -47,7 +47,7 @@ namespace golf_sim {
         GolfSimGlobals::golf_sim_running_ = false;
     }
 
-    static long kMaxCam2ImageReceivedTimeMs = 2000;
+    static long kMaxCam2ImageReceivedTimeMs = 40000;
 
     const int kWaitForBallPauseMs = 500;
     const int kEventLoopPauseMs = 5000;

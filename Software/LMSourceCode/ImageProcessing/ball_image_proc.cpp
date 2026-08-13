@@ -71,39 +71,39 @@ namespace golf_sim {
     static const double kEllipseColorMaskWideningAmount = 35;
     static const bool kSerializeOpsForDebug = false;
 
-    int BallImageProc::kCoarseXRotationDegreesIncrement = 6;
-    int BallImageProc::kCoarseXRotationDegreesStart = -42;
-    int BallImageProc::kCoarseXRotationDegreesEnd = 42;
+    int BallImageProc::kCoarseXRotationDegreesIncrement = 4;
+    int BallImageProc::kCoarseXRotationDegreesStart = -36;
+    int BallImageProc::kCoarseXRotationDegreesEnd = 36;
     int BallImageProc::kCoarseYRotationDegreesIncrement = 5;
-    int BallImageProc::kCoarseYRotationDegreesStart = -30;
-    int BallImageProc::kCoarseYRotationDegreesEnd = 30;
-    int BallImageProc::kCoarseZRotationDegreesIncrement = 6;
-    int BallImageProc::kCoarseZRotationDegreesStart = -50;
-    int BallImageProc::kCoarseZRotationDegreesEnd = 60;
+    int BallImageProc::kCoarseYRotationDegreesStart = -15;
+    int BallImageProc::kCoarseYRotationDegreesEnd = 15;
+    int BallImageProc::kCoarseZRotationDegreesIncrement = 4;
+    int BallImageProc::kCoarseZRotationDegreesStart = -10;
+    int BallImageProc::kCoarseZRotationDegreesEnd = 110;
     int BallImageProc::kCoarseSearchResolution = 90;
 
     double BallImageProc::kPlacedBallCannyLower;
     double BallImageProc::kPlacedBallCannyUpper;
-    double BallImageProc::kPlacedBallStartingParam2 = 40;
-    double BallImageProc::kPlacedBallMinParam2 = 30;
-    double BallImageProc::kPlacedBallMaxParam2 = 60;
-    double BallImageProc::kPlacedBallCurrentParam1 = 120.0;
-    double BallImageProc::kPlacedBallParam2Increment = 4;
+    double BallImageProc::kPlacedBallStartingParam2 = 0.9;
+    double BallImageProc::kPlacedBallMinParam2 = 0.8;
+    double BallImageProc::kPlacedBallMaxParam2 = 1.0;
+    double BallImageProc::kPlacedBallCurrentParam1 = 130.0;
+    double BallImageProc::kPlacedBallParam2Increment = 0.03;
 
     int BallImageProc::kPlacedMinHoughReturnCircles = 1;
     int BallImageProc::kPlacedMaxHoughReturnCircles = 4;
-    double BallImageProc::kStrobedBallsCannyLower = 50;
-    double BallImageProc::kStrobedBallsCannyUpper = 110;
+    double BallImageProc::kStrobedBallsCannyLower = 33;
+    double BallImageProc::kStrobedBallsCannyUpper = 90;
 
 
-    int BallImageProc::kStrobedBallsMaxHoughReturnCircles = 12;
-    int BallImageProc::kStrobedBallsMinHoughReturnCircles = 1;
+    int BallImageProc::kStrobedBallsMaxHoughReturnCircles = 20;
+    int BallImageProc::kStrobedBallsMinHoughReturnCircles = 6;
 
-    int BallImageProc::kStrobedBallsPreCannyBlurSize = 5;
+    int BallImageProc::kStrobedBallsPreCannyBlurSize = 3;
     int BallImageProc::kStrobedBallsPreHoughBlurSize = 13;
-    double BallImageProc::kStrobedBallsStartingParam2 = 40;
-    double BallImageProc::kStrobedBallsMinParam2 = 30;
-    double BallImageProc::kStrobedBallsMaxParam2 = 60;
+    double BallImageProc::kStrobedBallsStartingParam2 = 60;
+    double BallImageProc::kStrobedBallsMinParam2 = 18;
+    double BallImageProc::kStrobedBallsMaxParam2 = 140;
     double BallImageProc::kStrobedBallsCurrentParam1 = 120.0;
     double BallImageProc::kStrobedBallsHoughDpParam1 = 1.5;
     double BallImageProc::kStrobedBallsParam2Increment = 4;
@@ -111,26 +111,26 @@ namespace golf_sim {
     bool  BallImageProc::kStrobedBallsUseAltHoughAlgorithm = true;
     double BallImageProc::kStrobedBallsAltCannyLower = 35;
     double BallImageProc::kStrobedBallsAltCannyUpper = 70;
-    int BallImageProc::kStrobedBallsAltPreCannyBlurSize = 11;
-    int BallImageProc::kStrobedBallsAltPreHoughBlurSize = 16;
-    double BallImageProc::kStrobedBallsAltStartingParam2 = 0.95;
-    double BallImageProc::kStrobedBallsAltMinParam2 = 0.6;
+    int BallImageProc::kStrobedBallsAltPreCannyBlurSize = 9;
+    int BallImageProc::kStrobedBallsAltPreHoughBlurSize = 15;
+    double BallImageProc::kStrobedBallsAltStartingParam2 = 0.65;
+    double BallImageProc::kStrobedBallsAltMinParam2 = 0.5;
     double BallImageProc::kStrobedBallsAltMaxParam2 = 1.0;
     double BallImageProc::kStrobedBallsAltCurrentParam1 = 130.0;
-    double BallImageProc::kStrobedBallsAltHoughDpParam1 = 1.5;
+    double BallImageProc::kStrobedBallsAltHoughDpParam1 = 0.8;
     double BallImageProc::kStrobedBallsAltParam2Increment = 0.05;
 
     bool BallImageProc::kUseCLAHEProcessing;
     int BallImageProc::kCLAHEClipLimit;
     int BallImageProc::kCLAHETilesGridSize;
 
-    double BallImageProc::kPuttingBallStartingParam2 = 40;
-    double BallImageProc::kPuttingBallMinParam2 = 30;
-    double BallImageProc::kPuttingBallMaxParam2 = 60;
-    double BallImageProc::kPuttingBallCurrentParam1 = 120.0;
-    double BallImageProc::kPuttingBallParam2Increment = 4;
-    int BallImageProc::kPuttingMaxHoughReturnCircles = 12;
-    int BallImageProc::kPuttingMinHoughReturnCircles = 1;
+    double BallImageProc::kPuttingBallStartingParam2 = 0.9;
+    double BallImageProc::kPuttingBallMinParam2 = 0.8;
+    double BallImageProc::kPuttingBallMaxParam2 = 1.0;
+    double BallImageProc::kPuttingBallCurrentParam1 = 300.0;
+    double BallImageProc::kPuttingBallParam2Increment = 0.03;
+    int BallImageProc::kPuttingMaxHoughReturnCircles = 25;
+    int BallImageProc::kPuttingMinHoughReturnCircles = 6;
     double BallImageProc::kPuttingHoughDpParam1 = 1.5;
 
     double BallImageProc::kExternallyStrobedEnvCannyLower = 35;
@@ -151,22 +151,22 @@ namespace golf_sim {
     int BallImageProc::kExternallyStrobedEnvMinimumSearchRadius = 60;
     int BallImageProc::kExternallyStrobedEnvMaximumSearchRadius = 80;
 
-    bool BallImageProc::kUseDynamicRadiiAdjustment = true;
-    int BallImageProc::kNumberRadiiToAverageForDynamicAdjustment = 3;
-    double BallImageProc::kStrobedNarrowingRadiiMinRatio = 0.8;
-    double BallImageProc::kStrobedNarrowingRadiiMaxRatio = 1.2;
-    double BallImageProc::kStrobedNarrowingRadiiDpParam = 1.8;
-    double BallImageProc::kStrobedNarrowingRadiiParam2 = 100.0;
+    bool BallImageProc::kUseDynamicRadiiAdjustment = false;
+    int BallImageProc::kNumberRadiiToAverageForDynamicAdjustment = 2;
+    double BallImageProc::kStrobedNarrowingRadiiMinRatio = 0.7;
+    double BallImageProc::kStrobedNarrowingRadiiMaxRatio = 1.6;
+    double BallImageProc::kStrobedNarrowingRadiiDpParam = 1.5;
+    double BallImageProc::kStrobedNarrowingRadiiParam2 = 0.8;
 
 
     double BallImageProc::kPlacedNarrowingRadiiMinRatio = 0.9;
     double BallImageProc::kPlacedNarrowingRadiiMaxRatio = 1.1;
-    double BallImageProc::kPlacedNarrowingStartingParam2 = 80.0;
-    double BallImageProc::kPlacedNarrowingRadiiDpParam = 2.0;
+    double BallImageProc::kPlacedNarrowingStartingParam2 = 0.9;
+    double BallImageProc::kPlacedNarrowingRadiiDpParam = 1.5;
     double BallImageProc::kPlacedNarrowingParam1 = 130.0;
 
-    int BallImageProc::kPlacedPreCannyBlurSize = 5;
-    int BallImageProc::kPlacedPreHoughBlurSize = 11;
+    int BallImageProc::kPlacedPreCannyBlurSize = 11;
+    int BallImageProc::kPlacedPreHoughBlurSize = 13;
     int BallImageProc::kPuttingPreHoughBlurSize = 9;
 
 
@@ -180,8 +180,8 @@ namespace golf_sim {
     double BallImageProc::kBestCircleCannyUpper = 110;
     int BallImageProc::kBestCirclePreCannyBlurSize = 5;
     int BallImageProc::kBestCirclePreHoughBlurSize = 13;
-    double BallImageProc::kBestCircleParam1 = 120.;
-    double BallImageProc::kBestCircleParam2 = 35.;
+    double BallImageProc::kBestCircleParam1 = 300.;
+    double BallImageProc::kBestCircleParam2 = 0.65;
     double BallImageProc::kBestCircleHoughDpParam1 = 1.5;
 
     int BallImageProc::kExternallyStrobedBestCirclePreHoughBlurSize = 13;
@@ -193,11 +193,11 @@ namespace golf_sim {
     int BallImageProc::kExternallyStrobedCLAHEClipLimit = 6;
     int BallImageProc::kExternallyStrobedCLAHETilesGridSize = 6;
 
-    double BallImageProc::kBestCircleIdentificationMinRadiusRatio = 0.85;
-    double BallImageProc::kBestCircleIdentificationMaxRadiusRatio = 1.10;
+    double BallImageProc::kBestCircleIdentificationMinRadiusRatio = 0.9;
+    double BallImageProc::kBestCircleIdentificationMaxRadiusRatio = 1.2;
 
-    int BallImageProc::kGaborMaxWhitePercent = 44; // Nominal 46;
-    int BallImageProc::kGaborMinWhitePercent = 38; // Nominal 40;
+    int BallImageProc::kGaborMaxWhitePercent = 45; // Nominal 46;
+    int BallImageProc::kGaborMinWhitePercent = 39; // Nominal 40;
     std::string BallImageProc::kSpinDetectionMethod = "ml";
 
     // Model Detection Configuration
@@ -206,7 +206,7 @@ namespace golf_sim {
     #ifdef _WIN32
     std::string BallImageProc::kModelPath = "../../Software/LMSourceCode/ml_models/yolo26-ball-detector";
     #else
-    std::string BallImageProc::kModelPath = "../ml_models/yolo26-ball-detector";
+    std::string BallImageProc::kModelPath = "/etc/pitrac/models/yolo26-ball-detector";
     #endif
     float BallImageProc::kModelConfidenceThreshold = 0.5f;
     float BallImageProc::kModelNMSThreshold = 0.4f;

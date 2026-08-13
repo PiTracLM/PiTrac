@@ -33,10 +33,10 @@
 namespace golf_sim {
 
 	std::vector<float>  PulseStrobe::pulse_intervals_fast_ms_;
-	int PulseStrobe::number_bits_for_fast_on_pulse_ = 0;
+	int PulseStrobe::number_bits_for_fast_on_pulse_ = 1;
 
 	std::vector<float>  PulseStrobe::pulse_intervals_slow_ms_;
-	int PulseStrobe::number_bits_for_slow_on_pulse_ = 0;
+	int PulseStrobe::number_bits_for_slow_on_pulse_ = 1;
 
 	// Currently true for both Pi and InnoMaker cameras
 	// Should be set false if we are using the OG V1 Connector board,
@@ -62,13 +62,13 @@ namespace golf_sim {
 	bool PulseStrobe::spiOpen_ = false;
 	bool PulseStrobe::kRecordAllImages = true;
 	bool PulseStrobe::gpio_system_initialized_ = false;
-	int PulseStrobe::kPuttingStrobeDelayMs = 0;
+	int PulseStrobe::kPuttingStrobeDelayMs = 50;
 
 	long PulseStrobe::kCam2SetupPeriodMilliseconds = 2000;
 	int PulseStrobe::kNumberPrimingPulses = 12;
 	int PulseStrobe::kPrimingPulseFPS = 15;
-	int PulseStrobe::kPauseToSetUpInnoMakerExternalTriggerMilliseconds = 1000;
-	int PulseStrobe::kPauseBeforeReadyForFinalPrimingPulseMs = 100;
+	int PulseStrobe::kPauseToSetUpInnoMakerExternalTriggerMilliseconds = 500;
+	int PulseStrobe::kPauseBeforeReadyForFinalPrimingPulseMs = 400;
 
 
 	int PulseStrobe::kLastPulsePutterRepeats = 5;

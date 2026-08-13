@@ -57,20 +57,20 @@ namespace golf_sim {
     double LibCameraInterface::kCamera1Saturation = 1.0;
     double LibCameraInterface::kCamera1HighFPSGain = 15.0;
     double LibCameraInterface::kCamera1Contrast = 1.0;
-    double LibCameraInterface::kCamera2Gain = 6.0;
+    double LibCameraInterface::kCamera2Gain = 3.0;
     double LibCameraInterface::kCamera2Saturation = 1.0;
     double LibCameraInterface::kCamera2ComparisonGain = 0.8;
-    double LibCameraInterface::kCamera2Contrast = 1.0;
+    double LibCameraInterface::kCamera2Contrast = 1.2;
     double LibCameraInterface::kCamera2CalibrateOrLocationGain = 1.0;
     double LibCameraInterface::kCamera2PuttingGain = 4.0;
-    double LibCameraInterface::kCamera2PuttingContrast = 1.0;
+    double LibCameraInterface::kCamera2PuttingContrast = 1.2;
 
-    long LibCameraInterface::kCamera1StillShutterTimeuS = 15000;
+    long LibCameraInterface::kCamera1StillShutterTimeuS = 40000;
     long LibCameraInterface::kCamera2StillShutterTimeuS = 15000;
 
     // Default values are based on empirical measurements using a 6mm lens
-    int kCroppedImagePixelOffsetLeft = -5;
-    int kCroppedImagePixelOffsetUp = -13;
+    int kCroppedImagePixelOffsetLeft = 0;
+    int kCroppedImagePixelOffsetUp = -3;
 
     // The system will start in a full-screen watching mode, but ensure 
     // we set it up once just in case
