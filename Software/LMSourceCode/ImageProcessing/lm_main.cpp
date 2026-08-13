@@ -1537,8 +1537,9 @@ int main(int argc, char *argv[])
         // TBD - consider if there is a better place for this?
         GolfSimGlobals::golf_sim_running_ = true;
 
-        // Load BallImageProc configuration values after JSON config is loaded
+        // Load class configuration values after JSON config is loaded
         BallImageProc::LoadConfigurationValues();
+        GolfSimCamera::LoadConfigurationValues();
 
 	// If we have a version 3 Connector Board, then we want to ensure
 	// that it has been properly calibrated before we let the system

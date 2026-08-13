@@ -124,12 +124,9 @@ namespace golf_sim {
     bool GolfSimCamera::kUseOnlyHighQualityBallImagesForHLA = true;
 
 
-    GolfSimCamera::GolfSimCamera() {
-
-        // TBD - Probably shouldn't be doing all of this in the constructor
-
+    void GolfSimCamera::LoadConfigurationValues() {
         GS_LOG_TRACE_MSG(trace, "GolfSimCamera reading constants from JSON file.");
-        // The following constants are only used internal to the GolfSimCamera class, and so can be initialized in the constructor
+
         GolfSimConfiguration::SetConstant("gs_config.logging.kLogIntermediateExposureImagesToFile", kLogIntermediateExposureImagesToFile);
         GolfSimConfiguration::SetConstant("gs_config.logging.kLogWebserverImagesToFile", kLogWebserverImagesToFile);
         GolfSimConfiguration::SetConstant("gs_config.logging.kLogDiagnosticImagesToUniqueFiles", kLogDiagnosticImagesToUniqueFiles);
@@ -205,7 +202,9 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvMinimumHoughLineLength", kExternallyStrobedEnvMinimumHoughLineLength);
 
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallUseLargestBall", kPlacedBallUseLargestBall);
+    }
 
+    GolfSimCamera::GolfSimCamera() {
     }
 
     GolfSimCamera::~GolfSimCamera() {

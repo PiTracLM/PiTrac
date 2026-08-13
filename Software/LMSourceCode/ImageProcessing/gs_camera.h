@@ -204,6 +204,9 @@ namespace golf_sim {
 
         ~GolfSimCamera();
 
+        // Call once, after GolfSimConfiguration::Initialize
+        static void LoadConfigurationValues();
+
         // One of the main workhorses of the system.  It determines a ball in and
         // image by using various circle-identification algorithms and other processing.
         // 
