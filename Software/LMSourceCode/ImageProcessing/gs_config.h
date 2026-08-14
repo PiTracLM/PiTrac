@@ -51,13 +51,11 @@ namespace golf_sim {
 
 		static PiModel GetPiModel();
 
-		// Reads any values that need to be initialized early, such as static members of
-		// classes that won't otherwise have a good place to be otherwise initialized because,
-		// e.g., there's not constructor that will be called.
 		static bool ReadValues();
 
 		static bool PropertyExists(const std::string& value_tag);
 
+		// The served config always wins; a variable's initializer applies only when the server omits the key.
 		static void SetConstant(const std::string& value_tag, bool& constant_value);
 		static void SetConstant(const std::string& value_tag, int& constant_value);
 		static void SetConstant(const std::string& value_tag, long& constant_value);
