@@ -653,9 +653,6 @@ namespace golf_sim {
 		GS_LOG_TRACE_MSG(trace, "Sent final priming pulse. Camera 2 should be primed at this point.");
 
 		// Deal with a pre-image exposure if we need to (mostly deprecated - didn't work well)
-		GolfSimConfiguration::SetConstant("gs_config.ball_exposure_selection.kUsePreImageSubtraction", 
-												GolfSimCamera::kUsePreImageSubtraction);
-
 		if (GolfSimCamera::kUsePreImageSubtraction) {
 			GS_LOG_TRACE_MSG(trace, "Sent last priming pulse before pre-image.");
 
