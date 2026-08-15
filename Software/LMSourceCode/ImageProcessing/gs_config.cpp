@@ -205,7 +205,7 @@ bool GolfSimConfiguration::ReadValues() {
 	SetConstant("gs_config.cameras.kCamera2OffsetFromCamera1OriginMeters", GolfSimCamera::kCamera2OffsetFromCamera1OriginMeters);
 
 
-	int enclosure_type = 0;
+	int enclosure_type = 2;
 	GolfSimConfiguration::SetConstant("gs_config.system.kEnclosureVersion", enclosure_type);
 	kEnclosureVersion = (GolfSimConfiguration::EnclosureType)enclosure_type;
 

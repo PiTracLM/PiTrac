@@ -486,7 +486,7 @@ namespace golf_sim {
 
 
 			// The active-high setting will depend on which board the user sets
-			int kConnectionBoardVersionIntValue = 0;
+			int kConnectionBoardVersionIntValue = 3;
 			GolfSimConfiguration::SetConstant("gs_config.strobing.kConnectionBoardVersion", kConnectionBoardVersionIntValue);
 			GolfSimConfiguration::ConnectionBoardType kConnectionBoardVersion = (GolfSimConfiguration::ConnectionBoardType)kConnectionBoardVersionIntValue;
 
@@ -598,7 +598,7 @@ namespace golf_sim {
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kPuttingStrobeDelayMs", kPuttingStrobeDelayMs);
 
 		// Make sure we are sending pulses at a known speed.  In this case, in the "fast" setting
-		unsigned int baud_rate = 0;
+		unsigned int baud_rate = 115200;
 
 		GolfSimConfiguration::SetConstant("gs_config.strobing.kBaudRateForFastPulses", baud_rate);
 
@@ -656,14 +656,14 @@ namespace golf_sim {
 		if (GolfSimCamera::kUsePreImageSubtraction) {
 			GS_LOG_TRACE_MSG(trace, "Sent last priming pulse before pre-image.");
 
-			long kPauseBeforeSendingPreImageTriggerMs = 0;
+			long kPauseBeforeSendingPreImageTriggerMs = 300;
 			GolfSimConfiguration::SetConstant("gs_config.strobing.kPauseBeforeSendingPreImageTriggerMs", kPauseBeforeSendingPreImageTriggerMs);
 			usleep(kPauseBeforeSendingPreImageTriggerMs * 1000);
 
 			SendCameraStrobeTriggerAndShutter(lggpio_chip_handle_);
 			GS_LOG_TRACE_MSG(trace, "Sent pre-image trigger.");
 
-			long kPauseBeforeSendingImageFlushMs = 0;
+			long kPauseBeforeSendingImageFlushMs = 300;
 			GolfSimConfiguration::SetConstant("gs_config.strobing.kPauseBeforeSendingImageFlushMs", kPauseBeforeSendingImageFlushMs);
 			usleep(kPauseBeforeSendingImageFlushMs * 1000);
 
@@ -673,7 +673,7 @@ namespace golf_sim {
 
 			// It will take the camera2 system a moment to package up the pre-image and send it to the object broker and to the
 			// camera1 system (the one executing this code).  Give it a chance
-			long kPauseAfterSendingPreImageTriggerMs = 0;
+			long kPauseAfterSendingPreImageTriggerMs = 2000;
 			GolfSimConfiguration::SetConstant("gs_config.strobing.kPauseAfterSendingPreImageTriggerMs", kPauseAfterSendingPreImageTriggerMs);
 			usleep(kPauseAfterSendingPreImageTriggerMs * 1000);
 		}
@@ -712,7 +712,7 @@ namespace golf_sim {
 
 			GS_LOG_TRACE_MSG(trace, "Waiting a moment to send flush trigger.");
 
-			long kPauseBeforeSendingImageFlushMs = 0;
+			long kPauseBeforeSendingImageFlushMs = 300;
 			GolfSimConfiguration::SetConstant("gs_config.strobing.kPauseBeforeSendingImageFlushMs", kPauseBeforeSendingImageFlushMs);
 			usleep(kPauseBeforeSendingImageFlushMs * 1000);
 

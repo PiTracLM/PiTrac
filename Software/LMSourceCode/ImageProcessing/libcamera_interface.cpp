@@ -663,13 +663,13 @@ bool SendCameraCroppingCommand(const GolfSimCamera& camera, cv::Vec2i& cropping_
 
 bool ConfigurePostProcessing(const cv::Vec2i& roi_size, const cv::Vec2i& roi_offset ) {
 
-    float kDifferenceM = 0.;
-    float kDifferenceC = 0.;
-    float kRegionThreshold = 0.;
-    float kMaxRegionThreshold = 0.;
+    float kDifferenceM = 0.6;
+    float kDifferenceC = 3.;
+    float kRegionThreshold = 0.05;
+    float kMaxRegionThreshold = 0.05;
     uint kFramePeriod = 0;
-    uint kHSkip = 0;
-    uint kVSkip = 0;
+    uint kHSkip = 2;
+    uint kVSkip = 2;
 
 
     GolfSimConfiguration::SetConstant("gs_config.motion_detect_stage.kDifferenceM", kDifferenceM);

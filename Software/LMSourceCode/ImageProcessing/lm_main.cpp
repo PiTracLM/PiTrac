@@ -1544,7 +1544,7 @@ int main(int argc, char *argv[])
 	// If we have a version 3 Connector Board, then we want to ensure
 	// that it has been properly calibrated before we let the system
 	// run.
-        int kConnectionBoardVersionIntValue = 0;
+        int kConnectionBoardVersionIntValue = 3;
         GolfSimConfiguration::SetConstant("gs_config.strobing.kConnectionBoardVersion", kConnectionBoardVersionIntValue);
         GolfSimConfiguration::ConnectionBoardType kConnectionBoardVersion = (GolfSimConfiguration::ConnectionBoardType)kConnectionBoardVersionIntValue;
 

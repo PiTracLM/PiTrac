@@ -3,6 +3,7 @@ initializers it falls back on must match the defaults there."""
 
 import json
 import re
+from itertools import accumulate
 from pathlib import Path
 
 HERE = Path(__file__).parent
@@ -37,12 +38,19 @@ DYNAMIC_KEYS = {
 # The calls above plus GetConfigString forwarding its tag_name
 NON_LITERAL_SET_CONSTANT_CALLS = 6
 
-MEMBER_DEF = re.compile(r"^[ \t]*(?:static\s+)?[\w:<>]+(?:[ \t]+[\w:<>]+)?[ \t]+(\w+)::(\w+)\s*=\s*([^;]+);", re.M)
-PLAIN_DEF = re.compile(r"^[ \t]*(?:static\s+)?[\w:<>]+(?:[ \t]+[\w:<>]+)?[ \t]+(\w+)\s*=", re.M)
+DEFINITION = re.compile(r"^[ \t]*(?:static\s+)?[\w:<>]+(?:[ \t]+[\w:<>]+)?[ \t]+(?:(\w+)::)?(\w+)\s*=\s*([^;]+);", re.M)
 SET_CONSTANT = re.compile(r'SetConstant\(\s*"([^"]+)"\s*,\s*([\w:]+)\s*\)')
 
-# Comparison-mode override read into the same member as gs_config.strobing.number_bits_for_fast_on_pulse_
-SECOND_KEY_FOR_MEMBER = {"gs_config.testing.kExternallyStrobedEnvNumber_bits_for_fast_on_pulse_"}
+# Keys whose C++ fallback stays off the schema default on purpose
+NOT_SYNCED = {
+    # comparison-mode override read into the same member as gs_config.strobing.number_bits_for_fast_on_pulse_
+    "gs_config.testing.kExternallyStrobedEnvNumber_bits_for_fast_on_pulse_",
+    # rig_type 0 is no rig, so a missing key fails auto-calibration instead of assuming one
+    "gs_config.calibration.kCalibrationRigType",
+    # kBaseTestDir is a placeholder global, and a Windows path in testProjection
+    "gs_config.logging.kLinuxBaseImageLoggingDir",
+    "gs_config.logging.kPCBaseImageLoggingDir",
+}
 
 
 def test_every_key_the_cpp_reads_is_in_the_schema():
@@ -83,30 +91,39 @@ def same_value(cpp, default):
     return cpp == str(default)
 
 
-def test_cpp_member_initializers_match_the_schema_defaults():
-    members, plain, sites = {}, set(), []
-    for path in sorted(CPP_DIR.glob("*.cpp")):
-        text = re.sub(r"#ifdef _WIN32\n.*?#else\n", "", path.read_text(errors="replace"), flags=re.S)
-        for cls, name, value in MEMBER_DEF.findall(text):
-            members.setdefault(name, []).append((path.name, cls, value))
-        plain |= {(path.name, name) for name in PLAIN_DEF.findall(text)}
-        sites += [(path.name, key, target) for key, target in SET_CONSTANT.findall(text)]
+def test_cpp_initializers_match_the_schema_defaults():
+    sources = {
+        p.name: re.sub(r"#ifdef _WIN32\n.*?#else\n", "", p.read_text(errors="replace"), flags=re.S)
+        for p in sorted(CPP_DIR.glob("*.cpp"))
+    }
+    definitions = {file: list(DEFINITION.finditer(text)) for file, text in sources.items()}
+    members = [d.groups() for defs in definitions.values() for d in defs if d[1]]
 
     settings = json.loads(SCHEMA.read_text())["settings"]
     checked, drift = 0, []
-    for file, key, target in sites:
-        *scope, name = target.split("::")
-        if scope:
-            defs = [d for d in members.get(name, []) if d[1] == scope[-1]]
-        else:
-            defs = [] if (file, name) in plain else [d for d in members.get(name, []) if d[0] == file]
-        default = settings.get(key, {}).get("default")
-        value = cpp_literal(defs[0][2]) if len(defs) == 1 else None
-        if value is None or default is None or isinstance(default, (list, dict)) or key in SECOND_KEY_FOR_MEMBER:
-            continue
-        checked += 1
-        if not same_value(value, default):
-            drift.append(f"{key}: {defs[0][1]}::{name} = {defs[0][2].strip()}, schema default {default!r}")
+    for file, text in sources.items():
+        depth = [0, *accumulate((c == "{") - (c == "}") for c in text)]
+        for site in SET_CONSTANT.finditer(text):
+            key, target = site.groups()
+            *scope, name = target.split("::")
+            if scope:
+                values = [value for cls, member, value in members if (cls, member) == (scope[-1], name)]
+            else:
+                # the nearest definition above the call whose scope has not closed by then
+                values = [
+                    d[3]
+                    for d in definitions[file]
+                    if d[2] == name
+                    and d.start() < site.start()
+                    and min(depth[d.start() : site.start()]) >= depth[d.start()]
+                ][-1:]
+            default = settings.get(key, {}).get("default")
+            value = cpp_literal(values[0]) if len(values) == 1 else None
+            if value is None or default is None or isinstance(default, (list, dict)) or key in NOT_SYNCED:
+                continue
+            checked += 1
+            if not same_value(value, default):
+                drift.append(f"{key}: {target} = {values[0].strip()} in {file}, schema default {default!r}")
 
     assert checked > 150
     assert drift == []
