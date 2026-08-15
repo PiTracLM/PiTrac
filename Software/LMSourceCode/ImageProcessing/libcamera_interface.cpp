@@ -68,7 +68,6 @@ namespace golf_sim {
     long LibCameraInterface::kCamera1StillShutterTimeuS = 40000;
     long LibCameraInterface::kCamera2StillShutterTimeuS = 15000;
 
-    // Default values are based on empirical measurements using a 6mm lens
     int kCroppedImagePixelOffsetLeft = 0;
     int kCroppedImagePixelOffsetUp = -3;
 
