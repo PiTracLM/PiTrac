@@ -76,6 +76,14 @@ def _without_dotted_keys(nested: Dict[str, Any], dropped: List[str], prefix: str
     return clean
 
 
+def _as_integer(value: Any) -> Any:
+    """Truncate toward zero like stoi did; boost's integer parse rejects "35.5" outright."""
+    try:
+        return int(float(value))
+    except (TypeError, ValueError, OverflowError):
+        return value
+
+
 def _unflatten(flat: Dict[str, Any]) -> Dict[str, Any]:
     nested: Dict[str, Any] = {}
     for key, value in flat.items():
@@ -589,7 +597,7 @@ class ConfigurationManager:
                 if not isinstance(value, bool) and value not in [True, False, "true", "false"]:
                     return False, "Must be true or false"
 
-            elif setting_type == "number":
+            elif setting_type in ("number", "integer"):
                 try:
                     num_val = float(value)
                     if "min" in setting_info and num_val < setting_info["min"]:
@@ -641,6 +649,8 @@ class ConfigurationManager:
         json_settings_count = 0
         for key, setting_info in settings_metadata.items():
             value = self.get_config(key)
+            if setting_info.get("type") == "integer":
+                value = _as_integer(value)
             if value is not None:
                 self._set_nested_json(config, key, value)
                 json_settings_count += 1

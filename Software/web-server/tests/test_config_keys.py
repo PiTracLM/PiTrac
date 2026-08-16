@@ -38,7 +38,8 @@ DYNAMIC_KEYS = {
 # The calls above plus GetConfigString forwarding its tag_name
 NON_LITERAL_SET_CONSTANT_CALLS = 6
 
-DEFINITION = re.compile(r"^[ \t]*(?:static\s+)?[\w:<>]+(?:[ \t]+[\w:<>]+)?[ \t]+(?:(\w+)::)?(\w+)\s*=\s*([^;]+);", re.M)
+DEFINITION = re.compile(r"^[ \t]*(?:static\s+)?([\w:<>]+(?:[ \t]+[\w:<>]+)?)[ \t]+(?:(\w+)::)?(\w+)\s*=\s*([^;]+);", re.M)
+INTEGER_TYPES = {"int", "long", "unsigned int", "uint"}
 SET_CONSTANT = re.compile(r'SetConstant\(\s*"([^"]+)"\s*,\s*([\w:]+)\s*\)')
 
 # Keys whose C++ fallback stays off the schema default on purpose
@@ -91,39 +92,61 @@ def same_value(cpp, default):
     return cpp == str(default)
 
 
-def test_cpp_initializers_match_the_schema_defaults():
+def set_constant_sites():
+    """(file, key, target, C++ type, initializer text) for each literal-key SetConstant whose target definition is found."""
     sources = {
         p.name: re.sub(r"#ifdef _WIN32\n.*?#else\n", "", p.read_text(errors="replace"), flags=re.S)
         for p in sorted(CPP_DIR.glob("*.cpp"))
     }
     definitions = {file: list(DEFINITION.finditer(text)) for file, text in sources.items()}
-    members = [d.groups() for defs in definitions.values() for d in defs if d[1]]
+    members = [d.groups() for defs in definitions.values() for d in defs if d[2]]
 
-    settings = json.loads(SCHEMA.read_text())["settings"]
-    checked, drift = 0, []
     for file, text in sources.items():
         depth = [0, *accumulate((c == "{") - (c == "}") for c in text)]
         for site in SET_CONSTANT.finditer(text):
             key, target = site.groups()
             *scope, name = target.split("::")
             if scope:
-                values = [value for cls, member, value in members if (cls, member) == (scope[-1], name)]
+                found = [(typ, value) for typ, cls, member, value in members if (cls, member) == (scope[-1], name)]
             else:
                 # the nearest definition above the call whose scope has not closed by then
-                values = [
-                    d[3]
+                found = [
+                    (d[1], d[4])
                     for d in definitions[file]
-                    if d[2] == name
+                    if d[3] == name
                     and d.start() < site.start()
                     and min(depth[d.start() : site.start()]) >= depth[d.start()]
                 ][-1:]
-            default = settings.get(key, {}).get("default")
-            value = cpp_literal(values[0]) if len(values) == 1 else None
-            if value is None or default is None or isinstance(default, (list, dict)) or key in NOT_SYNCED:
-                continue
-            checked += 1
-            if not same_value(value, default):
-                drift.append(f"{key}: {target} = {values[0].strip()} in {file}, schema default {default!r}")
+            if len(found) == 1:
+                yield file, key, target, *found[0]
+
+
+def test_cpp_initializers_match_the_schema_defaults():
+    settings = json.loads(SCHEMA.read_text())["settings"]
+    checked, drift = 0, []
+    for file, key, target, _, initializer in set_constant_sites():
+        default = settings.get(key, {}).get("default")
+        value = cpp_literal(initializer)
+        if value is None or default is None or isinstance(default, (list, dict)) or key in NOT_SYNCED:
+            continue
+        checked += 1
+        if not same_value(value, default):
+            drift.append(f"{key}: {target} = {initializer.strip()} in {file}, schema default {default!r}")
 
     assert checked > 150
     assert drift == []
+
+
+def integer_typed(setting):
+    if setting.get("type") == "select":
+        return all(re.fullmatch(r"-?\d+", option) for option in setting.get("options", {}))
+    return setting.get("type") == "integer"
+
+
+def test_integer_cpp_targets_have_integer_schema_types():
+    """The server truncates integer-typed values for boost's integer parse, which rejects "35.5"."""
+    settings = json.loads(SCHEMA.read_text())["settings"]
+    integer_sites = [(key, typ) for _, key, _, typ, _ in set_constant_sites() if typ in INTEGER_TYPES]
+    assert len(integer_sites) > 60
+    untyped = sorted({key for key, _ in integer_sites if key in settings and not integer_typed(settings[key])})
+    assert untyped == []

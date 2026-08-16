@@ -777,6 +777,13 @@ class TestBuildGeneratedConfig:
         cfg = config_manager.build_generated_config()
         assert cfg["gs_config"]["testing"]["kBaseTestImageDir"] == "./Images/"
 
+    def test_build_generated_config_truncates_integer_settings(self, config_manager):
+        config_manager.set_config("gs_config.strobing.kPrimingPulseFPS", "35.5")
+        config_manager.set_config("gs_config.ipc_interface.kMaxCam2ImageReceivedTimeMs", 30000.0)
+        cfg = config_manager.build_generated_config()
+        assert cfg["gs_config"]["strobing"]["kPrimingPulseFPS"] == "35"
+        assert cfg["gs_config"]["ipc_interface"]["kMaxCam2ImageReceivedTimeMs"] == "30000"
+
     def test_build_generated_config_includes_former_cli_and_env(self, config_manager):
         cfg = config_manager.build_generated_config()
         # former CLI setting — gs_config.player.kGolferOrientation

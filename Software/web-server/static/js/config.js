@@ -1160,7 +1160,7 @@ async function validateInput(key, value, errorElement) {
     try {
         const metadata = configMetadata[key] || {};
 
-        if (metadata.type === 'number') {
+        if (metadata.type === 'number' || metadata.type === 'integer') {
             const num = parseFloat(value);
             if (isNaN(num)) {
                 errorElement.textContent = 'Must be a valid number';
