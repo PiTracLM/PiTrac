@@ -479,10 +479,9 @@ namespace golf_sim {
             return false;
         }
 
-        std::string camera_number_string = std::to_string(camera_number);
-            
-        std::string focal_length_tag_name = "gs_config.cameras.kCamera" + camera_number_string + "FocalLength";
-        std::string camera_angles_tag_name = "gs_config.cameras.kCamera" + camera_number_string + "Angles";
+        const bool is_camera1 = camera_number == GsCameraNumber::kGsCamera1;
+        std::string focal_length_tag_name = is_camera1 ? "gs_config.cameras.kCamera1FocalLength" : "gs_config.cameras.kCamera2FocalLength";
+        std::string camera_angles_tag_name = is_camera1 ? "gs_config.cameras.kCamera1Angles" : "gs_config.cameras.kCamera2Angles";
 
 #ifdef __unix__
         std::vector<double> angles_vector = {camera_angles[0], camera_angles[1]};
