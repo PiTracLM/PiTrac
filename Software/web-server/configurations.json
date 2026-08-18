@@ -3178,7 +3178,7 @@
       "default": 70,
       "requiresRestart": true
     },
-    "gs_config.testing.kExternallyStrobedEnvCannyLower": {
+    "gs_config.testing.kExternallyStrobedEnvCleanupCannyLower": {
       "category": "testing",
       "subcategory": "advanced",
       "displayName": "Ext Strobe Cleanup Canny Lower",
@@ -3187,7 +3187,7 @@
       "default": 156,
       "requiresRestart": true
     },
-    "gs_config.testing.kExternallyStrobedEnvCannyUpper": {
+    "gs_config.testing.kExternallyStrobedEnvCleanupCannyUpper": {
       "category": "testing",
       "subcategory": "advanced",
       "displayName": "Ext Strobe Cleanup Canny Upper",

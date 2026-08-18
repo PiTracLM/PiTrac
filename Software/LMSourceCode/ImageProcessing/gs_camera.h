@@ -168,8 +168,8 @@ namespace golf_sim {
         static int kExternallyStrobedEnvFilterHsvUpperS;
         static int kExternallyStrobedEnvFilterHsvLowerV;
         static int kExternallyStrobedEnvFilterHsvUpperV;
-        static int kExternallyStrobedEnvCannyLower;
-        static int kExternallyStrobedEnvCannyUpper;
+        static int kExternallyStrobedEnvCleanupCannyLower;
+        static int kExternallyStrobedEnvCleanupCannyUpper;
         static int kExternallyStrobedEnvCleanupPreHoughBlurSize;
         static int kExternallyStrobedEnvPreCannyBlurSize;
         static int kExternallyStrobedEnvLinesAngleLower;
