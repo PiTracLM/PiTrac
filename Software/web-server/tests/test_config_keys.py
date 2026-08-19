@@ -20,6 +20,11 @@ NOT_IN_SCHEMA = {
     "gs_config.testing.test_shots_to_inject",
 }
 
+# Keys sim_manager.py builds from the simulator name
+UNCHECKED_PREFIXES = ("simulators.",)
+# In the schema with no reader since the web server rewrite
+UNREAD = {"system.camera_role"}
+
 DEFINITION = re.compile(r"^[ \t]*(?:static\s+)?([\w:<>]+(?:[ \t]+[\w:<>]+)?)[ \t]+(?:(\w+)::)?(\w+)\s*=\s*([^;]+);", re.M)
 INTEGER_TYPES = {"int", "long", "unsigned int", "uint"}
 SET_CONSTANT = re.compile(r'SetConstant\(\s*"([^"]+)"\s*,\s*([\w:]+)\s*\)')
@@ -36,15 +41,38 @@ NOT_SYNCED = {
 }
 
 
-def test_every_key_the_cpp_reads_is_in_the_schema():
+def cpp_keys():
     source = "\n".join(p.read_text(errors="replace") for p in sorted(CPP_DIR.glob("*.cpp")))
+    return set(CALL_LITERAL.findall(source)) | set(KEY_LITERAL.findall(source))
 
-    keys = set(CALL_LITERAL.findall(source)) | set(KEY_LITERAL.findall(source))
+
+def test_every_key_the_cpp_reads_is_in_the_schema():
+    keys = cpp_keys()
     assert len(keys) > 200
 
     settings = json.loads(SCHEMA.read_text())["settings"]
     missing = sorted(keys - settings.keys() - NOT_IN_SCHEMA)
     assert missing == []
+
+
+def test_every_schema_key_has_a_reader():
+    web_source = "\n".join(
+        p.read_text(errors="replace")
+        for p in sorted(HERE.parent.rglob("*"))
+        if p.suffix in (".py", ".js", ".html") and not {"tests", "node_modules", "htmlcov"} & set(p.relative_to(HERE.parent).parts)
+    )
+    read_by_cpp = cpp_keys()
+
+    settings = json.loads(SCHEMA.read_text())["settings"]
+    unread = sorted(
+        key
+        for key in settings
+        if key not in read_by_cpp
+        and key not in web_source
+        and key not in UNREAD
+        and not key.startswith(UNCHECKED_PREFIXES)
+    )
+    assert unread == []
 
 
 def cpp_literal(text):
