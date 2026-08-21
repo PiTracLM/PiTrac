@@ -6,6 +6,7 @@ from typing import Awaitable, Callable, Dict, List, Optional
 
 from models import ShotData
 from sim_interface import SimInterface
+from sims.gspro_sim import GSProSim
 from sims.ogs_sim import OGSSim
 
 logger = logging.getLogger(__name__)
@@ -25,13 +26,25 @@ class SimManager:
         config_manager.register_callback("simulators.", self._on_config_change)
 
     def build_sims(self) -> None:
-        self._sims = {}
-        if self.config_manager.get_config("simulators.ogs.enabled"):
-            sim = OGSSim(
-                host=self.config_manager.get_config("simulators.ogs.host") or "",
-                port=int(self.config_manager.get_config("simulators.ogs.port") or 3111),
-                keepalive_sec=int(self.config_manager.get_config("simulators.ogs.keepalive_sec") or 5),
+        get = self.config_manager.get_config
+        sims: List[SimInterface] = []
+        if get("simulators.ogs.enabled"):
+            sims.append(
+                OGSSim(
+                    host=get("simulators.ogs.host") or "",
+                    port=int(get("simulators.ogs.port") or 3111),
+                    keepalive_sec=int(get("simulators.ogs.keepalive_sec") or 5),
+                )
             )
+        if get("simulators.gspro.enabled"):
+            sims.append(
+                GSProSim(
+                    host=get("simulators.gspro.host") or "",
+                    port=int(get("simulators.gspro.port") or 921),
+                )
+            )
+        self._sims = {}
+        for sim in sims:
             sim.set_status_callback(self._broadcast_status)
             self._sims[sim.name] = sim
 

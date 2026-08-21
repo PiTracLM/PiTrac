@@ -66,6 +66,29 @@ async def test_enabled_ogs_is_built():
     assert names == ["ogs"]
 
 
+def _gspro_values(enabled):
+    return {
+        "simulators.gspro.enabled": enabled, "simulators.gspro.auto_connect": False,
+        "simulators.gspro.host": "1.2.3.5", "simulators.gspro.port": 921,
+    }
+
+
+@pytest.mark.asyncio
+async def test_enabled_gspro_is_built():
+    mgr = SimManager(_StubConfig(_gspro_values(True)), broadcast=None)
+    mgr.build_sims()
+    assert [s["name"] for s in mgr.status()] == ["gspro"]
+
+
+@pytest.mark.asyncio
+async def test_both_sims_are_built():
+    cfg = _ogs_config(True)
+    cfg._v.update(_gspro_values(True))
+    mgr = SimManager(cfg, broadcast=None)
+    mgr.build_sims()
+    assert [s["name"] for s in mgr.status()] == ["ogs", "gspro"]
+
+
 @pytest.mark.asyncio
 async def test_on_shot_fans_out_and_isolates_failures():
     mgr = SimManager(_StubConfig({}), broadcast=None)
