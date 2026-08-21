@@ -22,8 +22,6 @@ NOT_IN_SCHEMA = {
 
 # Keys sim_manager.py builds from the simulator name
 UNCHECKED_PREFIXES = ("simulators.",)
-# In the schema with no reader since the web server rewrite
-UNREAD = {"system.camera_role"}
 
 DEFINITION = re.compile(r"^[ \t]*(?:static\s+)?([\w:<>]+(?:[ \t]+[\w:<>]+)?)[ \t]+(?:(\w+)::)?(\w+)\s*=\s*([^;]+);", re.M)
 INTEGER_TYPES = {"int", "long", "unsigned int", "uint"}
@@ -69,7 +67,6 @@ def test_every_schema_key_has_a_reader():
         for key in settings
         if key not in read_by_cpp
         and key not in web_source
-        and key not in UNREAD
         and not key.startswith(UNCHECKED_PREFIXES)
     )
     assert unread == []

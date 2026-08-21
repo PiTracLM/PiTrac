@@ -286,22 +286,6 @@
       "default": "2",
       "requiresRestart": true
     },
-    "system.camera_role": {
-      "category": "System",
-      "subcategory": "advanced",
-      "displayName": "Camera Role (Dual Pi Mode)",
-      "description": "Which camera this Pi controls in dual Pi mode",
-      "type": "select",
-      "options": {
-        "camera1": "Camera 1 (Primary)",
-        "camera2": "Camera 2 (Secondary)"
-      },
-      "default": "camera1",
-      "requiresRestart": true,
-      "visibleWhen": {
-        "system.mode": "dual"
-      }
-    },
     "gs_config.modes.kStartInPuttingMode": {
       "category": "System",
       "subcategory": "basic",
