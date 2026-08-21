@@ -186,7 +186,6 @@ pitrac_lm_sources += ([
 			'libcamera_jpeg.cpp',
 			'ball_watcher.cpp',
 			'ball_watcher_image_buffer.cpp',
-			'libcamera_jpeg.cpp',
 			'ball_image_proc.cpp',
 			'ncnn_detector.cpp',
 			'spin_predictor.cpp',
