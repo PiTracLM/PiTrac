@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import json
 import logging
 import math
@@ -11,6 +12,8 @@ from sims.tcp_sim import TcpSim
 logger = logging.getLogger(__name__)
 
 _MAX_SPEED_MPH = 200.0
+# Process-wide like GsSimInterface::shot_counter_, so numbers survive reconnects and sim rebuilds
+_shot_numbers = itertools.count(1)
 _ZERO_CLUB_DATA = {
     key: 0.0
     for key in (
@@ -88,32 +91,37 @@ class GSProSim(TcpSim):
     def __init__(self, host: str, port: int = 921, on_club: Optional[Callable[[str], None]] = None) -> None:
         super().__init__(host, port)
         self._on_club = on_club
-        self._shot_number = 0
 
     def _encode(self, obj: Dict[str, object]) -> bytes:
         # The layout boost's write_json gave the C++ sender
         return (json.dumps(obj, indent=4) + "\n").encode("utf-8")
 
     async def _on_connected(self) -> None:
-        self._shot_number = 0
         await self._send_obj(build_heartbeat(False))
 
     async def on_ball_state(self, ball_detected: bool) -> None:
-        if self._writer is not None:
+        if self._writer is None:
+            return
+        try:
             await self._send_or_reconnect(build_heartbeat(ball_detected))
+        except Exception:
+            pass
 
     async def send_shot(self, shot: ShotData) -> None:
         if self._writer is None:
             raise ConnectionError("GSPro not connected")
-        self._shot_number += 1
-        await self._send_or_reconnect(build_shot_payload(shot, self._shot_number))
+        await self._send_or_reconnect(build_shot_payload(shot, next(_shot_numbers)))
 
     async def _on_message(self, obj: object) -> None:
         if not isinstance(obj, dict):
             logger.warning(f"GSPro sent an unexpected message: {obj!r}")
             return
-        code = obj.get("Code")
         message = obj.get("Message", "")
+        try:
+            code = int(obj.get("Code", 0))
+        except (TypeError, ValueError):
+            logger.warning(f"GSPro sent a message with no usable Code: {obj!r}")
+            return
         if code == 201:
             player = obj.get("Player") or {}
             # GsGSProResponse treats any club but PT as the driver

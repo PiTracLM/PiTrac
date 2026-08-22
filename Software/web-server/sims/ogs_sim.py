@@ -42,6 +42,10 @@ class OGSSim(TcpSim):
         self.keepalive_sec = max(1, int(keepalive_sec))
         self._keepalive_task: Optional[asyncio.Task] = None
 
+    def _teardown_socket(self) -> None:
+        super()._teardown_socket()
+        self._keepalive_task = None
+
     def _encode(self, obj: Dict[str, object]) -> bytes:
         return (json.dumps(obj) + "\n").encode("utf-8")
 

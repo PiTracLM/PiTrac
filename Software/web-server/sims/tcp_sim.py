@@ -16,6 +16,7 @@ from sim_interface import (
 logger = logging.getLogger(__name__)
 
 _RECONNECT_BACKOFF_SEC = [1, 2, 5, 10]
+_MAX_UNPARSED_CHARS = 64 * 1024
 
 
 class TcpSim(SimInterface):
@@ -111,12 +112,15 @@ class TcpSim(SimInterface):
                     try:
                         obj, end = decoder.raw_decode(buf)
                     except json.JSONDecodeError:
-                        if buf[0] != "{":
-                            logger.warning(f"{self.display_name} sent non-JSON, dropped: {buf[:200]!r}")
+                        if buf[0] != "{" or len(buf) > _MAX_UNPARSED_CHARS:
+                            logger.warning(f"{self.display_name} sent unparseable data, dropped: {buf[:200]!r}")
                             buf = ""
                         break
                     buf = buf[end:]
-                    await self._on_message(obj)
+                    try:
+                        await self._on_message(obj)
+                    except Exception as e:
+                        logger.warning(f"{self.display_name} message handling failed: {e!r}")
         except (ConnectionError, OSError) as e:
             logger.warning(f"{self.display_name} read failed: {e}")
         await self._set_status(STATUS_ERROR, "connection closed")
