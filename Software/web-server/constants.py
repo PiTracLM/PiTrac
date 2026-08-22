@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-MPS_TO_MPH = 2.237
+MPS_TO_MPH = 2.23694
 
 HOME_DIR = Path(os.environ.get("HOME", str(Path.home())))
 PITRAC_DIR = HOME_DIR / ".pitrac"

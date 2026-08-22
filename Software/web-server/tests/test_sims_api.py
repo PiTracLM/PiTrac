@@ -1,5 +1,7 @@
 import time
 
+import pytest
+
 from models import ShotData
 
 
@@ -69,10 +71,31 @@ def test_status_or_fake_hit_is_not_forwarded_to_sims(client, server_instance):
 
     r = client.post("/api/internal/shot-result", json={
         "result_type": 7,
-        "message": "Club type was set",
+        "message": "Club type was set to Putter",
     })
     assert r.status_code == 200
 
     # Give any erroneously-scheduled task a chance to run, then confirm none did.
     _wait_for(lambda: len(calls) > 0)
     assert calls == []
+
+
+def test_sims_get_unrounded_values(client, server_instance):
+    calls = _install_on_shot_spy(server_instance)
+    client.post("/api/internal/shot-result", json={
+        "result_type": 7, "speed_mps": 65.0, "launch_angle": 12.25, "side_angle": -2.15,
+    })
+    assert _wait_for(lambda: len(calls) == 1)
+    assert calls[0].speed == pytest.approx(65.0 * 2.23694)
+    assert (calls[0].launch_angle, calls[0].side_angle) == (12.25, -2.15)
+    stored = server_instance.shot_store.get()
+    assert (stored.speed, stored.launch_angle, stored.side_angle) == (145.4, 12.2, -2.1)
+
+
+def test_status_reply_carries_armed_and_club(client, server_instance):
+    status = {"result_type": 2, "message": "Waiting for ball to be teed up."}
+    r = client.post("/api/internal/shot-result", json=status)
+    assert r.json() == {"status": "ok", "armed": True}
+    server_instance.sim_manager.set_club("gspro", "putter")
+    r = client.post("/api/internal/shot-result", json=status)
+    assert r.json() == {"status": "ok", "armed": True, "club": "putter"}

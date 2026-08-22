@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 from typing import Awaitable, Callable, Dict, List, Optional
 
@@ -10,6 +11,13 @@ from sims.gspro_sim import GSProSim
 from sims.ogs_sim import OGSSim
 
 logger = logging.getLogger(__name__)
+
+# The C++ sent a ball-detected heartbeat when it found the ball, just before the stabilization status
+_BALL_DETECTED_BY_STATUS = {
+    "Waiting For Ball": False,
+    "Waiting For Placement To Stabilize": True,
+    "Ball Placed": True,
+}
 
 BroadcastFn = Callable[[Dict[str, object]], Awaitable[None]]
 
@@ -23,6 +31,9 @@ class SimManager:
         self._sims: Dict[str, SimInterface] = {}
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self._reload_task: Optional[asyncio.Task] = None
+        self._ball_detected: Optional[bool] = None
+        self._club: Optional[str] = None
+        self._club_sim: Optional[str] = None
         config_manager.register_callback("simulators.", self._on_config_change)
 
     def build_sims(self) -> None:
@@ -41,11 +52,12 @@ class SimManager:
                 GSProSim(
                     host=get("simulators.gspro.host") or "",
                     port=int(get("simulators.gspro.port") or 921),
+                    on_club=functools.partial(self.set_club, "gspro"),
                 )
             )
         self._sims = {}
         for sim in sims:
-            sim.set_status_callback(self._broadcast_status)
+            sim.set_status_callback(functools.partial(self._on_sim_status, sim))
             self._sims[sim.name] = sim
 
     async def start(self) -> None:
@@ -93,6 +105,33 @@ class SimManager:
             except Exception as e:
                 logger.warning(f"sim {name} send_shot failed: {e}")
 
+    async def on_status(self, result_type: str) -> None:
+        ball_detected = _BALL_DETECTED_BY_STATUS.get(result_type)
+        if ball_detected is None or ball_detected == self._ball_detected:
+            return
+        self._ball_detected = ball_detected
+        for name, sim in self._sims.items():
+            if sim.status != "connected":
+                continue
+            try:
+                await sim.on_ball_state(ball_detected)
+            except Exception as e:
+                logger.warning(f"sim {name} on_ball_state failed: {e}")
+
+    @property
+    def armed(self) -> bool:
+        return all(
+            sim.armed for sim in self._sims.values() if sim.status == "connected" and hasattr(sim, "armed")
+        )
+
+    @property
+    def club(self) -> Optional[str]:
+        return self._club
+
+    def set_club(self, sim_name: str, club: str) -> None:
+        self._club = club
+        self._club_sim = sim_name
+
     async def connect(self, name: str) -> None:
         sim = self._sims.get(name)
         if sim is None:
@@ -107,6 +146,12 @@ class SimManager:
 
     def status(self) -> List[Dict[str, str]]:
         return [sim.info() for sim in self._sims.values()]
+
+    async def _on_sim_status(self, sim: SimInterface) -> None:
+        if sim.name == self._club_sim and sim.status != "connected":
+            self._club = None
+            self._club_sim = None
+        await self._broadcast_status()
 
     async def _broadcast_status(self) -> None:
         if self._broadcast is None:

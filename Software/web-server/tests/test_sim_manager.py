@@ -22,6 +22,7 @@ class _StubSim:
         self.name = "stub"
         self.display_name = "Stub"
         self.shots = []
+        self.ball_states = []
         self.connected = False
         self._cb = None
 
@@ -40,6 +41,9 @@ class _StubSim:
 
     async def send_shot(self, shot):
         self.shots.append(shot)
+
+    async def on_ball_state(self, ball_detected):
+        self.ball_states.append(ball_detected)
 
     def info(self):
         return {"name": self.name, "status": self.status}
@@ -109,6 +113,66 @@ async def test_on_shot_fans_out_and_isolates_failures():
     await mgr.on_shot(shot)  # must not raise even though boom raises
     assert good.shots == [shot]
     assert skipped.shots == []
+
+
+@pytest.mark.asyncio
+async def test_ball_state_changes_reach_sims_once():
+    mgr = SimManager(_StubConfig({}), broadcast=None)
+    sim = _StubSim()
+    sim.connected = True
+    mgr._sims = {"stub": sim}
+    for status in ("Waiting For Ball", "Waiting For Ball", "Ball Placed", "Ball Placed"):
+        await mgr.on_status(status)
+    assert sim.ball_states == [False, True]
+
+
+@pytest.mark.asyncio
+async def test_on_status_isolates_failures():
+    mgr = SimManager(_StubConfig({}), broadcast=None)
+
+    class _Boom(_StubSim):
+        async def on_ball_state(self, ball_detected):
+            raise RuntimeError("dead sim")
+
+    boom = _Boom()
+    boom.connected = True
+    good = _StubSim()
+    good.connected = True
+    mgr._sims = {"boom": boom, "good": good}
+    await mgr.on_status("Ball Placed")
+    assert good.ball_states == [True]
+
+
+@pytest.mark.asyncio
+async def test_armed_follows_sims_that_have_an_arm_state():
+    cfg = _ogs_config(True)
+    cfg._v.update(_gspro_values(True))
+    mgr = SimManager(cfg, broadcast=None)
+    assert mgr.armed is True
+    mgr.build_sims()
+    for sim in mgr._sims.values():
+        sim._status = "connected"
+    assert mgr.armed is True
+    stub = _StubSim()
+    stub.connected = True
+    stub.armed = False
+    mgr._sims["stub"] = stub
+    assert mgr.armed is False
+    stub.armed = True
+    assert mgr.armed is True
+
+
+@pytest.mark.asyncio
+async def test_gspro_club_is_kept_until_it_disconnects():
+    mgr = SimManager(_StubConfig(_gspro_values(True)), broadcast=None)
+    mgr.build_sims()
+    gspro = mgr._sims["gspro"]
+    gspro._status = "connected"
+    assert mgr.club is None
+    await gspro._on_message({"Code": 201, "Player": {"Club": "PT"}})
+    assert mgr.club == "putter"
+    await mgr.disconnect("gspro")
+    assert mgr.club is None
 
 
 @pytest.mark.asyncio

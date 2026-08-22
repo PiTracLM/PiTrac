@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -314,7 +315,7 @@ class PiTracServer:
                 self.sim_connection_manager.disconnect(websocket)
 
         @self.app.post("/api/internal/shot-result")
-        async def receive_shot_result(request: Request) -> Dict[str, str]:
+        async def receive_shot_result(request: Request) -> Dict[str, Any]:
             """Receives shot results from the C++ pitrac_lm process via HTTP POST."""
             body = await request.json()
 
@@ -324,9 +325,8 @@ class PiTracServer:
             message = str(body.get("message", ""))
 
             is_status = result_type_str in self.parser._get_status_message_strings()
-            is_fake_hit = result_type_int == 7 and message in [
-                "Club type was set", "Test message", "Configuration update",
-            ]
+            is_fake_hit = result_type_int == 7 and message.startswith("Club type was set")
+            sim_shot = None
 
             if is_status or is_fake_hit:
                 current = self.shot_store.get()
@@ -342,11 +342,14 @@ class PiTracServer:
                     timestamp=datetime.now().isoformat(),
                 )
             else:
+                speed_mph = speed_mps * MPS_TO_MPH
+                launch_angle = float(body.get("launch_angle", 0))
+                side_angle = float(body.get("side_angle", 0))
                 shot_data = ShotData(
-                    speed=round(speed_mps * MPS_TO_MPH, 1),
+                    speed=round(speed_mph, 1),
                     carry=float(body.get("carry", 0)),
-                    launch_angle=round(float(body.get("launch_angle", 0)), 1),
-                    side_angle=round(float(body.get("side_angle", 0)), 1),
+                    launch_angle=round(launch_angle, 1),
+                    side_angle=round(side_angle, 1),
                     back_spin=int(body.get("back_spin", 0)),
                     side_spin=int(body.get("side_spin", 0)),
                     result_type=result_type_str,
@@ -355,6 +358,8 @@ class PiTracServer:
                 )
                 shot_data.shot_id = body.get("shot_id")
                 shot_data.images = list(body.get("images", []))
+                # The sims round for their own protocol, so they get the values before display rounding
+                sim_shot = replace(shot_data, speed=speed_mph, launch_angle=launch_angle, side_angle=side_angle)
                 if result_type_str == "Hit":
                     shot_id = shot_data.shot_id or int(datetime.now().timestamp() * 1000)
                     images = [(Path(p).stem, p) for p in shot_data.images]
@@ -362,11 +367,19 @@ class PiTracServer:
 
             self.shot_store.update(shot_data)
             await self.connection_manager.broadcast(shot_data.to_dict())
-            if not is_status and not is_fake_hit:
-                task = asyncio.create_task(self.sim_manager.on_shot(shot_data))
+            sim_work = None
+            if is_status:
+                sim_work = self.sim_manager.on_status(result_type_str)
+            elif sim_shot is not None:
+                sim_work = self.sim_manager.on_shot(sim_shot)
+            if sim_work is not None:
+                task = asyncio.create_task(sim_work)
                 self.background_tasks.add(task)
                 task.add_done_callback(self.background_tasks.discard)
-            return {"status": "ok"}
+            reply: Dict[str, Any] = {"status": "ok", "armed": self.sim_manager.armed}
+            if self.sim_manager.club:
+                reply["club"] = self.sim_manager.club
+            return reply
 
         @self.app.post("/api/internal/image-ready")
         async def receive_image_ready(request: Request) -> Dict[str, str]:

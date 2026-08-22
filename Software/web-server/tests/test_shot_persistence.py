@@ -29,7 +29,7 @@ class TestShotPersistence:
 
     def test_fake_hit_not_persisted(self, client, server_instance):
         client.post("/api/internal/shot-result",
-                    json={"result_type": 7, "message": "Club type was set"})
+                    json={"result_type": 7, "message": "Club type was set to Putter"})
         assert server_instance.session_repo.list() == []
 
     def test_duplicate_post_is_idempotent(self, client, server_instance):

@@ -68,3 +68,6 @@ class SimInterface(ABC):
     @abstractmethod
     async def send_shot(self, shot: ShotData) -> None:
         ...
+
+    async def on_ball_state(self, ball_detected: bool) -> None:
+        pass
