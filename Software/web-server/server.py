@@ -325,10 +325,9 @@ class PiTracServer:
             message = str(body.get("message", ""))
 
             is_status = result_type_str in self.parser._get_status_message_strings()
-            is_fake_hit = result_type_int == 7 and message.startswith("Club type was set")
             sim_shot = None
 
-            if is_status or is_fake_hit:
+            if is_status:
                 current = self.shot_store.get()
                 shot_data = ShotData(
                     speed=current.speed,

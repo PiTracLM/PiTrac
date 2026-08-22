@@ -65,12 +65,11 @@ def test_real_shot_is_forwarded_to_sims(client, server_instance):
     assert isinstance(calls[0], ShotData)
 
 
-def test_status_or_fake_hit_is_not_forwarded_to_sims(client, server_instance):
-    # result_type 7 with a fake-hit message -> must NOT be forwarded
+def test_club_change_is_not_forwarded_to_sims(client, server_instance):
     calls = _install_on_shot_spy(server_instance)
 
     r = client.post("/api/internal/shot-result", json={
-        "result_type": 7,
+        "result_type": 10,
         "message": "Club type was set to Putter",
     })
     assert r.status_code == 200

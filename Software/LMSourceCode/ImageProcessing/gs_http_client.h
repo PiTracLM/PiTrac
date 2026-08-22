@@ -12,13 +12,13 @@
 
 namespace golf_sim {
 
-// HTTP client for the Python web server. Shot result posts are fire-and-forget:
-// failures are logged but don't block the shot cycle.
+// HTTP client for the Python web server. Shot result post failures are logged
+// but don't block the shot cycle.
 class GsHttpClient {
 public:
     static void Init(const std::string& host = "localhost", int port = 8080);
     static std::string FetchConfig();  // GET /api/internal/config; returns body or "" on failure
-    static void PostResult(const std::string& json_body);
+    static std::string PostResult(const std::string& json_body);  // returns the reply body or "" on failure
     static void PostImageReady(const std::string& filename);
     static bool PutJson(const std::string& path, const std::string& json_body);
     static bool UpdateCalibration(const std::string& key, double value);

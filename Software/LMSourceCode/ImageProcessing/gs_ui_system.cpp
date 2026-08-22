@@ -10,6 +10,9 @@
 #include <chrono>
 #include <filesystem>
 #include <mutex>
+#include <sstream>
+
+#include <boost/property_tree/json_parser.hpp>
 
 #include "logging_tools.h"
 
@@ -20,6 +23,8 @@
 #include "gs_sim_interface.h"
 #include "gs_camera.h"
 #include "gs_http_client.h"
+#include "gs_events.h"
+#include "gs_control_msg.h"
 #include "cv_utils.h"
 
 namespace golf_sim {
@@ -35,6 +40,7 @@ namespace golf_sim {
     long GsUISystem::current_shot_id_ = 0;
     std::vector<std::string> GsUISystem::current_shot_image_paths_;
     std::mutex GsUISystem::shot_images_mutex_;
+    std::atomic<bool> GsUISystem::sim_armed_{ true };
 
     std::string GsUISystem::CurrentShotRelativePath(const std::string& file_name) {
         std::lock_guard<std::mutex> lock(shot_images_mutex_);
@@ -95,6 +101,50 @@ namespace golf_sim {
         return json;
     }
 
+    bool GsUISystem::SimArmed() {
+        return sim_armed_;
+    }
+
+    void GsUISystem::PostResult(const std::string& json) {
+        std::string reply = GsHttpClient::PostResult(json);
+
+        // A missing field, an unreadable reply or a server that is down all leave the FSM armed.
+        bool armed = true;
+        std::string club;
+        if (!reply.empty()) {
+            try {
+                boost::property_tree::ptree pt;
+                std::istringstream reply_stream(reply);
+                boost::property_tree::read_json(reply_stream, pt);
+                armed = pt.get<std::string>("armed", "true") != "false";
+                club = pt.get<std::string>("club", "");
+            }
+            catch (const std::exception& e) {
+                GS_LOG_MSG(warning, "Could not read the web server reply: " + std::string(e.what()));
+            }
+        }
+        sim_armed_ = armed;
+
+        GolfSimClubs::GsClubType club_type;
+        GsIPCControlMsgType club_instruction;
+        if (club == "putter") {
+            club_type = GolfSimClubs::GsClubType::kPutter;
+            club_instruction = GsIPCControlMsgType::kClubChangeToPutter;
+        }
+        else if (club == "driver") {
+            club_type = GolfSimClubs::GsClubType::kDriver;
+            club_instruction = GsIPCControlMsgType::kClubChangeToDriver;
+        }
+        else {
+            return;
+        }
+
+        if (club_type != GolfSimClubs::GetCurrentClubType()) {
+            GolfSimEventElement control_message{ new GolfSimEvent::ControlMessage{ club_instruction } };
+            GolfSimEventQueue::QueueEvent(control_message);
+        }
+    }
+
 
     void GsUISystem::SendIPCErrorStatusMessage(const std::string& error_message) {
         std::string msg;
@@ -118,7 +168,7 @@ namespace golf_sim {
         }
 
         GS_LOG_TRACE_MSG(trace, "Sending error result: " + msg);
-        GsHttpClient::PostResult(BuildResultJson(
+        PostResult(BuildResultJson(
             static_cast<int>(GsIPCResultType::kError), msg,
             0, 0, 0, 0, 0, 0, images, shot_id));
     }
@@ -157,6 +207,9 @@ namespace golf_sim {
         case GsIPCResultType::kCalibrationResults:
             msg = "Returning Camera Calibration Results - see message.";
             break;
+        case GsIPCResultType::kControlMessage:
+            msg = "Control message.";
+            break;
         default:
             GS_LOG_TRACE_MSG(trace, "SendIPCStatusMessage received unknown GsIPCResultType : " + std::to_string((int)message_type));
             return false;
@@ -167,7 +220,7 @@ namespace golf_sim {
         }
 
         GS_LOG_TRACE_MSG(trace, "Sending status result: " + msg);
-        GsHttpClient::PostResult(BuildResultJson(static_cast<int>(message_type), msg));
+        PostResult(BuildResultJson(static_cast<int>(message_type), msg));
         return true;
     }
 
@@ -200,7 +253,7 @@ namespace golf_sim {
             + std::to_string(side)
             + ", (Descent Angle-NA), (Apex-NA), (Flight Time-NA), (Type-NA)");
 
-        GsHttpClient::PostResult(BuildResultJson(
+        PostResult(BuildResultJson(
             static_cast<int>(GsIPCResultType::kHit), msg,
             speed, launch, side, back_spin, side_spin, carry, images, shot_id));
     }

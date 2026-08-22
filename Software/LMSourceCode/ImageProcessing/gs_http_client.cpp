@@ -42,7 +42,7 @@ std::string GsHttpClient::FetchConfig() {
     }
 }
 
-void GsHttpClient::PostResult(const std::string& json_body) {
+std::string GsHttpClient::PostResult(const std::string& json_body) {
     try {
         httplib::Client cli(host_, port_);
         cli.set_connection_timeout(1);
@@ -54,10 +54,13 @@ void GsHttpClient::PostResult(const std::string& json_body) {
             GS_LOG_MSG(warning, "HTTP POST to web server failed (no response)");
         } else if (res->status != 200) {
             GS_LOG_MSG(warning, "HTTP POST returned status " + std::to_string(res->status));
+        } else {
+            return res->body;
         }
     } catch (const std::exception& e) {
         GS_LOG_MSG(warning, "HTTP POST exception: " + std::string(e.what()));
     }
+    return "";
 }
 
 void GsHttpClient::PostImageReady(const std::string& filename) {

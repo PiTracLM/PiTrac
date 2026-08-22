@@ -27,9 +27,9 @@ class TestShotPersistence:
         client.post("/api/internal/shot-result", json={"result_type": 2, "message": "waiting"})
         assert server_instance.session_repo.list() == []
 
-    def test_fake_hit_not_persisted(self, client, server_instance):
+    def test_club_change_not_persisted(self, client, server_instance):
         client.post("/api/internal/shot-result",
-                    json={"result_type": 7, "message": "Club type was set to Putter"})
+                    json={"result_type": 10, "message": "Club type was set to Putter"})
         assert server_instance.session_repo.list() == []
 
     def test_duplicate_post_is_idempotent(self, client, server_instance):

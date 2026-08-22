@@ -133,7 +133,7 @@ namespace golf_sim {
         GsUISystem::ResetCurrentShot();
 
         // If we're already armed, just start waiting for a ball to appear.
-        if (GsSimInterface::GetAllSystemsArmed()) {
+        if (GsUISystem::SimArmed() && GsSimInterface::GetAllSystemsArmed()) {
             GolfSimEventElement beginWaitingForBallPlacedEvent{ new GolfSimEvent::BeginWaitingForBallPlaced{ } };
             GolfSimEventQueue::QueueEvent(beginWaitingForBallPlacedEvent);
 
@@ -348,7 +348,7 @@ namespace golf_sim {
         // Wait a moment so that we're not spinning too much
         sleep(1);
 
-        if (GsSimInterface::GetAllSystemsArmed()) {
+        if (GsUISystem::SimArmed() && GsSimInterface::GetAllSystemsArmed()) {
             GolfSimEventElement beginWaitingForBallPlacedEvent{ new GolfSimEvent::BeginWaitingForBallPlaced{ } };
             GolfSimEventQueue::QueueEvent(beginWaitingForBallPlacedEvent);
 

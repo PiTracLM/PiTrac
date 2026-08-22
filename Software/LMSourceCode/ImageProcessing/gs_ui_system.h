@@ -10,6 +10,7 @@
 #ifdef __unix__  // Ignore in Windows environment
 
 
+#include <atomic>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -56,6 +57,9 @@ namespace golf_sim {
 
         static void SendIPCHitMessage(const GolfBall& result_ball, const std::string& secondary_message = "");
 
+        // Whether the web server's sims are ready for a shot, as of its last reply.
+        static bool SimArmed();
+
         // Save the image into the shared web-server directory so that the web-based 
         // golf-sim user interface can access it.  
         // Also save a uniquely-named copy to the usual images directory unless suppressed.
@@ -64,6 +68,12 @@ namespace golf_sim {
         static bool SaveWebserverImage(const std::string& file_name, const cv::Mat& img, const std::vector<GolfBall>& balls, bool suppress_diagnostic_saving = false);
 
         static void ClearWebserverImages();
+
+    private:
+        // Posts to the web server and applies the armed state and club in its reply.
+        static void PostResult(const std::string& json);
+
+        static std::atomic<bool> sim_armed_;
     };
 
 }
