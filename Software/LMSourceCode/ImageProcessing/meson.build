@@ -96,6 +96,9 @@ pitrac_lm_module_deps = [
 	libcamera_dep, thread_dep, opencv_dep, lgpio_dep, rpicam_app_dep,
 	fmt_dep, boost_dep, ssl_dep, ncnn_dep, omp_dep,]
 
+# Before subdir('core'), which rebinds boost_dep to program_options only
+e6_auth_deps = [ boost_dep, ssl_dep, thread_dep ]
+
 
 subdir('core')
 subdir('encoder')
@@ -139,7 +142,6 @@ endif
 closed_source_object_files = []
 pitrac_lm_sources = []
 e6_auth_sources = [ 'e6_auth_shim.cpp' ]
-e6_auth_deps = [ boost_dep, ssl_dep, thread_dep ]
 
 if enable_recompile_closed_source 
     message('Recompiling closed source code')
