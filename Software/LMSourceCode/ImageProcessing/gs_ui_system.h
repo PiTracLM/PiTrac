@@ -74,7 +74,6 @@ namespace golf_sim {
         static void PostResult(const std::string& json);
 
         static std::atomic<bool> sim_armed_;
-        static std::atomic<GolfSimClubs::GsClubType> last_queued_club_;
     };
 
 }

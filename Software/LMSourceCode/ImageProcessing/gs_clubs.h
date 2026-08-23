@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <atomic>
+
 // TThis is basically just a state flag for now.  It's used
 // to determine whether the system is putting or not.
 
@@ -22,6 +24,9 @@ namespace golf_sim {
 		};
 
 		static GsClubType current_club_;
+
+		// The club most recently applied or queued to be applied, from any source.
+		static std::atomic<GsClubType> latest_club_;
 
 		static GsClubType GetCurrentClubType();
 		static void SetCurrentClubType(GsClubType club_type);
