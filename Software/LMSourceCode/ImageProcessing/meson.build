@@ -138,17 +138,16 @@ endif
 
 closed_source_object_files = []
 pitrac_lm_sources = []
+e6_auth_sources = [ 'e6_auth_shim.cpp' ]
+e6_auth_deps = [ boost_dep, ssl_dep, thread_dep ]
 
 if enable_recompile_closed_source 
     message('Recompiling closed source code')
     run_command('cp', '/home/USERNAME/Dev/ClosedSourceCode/gs_e6_response.cpp.FULL', 'gs_e6_response.cpp', check:true)
-    pitrac_lm_sources += ([ 'gs_e6_response.cpp' ])
-endif
-
-if enable_recompile_closed_source 
-    message('Recompiling closed source code')
     run_command('cp', '/home/USERNAME/Dev/ClosedSourceCode/obfuscate.h', 'obfuscate.h', check:true)
     pitrac_lm_sources += ([ 'gs_e6_response.cpp' ])
+    e6_auth_sources += ([ 'gs_e6_response.cpp' ])
+    e6_auth_deps += ([ opencv_dep.partial_dependency(compile_args : true, includes : true) ])
 endif
 
 # Move the pre-compiled, closed-source object file(s) into place
@@ -247,23 +246,34 @@ exec = executable('pitrac_lm',
 	cpp_args : cpp_arguments
 	)
 
+e6_auth_lib = shared_library('pitrac_e6',
+	e6_auth_sources,
+	install : true,
+	install_dir : '/usr/lib/pitrac',
+	objects : closed_source_object_files,
+	dependencies : e6_auth_deps,
+	cpp_args : cpp_arguments
+	)
+
 # Hacky two targets, because can't figure out how to execute more than one command
 # per  target.  TBD
-custom_target('post_build1',
-  depends: exec,  # Ensure the executable is built first
-  input: exec,
-  output: 'dummy_file1',  # NOTE - command will execute in the build directory
-  command: [ 'cp', '-f', './pitrac_lm.p/gs_e6_response.cpp.o', '../ClosedSourceObjectFiles'],
-  build_by_default : true
-)
+if enable_recompile_closed_source
+    custom_target('post_build1',
+      depends: e6_auth_lib,  # Ensure the library is built first
+      input: e6_auth_lib,
+      output: 'dummy_file1',  # NOTE - command will execute in the build directory
+      command: [ 'cp', '-f', './libpitrac_e6.so.p/gs_e6_response.cpp.o', '../ClosedSourceObjectFiles'],
+      build_by_default : true
+    )
 
-custom_target('post_build2',
-  depends: exec,  # Ensure the executable is built first
-  input: exec,
-  output: 'dummy_file2',  # NOTE - command will execute in the build directory
-  command: [ 'cp', '-f', './pitrac_lm.p/gs_e6_response.cpp.o', '..'],
-  build_by_default : true
-)
+    custom_target('post_build2',
+      depends: e6_auth_lib,  # Ensure the library is built first
+      input: e6_auth_lib,
+      output: 'dummy_file2',  # NOTE - command will execute in the build directory
+      command: [ 'cp', '-f', './libpitrac_e6.so.p/gs_e6_response.cpp.o', '..'],
+      build_by_default : true
+    )
+endif
 
 summary({
             'libav encoder' : enable_libav,
