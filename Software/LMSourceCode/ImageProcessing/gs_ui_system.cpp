@@ -41,6 +41,7 @@ namespace golf_sim {
     std::vector<std::string> GsUISystem::current_shot_image_paths_;
     std::mutex GsUISystem::shot_images_mutex_;
     std::atomic<bool> GsUISystem::sim_armed_{ true };
+    std::atomic<GolfSimClubs::GsClubType> GsUISystem::last_queued_club_{ GolfSimClubs::GsClubType::kNotSelected };
 
     std::string GsUISystem::CurrentShotRelativePath(const std::string& file_name) {
         std::lock_guard<std::mutex> lock(shot_images_mutex_);
@@ -139,7 +140,8 @@ namespace golf_sim {
             return;
         }
 
-        if (club_type != GolfSimClubs::GetCurrentClubType()) {
+        // Queue a change once; modes without the FSM loop never drain the bounded event queue.
+        if (club_type != GolfSimClubs::GetCurrentClubType() && last_queued_club_.exchange(club_type) != club_type) {
             GolfSimEventElement control_message{ new GolfSimEvent::ControlMessage{ club_instruction } };
             GolfSimEventQueue::QueueEvent(control_message);
         }
