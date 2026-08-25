@@ -3,7 +3,8 @@
  * Copyright (C) 2022-2025, Verdant Consultants, LLC.
  */
 
-// C entry point to GsE6Response for the web server's E6 sim (sims/e6_auth.py).
+// C entry point that answers the E6 authentication challenge for the web
+// server's E6 sim (sims/e6_auth.py).
 // The real headers for the symbols stubbed below pull in OpenCV, so they are
 // declared here with the same signatures instead.
 
@@ -86,11 +87,24 @@ namespace {
     }();
 }
 
+// Only challenge messages reach GsE6Response: Arm and Disarm dereference the
+// null GetSimInterfaceByType stub, which would kill the web server process.
+static bool IsChallenge(const char* json) {
+    boost::property_tree::ptree pt;
+    std::istringstream ss(json);
+    boost::property_tree::read_json(ss, pt);
+    const std::string type = pt.get<std::string>("Type", "");
+    return (type == "Handshake" || type == "Challenge") && pt.count("Challenge") > 0;
+}
+
 // sims/e6_auth.py depends on these codes: reply length, 0 for no reply,
 // -1 rejected, -2 reply plus terminator larger than cap.
 extern "C" int e6_process(const char* json, char* out, size_t cap) {
     std::string reply;
     try {
+        if (!IsChallenge(json)) {
+            return -1;
+        }
         golf_sim::GsE6Response response;
         if (!response.ProcessJson(json, reply)) {
             return -1;

@@ -495,7 +495,7 @@ build_dev() {
     # Install binary
     log_info "Installing PiTrac binary..."
     install -m 755 build/pitrac_lm /usr/lib/pitrac/pitrac_lm
-    install -m 644 build/libpitrac_e6.so /usr/lib/pitrac/libpitrac_e6.so
+    install -s -m 644 build/libpitrac_e6.so /usr/lib/pitrac/libpitrac_e6.so
 
     # Remove any stale file capabilities — file capabilities trigger AT_SECURE
     # which breaks libcamera's secure_getenv() config file reading.
