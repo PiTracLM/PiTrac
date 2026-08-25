@@ -7,6 +7,7 @@ from typing import Awaitable, Callable, Dict, List, Optional
 
 from models import ShotData
 from sim_interface import SimInterface
+from sims.e6_sim import E6Sim
 from sims.gspro_sim import GSProSim
 from sims.ogs_sim import OGSSim
 
@@ -53,6 +54,15 @@ class SimManager:
                     host=get("simulators.gspro.host") or "",
                     port=int(get("simulators.gspro.port") or 921),
                     on_club=functools.partial(self.set_club, "gspro"),
+                )
+            )
+        if get("simulators.e6.enabled"):
+            sims.append(
+                E6Sim(
+                    host=get("simulators.e6.host") or "",
+                    port=int(get("simulators.e6.port") or 2483),
+                    inter_message_delay_ms=int(get("simulators.e6.inter_message_delay_ms") or 0),
+                    on_club=functools.partial(self.set_club, "e6"),
                 )
             )
         self._sims = {}

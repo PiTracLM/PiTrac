@@ -176,6 +176,26 @@ async def test_gspro_club_is_kept_until_it_disconnects():
 
 
 @pytest.mark.asyncio
+async def test_e6_is_built_and_gates_armed():
+    mgr = SimManager(_StubConfig({
+        "simulators.e6.enabled": True, "simulators.e6.auto_connect": False,
+        "simulators.e6.host": "1.2.3.6", "simulators.e6.port": 2483,
+        "simulators.e6.inter_message_delay_ms": 50,
+    }), broadcast=None)
+    mgr.build_sims()
+    assert [s["name"] for s in mgr.status()] == ["e6"]
+    e6 = mgr._sims["e6"]
+    e6._status = "connected"
+    assert mgr.armed is False
+    await e6._on_message({"Type": "SimCommand", "SubType": "Arm"})
+    assert mgr.armed is True
+    await e6._on_message({"Type": "SimCommand", "SubType": "PlayerDataModified", "Details": {"ClubType": "Putter"}})
+    assert mgr.club == "putter"
+    await e6._on_message({"Type": "SimCommand", "SubType": "Disarm"})
+    assert mgr.armed is False
+
+
+@pytest.mark.asyncio
 async def test_connect_disconnect_by_name():
     mgr = SimManager(_StubConfig({}), broadcast=None)
     sim = _StubSim()

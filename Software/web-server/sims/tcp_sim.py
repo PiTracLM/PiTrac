@@ -24,10 +24,12 @@ class TcpSim(SimInterface):
 
     Subclasses frame messages in _encode, send their greeting in _on_connected,
     and set READS to have each JSON object the simulator sends passed to _on_message.
+    One that must authenticate first sets CONNECTED_ON_OPEN False and reports connected itself.
     """
 
     CONNECT_TIMEOUT_SEC = 5
     READS = False
+    CONNECTED_ON_OPEN = True
 
     def __init__(self, host: str, port: int) -> None:
         super().__init__()
@@ -71,7 +73,8 @@ class TcpSim(SimInterface):
                 await self._set_status(STATUS_ERROR, str(e) or type(e).__name__)
                 self._schedule_reconnect()
                 return
-            await self._set_status(STATUS_CONNECTED, f"{self.host}:{self.port}")
+            if self.CONNECTED_ON_OPEN:
+                await self._set_status(STATUS_CONNECTED, f"{self.host}:{self.port}")
             if self.READS:
                 self._spawn(self._read_loop())
 
@@ -101,10 +104,11 @@ class TcpSim(SimInterface):
 
     async def _read_loop(self) -> None:
         decoder = json.JSONDecoder()
+        reader = self._reader
         buf = ""
         try:
             while True:
-                chunk = await self._reader.read(4096)
+                chunk = await reader.read(4096)
                 if not chunk:
                     break
                 buf += chunk.decode("utf-8", errors="replace")
@@ -121,6 +125,8 @@ class TcpSim(SimInterface):
                         await self._on_message(obj)
                     except Exception as e:
                         logger.warning(f"{self.display_name} message handling failed: {e!r}")
+                    if self._reader is not reader:
+                        return
         except (ConnectionError, OSError) as e:
             logger.warning(f"{self.display_name} read failed: {e}")
         await self._set_status(STATUS_ERROR, "connection closed")
