@@ -209,7 +209,9 @@ class TestConfigManager:
         }))
 
         expected_settings = {
-            "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress": "10.0.0.5",
+            "simulators.gspro.host": "10.0.0.5",
+            "simulators.gspro.enabled": True,
+            "simulators.gspro.auto_connect": True,
             "cameras.slot1.type": "4",
         }
         expected_calibration = {
@@ -367,6 +369,80 @@ class TestConfigManager:
 
         is_valid, _ = config_manager.validate_config("gs_config.cameras.kCamera1Gain", "20.0")
         assert not is_valid
+
+
+OLD_SIM = "gs_config.golf_simulator_interfaces"
+
+
+class TestRenamedSimKeys:
+    def _start(self, db, rows):
+        KeyValueRepository(db, "settings").replace_all(rows)
+        ConfigManager(db)
+        return KeyValueRepository(db, "settings").load()
+
+    def test_gspro_rows_move_and_turn_the_sim_on(self, db):
+        rows = self._start(db, {
+            f"{OLD_SIM}.GSPro.kGSProConnectAddress": "10.0.0.5",
+            f"{OLD_SIM}.GSPro.kGSProConnectPort": 9210,
+            f"{OLD_SIM}.kLaunchMonitorIdString": "My LM",
+            "cameras.slot1.type": "4",
+        })
+
+        assert rows == {
+            "simulators.gspro.host": "10.0.0.5",
+            "simulators.gspro.port": 9210,
+            "simulators.gspro.enabled": True,
+            "simulators.gspro.auto_connect": True,
+            "cameras.slot1.type": "4",
+        }
+
+    def test_e6_rows_move_and_turn_the_sim_on(self, db):
+        rows = self._start(db, {
+            f"{OLD_SIM}.E6.kE6ConnectAddress": "10.0.0.6",
+            f"{OLD_SIM}.E6.kE6ConnectPort": "2484",
+            f"{OLD_SIM}.E6.kE6InterMessageDelayMs": 75,
+        })
+
+        assert rows == {
+            "simulators.e6.host": "10.0.0.6",
+            "simulators.e6.port": 2484,
+            "simulators.e6.inter_message_delay_ms": 75,
+            "simulators.e6.enabled": True,
+            "simulators.e6.auto_connect": True,
+        }
+
+    def test_empty_address_moves_nothing_and_enables_nothing(self, db):
+        rows = self._start(db, {f"{OLD_SIM}.GSPro.kGSProConnectAddress": "", "cameras.slot1.type": "4"})
+
+        assert rows == {"cameras.slot1.type": "4"}
+
+    def test_values_equal_to_the_default_leave_no_row(self, db):
+        rows = self._start(db, {
+            f"{OLD_SIM}.GSPro.kGSProConnectPort": "921",
+            f"{OLD_SIM}.E6.kE6ConnectPort": 2483,
+            f"{OLD_SIM}.E6.kE6InterMessageDelayMs": 50,
+        })
+
+        assert rows == {}
+
+    def test_never_overwrites_a_new_key_already_set(self, db):
+        rows = self._start(db, {
+            f"{OLD_SIM}.GSPro.kGSProConnectAddress": "10.0.0.5",
+            "simulators.gspro.host": "10.0.0.9",
+        })
+
+        assert rows == {"simulators.gspro.host": "10.0.0.9"}
+
+    def test_second_start_changes_nothing(self, db):
+        self._start(db, {f"{OLD_SIM}.GSPro.kGSProConnectAddress": "10.0.0.5"})
+        ConfigManager(db).set_config("simulators.gspro.enabled", False)
+        settings = KeyValueRepository(db, "settings")
+        before = settings.load()
+
+        ConfigManager(db)
+
+        assert settings.load() == before
+        assert "simulators.gspro.enabled" not in before
 
 
 class TestArrayHandling:

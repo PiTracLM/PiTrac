@@ -24,6 +24,16 @@ from db.repositories import KeyValueRepository
 
 logger = logging.getLogger(__name__)
 
+_OLD_SIM = "gs_config.golf_simulator_interfaces"
+_RENAMED_SETTINGS = {
+    f"{_OLD_SIM}.GSPro.kGSProConnectAddress": "simulators.gspro.host",
+    f"{_OLD_SIM}.GSPro.kGSProConnectPort": "simulators.gspro.port",
+    f"{_OLD_SIM}.E6.kE6ConnectAddress": "simulators.e6.host",
+    f"{_OLD_SIM}.E6.kE6ConnectPort": "simulators.e6.port",
+    f"{_OLD_SIM}.E6.kE6InterMessageDelayMs": "simulators.e6.inter_message_delay_ms",
+    f"{_OLD_SIM}.kLaunchMonitorIdString": None,
+}
+
 
 def _deep_merge(base: Dict, override: Dict) -> Dict:
     """Recursively merge override into base"""
@@ -126,6 +136,7 @@ class ConfigurationManager:
         self.found_legacy_json = self.user_settings_path.exists() or self.calibration_data_path.exists()
         self._import_json(self._settings, self.user_settings_path)
         self._import_json(self._calibration, self.calibration_data_path)
+        self._move_renamed_keys()
         self.reload()
 
     def _load_raw_metadata(self) -> Dict[str, Any]:
@@ -216,6 +227,38 @@ class ConfigurationManager:
             logger.error(f"Imported {path} but could not rename it to {target}, will import it again next start: {e}")
             return
         logger.info(f"Imported {path} into the {repo.table} table, renamed to {target.name}")
+
+    def _move_renamed_keys(self) -> None:
+        """Move stored settings to their renamed keys in one write; an old sim address also meant connect at startup"""
+        stored = self._settings.load()
+        old_keys = [key for key in _RENAMED_SETTINGS if key in stored]
+        if not old_keys:
+            return
+
+        schema = self._raw_metadata.get("settings", {})
+        moved = {key: value for key, value in stored.items() if key not in _RENAMED_SETTINGS}
+        for old in old_keys:
+            new, value = _RENAMED_SETTINGS[old], stored[old]
+            if new is None:
+                logger.info(f"Dropping stored setting {old}={value!r}, nothing reads it any more")
+                continue
+            if new in stored:
+                logger.info(f"Dropping stored setting {old}={value!r}, {new} is already set")
+                continue
+            meta = schema.get(new, {})
+            if meta.get("type") == "integer":
+                value = _as_integer(value)
+            if value == meta.get("default"):
+                logger.info(f"Dropping stored setting {old}={value!r}, it equals the default of {new}")
+                continue
+            moved[new] = value
+            logger.info(f"Moved stored setting {old} to {new}")
+            if new.endswith(".host") and str(value).strip():
+                sim = new.rsplit(".", 1)[0]
+                moved.setdefault(f"{sim}.enabled", True)
+                moved.setdefault(f"{sim}.auto_connect", True)
+
+        self._settings.replace_all(moved)
 
     def _build_config_from_metadata(self) -> Dict[str, Any]:
         """Build configuration from metadata defaults, calibration data, and user overrides"""
