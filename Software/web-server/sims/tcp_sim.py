@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Coroutine, Dict, List, Optional
+import math
+from typing import Coroutine, Dict, List, Optional, Union
 
 from sim_interface import (
     SimInterface,
@@ -19,11 +20,20 @@ _RECONNECT_BACKOFF_SEC = [1, 2, 5, 10]
 _MAX_UNPARSED_CHARS = 64 * 1024
 
 
+def clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(high, value))
+
+
+def round1(value: float) -> float:
+    # std::round in GsResults::FormatDoubleAsString rounds halves away from zero
+    return math.copysign(math.floor(abs(value) * 10 + 0.5), value) / 10
+
+
 class TcpSim(SimInterface):
     """A sim that is a TCP client of its simulator, with reconnect.
 
     Subclasses frame messages in _encode, send their greeting in _on_connected,
-    and set READS to have each JSON object the simulator sends passed to _on_message.
+    and set READS to have each JSON object the simulator sends, with its raw text, passed to _on_message.
     One that must authenticate first sets CONNECTED_ON_OPEN False and reports connected itself.
     """
 
@@ -84,13 +94,13 @@ class TcpSim(SimInterface):
     def _encode(self, obj: Dict[str, object]) -> bytes:
         return json.dumps(obj).encode("utf-8")
 
-    async def _send_obj(self, obj: Dict[str, object]) -> None:
+    async def _send_obj(self, obj: Union[Dict[str, object], bytes]) -> None:
         if self._writer is None:
             raise ConnectionError("not connected")
-        self._writer.write(self._encode(obj))
+        self._writer.write(obj if isinstance(obj, bytes) else self._encode(obj))
         await self._writer.drain()
 
-    async def _send_or_reconnect(self, obj: Dict[str, object]) -> None:
+    async def _send_or_reconnect(self, obj: Union[Dict[str, object], bytes]) -> None:
         try:
             await self._send_obj(obj)
         except Exception as e:
@@ -99,7 +109,7 @@ class TcpSim(SimInterface):
             self._schedule_reconnect()
             raise
 
-    async def _on_message(self, obj: object) -> None:
+    async def _on_message(self, obj: object, raw: str = "") -> None:
         pass
 
     async def _read_loop(self) -> None:
@@ -120,9 +130,9 @@ class TcpSim(SimInterface):
                             logger.warning(f"{self.display_name} sent unparseable data, dropped: {buf[:200]!r}")
                             buf = ""
                         break
-                    buf = buf[end:]
+                    raw, buf = buf[:end], buf[end:]
                     try:
-                        await self._on_message(obj)
+                        await self._on_message(obj, raw)
                     except Exception as e:
                         logger.warning(f"{self.display_name} message handling failed: {e!r}")
                     if self._reader is not reader:

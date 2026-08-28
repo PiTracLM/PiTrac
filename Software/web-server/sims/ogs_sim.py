@@ -6,13 +6,9 @@ import math
 from typing import Dict, Optional
 
 from models import ShotData
-from sims.tcp_sim import TcpSim
+from sims.tcp_sim import TcpSim, clamp
 
 _READY = {"type": "device", "status": "ready"}
-
-
-def _clamp(value: float, low: float, high: float) -> float:
-    return max(low, min(high, value))
 
 
 def build_shot_payload(shot: ShotData) -> Dict[str, object]:
@@ -25,10 +21,10 @@ def build_shot_payload(shot: ShotData) -> Dict[str, object]:
         "unit": "imperial",
         "shot": {
             "ballSpeed": round(float(shot.speed), 1),
-            "verticalLaunchAngle": round(_clamp(float(shot.launch_angle), 0, 45), 1),
-            "horizontalLaunchAngle": round(_clamp(float(shot.side_angle), -45, 45), 1),
+            "verticalLaunchAngle": round(clamp(float(shot.launch_angle), 0, 45), 1),
+            "horizontalLaunchAngle": round(clamp(float(shot.side_angle), -45, 45), 1),
             "spinSpeed": spin_speed,
-            "spinAxis": round(_clamp(spin_axis, -45, 45), 1),
+            "spinAxis": round(clamp(spin_axis, -45, 45), 1),
         },
     }
 

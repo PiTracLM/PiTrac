@@ -7,7 +7,7 @@ import math
 from typing import Callable, Dict, Optional
 
 from models import ShotData
-from sims.tcp_sim import TcpSim
+from sims.tcp_sim import TcpSim, round1
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +31,6 @@ _ZERO_CLUB_DATA = {
 }
 
 
-def _round1(value: float) -> float:
-    # std::round in GsResults::FormatDoubleAsString rounds halves away from zero
-    return math.copysign(math.floor(abs(value) * 10 + 0.5), value) / 10
-
-
 def _spin_axis(back: float, side: float) -> float:
     # Same formula as GsResults::GetSpinAxis, so a negative back spin keeps the C++ sign
     if abs(side) <= 0.0001:
@@ -51,7 +46,7 @@ def _message(shot_number: int, ball: Dict[str, float], heartbeat: bool, ball_det
         "Units": "Yards",
         "ShotNumber": shot_number,
         "APIversion": "1",
-        "BallData": {key: _round1(value) for key, value in ball.items()},
+        "BallData": {key: round1(value) for key, value in ball.items()},
         "ClubData": _ZERO_CLUB_DATA,
         "ShotDataOptions": {
             "ContainsBallData": not heartbeat,
@@ -112,7 +107,7 @@ class GSProSim(TcpSim):
             raise ConnectionError("GSPro not connected")
         await self._send_or_reconnect(build_shot_payload(shot, next(_shot_numbers)))
 
-    async def _on_message(self, obj: object) -> None:
+    async def _on_message(self, obj: object, raw: str = "") -> None:
         if not isinstance(obj, dict):
             logger.warning(f"GSPro sent an unexpected message: {obj!r}")
             return

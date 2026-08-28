@@ -33,7 +33,7 @@ def _load() -> ctypes.CDLL:
     return _lib
 
 
-def _is_challenge(text: str) -> bool:
+def is_challenge(text: str) -> bool:
     try:
         message = json.loads(text)
     except ValueError:
@@ -44,7 +44,7 @@ def _is_challenge(text: str) -> bool:
 def challenge_response(text: str) -> str:
     """Answer an E6 authentication challenge (a Handshake or Challenge message carrying a Challenge field)."""
     # Other messages reach code in the closed-source object that crashes this process
-    if not _is_challenge(text):
+    if not is_challenge(text):
         raise E6AuthError("not an e6 authentication challenge")
     buf = ctypes.create_string_buffer(_BUFFER_SIZE)
     length = _load().e6_process(text.encode(), buf, _BUFFER_SIZE)

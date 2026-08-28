@@ -1,33 +1,30 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from typing import Callable, Dict, Optional
 
 from models import ShotData
-from sim_interface import STATUS_CONNECTED, STATUS_ERROR
+from sim_interface import STATUS_CONNECTED, STATUS_CONNECTING, STATUS_ERROR
 from sims import e6_auth
-from sims.gspro_sim import _round1
-from sims.ogs_sim import _clamp
-from sims.tcp_sim import TcpSim
+from sims.tcp_sim import TcpSim, clamp, round1
 
 logger = logging.getLogger(__name__)
 
-_CHALLENGE_TYPES = ("Handshake", "Challenge")
+_CLUBS = {"Putter": "putter", "Driver": "driver"}
 _ZERO_CLUB_DATA = dict.fromkeys(("ClubHeadSpeed", "ClubAngleFace", "ClubAnglePath", "ClubHeadSpeedMPH"), 0.0)
 
 
 def build_ball_data(shot: ShotData) -> Dict[str, object]:
     # The ranges E6 enforces, which GsE6Results::Format meant to apply
     ball = {
-        "BackSpin": _clamp(float(shot.back_spin), -999, 19999),
-        "BallSpeed": _clamp(float(shot.speed), 0.09, 249.9),
+        "BackSpin": clamp(float(shot.back_spin), -999, 19999),
+        "BallSpeed": clamp(float(shot.speed), 0.09, 249.9),
         "LaunchAngle": float(shot.launch_angle),
         "LaunchDirection": float(shot.side_angle),
-        "SideSpin": _clamp(float(shot.side_spin), -5999, 5999),
+        "SideSpin": clamp(float(shot.side_spin), -5999, 5999),
     }
-    return {"Type": "SetBallData", "BallData": {key: _round1(value) for key, value in ball.items()}}
+    return {"Type": "SetBallData", "BallData": {key: round1(value) for key, value in ball.items()}}
 
 
 class E6Sim(TcpSim):
@@ -35,6 +32,7 @@ class E6Sim(TcpSim):
     display_name = "E6 Connect"
     READS = True
     CONNECTED_ON_OPEN = False
+    AUTH_TIMEOUT_SEC = 10
 
     def __init__(
         self,
@@ -56,6 +54,13 @@ class E6Sim(TcpSim):
 
     async def _on_connected(self) -> None:
         await self._send_obj({"Type": "Handshake"})
+        self._spawn(self._auth_deadline())
+
+    async def _auth_deadline(self) -> None:
+        await asyncio.sleep(self.AUTH_TIMEOUT_SEC)
+        if self.status == STATUS_CONNECTING:
+            await self._set_status(STATUS_ERROR, "E6 did not authenticate")
+            self._schedule_reconnect()
 
     async def disconnect(self) -> None:
         if self._writer is not None:
@@ -88,18 +93,21 @@ class E6Sim(TcpSim):
         await self._send_or_reconnect({"Type": "SendShot"})
         await self._set_armed(False)
 
-    async def _on_message(self, obj: object) -> None:
+    async def _on_message(self, obj: object, raw: str = "") -> None:
         if not isinstance(obj, dict):
             logger.warning(f"E6 sent an unexpected message: {obj!r}")
             return
         msg_type = obj.get("Type")
-        if msg_type in _CHALLENGE_TYPES and "Challenge" in obj:
+        if e6_auth.is_challenge(raw):
+            # The exact text both ways: the object's reply is not always valid JSON, and the C++ sent it as is
             try:
-                reply = self._auth(json.dumps(obj))
-                if reply:
-                    await self._send_or_reconnect(json.loads(reply))
-            except (e6_auth.E6AuthError, ValueError) as e:
+                reply = self._auth(raw)
+                if not reply:
+                    raise e6_auth.E6AuthError("no reply to the challenge")
+            except e6_auth.E6AuthError as e:
                 await self._give_up(f"E6 authentication failed: {e}")
+                return
+            await self._send_or_reconnect(reply.encode())
         elif msg_type == "Authentication":
             if obj.get("Success") in ("true", True):
                 logger.info("E6 authenticated")
@@ -124,9 +132,10 @@ class E6Sim(TcpSim):
             await self._set_armed(False)
         elif sub_type == "PlayerDataModified":
             club_type = details.get("ClubType") if isinstance(details, dict) else None
-            logger.info(f"E6 player data: club {club_type!r}")
-            if club_type is not None and self._on_club is not None:
-                self._on_club("putter" if club_type == "Putter" else "driver")
+            club = _CLUBS.get(club_type)
+            logger.info(f"E6 player data: club {club_type!r}" + ("" if club else ", ignored"))
+            if club and self._on_club is not None:
+                self._on_club(club)
         elif sub_type == "ShotComplete":
             logger.info(f"E6 shot complete: {details}")
         else:
