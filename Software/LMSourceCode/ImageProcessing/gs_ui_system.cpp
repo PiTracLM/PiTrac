@@ -20,7 +20,6 @@
 #include "gs_options.h"
 #include "gs_clubs.h"
 #include "gs_ui_system.h"
-#include "gs_sim_interface.h"
 #include "gs_camera.h"
 #include "gs_http_client.h"
 #include "gs_events.h"
@@ -41,6 +40,7 @@ namespace golf_sim {
     std::vector<std::string> GsUISystem::current_shot_image_paths_;
     std::mutex GsUISystem::shot_images_mutex_;
     std::atomic<bool> GsUISystem::sim_armed_{ true };
+    long GsUISystem::shot_counter_ = 0;
 
     std::string GsUISystem::CurrentShotRelativePath(const std::string& file_name) {
         std::lock_guard<std::mutex> lock(shot_images_mutex_);
@@ -103,6 +103,14 @@ namespace golf_sim {
 
     bool GsUISystem::SimArmed() {
         return sim_armed_;
+    }
+
+    void GsUISystem::IncrementShotCounter() {
+        shot_counter_++;
+    }
+
+    long GsUISystem::GetShotCounter() {
+        return shot_counter_;
     }
 
     void GsUISystem::PostResult(const std::string& json) {
@@ -245,7 +253,7 @@ namespace golf_sim {
 
         std::string msg = "Ball Hit - Results returned." + secondary_message;
 
-        GS_LOG_MSG(info, "BALL_HIT_CSV, " + std::to_string(GsSimInterface::GetShotCounter())
+        GS_LOG_MSG(info, "BALL_HIT_CSV, " + std::to_string(GetShotCounter())
             + ", (carry - NA), (Total - NA), (Side Dest - NA), (Smash Factor - NA), (Club Speed - NA), "
             + std::to_string(CvUtils::MetersPerSecondToMPH(speed)) + ", "
             + std::to_string(back_spin) + ", "
@@ -274,7 +282,7 @@ namespace golf_sim {
         std::string file_name(input_file_name);
 
         if (GolfSimCamera::kLogDiagnosticImagesToUniqueFiles  && !suppress_diagnostic_saving) {
-            LoggingTools::LogImage(file_name + "_", img, std::vector < cv::Point >{}, false, "", "_Shot_" + std::to_string(GsSimInterface::GetShotCounter()));
+            LoggingTools::LogImage(file_name + "_", img, std::vector < cv::Point >{}, false, "", "_Shot_" + std::to_string(GetShotCounter()));
         }
 
         if (!GolfSimCamera::kLogWebserverImagesToFile) {

@@ -24,8 +24,6 @@ namespace golf_sim {
 		kTestSpin = 7,
 		kCamera1BallLocation = 8,
 		kCamera2BallLocation = 9,
-		kTestExternalSimMessage = 10,
-		kTestGSProServer = 11,
 		kAutomatedTesting = 12,
 		kCamera1AutoCalibrate = 13,
 		kCamera2AutoCalibrate = 14,
@@ -71,7 +69,7 @@ namespace golf_sim {
 				("version", value<bool>(&version_)->default_value(false)->implicit_value(true),
 					"Displays the build version number")
 				("system_mode", value<std::string>(&system_mode_string_)->default_value("test"),
-					"Set the system's operating mode (camera1, camera1_test_standalone, camera1Calibrate, camera2Calibrate, test_spin, camera1_ball_location, camera2_ball_location, test_gspro_server, automated_testing, camera1AutoCalibrate, camera2AutoCalibrate, test)")
+					"Set the system's operating mode (camera1, camera1_test_standalone, camera1Calibrate, camera2Calibrate, test_spin, camera1_ball_location, camera2_ball_location, automated_testing, camera1AutoCalibrate, camera2AutoCalibrate, test)")
 				("shutdown", value<bool>(&shutdown_)->default_value(false)->implicit_value(true),
 					"Request clean shutdown")
 				("cam_still_mode", value<bool>(&camera_still_mode_)->default_value(false)->implicit_value(true),
@@ -137,8 +135,6 @@ namespace golf_sim {
 		std::string msg_broker_address_;
 		std::string base_image_logging_dir_;
 		std::string web_server_share_dir_;
-		std::string e6_host_address_;
-		std::string gspro_host_address_;
 		std::string golfer_orientation_string_ = "right_handed";
 		SystemMode system_mode_ = kTest;
 		LoggingLevel logging_level_ = kWarn;

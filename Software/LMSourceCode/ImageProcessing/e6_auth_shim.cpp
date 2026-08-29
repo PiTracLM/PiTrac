@@ -63,7 +63,7 @@ namespace golf_sim {
         static std::string GenerateStringFromJsonTree(const boost::property_tree::ptree& root);
     };
 
-    // Same as gs_results.cpp
+    // The object calls this. write_json quotes every value, so numbers and booleans are unquoted here
     std::string GsResults::GenerateStringFromJsonTree(const boost::property_tree::ptree& root) {
         std::stringstream ss;
         boost::property_tree::write_json(ss, root);

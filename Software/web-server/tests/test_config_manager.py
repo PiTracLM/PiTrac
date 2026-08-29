@@ -83,17 +83,13 @@ class TestConfigManager:
 
     def test_config_validation_port(self, config_manager):
         """Test configuration validation for network ports"""
-        is_valid, _ = config_manager.validate_config("gs_config.golf_simulator_interfaces.GSPro.kGSProConnectPort", "0")
+        is_valid, _ = config_manager.validate_config("simulators.gspro.port", "0")
         assert not is_valid
 
-        is_valid, _ = config_manager.validate_config(
-            "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectPort", "70000"
-        )
+        is_valid, _ = config_manager.validate_config("simulators.gspro.port", "70000")
         assert not is_valid
 
-        is_valid, _ = config_manager.validate_config(
-            "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectPort", "8080"
-        )
+        is_valid, _ = config_manager.validate_config("simulators.gspro.port", "8080")
         assert is_valid
 
     def test_reset_all(self, setup_config_files):
@@ -159,19 +155,13 @@ class TestConfigManager:
 
     def test_nested_config_access(self, config_manager):
         """Test accessing deeply nested configuration values"""
-        config_manager.user_settings = {
-            "gs_config": {
-                "golf_simulator_interfaces": {
-                    "GSPro": {"kGSProConnectAddress": "192.168.1.100", "kGSProConnectPort": 921}
-                }
-            }
-        }
+        config_manager.user_settings = {"simulators": {"gspro": {"host": "192.168.1.100", "port": 921}}}
         config_manager._rebuild_merged_config()
 
-        port = config_manager.get_config("gs_config.golf_simulator_interfaces.GSPro.kGSProConnectPort")
+        port = config_manager.get_config("simulators.gspro.port")
         assert port == 921
 
-        address = config_manager.get_config("gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress")
+        address = config_manager.get_config("simulators.gspro.host")
         assert address == "192.168.1.100"
 
     def test_set_survives_reload(self, setup_config_files):

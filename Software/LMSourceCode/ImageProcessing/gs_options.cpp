@@ -63,8 +63,6 @@ bool GolfSimOptions::Parse(int argc, char *argv[])
 		{ "test_spin", SystemMode::kTestSpin },
 		{ "camera1_ball_location", SystemMode::kCamera1BallLocation },
 		{ "camera2_ball_location", SystemMode::kCamera2BallLocation },
-		{ "test_sim_message", SystemMode::kTestExternalSimMessage },
-		{ "test_gspro_server", SystemMode::kTestGSProServer },
 		{ "automated_testing", SystemMode::kAutomatedTesting },
 		{ "camera1AutoCalibrate", SystemMode::kCamera1AutoCalibrate },
 		{ "camera2AutoCalibrate", SystemMode::kCamera2AutoCalibrate },
@@ -153,10 +151,6 @@ void GolfSimOptions::Print() const
 		std::cout << "    base_image_logging_dir_: " << base_image_logging_dir_ << std::endl;
 	if (!web_server_share_dir_.empty())
 			std::cout << "    web_server_share_dir: " << web_server_share_dir_ << std::endl;
-	if (!e6_host_address_.empty())
-		std::cout << "    e6_host_address: " << e6_host_address_ << std::endl;
-	if (!gspro_host_address_.empty())
-		std::cout << "    gspro_host_address: " << gspro_host_address_ << std::endl;
 	std::cout << "    web_server_port: " << std::to_string(web_server_port_) << std::endl;
 	std::cout << "    pulse_test: " << std::to_string(perform_pulse_test_) << std::endl;
 	std::cout << "    golfer_orientation: " << golfer_orientation_string_ << std::endl;

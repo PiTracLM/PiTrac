@@ -19,7 +19,6 @@
 #include "gs_globals.h"
 #include "golf_ball.h"
 #include "gs_options.h"
-#include "gs_gspro_results.h"
 #include "gs_ui_system.h"
 #include "gs_config.h"
 #include "gs_results.h"
@@ -34,11 +33,6 @@
 #include "pulse_strobe.h"
 
 
-#include "gs_gspro_results.h"
-#include "gs_gspro_test_server.h"
-#include "gs_gspro_response.h"
-#include "gs_sim_interface.h"
-#include "gs_e6_interface.h"
 #include "gs_calibration.h"
 #include "gs_automated_testing.h"
 
@@ -522,7 +516,7 @@ bool testAnalyzeStrobedBalls() {
 #ifdef __unix__  // Ignore in Windows environment
     GsUISystem::SaveWebserverImage("kCameraXBallLocation_", exposures_image, exposure_balls);
 #endif
-    GsGSProResults results(result_ball);
+    GsResults results(result_ball);
     GS_LOG_TRACE_MSG(trace, "Results are: " + results.Format());
 
     PulseStrobe::DeinitGPIOSystem();
@@ -706,100 +700,6 @@ bool test_hit_trigger() {
     return true;
 }
 
-void WaitForSimArmed() {
-
-    // Wait until the system is armed.
-    while (true) {
-        if (GsSimInterface::GetAllSystemsArmed())
-            break;
-
-        GS_LOG_TRACE_MSG(info, "Waiting for interface armed...");
-#ifdef __unix__
-        sleep(1);
-#endif
-    }
-}
-
-bool WaitAndSendShotToSim(int shot_number, GsGSProResults& test_result) {
-    try {
-        GS_LOG_TRACE_MSG(trace, "Sending test shot " + std::to_string(shot_number));
-
-        if (!GsSimInterface::SendResultsToGolfSims(test_result)) {
-            GS_LOG_MSG(error, "Failed to SendResultsToGolfSim (the Golf Simulator Interface).");
-            return false;
-        }
-
-        GS_LOG_TRACE_MSG(trace, "Sent test shot " + std::to_string(shot_number));
-    }
-    catch (std::exception& e)
-    {
-        GS_LOG_MSG(error, "Failed TestGSProServer - Error was: " + std::string(e.what()));
-        return false;
-    }
-
-    return true;
-}
-
-bool TestExternalSimMessage() {
-
-    if (!GsSimInterface::InitializeSims()) {
-        GS_LOG_MSG(error, "Failed to Initialize the Golf Simulator Interface.");
-        return false;
-    }
-
-#ifdef __unix__
-    // Brief settle time for simulator connections
-    sleep(2);
-#endif
-    GolfBall ball;
-    ball.velocity_ = 123.6;
-    GsGSProResults test_result(ball);
-    test_result.speed_mph_ = 99;
-    test_result.vla_deg_ = 23.4F;
-    test_result.hla_deg_ = 1.23F;
-    test_result.back_spin_rpm_ = 3456;
-    test_result.side_spin_rpm_ = -567;
-
-#ifdef __unix__
-
-    // If we are interfacing with a TruGolf/E6 system, then we need to make sure that it is armed before
-    // sending shot information.  For GSPro, the arming is not important.
-
-    if (GsE6Interface::InterfaceIsPresent()) {
-        GS_LOG_TRACE_MSG(trace, "Waiting for E6 simulator arm message.");
-        sleep(2);
-    }
-    else {
-        sleep(1);
-    }
-#endif
-    GsSimInterface::IncrementShotCounter();
-
-    WaitForSimArmed();
-
-    if (!WaitAndSendShotToSim(GsSimInterface::GetShotCounter(), test_result)) {
-        GS_LOG_MSG(error, "Failed to WaitAndSendShotToSim (the Golf Simulator Interface).");
-    }
-
-    test_result.speed_mph_ = 55;
-    test_result.vla_deg_ = 12.3F;
-
-    GsSimInterface::IncrementShotCounter();
-
-    WaitForSimArmed();
-
-    if (!WaitAndSendShotToSim(GsSimInterface::GetShotCounter(), test_result)) {
-        GS_LOG_MSG(error, "Failed to WaitAndSendShotToSim (the Golf Simulator Interface).");
-
-    }
-    return true;
-
-    GS_LOG_TRACE_MSG(trace, "De-initializing GSPro interface.");
-    GsSimInterface::DeInitializeSims();
-
-    return true;
-}
-
 bool TestBallDeltaCalculations() {
     // Setup a couple of test balls in specific locations.  Each ball needs the same information it would have if
     // the GolfSimCamera::ComputeXyzDistanceFromOrthoCamPerspective function had been called on it
@@ -876,36 +776,6 @@ bool TestBallDeltaCalculations() {
     return true;
 }
 
-
-bool TestGSProServer() {
-    try
-    {
-        int kGSProConnectPort;
-        GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.GSPro.kGSProConnectPort", kGSProConnectPort);
-
-        boost::asio::io_context io_context;
-        GsGSProTestServer server(io_context, kGSProConnectPort);
-        GS_LOG_TRACE_MSG(trace, "About to call io_context.run()");
-        io_context.run();
-    }
-    catch (std::exception& e)
-    {
-        GS_LOG_MSG(error, "Failed TestGSProServer - Error was: " + std::string(e.what()));
-        return false;
-    }
-
-    return true;
-}
-
-void test_gspro_communication() {
-
-    GolfBall ball;
-    ball.rotation_speeds_RPM_[2] = 5000.;
-    ball.rotation_speeds_RPM_[0] = 100.;
-    GsGSProResults results(ball);
-    std::string json = results.Format();
-    GS_LOG_MSG(debug, json);
-}
 
 static std::atomic<bool> g_shutdown_requested(false);
 
@@ -1000,22 +870,19 @@ void run_main(int argc, char* argv[])
             sleep(kInterShotInjectionPauseSeconds);
 
             if (!GolfSimOptions::GetCommandLineOptions().skip_wait_armed_) {
-                while(!GsSimInterface::GetAllSystemsArmed()) {
+                // The armed state only changes on a reply, so ask again each time around
+                while(!GsUISystem::SimArmed()) {
                     sleep(2);
                     GS_LOG_MSG(info, "            Waiting for Simulator to Arm.");
+                    GsUISystem::SendIPCStatusMessage(GsIPCResultType::kWaitingForSimulatorArmed);
                 }
             } else {
                 GS_LOG_MSG(info, "            Skipping wait for simulator armed (hardware-less testing mode).");
             }
 
-            GsSimInterface::IncrementShotCounter();
+            GsUISystem::IncrementShotCounter();
 
-            // Get the result to the golf simulator ASAP
-            if (!GsSimInterface::SendResultsToGolfSims(result)) {
-                GS_LOG_MSG(error, "Could not SendResultsToGolfSim. Continuing");
-            }
-
-            // Also send to Python webserver via IPC for monitoring
+            // The web server passes the shot on to every connected sim
             GolfBall test_ball;
             test_ball.velocity_ = result.speed_mph_ * 0.44704;  // Convert mph to m/s
             test_ball.angles_ball_perspective_[0] = result.hla_deg_;
@@ -1127,9 +994,6 @@ void run_main(int argc, char* argv[])
                 return;
             }
 
-            std::string address;
-            GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress", address);
-
             if (kStartInPuttingMode) {
                 GS_LOG_MSG(info, "Starting in Putting Mode.");
                 GolfSimClubs::SetCurrentClubType(GolfSimClubs::GsClubType::kPutter);
@@ -1205,24 +1069,6 @@ void run_main(int argc, char* argv[])
 
             average_focal_length /= number_samples;
             GS_LOG_MSG(info, "====>  Average Focal Length = " + std::to_string(average_focal_length) + ".Set this value into the gs_config.json file.");
-        }
-        break;
-
-        case SystemMode::kTestExternalSimMessage:
-        {
-            if (!TestExternalSimMessage()) {
-                GS_LOG_MSG(info, "Failed to TestExternalSimMessage.");
-                return;
-            }
-        }
-        break;
-
-        case SystemMode::kTestGSProServer:
-        {
-            if (!TestGSProServer()) {
-                GS_LOG_MSG(info, "Failed to TestGSProSever.");
-                return;
-            }
         }
         break;
 
@@ -1319,10 +1165,6 @@ void run_main(int argc, char* argv[])
     }
 
 #else
-    // TBD - REMOVE -Just for testing
-    std::string address;
-    GolfSimConfiguration::SetConstant("gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress", address);
-
     if (kStartInPuttingMode) {
         GS_LOG_MSG(info, "Starting in Putting Mode.");
         GolfSimClubs::SetCurrentClubType(GolfSimClubs::GsClubType::kPutter);
@@ -1418,7 +1260,6 @@ void run_main(int argc, char* argv[])
             testAnalyzeStrobedBalls();
             // test_strobed_balls_detection();
             // TestBallPosition();
-            // test_gspro_communication();
             // testSpinDetection();
             break;
         }
@@ -1506,8 +1347,6 @@ int main(int argc, char *argv[])
             ", wait_keys=" + std::to_string(options.wait_for_key_on_images_) +
             ", practice_ball=" + std::to_string(options.practice_ball_) +
             ", search_center=" + std::to_string(options.search_center_x_) + "," + std::to_string(options.search_center_y_) +
-            ", gspro_host_address=" + options.gspro_host_address_ +
-            ", e6_host_address=" + options.e6_host_address_ +
             ", slot1 type/lens/orientation=" + std::to_string(GolfSimCamera::kSystemSlot1CameraType) + "/" +
                 std::to_string(GolfSimCamera::kSystemSlot1LensType) + "/" + std::to_string(GolfSimCamera::kSystemSlot1CameraOrientation) +
             ", slot2 type/lens/orientation=" + std::to_string(GolfSimCamera::kSystemSlot2CameraType) + "/" +

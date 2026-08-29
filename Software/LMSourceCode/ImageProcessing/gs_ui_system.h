@@ -60,6 +60,10 @@ namespace golf_sim {
         // Whether the web server's sims are ready for a shot, as of its last reply.
         static bool SimArmed();
 
+        // Numbers each shot for the log lines and image names.
+        static void IncrementShotCounter();
+        static long GetShotCounter();
+
         // Save the image into the shared web-server directory so that the web-based 
         // golf-sim user interface can access it.  
         // Also save a uniquely-named copy to the usual images directory unless suppressed.
@@ -74,6 +78,8 @@ namespace golf_sim {
         static void PostResult(const std::string& json);
 
         static std::atomic<bool> sim_armed_;
+
+        static long shot_counter_;
     };
 
 }

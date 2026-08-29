@@ -638,50 +638,6 @@
       "default": 0.0,
       "requiresRestart": false
     },
-    "gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "E6 Connect Address",
-      "description": "IP address of E6 Connect simulator",
-      "type": "ip_address",
-      "default": "",
-      "requiresRestart": false
-    },
-    "gs_config.golf_simulator_interfaces.E6.kE6ConnectPort": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "E6 Connect Port",
-      "description": "Port number for E6 Connect simulator",
-      "type": "number",
-      "min": 1,
-      "max": 65535,
-      "default": 2483,
-      "requiresRestart": true
-    },
-    "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "GSPro Address",
-      "description": "IP address of GSPro simulator (e.g., 192.168.1.100)",
-      "type": "ip_address",
-      "default": "",
-      "requiresRestart": false
-    },
-    "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectPort": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "GSPro Port",
-      "description": "Port number for GSPro simulator",
-      "type": "integer",
-      "min": 1,
-      "max": 65535,
-      "default": 921,
-      "requiresRestart": true
-    },
     "simulators.ogs.enabled": {
       "category": "Simulators",
       "subcategory": "basic",
@@ -1658,26 +1614,6 @@
       "max": 60000,
       "default": 40000,
       "requiresRestart": true
-    },
-    "gs_config.golf_simulator_interfaces.E6.kE6InterMessageDelayMs": {
-      "category": "Simulators",
-      "subcategory": "advanced",
-      "displayName": "E6 Inter-Message Delay (ms)",
-      "description": "Delay between E6 messages in milliseconds",
-      "type": "integer",
-      "min": 0,
-      "max": 500,
-      "default": 50,
-      "requiresRestart": false
-    },
-    "gs_config.golf_simulator_interfaces.kLaunchMonitorIdString": {
-      "category": "Simulators",
-      "subcategory": "advanced",
-      "displayName": "Launch Monitor ID String",
-      "description": "Identification string sent to golf simulators",
-      "type": "text",
-      "default": "PiTrac LM 0.1",
-      "requiresRestart": false
     },
     "gs_config.club_data.kEnableClubImages": {
       "category": "Club Data",

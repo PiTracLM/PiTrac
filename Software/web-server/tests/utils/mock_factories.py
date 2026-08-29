@@ -18,7 +18,7 @@ class MockConfigManagerFactory:
 
         manager.get_config.return_value = {
             "cameras": {"camera1_gain": 2.0, "camera2_gain": 4.0},
-            "simulators": {"gspro_host": "192.168.1.100", "gspro_port": 921},
+            "simulators": {"gspro": {"host": "192.168.1.100", "port": 921}},
             "logging": {"level": "info"},
         }
 
@@ -27,7 +27,7 @@ class MockConfigManagerFactory:
         manager.get_categories.return_value = {
             "Basic": {"basic": [], "advanced": []},
             "Cameras": {"basic": ["cameras.camera1_gain"], "advanced": ["cameras.camera2_gain"]},
-            "Simulators": {"basic": ["simulators.gspro_host"], "advanced": ["simulators.gspro_port"]},
+            "Simulators": {"basic": ["simulators.gspro.host"], "advanced": ["simulators.gspro.port"]},
         }
 
         manager.set_config.return_value = (True, "Configuration updated", False)
@@ -46,8 +46,8 @@ class MockConfigManagerFactory:
             "logging.level": "info",
             "storage.image_dir": "/var/pitrac/images",
             "storage.web_share_dir": "/var/pitrac/web",
-            "gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress": "192.168.1.100",
-            "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress": "192.168.1.101",
+            "simulators.e6.host": "192.168.1.100",
+            "simulators.gspro.host": "192.168.1.101",
             "gs_config.cameras.kCamera1Gain": 1.0,
             "gs_config.cameras.kCamera2Gain": 4.0,
         }

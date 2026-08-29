@@ -26,7 +26,6 @@
 #include "ball_image_proc.h"
 #include "gs_http_client.h"
 #include "gs_ui_system.h"
-#include "gs_sim_interface.h"
 #include "pulse_strobe.h"
 #include "libcamera_interface.h"
 
@@ -133,7 +132,7 @@ namespace golf_sim {
         GsUISystem::ResetCurrentShot();
 
         // If we're already armed, just start waiting for a ball to appear.
-        if (GsUISystem::SimArmed() && GsSimInterface::GetAllSystemsArmed()) {
+        if (GsUISystem::SimArmed()) {
             GolfSimEventElement beginWaitingForBallPlacedEvent{ new GolfSimEvent::BeginWaitingForBallPlaced{ } };
             GolfSimEventQueue::QueueEvent(beginWaitingForBallPlacedEvent);
 
@@ -171,7 +170,6 @@ namespace golf_sim {
         // TBD - see if we need to move this back to the initializating state
         if (!waitingForBallState.already_sent_waiting_ipc_message) {
             GsUISystem::SendIPCStatusMessage(GsIPCResultType::kWaitingForBallToAppear);
-            GsSimInterface::SendHeartbeat(false);
         }
 
         // This check will be called repeatedly by re-queuing events.
@@ -189,8 +187,6 @@ namespace golf_sim {
         }
 
         if (found) {
-            // Inform connected sims that the ball is on the tee.
-            GsSimInterface::SendHeartbeat(true);
             if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1Calibrate ||
                 GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2Calibrate) {
 
@@ -291,7 +287,7 @@ namespace golf_sim {
         GS_LOG_MSG(info, "=============== Ball Stabilized - Let's Play Golf!  (Waiting for hit)\n\n");
 
         // Whatever happens, this is a new shot with a new shot number
-        GsSimInterface::IncrementShotCounter();
+        GsUISystem::IncrementShotCounter();
 
         // Arm Camera2 thread to start waiting for the external trigger
         g_cam2_thread.arm();
@@ -312,7 +308,7 @@ namespace golf_sim {
             if (GolfSimCamera::kLogDiagnosticImagesToUniqueFiles) {
                 // Save a unique version of the webserver image into a directory that will not get
                 // over-written.  A unique timestamp will be added to the file name
-                LoggingTools::LogImage(kWebServerLastTeedBallImage + "_", img, std::vector < cv::Point >{}, false, "", "_Shot_" + std::to_string(GsSimInterface::GetShotCounter()));
+                LoggingTools::LogImage(kWebServerLastTeedBallImage + "_", img, std::vector < cv::Point >{}, false, "", "_Shot_" + std::to_string(GsUISystem::GetShotCounter()));
 
             }
 
@@ -348,7 +344,7 @@ namespace golf_sim {
         // Wait a moment so that we're not spinning too much
         sleep(1);
 
-        if (GsUISystem::SimArmed() && GsSimInterface::GetAllSystemsArmed()) {
+        if (GsUISystem::SimArmed()) {
             GolfSimEventElement beginWaitingForBallPlacedEvent{ new GolfSimEvent::BeginWaitingForBallPlaced{ } };
             GolfSimEventQueue::QueueEvent(beginWaitingForBallPlacedEvent);
 
@@ -457,7 +453,7 @@ namespace golf_sim {
 
             GsUISystem::SendIPCErrorStatusMessage("GolfSim FSM could not ProcessReceivedCam2Image.");
 
-            GS_LOG_MSG(info, "BALL_HIT_CSV, " + std::to_string(GsSimInterface::GetShotCounter()) + ", (carry - Error), (Total - Error), (Side Dest - Error), (Smash Factor - Error), (Club Speed - Error), "
+            GS_LOG_MSG(info, "BALL_HIT_CSV, " + std::to_string(GsUISystem::GetShotCounter()) + ", (carry - Error), (Total - Error), (Side Dest - Error), (Smash Factor - Error), (Club Speed - Error), "
                 + std::to_string(0) + ", "
                 + std::to_string(0) + ", "
                 + std::to_string(0) + ", "
@@ -470,13 +466,6 @@ namespace golf_sim {
         else {
 
             GS_LOG_TRACE_MSG(trace, "Received and processed cam2ImageReceived.  Now sending Results to any connected Golf Simulator");
-            GsResults results(result_ball);
-
-
-            // Get the result to the golf simulator ASAP
-            if (!GsSimInterface::SendResultsToGolfSims(results)) {
-                GS_LOG_MSG(error, "GolfSim FSM could not SendResultsToGolfSim.");
-            }
 
             GS_LOG_TRACE_MSG(trace, "Received and processed cam2ImageReceived.  Now sending an IPC Results Message:");
 
@@ -809,8 +798,6 @@ namespace golf_sim {
 
         std::this_thread::yield();
 
-        GsSimInterface::DeInitializeSims();
-
         GS_LOG_TRACE_MSG(trace, "System shutdown complete");
 
         PulseStrobe::DeinitGPIOSystem();
@@ -827,8 +814,6 @@ namespace golf_sim {
         // These modes use test images or simulate functionality without cameras
         bool skip_camera = (mode == SystemMode::kTest ||
                            mode == SystemMode::kTestSpin ||
-                           mode == SystemMode::kTestExternalSimMessage ||
-                           mode == SystemMode::kTestGSProServer ||
                            mode == SystemMode::kAutomatedTesting);
 
         if (!skip_camera) {
@@ -846,11 +831,6 @@ namespace golf_sim {
 
         if (!PulseStrobe::InitGPIOSystem(default_signal_handler)) {
             GS_LOG_MSG(error, "Failed to InitGPIOSystem.");
-            return false;
-        }
-
-        if (!GsSimInterface::InitializeSims()) {
-            GS_LOG_MSG(error, "Failed to Initialize the Golf Simulator Interface.");
             return false;
         }
 

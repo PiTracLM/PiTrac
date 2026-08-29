@@ -33,13 +33,6 @@ namespace golf_sim {
         // to the right.
         float GetSpinAxis() const;
 
-        // Deals with problem where Boost will put double-quotes around double values
-        static std::string FormatDoubleAsString(const double value);
-        
-        // Helper that converts a boost JSON tree into a string.  Includes processing that
-        // will remove extraneous quotes.
-        static std::string GenerateStringFromJsonTree(const boost::property_tree::ptree& root);
-
 
     public:
         long shot_number_ = 0;
@@ -49,12 +42,6 @@ namespace golf_sim {
         int back_spin_rpm_ = 0;
         int side_spin_rpm_ = 0;     // Negative is left (counter-clockwise from above ball)
         GolfSimClubs::GsClubType club_type_ = GolfSimClubs::GsClubType::kNotSelected;
-
-        // Some systems need a keep-alive
-        bool result_message_is_keepalive_ = false;
-        bool heartbeat_launch_monitor_ready_ = true;
-        bool heartbeat_ball_detected_ = false;
-
     };
 
 }

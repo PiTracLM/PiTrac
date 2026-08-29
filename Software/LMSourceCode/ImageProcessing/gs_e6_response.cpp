@@ -20,9 +20,7 @@
 #include "gs_events.h"
 #include "gs_control_msg.h"
 
-#include "gs_e6_interface.h"
 #include "gs_e6_response.h"
-#include "gs_e6_results.h"
 
 
 namespace golf_sim {

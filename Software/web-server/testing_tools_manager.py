@@ -97,14 +97,6 @@ class TestingToolsManager:
                 "requires_sudo": False,
                 "timeout": 120,
             },
-            "test_gspro_server": {
-                "name": "Test GSPro Server",
-                "description": "Test GSPro server connectivity",
-                "category": "connectivity",
-                "args": ["--system_mode", "test_gspro_server"],
-                "requires_sudo": False,
-                "timeout": 30,
-            },
         }
 
     def get_available_tools(self) -> Dict[str, Any]:

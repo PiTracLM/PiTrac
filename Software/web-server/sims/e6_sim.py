@@ -16,7 +16,7 @@ _ZERO_CLUB_DATA = dict.fromkeys(("ClubHeadSpeed", "ClubAngleFace", "ClubAnglePat
 
 
 def build_ball_data(shot: ShotData) -> Dict[str, object]:
-    # The ranges E6 enforces, which GsE6Results::Format meant to apply
+    # The ranges E6 enforces
     ball = {
         "BackSpin": clamp(float(shot.back_spin), -999, 19999),
         "BallSpeed": clamp(float(shot.speed), 0.09, 249.9),

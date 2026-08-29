@@ -12,7 +12,7 @@ from sims.tcp_sim import TcpSim, round1
 logger = logging.getLogger(__name__)
 
 _MAX_SPEED_MPH = 200.0
-# Process-wide like GsSimInterface::shot_counter_, so numbers survive reconnects and sim rebuilds
+# Process-wide, so numbers survive reconnects and sim rebuilds
 _shot_numbers = itertools.count(1)
 _ZERO_CLUB_DATA = {
     key: 0.0
@@ -119,7 +119,7 @@ class GSProSim(TcpSim):
             return
         if code == 201:
             player = obj.get("Player") or {}
-            # GsGSProResponse treats any club but PT as the driver
+            # Any club but PT counts as the driver
             club = "putter" if player.get("Club") == "PT" else "driver"
             logger.info(f"GSPro player info: club {player.get('Club')!r}, handed {player.get('Handed')!r}")
             if self._on_club is not None:

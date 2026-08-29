@@ -54,15 +54,6 @@ static void PopulateOptionsFromConfig() {
 	GolfSimConfiguration::SetConstant("gs_config.player.kUsePracticeBalls", options.practice_ball_);
 	GolfSimConfiguration::SetConstant("gs_config.cameras.kCamera1SearchCenterX", options.search_center_x_);
 	GolfSimConfiguration::SetConstant("gs_config.cameras.kCamera1SearchCenterY", options.search_center_y_);
-
-	std::string gspro_address = GetConfigString("gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress");
-	if (!gspro_address.empty()) {
-		options.gspro_host_address_ = gspro_address;
-	}
-	std::string e6_address = GetConfigString("gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress");
-	if (!e6_address.empty()) {
-		options.e6_host_address_ = e6_address;
-	}
 }
 
 	bool GolfSimConfiguration::Initialize() {

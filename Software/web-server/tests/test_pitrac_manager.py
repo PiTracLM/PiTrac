@@ -22,8 +22,8 @@ class TestPiTracProcessManager:
             "logging.level": "info",
             "storage.image_dir": "/var/pitrac/images",
             "storage.web_share_dir": "/var/pitrac/web",
-            "gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress": "192.168.1.100",
-            "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress": "192.168.1.101",
+            "simulators.e6.host": "192.168.1.100",
+            "simulators.gspro.host": "192.168.1.101",
             "gs_config.cameras.kCamera1Gain": 1.0,
             "gs_config.cameras.kCamera2Gain": 4.0,
         }

@@ -147,29 +147,14 @@ if enable_recompile_closed_source
     message('Recompiling closed source code')
     run_command('cp', '/home/USERNAME/Dev/ClosedSourceCode/gs_e6_response.cpp.FULL', 'gs_e6_response.cpp', check:true)
     run_command('cp', '/home/USERNAME/Dev/ClosedSourceCode/obfuscate.h', 'obfuscate.h', check:true)
-    pitrac_lm_sources += ([ 'gs_e6_response.cpp' ])
     e6_auth_sources += ([ 'gs_e6_response.cpp' ])
     e6_auth_deps += ([ opencv_dep.partial_dependency(compile_args : true, includes : true) ])
 endif
 
-# Move the pre-compiled, closed-source object file(s) into place
-# This is a workaround to the fact that meson will not allow paths in the 
-# output and input parameters of a custom_target
-create_closed_source_objects = find_program('create_closed_source_objects.sh')
-closed_source_target = custom_target('copy_closed_source_object',
-    input : 'gs_e6_results.cpp',
-    output : 'gs_e6_response.cpp.o',
-    command : [ create_closed_source_objects, '@INPUT@', '@OUTPUT@'],
-)
-
 if not enable_recompile_closed_source 
     message('Using pre-compiled closed object_code')
-    pitrac_lm_sources += ([ closed_source_target, ])
-    closed_source_object_files += (['gs_e6_response.cpp.o'])
-endif
-
-if not enable_recompile_closed_source 
     r = run_command ( 'cp', '-f', './ClosedSourceObjectFiles/gs_e6_response.cpp.o', '.', check:true)
+    closed_source_object_files += (['gs_e6_response.cpp.o'])
 endif
 
 libav_dep_names = ['libavcodec', 'libavdevice', 'libavformat', 'libavutil', 'libswresample']
@@ -204,20 +189,12 @@ pitrac_lm_sources += ([
 			'gs_options.cpp',
 			'gs_config.cpp',
 			'gs_shot_parameters.cpp',
-			'gs_sim_interface.cpp',
-			'gs_gspro_interface.cpp',
-			'gs_gspro_response.cpp',
-			'gs_gspro_test_server.cpp',
-			'gs_sim_socket_interface.cpp',
-                        'gs_e6_interface.cpp',
-                        'gs_e6_results.cpp',
 			'logging_tools.cpp',
 			'gs_events.cpp',
 			'worker_thread.cpp',
 			'camera_hardware.cpp',
                         'gs_control_msg.cpp',
                         'gs_results.cpp',
-                        'gs_gspro_results.cpp',
                         'gs_ui_system.cpp',
                         'gs_result_types.cpp',
                         'gs_http_client.cpp',
@@ -243,7 +220,6 @@ exec = executable('pitrac_lm',
 	pitrac_lm_sources,
 	include_directories : pitrac_lm_include_dirs,
 	install : true,
-        objects : closed_source_object_files,
 	dependencies : pitrac_lm_module_deps,
 	cpp_args : cpp_arguments
 	)
