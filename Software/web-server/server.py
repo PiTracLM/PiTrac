@@ -38,7 +38,7 @@ CHARUCO_MARKER_LENGTH = 0.017
 # Locked to defeat AE/AWB/tuning drift across calibration frames (sub-pixel
 # corner bias). Tuning file matches production rcPi5GS.sh; shutter is shorter
 # than production (11 vs 20 ms) to limit hand-tremor blur.
-RPICAM_TUNING_FILE = "/usr/share/libcamera/ipa/rpi/pisp/imx296_noir.json"
+RPICAM_TUNING_FILE = "/usr/share/libcamera/ipa/rpi/pisp/imx296_noir.json"  # NOTE - Mira220 will need a different tuning file.  For now, folks can just put the Mira220 file in this file
 RPICAM_CAL_SHUTTER_US = 11000
 RPICAM_CAL_GAIN = 1.3
 

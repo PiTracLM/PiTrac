@@ -751,8 +751,10 @@ bool ConfigureLibCameraOptions(const GolfSimCamera& camera, RPiCamEncoder& app, 
 
     options->Set().timeout.set("100000s");
 
+    // TBD - Internet suggests that the Mira220 also needs cdn_off 
     const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot1CameraType;
-    if (camera_model != CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+    if (camera_model != CameraHardware::CameraModel::InnoMakerIMX296GS_Mono &&
+        camera_model != CameraHardware::CameraModel::Mira220_Mono) {
         options->Set().denoise = "cdn_off";
     }
     else {
@@ -1117,7 +1119,8 @@ LibcameraJpegApp* ConfigureForLibcameraStill(const GolfSimCamera& camera) {
         options->Set().contrast = camera_contrast;
         options->Set().timeout.set("100000s");
         const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot1CameraType;
-        if (camera_model != CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+        if (camera_model != CameraHardware::CameraModel::InnoMakerIMX296GS_Mono &&
+            camera_model != CameraHardware::CameraModel::Mira220_Mono) {
             options->Set().denoise = "cdn_off";
         }
         else {
@@ -1417,7 +1420,8 @@ bool WaitForCam2Trigger(cv::Mat& return_image) {
 	// JPMOD
         options->Set().timeout.set("100000s");  // Wait forever for external trigger
         const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot1CameraType;
-        if (camera_model != CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+        if (camera_model != CameraHardware::CameraModel::InnoMakerIMX296GS_Mono &&
+            camera_model != CameraHardware::CameraModel::Mira220_Mono) {
             options->Set().denoise = "cdn_off";
         }
         else {
