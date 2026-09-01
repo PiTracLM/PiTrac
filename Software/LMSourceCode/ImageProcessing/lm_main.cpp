@@ -54,13 +54,6 @@ static constexpr std::string_view TEST_IMAGE_PREFIX = "TEST_RESULT_GetBall_";
 std::string kBaseTestDir = "Will be set from the .json configuration file";
 
 
-BallImageProc *get_ball_image_processor() {
-    BallImageProc  *ip = new BallImageProc;
-    // TBD - Setup as necessary
-    return ip;
-}
-
-
 void test_image(std::string_view subdir, std::string_view filename) {
     BOOST_LOG_FUNCTION();
 
@@ -101,7 +94,7 @@ void test_image(std::string_view subdir, std::string_view filename) {
         }
     }
 
-    BallImageProc *ip = get_ball_image_processor();
+    BallImageProc *ip = BallImageProc::get_ball_image_processor();
 
     cv::Mat img = cv::imread(fname, cv::IMREAD_COLOR);
     ip->image_name_ = fname;
@@ -545,7 +538,7 @@ bool test_strobed_balls_detection() {
         return false;
     }
 
-    BallImageProc *ip = get_ball_image_processor();
+    BallImageProc *ip = BallImageProc::get_ball_image_processor();
 
     ip->image_name_ = kBaseTestDir + kCam1BallOnTee;
 
