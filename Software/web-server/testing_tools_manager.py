@@ -35,7 +35,7 @@ class TestingToolsManager:
                 "name": "Test Uploaded Image",
                 "description": "Run full pipeline on uploaded flight camera image",
                 "category": "testing",
-                "args": ["--system_mode", "test", "--skip_wait_armed"],
+                "args": ["--system_mode", "test"],
                 "requires_sudo": False,
                 "timeout": 60,
                 "uses_uploaded_image": True,

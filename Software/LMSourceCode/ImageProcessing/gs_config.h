@@ -71,8 +71,6 @@ namespace golf_sim {
 		static void SetConstant(const std::string& tag_name, cv::Mat& matrix);
 
 
-		static bool ReadShotInjectionData(std::vector<GsResults>& shots,
-								   int& kInterShotInjectionPauseSeconds);
 
 		// Returns the valiue of the environment variable PITRAC_ROOT
 		static std::string GetPiTracRootPath();

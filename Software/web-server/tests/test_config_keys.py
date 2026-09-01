@@ -14,12 +14,6 @@ SCHEMA = HERE.parent / "configurations.json"
 KEY_LITERAL = re.compile(r'(?<!#include )"((?:gs_config|cameras)\.[\w.]*)"')
 CALL_LITERAL = re.compile(r'(?:SetConstant|GetConfigString|apply_enum)\(\s*"([^"]+)"\s*[,)]')
 
-# Read by the C++ but not served
-NOT_IN_SCHEMA = {
-    # the shot list for the shot-injection test mode, a get_child read the schema has no entry for
-    "gs_config.testing.test_shots_to_inject",
-}
-
 # Keys sim_manager.py builds from the simulator name
 UNCHECKED_PREFIXES = ("simulators.",)
 
@@ -49,7 +43,7 @@ def test_every_key_the_cpp_reads_is_in_the_schema():
     assert len(keys) > 200
 
     settings = json.loads(SCHEMA.read_text())["settings"]
-    missing = sorted(keys - settings.keys() - NOT_IN_SCHEMA)
+    missing = sorted(keys - settings.keys())
     assert missing == []
 
 

@@ -835,65 +835,6 @@ void run_main(int argc, char* argv[])
 
 
 
-    if (GolfSimOptions::GetCommandLineOptions().send_test_results_) {
-
-        GS_LOG_TRACE_MSG(trace, "Running in send_test_results mode.");
-        if (!PerformSystemStartupTasks()) {
-            GS_LOG_MSG(error, "Failed to PerformSystemStartupTasks.");
-            return;
-        }
-
-        // Send as many test shots as we have to whatever golf sim we are connected to
-        std::vector<GsResults> shots;
-
-        int kInterShotInjectionPauseSeconds = 0;
-        if (!GolfSimConfiguration::ReadShotInjectionData(shots, kInterShotInjectionPauseSeconds)) {
-            GS_LOG_MSG(error, "Failed to kInterShotInjectionPauseSeconds.");
-            return;
-        }
-        else {
-            GS_LOG_MSG(info, "About to inject " + std::to_string(shots.size()) + " shots.");
-        }
-
-        for (GsResults& result : shots) {
-            GS_LOG_MSG(info, "********   READY FOR SHOT NO. " + std::to_string(result.shot_number_) + " ********");
-
-            GS_LOG_MSG(info, "********   PLEASE RE-ARM THE SIMULATOR TO ACCEPT ANOTHER SHOT  ********");
-
-            sleep(kInterShotInjectionPauseSeconds);
-
-            if (!GolfSimOptions::GetCommandLineOptions().skip_wait_armed_) {
-                // The armed state only changes on a reply, so ask again each time around
-                while(!GsUISystem::SimArmed()) {
-                    sleep(2);
-                    GS_LOG_MSG(info, "            Waiting for Simulator to Arm.");
-                    GsUISystem::SendIPCStatusMessage(GsIPCResultType::kWaitingForSimulatorArmed);
-                }
-            } else {
-                GS_LOG_MSG(info, "            Skipping wait for simulator armed (hardware-less testing mode).");
-            }
-
-            GsUISystem::IncrementShotCounter();
-
-            // The web server passes the shot on to every connected sim
-            GolfBall test_ball;
-            test_ball.velocity_ = result.speed_mph_ * 0.44704;  // Convert mph to m/s
-            test_ball.angles_ball_perspective_[0] = result.hla_deg_;
-            test_ball.angles_ball_perspective_[1] = result.vla_deg_;
-            test_ball.rotation_speeds_RPM_[0] = result.side_spin_rpm_;
-            test_ball.rotation_speeds_RPM_[2] = result.back_spin_rpm_;
-
-            std::string message = "Test shot #" + std::to_string(result.shot_number_);
-            GsUISystem::SendIPCHitMessage(test_ball, message);
-        }
-
-
-        PerformSystemShutdownTasks();
-
-        return;
-    }
-
-
     // In this mode, we just take a single picture and save it.
     if (GolfSimOptions::GetCommandLineOptions().camera_still_mode_) {
 

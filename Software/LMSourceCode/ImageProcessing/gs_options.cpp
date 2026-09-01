@@ -144,7 +144,6 @@ void GolfSimOptions::Print() const
 	std::cout << "    shutdown: " << std::to_string(shutdown_) << std::endl;
 	std::cout << "    cam_still_mode: " << std::to_string(camera_still_mode_) << std::endl;
 	std::cout << "    lm_comparison_mode: " << std::to_string(lm_comparison_mode_) << std::endl;	
-	std::cout << "    send_test_results: " << std::to_string(send_test_results_) << std::endl;
 	if (!output_filename_.empty())
 		std::cout << "    output_filename: " << output_filename_ << std::endl;
 	if (!base_image_logging_dir_.empty())

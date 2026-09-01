@@ -3445,15 +3445,6 @@
       "default": true,
       "requiresRestart": true
     },
-    "gs_config.testing.kInterShotInjectionPauseSeconds": {
-      "category": "testing",
-      "subcategory": "advanced",
-      "displayName": "Inter-Shot Injection Pause (s)",
-      "description": "Seconds between injected test shots",
-      "type": "integer",
-      "default": 0,
-      "requiresRestart": true
-    },
     "gs_config.testing.kTwoImageTestPreImage": {
       "category": "testing",
       "subcategory": "advanced",

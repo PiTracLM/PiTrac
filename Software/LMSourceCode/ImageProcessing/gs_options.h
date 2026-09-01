@@ -76,10 +76,6 @@ namespace golf_sim {
 					"Take a single camera2 still picture (using one strobe flash) and exit")
 				("lm_comparison_mode", value<bool>(&lm_comparison_mode_)->default_value(false)->implicit_value(true),
 					"Configure for operating in another infrared-based LM environment")
-				("send_test_results", value<bool>(&send_test_results_)->default_value(false)->implicit_value(true),
-					"Send test shot results to the web server and exit")
-				("skip_wait_armed", value<bool>(&skip_wait_armed_)->default_value(false)->implicit_value(true),
-					"Skip waiting for simulator armed state (for hardware-less testing)")
 				("output_filename", value<std::string>(&output_filename_)->default_value("out.png"),
 					"Write any still picture to the specified filename")
 				("pulse_test", value<bool>(&perform_pulse_test_)->default_value(false)->implicit_value(true),
@@ -121,8 +117,6 @@ namespace golf_sim {
 		bool shutdown_;
 		bool camera_still_mode_;
 		bool lm_comparison_mode_;
-		bool send_test_results_;
-		bool skip_wait_armed_;
 		bool practice_ball_ = false;
 		bool perform_pulse_test_;
 		bool use_non_IR_camera_;

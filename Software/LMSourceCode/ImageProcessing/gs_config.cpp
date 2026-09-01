@@ -113,39 +113,6 @@ static void PopulateOptionsFromConfig() {
 	}
 
 
-	bool GolfSimConfiguration::ReadShotInjectionData(std::vector<GsResults>& shots,
-													 int & kInterShotInjectionPauseSeconds) {
-		try {
-			SetConstant("gs_config.testing.kInterShotInjectionPauseSeconds", kInterShotInjectionPauseSeconds);
-
-			// Retrirve as many shots as are defined in the json file
-			boost::property_tree::ptree shots_json = configuration_root_.get_child("gs_config.testing.test_shots_to_inject");
-
-			int shot_number = 1;
-			for (boost::property_tree::ptree::iterator iter = shots_json.begin(); iter != shots_json.end(); iter++) {
-			// for (boost::property_tree::ptree& shot_section : shots_json) {
-				GsResults result;
-				result.shot_number_ = shot_number;
-				shot_number++;
-
-				result.speed_mph_ = iter->second.get<float>("Speed", 0);
-				result.hla_deg_ = iter->second.get<float>("HLA", 0);
-				result.vla_deg_ = iter->second.get<float>("VLA", 0);
-				result.back_spin_rpm_ = iter->second.get<int>("BackSpin", 0);
-				result.side_spin_rpm_ = iter->second.get<int>("SideSpin", 0);
-				result.club_type_ = GolfSimClubs::GsClubType::kNotSelected;
-
-				shots.push_back(result);
-			}
-		}
-		catch (std::exception const& e)
-		{
-			GS_LOG_MSG(error, "GolfSimConfiguration::ReadShotInjectionData failed. ERROR: *** " + std::string(e.what()) + " ***");
-			return false;
-		}
-		return true;
-	}
-
 	// Returns the valiue of the environment variable PITRAC_ROOT
 	std::string GolfSimConfiguration::GetPiTracRootPath() {
 
