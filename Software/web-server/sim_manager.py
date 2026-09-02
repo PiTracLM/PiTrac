@@ -30,6 +30,7 @@ class SimManager:
         self.config_manager = config_manager
         self._broadcast = broadcast
         self._sims: Dict[str, SimInterface] = {}
+        self._build_errors: Dict[str, Dict[str, str]] = {}
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self._reload_task: Optional[asyncio.Task] = None
         self._ball_detected: Optional[bool] = None
@@ -39,34 +40,40 @@ class SimManager:
 
     def build_sims(self) -> None:
         get = self.config_manager.get_config
-        sims: List[SimInterface] = []
-        if get("simulators.ogs.enabled"):
-            sims.append(
-                OGSSim(
-                    host=get("simulators.ogs.host") or "",
-                    port=int(get("simulators.ogs.port") or 3111),
-                    keepalive_sec=int(get("simulators.ogs.keepalive_sec") or 5),
-                )
-            )
-        if get("simulators.gspro.enabled"):
-            sims.append(
-                GSProSim(
-                    host=get("simulators.gspro.host") or "",
-                    port=int(get("simulators.gspro.port") or 921),
-                    on_club=functools.partial(self.set_club, "gspro"),
-                )
-            )
-        if get("simulators.e6.enabled"):
-            sims.append(
-                E6Sim(
-                    host=get("simulators.e6.host") or "",
-                    port=int(get("simulators.e6.port") or 2483),
-                    inter_message_delay_ms=int(get("simulators.e6.inter_message_delay_ms") or 0),
-                    on_club=functools.partial(self.set_club, "e6"),
-                )
-            )
+        factories = {
+            OGSSim: lambda: OGSSim(
+                host=get("simulators.ogs.host") or "",
+                port=int(get("simulators.ogs.port") or 3111),
+                keepalive_sec=int(get("simulators.ogs.keepalive_sec") or 5),
+            ),
+            GSProSim: lambda: GSProSim(
+                host=get("simulators.gspro.host") or "",
+                port=int(get("simulators.gspro.port") or 921),
+                on_club=functools.partial(self.set_club, "gspro"),
+            ),
+            E6Sim: lambda: E6Sim(
+                host=get("simulators.e6.host") or "",
+                port=int(get("simulators.e6.port") or 2483),
+                inter_message_delay_ms=int(get("simulators.e6.inter_message_delay_ms") or 0),
+                on_club=functools.partial(self.set_club, "e6"),
+            ),
+        }
         self._sims = {}
-        for sim in sims:
+        self._build_errors = {}
+        for cls, factory in factories.items():
+            if not get(f"simulators.{cls.name}.enabled"):
+                continue
+            try:
+                sim = factory()
+            except (TypeError, ValueError, OverflowError) as e:
+                logger.error(f"{cls.display_name} settings are invalid, sim not started: {e}")
+                self._build_errors[cls.name] = {
+                    "name": cls.name,
+                    "display_name": cls.display_name,
+                    "status": "error",
+                    "detail": f"Invalid settings: {e}",
+                }
+                continue
             sim.set_status_callback(functools.partial(self._on_sim_status, sim))
             self._sims[sim.name] = sim
 
@@ -155,7 +162,7 @@ class SimManager:
         await sim.disconnect()
 
     def status(self) -> List[Dict[str, str]]:
-        return [sim.info() for sim in self._sims.values()]
+        return [sim.info() for sim in self._sims.values()] + list(self._build_errors.values())
 
     async def _on_sim_status(self, sim: SimInterface) -> None:
         if sim.name == self._club_sim and sim.status != "connected":

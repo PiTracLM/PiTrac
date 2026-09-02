@@ -415,6 +415,21 @@ class TestRenamedSimKeys:
 
         assert rows == {}
 
+    def test_integer_value_that_cannot_be_coerced_is_dropped(self, db):
+        rows = self._start(db, {
+            f"{OLD_SIM}.GSPro.kGSProConnectPort": "abc",
+            f"{OLD_SIM}.E6.kE6ConnectPort": "inf",
+            f"{OLD_SIM}.E6.kE6InterMessageDelayMs": None,
+        })
+
+        assert rows == {}
+
+    def test_non_string_address_does_not_enable_the_sim(self, db):
+        rows = self._start(db, {f"{OLD_SIM}.GSPro.kGSProConnectAddress": None})
+
+        assert "simulators.gspro.enabled" not in rows
+        assert "simulators.gspro.auto_connect" not in rows
+
     def test_never_overwrites_a_new_key_already_set(self, db):
         rows = self._start(db, {
             f"{OLD_SIM}.GSPro.kGSProConnectAddress": "10.0.0.5",

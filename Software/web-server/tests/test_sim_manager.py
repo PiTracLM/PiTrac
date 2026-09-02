@@ -94,6 +94,19 @@ async def test_both_sims_are_built():
 
 
 @pytest.mark.asyncio
+async def test_start_survives_unconvertible_settings_and_reports_an_error():
+    cfg = _ogs_config(True)
+    cfg._v.update(_gspro_values(True))
+    cfg._v["simulators.gspro.port"] = "abc"
+    mgr = SimManager(cfg, broadcast=None)
+    await mgr.start()
+    by_name = {s["name"]: s for s in mgr.status()}
+    assert by_name["ogs"]["status"] != "error"
+    assert by_name["gspro"]["status"] == "error"
+    assert "abc" in by_name["gspro"]["detail"]
+
+
+@pytest.mark.asyncio
 async def test_on_shot_fans_out_and_isolates_failures():
     mgr = SimManager(_StubConfig({}), broadcast=None)
     good = _StubSim()

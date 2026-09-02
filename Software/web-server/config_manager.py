@@ -248,12 +248,15 @@ class ConfigurationManager:
             meta = schema.get(new, {})
             if meta.get("type") == "integer":
                 value = _as_integer(value)
+                if not isinstance(value, int):
+                    logger.warning(f"Dropping stored setting {old}={value!r}, {new} needs an integer")
+                    continue
             if value == meta.get("default"):
                 logger.info(f"Dropping stored setting {old}={value!r}, it equals the default of {new}")
                 continue
             moved[new] = value
             logger.info(f"Moved stored setting {old} to {new}")
-            if new.endswith(".host") and str(value).strip():
+            if new.endswith(".host") and isinstance(value, str) and value.strip():
                 sim = new.rsplit(".", 1)[0]
                 moved.setdefault(f"{sim}.enabled", True)
                 moved.setdefault(f"{sim}.auto_connect", True)
