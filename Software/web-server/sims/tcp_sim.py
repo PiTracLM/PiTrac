@@ -73,6 +73,9 @@ class TcpSim(SimInterface):
                 self._reader, self._writer = await asyncio.wait_for(
                     asyncio.open_connection(self.host, self.port), self.CONNECT_TIMEOUT_SEC
                 )
+                if not self._want_connected:
+                    self._teardown_socket()
+                    return
                 await self._on_connected()
             except asyncio.CancelledError:
                 self._teardown_socket()

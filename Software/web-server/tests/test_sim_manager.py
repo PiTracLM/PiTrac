@@ -140,6 +140,32 @@ async def test_ball_state_changes_reach_sims_once():
 
 
 @pytest.mark.asyncio
+async def test_gspro_reads_the_ball_state_the_manager_last_saw():
+    mgr = SimManager(_StubConfig(_gspro_values(True)), broadcast=None)
+    mgr.build_sims()
+    assert mgr._sims["gspro"]._ball_state() is False
+    await mgr.on_status("Ball Placed")
+    assert mgr._sims["gspro"]._ball_state() is True
+
+
+@pytest.mark.asyncio
+async def test_start_does_not_wait_for_auto_connect():
+    class _Hangs(_StubSim):
+        async def connect(self):
+            await asyncio.Event().wait()
+
+    mgr = SimManager(_StubConfig({"simulators.stub.auto_connect": True}), broadcast=None)
+    sim = _Hangs()
+    mgr.build_sims = lambda: setattr(mgr, "_sims", {"stub": sim})
+
+    await asyncio.wait_for(mgr.start(), 0.5)
+    (task,) = mgr._connect_tasks
+    await mgr.stop()
+    await asyncio.sleep(0)
+    assert task.cancelled()
+
+
+@pytest.mark.asyncio
 async def test_on_status_isolates_failures():
     mgr = SimManager(_StubConfig({}), broadcast=None)
 

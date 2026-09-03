@@ -324,8 +324,11 @@ class PiTracServer:
             speed_mps = float(body.get("speed_mps", 0))
             message = str(body.get("message", ""))
 
+            # Club changes the C++ already applied; not for the dashboard, history or sims
+            if result_type_str == "Control Message":
+                return self._shot_result_reply()
+
             is_status = result_type_str in self.parser._get_status_message_strings()
-            sim_shot = None
 
             if is_status:
                 current = self.shot_store.get()
@@ -359,6 +362,7 @@ class PiTracServer:
                 shot_data.images = list(body.get("images", []))
                 # The sims round for their own protocol, so they get the values before display rounding
                 sim_shot = replace(shot_data, speed=speed_mph, launch_angle=launch_angle, side_angle=side_angle)
+                self._run_in_background(self.sim_manager.on_shot(sim_shot))
                 if result_type_str == "Hit":
                     shot_id = shot_data.shot_id or int(datetime.now().timestamp() * 1000)
                     images = [(Path(p).stem, p) for p in shot_data.images]
@@ -366,19 +370,9 @@ class PiTracServer:
 
             self.shot_store.update(shot_data)
             await self.connection_manager.broadcast(shot_data.to_dict())
-            sim_work = None
             if is_status:
-                sim_work = self.sim_manager.on_status(result_type_str)
-            elif sim_shot is not None:
-                sim_work = self.sim_manager.on_shot(sim_shot)
-            if sim_work is not None:
-                task = asyncio.create_task(sim_work)
-                self.background_tasks.add(task)
-                task.add_done_callback(self.background_tasks.discard)
-            reply: Dict[str, Any] = {"status": "ok", "armed": self.sim_manager.armed}
-            if self.sim_manager.club:
-                reply["club"] = self.sim_manager.club
-            return reply
+                self._run_in_background(self.sim_manager.on_status(result_type_str))
+            return self._shot_result_reply()
 
         @self.app.post("/api/internal/image-ready")
         async def receive_image_ready(request: Request) -> Dict[str, str]:
@@ -1591,6 +1585,17 @@ class PiTracServer:
     def _persist_shot(self, shot_id, shot_data, images):
         session_id = self.session_repo.ensure_open(shot_data.timestamp, self.session_timeout_minutes)
         self.shot_repo.add(shot_id, session_id, shot_data, images)
+
+    def _run_in_background(self, coro) -> None:
+        task = asyncio.create_task(coro)
+        self.background_tasks.add(task)
+        task.add_done_callback(self.background_tasks.discard)
+
+    def _shot_result_reply(self) -> Dict[str, Any]:
+        reply: Dict[str, Any] = {"status": "ok", "armed": self.sim_manager.armed}
+        if self.sim_manager.club:
+            reply["club"] = self.sim_manager.club
+        return reply
 
     async def shutdown_event(self) -> None:
         logger.info("Shutting down PiTrac Web Server...")

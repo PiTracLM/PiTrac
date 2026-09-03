@@ -166,6 +166,24 @@ async def test_on_ball_state_sends_a_heartbeat():
 
 
 @pytest.mark.asyncio
+async def test_reconnect_heartbeat_carries_the_current_ball_state():
+    fake = _FakeGSPro()
+    await fake.start()
+    ball_detected = [False]
+    sim = GSProSim(host="127.0.0.1", port=fake.port, ball_state=lambda: ball_detected[0])
+    await sim.connect()
+    await asyncio.sleep(0.05)
+    await sim.disconnect()
+    ball_detected[0] = True
+    await sim.connect()
+    await asyncio.sleep(0.05)
+    await sim.disconnect()
+    await fake.stop()
+
+    assert [m["ShotDataOptions"]["LaunchMonitorBallDetected"] for m in fake.messages] == [False, True]
+
+
+@pytest.mark.asyncio
 async def test_failed_heartbeat_does_not_raise():
     async def broken_drain():
         raise ConnectionResetError("gone")

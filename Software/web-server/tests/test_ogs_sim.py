@@ -151,3 +151,27 @@ async def test_cancel_during_first_send_closes_socket(monkeypatch):
     writer.close.assert_called_once()
     assert sim._writer is None
     assert sim.status == "off"
+
+
+@pytest.mark.asyncio
+async def test_disconnect_during_connect_closes_the_late_socket(monkeypatch):
+    opened = asyncio.Event()
+    writer = MagicMock()
+
+    async def slow_open(host, port):
+        await opened.wait()
+        return MagicMock(), writer
+
+    monkeypatch.setattr(asyncio, "open_connection", slow_open)
+    sim = OGSSim(host="127.0.0.1", port=3111, keepalive_sec=999)
+    task = asyncio.create_task(sim.connect())
+    for _ in range(5):
+        await asyncio.sleep(0)
+    await sim.disconnect()
+    opened.set()
+    await task
+
+    writer.close.assert_called_once()
+    writer.write.assert_not_called()
+    assert sim._writer is None
+    assert sim.status == "off"

@@ -83,16 +83,23 @@ class GSProSim(TcpSim):
     display_name = "GSPro"
     READS = True
 
-    def __init__(self, host: str, port: int = 921, on_club: Optional[Callable[[str], None]] = None) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int = 921,
+        on_club: Optional[Callable[[str], None]] = None,
+        ball_state: Callable[[], bool] = lambda: False,
+    ) -> None:
         super().__init__(host, port)
         self._on_club = on_club
+        self._ball_state = ball_state
 
     def _encode(self, obj: Dict[str, object]) -> bytes:
         # The layout boost's write_json gave the C++ sender
         return (json.dumps(obj, indent=4) + "\n").encode("utf-8")
 
     async def _on_connected(self) -> None:
-        await self._send_obj(build_heartbeat(False))
+        await self._send_obj(build_heartbeat(self._ball_state()))
 
     async def on_ball_state(self, ball_detected: bool) -> None:
         if self._writer is None:

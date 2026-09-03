@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
-from typing import Awaitable, Callable, Dict, List, Optional
+from typing import Awaitable, Callable, Dict, List, Optional, Set
 
 from models import ShotData
 from sim_interface import SimInterface
@@ -33,6 +33,7 @@ class SimManager:
         self._build_errors: Dict[str, Dict[str, str]] = {}
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self._reload_task: Optional[asyncio.Task] = None
+        self._connect_tasks: Set[asyncio.Task] = set()
         self._ball_detected: Optional[bool] = None
         self._club: Optional[str] = None
         self._club_sim: Optional[str] = None
@@ -50,6 +51,7 @@ class SimManager:
                 host=get("simulators.gspro.host") or "",
                 port=int(get("simulators.gspro.port") or 921),
                 on_club=functools.partial(self.set_club, "gspro"),
+                ball_state=lambda: bool(self._ball_detected),
             ),
             E6Sim: lambda: E6Sim(
                 host=get("simulators.e6.host") or "",
@@ -81,7 +83,9 @@ class SimManager:
         self.build_sims()
         for sim in self._sims.values():
             if self.config_manager.get_config(f"simulators.{sim.name}.auto_connect"):
-                await sim.connect()
+                task = asyncio.create_task(sim.connect())
+                self._connect_tasks.add(task)
+                task.add_done_callback(self._connect_tasks.discard)
         await self._broadcast_status()
 
     async def stop(self) -> None:
@@ -107,6 +111,8 @@ class SimManager:
         await self.start()
 
     async def _disconnect_all(self) -> None:
+        for task in self._connect_tasks:
+            task.cancel()
         for sim in self._sims.values():
             try:
                 await sim.disconnect()

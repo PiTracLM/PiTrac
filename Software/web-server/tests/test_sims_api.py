@@ -98,3 +98,33 @@ def test_status_reply_carries_armed_and_club(client, server_instance):
     server_instance.sim_manager.set_club("gspro", "putter")
     r = client.post("/api/internal/shot-result", json=status)
     assert r.json() == {"status": "ok", "armed": True, "club": "putter"}
+
+
+def test_sims_are_not_held_up_by_the_shot_insert(client, server_instance):
+    calls = _install_on_shot_spy(server_instance)
+    sims_called_during_insert = []
+
+    def slow_persist(*args):
+        sims_called_during_insert.append(_wait_for(lambda: len(calls) == 1))
+
+    server_instance._persist_shot = slow_persist
+    client.post("/api/internal/shot-result", json={"result_type": 7, "speed_mps": 45.0})
+    assert sims_called_during_insert == [True]
+
+
+def test_club_change_is_not_shown_on_the_dashboard(client, server_instance):
+    broadcasts = []
+
+    async def spy(message):
+        broadcasts.append(message)
+
+    server_instance.connection_manager.broadcast = spy
+    before = server_instance.shot_store.get()
+    server_instance.sim_manager.set_club("gspro", "putter")
+    r = client.post("/api/internal/shot-result", json={
+        "result_type": 10,
+        "message": "Club type was set to Putter",
+    })
+    assert r.json() == {"status": "ok", "armed": True, "club": "putter"}
+    assert broadcasts == []
+    assert server_instance.shot_store.get() == before
