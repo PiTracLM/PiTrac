@@ -40,10 +40,6 @@ namespace golf_sim {
         return (dynamic_cast<GolfSimEvent::Exit*>(event) != nullptr);
     }
 
-    bool GolfSimEventQueue::EventIsControlEvent(GolfSimEventBase* event) {
-        return (dynamic_cast<GolfSimEvent::ControlMessage*>(event) != nullptr);
-    }
-
     // Down-cast a specific derived event type into the PossibleEvent variant type
     // TBD - Seems really clunky - how to improve?
     PossibleEvent GolfSimEventQueue::ConvertEventToPossibleEvent(GolfSimEventBase *event) {
@@ -55,7 +51,6 @@ namespace golf_sim {
         GolfSimEvent::EventLoopTick* eventLoopTick = nullptr;
         GolfSimEvent::BallStabilized* ballStabilized = nullptr;
         GolfSimEvent::BallHit* ballHit = nullptr;
-        GolfSimEvent::ControlMessage* controlMessage = nullptr;
         GolfSimEvent::FoundMultipleBalls* foundMultipleBalls = nullptr;
         GolfSimEvent::Camera2ImageReceived* cam2ImageReceived = nullptr;
         GolfSimEvent::Restart* restart = nullptr;
@@ -82,9 +77,6 @@ namespace golf_sim {
         }
         else if ((ballHit = dynamic_cast<GolfSimEvent::BallHit*>(event))) {
             possible_event = *ballHit;
-        }
-        else if ((controlMessage = dynamic_cast<GolfSimEvent::ControlMessage*>(event))) {
-            possible_event = *controlMessage;
         }
         else if ((beginWatchingForBallHit = dynamic_cast<GolfSimEvent::BeginWatchingForBallHit*>(event))) {
             possible_event = *beginWatchingForBallHit;

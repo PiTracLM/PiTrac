@@ -618,26 +618,6 @@ namespace golf_sim {
     }
 
 
-    bool ProcessControlMessageEvent(GolfSimEvent::ControlMessage &control_message) {
-
-        GsIPCControlMsgType message_type = control_message.message_type_;
-
-        GS_LOG_TRACE_MSG(trace, "Processing ControlMessage of type: " + GsIPCControlMsg::FormatControlMessageType(message_type));
-
-        if (message_type == GsIPCControlMsgType::kClubChangeToPutter) {
-            GolfSimClubs::SetCurrentClubType(GolfSimClubs::GsClubType::kPutter);
-        }
-        else if (message_type == GsIPCControlMsgType::kClubChangeToDriver) {
-            GolfSimClubs::SetCurrentClubType(GolfSimClubs::GsClubType::kDriver);
-        }
-        else {
-            GS_LOG_MSG(error, "Received ControlMessage event with unknown message type.");
-        }
-
-        return true;
-    }
-
-
     bool RunGolfSimFsm( const GolfSimState& starting_state ) {
         GS_LOG_TRACE_MSG(trace, "RunGolfSimFsm");
 
@@ -700,21 +680,6 @@ namespace golf_sim {
                 if (GolfSimEventQueue::EventIsShutdownEvent(eventElement.e_)) {
                     GS_LOG_TRACE_MSG(trace, "----------- Shutting Down - Received Exit Event -------------");
                     GolfSimGlobals::golf_sim_running_ = false;
-                }
-                else if (GolfSimEventQueue::EventIsControlEvent(eventElement.e_)) {
-                    GS_LOG_TRACE_MSG(trace, "----------- Received Control Event -------------");
-
-                    GolfSimEvent::ControlMessage* control_message = dynamic_cast<GolfSimEvent::ControlMessage*>(eventElement.e_);
-                    
-                    if (control_message == nullptr) {
-                        GS_LOG_MSG(error, "Could not get ControlMessage event.");
-                        continue;
-                    }
-
-                    if (!ProcessControlMessageEvent(*control_message)) {
-                        GS_LOG_MSG(error, "Could not ProcessControlMessageEvent.");
-                        continue;
-                    }
                 }
                 else {
                     // Let the FSM handle the event

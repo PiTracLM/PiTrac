@@ -22,8 +22,6 @@
 #include "gs_ui_system.h"
 #include "gs_camera.h"
 #include "gs_http_client.h"
-#include "gs_events.h"
-#include "gs_control_msg.h"
 #include "cv_utils.h"
 
 namespace golf_sim {
@@ -134,23 +132,19 @@ namespace golf_sim {
         sim_armed_ = armed;
 
         GolfSimClubs::GsClubType club_type;
-        GsIPCControlMsgType club_instruction;
         if (club == "putter") {
             club_type = GolfSimClubs::GsClubType::kPutter;
-            club_instruction = GsIPCControlMsgType::kClubChangeToPutter;
         }
         else if (club == "driver") {
             club_type = GolfSimClubs::GsClubType::kDriver;
-            club_instruction = GsIPCControlMsgType::kClubChangeToDriver;
         }
         else {
             return;
         }
 
-        // Queue a change once; modes without the FSM loop never drain the bounded event queue.
-        if (club_type != GolfSimClubs::GetCurrentClubType() && GolfSimClubs::latest_club_.exchange(club_type) != club_type) {
-            GolfSimEventElement control_message{ new GolfSimEvent::ControlMessage{ club_instruction } };
-            GolfSimEventQueue::QueueEvent(control_message);
+        // SetCurrentClubType posts again, and that reply names the club just set, so this recurses once.
+        if (club_type != GolfSimClubs::GetCurrentClubType()) {
+            GolfSimClubs::SetCurrentClubType(club_type);
         }
     }
 

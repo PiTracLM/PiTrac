@@ -102,9 +102,6 @@
     <ClCompile Include="gs_clubs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="gs_control_msg.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="core\dma_heaps.cpp">
       <Filter>Resource Files</Filter>
     </ClCompile>

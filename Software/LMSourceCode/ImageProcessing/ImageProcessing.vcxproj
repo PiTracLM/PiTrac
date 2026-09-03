@@ -255,7 +255,6 @@
     <ClCompile Include="gs_e6_response.cpp" />
     <ClCompile Include="gs_events.cpp" />
     <ClCompile Include="gs_fsm.cpp" />
-    <ClCompile Include="gs_control_msg.cpp" />
     <ClCompile Include="gs_result_types.cpp" />
     <ClCompile Include="gs_results.cpp" />
     <ClCompile Include="gs_shot_parameters.cpp" />

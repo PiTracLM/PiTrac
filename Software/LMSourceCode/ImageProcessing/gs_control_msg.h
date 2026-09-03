@@ -3,29 +3,17 @@
  * Copyright (C) 2022-2025, Verdant Consultants, LLC.
  */
 
-// Base class for control messages, such as those sent between the LM and
-// external systems like the web dashboard and third-party golf simulators
+// Control message types used by the closed-source E6 object (gs_e6_response).
+// e6_auth_shim.cpp defines FormatControlMessageType for it.
 
 #pragma once
 
 #ifdef __unix__  // Ignore in Windows environment
 
-
-#include <opencv2/core.hpp>
-#include <opencv2/dnn.hpp>
-#include <opencv2/dnn/all_layers.hpp>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/opencv.hpp>
-
-#include "logging_tools.h"
-
-
-// The primary object for control-type communications from the Golf Sim user interface
+#include <string>
 
 namespace golf_sim {
 
-    // TBD - Add a change-player type?
     enum class GsIPCControlMsgType { 
         kUnknown = 0, 
         kClubChangeToPutter = 1,
@@ -36,16 +24,7 @@ namespace golf_sim {
 
     public:
 
-        GsIPCControlMsg();
-        virtual ~GsIPCControlMsg();
-
-        // Returns a string representation of this result
-        std::string Format() const;
-
         static std::string FormatControlMessageType(const GsIPCControlMsgType t);
-
-    public:
-        GsIPCControlMsgType control_type_ = GsIPCControlMsgType::kUnknown;
 
     };
 
