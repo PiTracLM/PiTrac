@@ -269,6 +269,41 @@ async def test_config_change_rebuilds_sims(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_connect_during_reload_reaches_the_rebuilt_sim(monkeypatch):
+    monkeypatch.setattr(SimManager, "RELOAD_DEBOUNCE_SEC", 0)
+    release = asyncio.Event()
+
+    class _SlowStop(_StubSim):
+        async def disconnect(self):
+            await release.wait()
+            self.connected = False
+
+    mgr = SimManager(_StubConfig({}), broadcast=None)
+    mgr.loop = asyncio.get_running_loop()
+    built = []
+
+    def build():
+        built.append(_SlowStop())
+        mgr._sims = {"stub": built[-1]}
+
+    mgr.build_sims = build
+    mgr.build_sims()
+    mgr._on_config_change("simulators.stub.host", "x")
+    for _ in range(5):
+        await asyncio.sleep(0)
+    connecting = asyncio.create_task(mgr.connect("stub"))
+    for _ in range(5):
+        await asyncio.sleep(0)
+    release.set()
+    await asyncio.wait_for(asyncio.gather(mgr._reload_task, connecting), 1)
+
+    old, new = built
+    assert old.connected is False
+    assert new.connected is True
+    assert mgr._sims["stub"] is new
+
+
+@pytest.mark.asyncio
 async def test_burst_of_changes_reloads_once(monkeypatch):
     monkeypatch.setattr(SimManager, "RELOAD_DEBOUNCE_SEC", 0.05)
     mgr = SimManager(_ogs_config(True), broadcast=None)

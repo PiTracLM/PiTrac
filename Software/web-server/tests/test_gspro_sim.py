@@ -287,3 +287,21 @@ async def test_peer_close_sets_error_and_schedules_reconnect():
     assert sim._reconnect_task is not None and not sim._reconnect_task.done()
     await sim.disconnect()
     await fake.stop()
+
+
+@pytest.mark.asyncio
+async def test_disconnect_while_reporting_connected_starts_no_reader():
+    fake = _FakeGSPro()
+    await fake.start()
+    sim = GSProSim(host="127.0.0.1", port=fake.port)
+
+    async def disconnect_once_connected():
+        if sim.status == "connected":
+            await sim.disconnect()
+
+    sim.set_status_callback(disconnect_once_connected)
+    await sim.connect()
+    await fake.stop()
+
+    assert sim._tasks == []
+    assert sim.status == "off"

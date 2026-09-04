@@ -175,3 +175,24 @@ async def test_disconnect_during_connect_closes_the_late_socket(monkeypatch):
     writer.write.assert_not_called()
     assert sim._writer is None
     assert sim.status == "off"
+
+
+@pytest.mark.asyncio
+async def test_failed_connect_after_disconnect_leaves_status_off(monkeypatch):
+    refused = asyncio.Event()
+
+    async def slow_refusal(host, port):
+        await refused.wait()
+        raise ConnectionRefusedError("refused")
+
+    monkeypatch.setattr(asyncio, "open_connection", slow_refusal)
+    sim = OGSSim(host="127.0.0.1", port=3111, keepalive_sec=999)
+    task = asyncio.create_task(sim.connect())
+    for _ in range(5):
+        await asyncio.sleep(0)
+    await sim.disconnect()
+    refused.set()
+    await task
+
+    assert sim.status == "off"
+    assert sim._reconnect_task is None

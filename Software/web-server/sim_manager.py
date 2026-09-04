@@ -34,6 +34,7 @@ class SimManager:
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self._reload_task: Optional[asyncio.Task] = None
         self._connect_tasks: Set[asyncio.Task] = set()
+        self._reload_lock = asyncio.Lock()
         self._ball_detected: Optional[bool] = None
         self._club: Optional[str] = None
         self._club_sim: Optional[str] = None
@@ -107,8 +108,9 @@ class SimManager:
 
     async def _reload_after_debounce(self) -> None:
         await asyncio.sleep(self.RELOAD_DEBOUNCE_SEC)
-        await self._disconnect_all()
-        await self.start()
+        async with self._reload_lock:
+            await self._disconnect_all()
+            await self.start()
 
     async def _disconnect_all(self) -> None:
         for task in self._connect_tasks:
@@ -156,16 +158,18 @@ class SimManager:
         self._club_sim = sim_name
 
     async def connect(self, name: str) -> None:
-        sim = self._sims.get(name)
-        if sim is None:
-            raise KeyError(name)
-        await sim.connect()
+        await (await self._current_sim(name)).connect()
 
     async def disconnect(self, name: str) -> None:
-        sim = self._sims.get(name)
+        await (await self._current_sim(name)).disconnect()
+
+    async def _current_sim(self, name: str) -> SimInterface:
+        # Waits out a reload in progress, so the request reaches the rebuilt sim and not one being torn down
+        async with self._reload_lock:
+            sim = self._sims.get(name)
         if sim is None:
             raise KeyError(name)
-        await sim.disconnect()
+        return sim
 
     def status(self) -> List[Dict[str, str]]:
         return [sim.info() for sim in self._sims.values()] + list(self._build_errors.values())
