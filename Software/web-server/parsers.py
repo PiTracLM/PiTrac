@@ -2,7 +2,6 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List
 
-from constants import MPS_TO_MPH
 from models import ResultType, ShotData
 
 logger = logging.getLogger(__name__)
