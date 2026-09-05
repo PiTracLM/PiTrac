@@ -350,3 +350,21 @@ async def test_disconnect_sends_disconnect_first():
     assert sim.status == "off"
     assert sim.armed is False
     await fake.stop()
+
+
+@pytest.mark.asyncio
+async def test_disconnect_does_not_wait_forever_on_a_peer_that_stopped_reading():
+    async def stalls():
+        await asyncio.Event().wait()
+
+    writer = MagicMock()
+    writer.drain = stalls
+    writer.wait_closed = stalls
+    sim = E6Sim(host="127.0.0.1", port=2483)
+    sim.DISCONNECT_TIMEOUT_SEC = 0.05
+    sim._writer = writer
+
+    await asyncio.wait_for(sim.disconnect(), 1)
+
+    writer.transport.abort.assert_called_once()
+    assert sim.status == "off"

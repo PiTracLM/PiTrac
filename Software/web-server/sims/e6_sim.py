@@ -65,7 +65,7 @@ class E6Sim(TcpSim):
     async def disconnect(self) -> None:
         if self._writer is not None:
             try:
-                await self._send_obj({"Type": "Disconnect"})
+                await asyncio.wait_for(self._send_obj({"Type": "Disconnect"}), self.DISCONNECT_TIMEOUT_SEC)
             except Exception as e:
                 logger.warning(f"E6 disconnect message failed: {e}")
         await super().disconnect()

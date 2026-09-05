@@ -196,3 +196,20 @@ async def test_failed_connect_after_disconnect_leaves_status_off(monkeypatch):
 
     assert sim.status == "off"
     assert sim._reconnect_task is None
+
+
+@pytest.mark.asyncio
+async def test_disconnect_does_not_wait_forever_for_the_socket_to_close():
+    async def never_closes():
+        await asyncio.Event().wait()
+
+    writer = MagicMock()
+    writer.wait_closed = never_closes
+    sim = OGSSim(host="127.0.0.1", port=3111, keepalive_sec=999)
+    sim.DISCONNECT_TIMEOUT_SEC = 0.05
+    sim._writer = writer
+
+    await asyncio.wait_for(sim.disconnect(), 1)
+
+    writer.transport.abort.assert_called_once()
+    assert sim.status == "off"

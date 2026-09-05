@@ -38,6 +38,7 @@ class TcpSim(SimInterface):
     """
 
     CONNECT_TIMEOUT_SEC = 5
+    DISCONNECT_TIMEOUT_SEC = 2
     READS = False
     CONNECTED_ON_OPEN = True
 
@@ -192,7 +193,8 @@ class TcpSim(SimInterface):
         self._teardown_socket()
         if writer is not None:
             try:
-                await writer.wait_closed()
+                await asyncio.wait_for(writer.wait_closed(), self.DISCONNECT_TIMEOUT_SEC)
             except Exception:
-                pass
+                # A peer that stopped reading leaves buffered data, so drop it rather than wait
+                writer.transport.abort()
         await self._set_status(STATUS_OFF, "")
