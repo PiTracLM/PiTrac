@@ -17,6 +17,7 @@
 
 #include "logging_tools.h"
 #include "golf_ball.h"
+#include "gs_clubs.h"
 #include "gs_result_types.h"
 
 
@@ -60,6 +61,10 @@ namespace golf_sim {
         // Whether the web server's sims are ready for a shot, as of its last reply.
         static bool SimArmed();
 
+        // The club the web server's sims last asked for, kNotSelected when none has.
+        // The FSM applies it only at startup and just before Camera2 is armed.
+        static GolfSimClubs::GsClubType SimClub();
+
         // Numbers each shot for the log lines and image names.
         static void IncrementShotCounter();
         static long GetShotCounter();
@@ -74,10 +79,11 @@ namespace golf_sim {
         static void ClearWebserverImages();
 
     private:
-        // Posts to the web server and applies the armed state and club in its reply.
+        // Posts to the web server and records the armed state and club in its reply.
         static void PostResult(const std::string& json);
 
         static std::atomic<bool> sim_armed_;
+        static std::atomic<GolfSimClubs::GsClubType> sim_club_;
 
         static long shot_counter_;
     };

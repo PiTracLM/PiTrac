@@ -38,6 +38,7 @@ namespace golf_sim {
     std::vector<std::string> GsUISystem::current_shot_image_paths_;
     std::mutex GsUISystem::shot_images_mutex_;
     std::atomic<bool> GsUISystem::sim_armed_{ true };
+    std::atomic<GolfSimClubs::GsClubType> GsUISystem::sim_club_{ GolfSimClubs::kNotSelected };
     long GsUISystem::shot_counter_ = 0;
 
     std::string GsUISystem::CurrentShotRelativePath(const std::string& file_name) {
@@ -103,6 +104,10 @@ namespace golf_sim {
         return sim_armed_;
     }
 
+    GolfSimClubs::GsClubType GsUISystem::SimClub() {
+        return sim_club_;
+    }
+
     void GsUISystem::IncrementShotCounter() {
         shot_counter_++;
     }
@@ -131,20 +136,14 @@ namespace golf_sim {
         }
         sim_armed_ = armed;
 
-        GolfSimClubs::GsClubType club_type;
         if (club == "putter") {
-            club_type = GolfSimClubs::GsClubType::kPutter;
+            sim_club_ = GolfSimClubs::GsClubType::kPutter;
         }
         else if (club == "driver") {
-            club_type = GolfSimClubs::GsClubType::kDriver;
+            sim_club_ = GolfSimClubs::GsClubType::kDriver;
         }
         else {
-            return;
-        }
-
-        // SetCurrentClubType posts again, and that reply names the club just set, so this recurses once.
-        if (club_type != GolfSimClubs::GetCurrentClubType()) {
-            GolfSimClubs::SetCurrentClubType(club_type);
+            sim_club_ = GolfSimClubs::GsClubType::kNotSelected;
         }
     }
 

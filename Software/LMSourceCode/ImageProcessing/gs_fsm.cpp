@@ -289,6 +289,13 @@ namespace golf_sim {
         // Whatever happens, this is a new shot with a new shot number
         GsUISystem::IncrementShotCounter();
 
+        // The last POST before arming was the stabilization status, so a club the sims picked
+        // since the previous shot applies here and then holds through the hit and its analysis.
+        GolfSimClubs::GsClubType sim_club = GsUISystem::SimClub();
+        if (sim_club != GolfSimClubs::kNotSelected && sim_club != GolfSimClubs::GetCurrentClubType()) {
+            GolfSimClubs::SetCurrentClubType(sim_club);
+        }
+
         // Arm Camera2 thread to start waiting for the external trigger
         g_cam2_thread.arm();
 
@@ -813,7 +820,11 @@ namespace golf_sim {
         bool kStartInPuttingMode = false;
         GolfSimConfiguration::SetConstant("gs_config.modes.kStartInPuttingMode", kStartInPuttingMode);
         
-        if (kStartInPuttingMode) {
+        // A club the sims reported in reply to the Initializing post wins over the configured default
+        if (GsUISystem::SimClub() != GolfSimClubs::kNotSelected) {
+            GolfSimClubs::SetCurrentClubType(GsUISystem::SimClub());
+        }
+        else if (kStartInPuttingMode) {
             GS_LOG_MSG(info, "Starting in Putting Mode.");
             GolfSimClubs::SetCurrentClubType(GolfSimClubs::GsClubType::kPutter);
         }
