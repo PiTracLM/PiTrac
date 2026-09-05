@@ -37,6 +37,14 @@ namespace golf_sim {
 
     static Camera2Thread g_cam2_thread;
 
+    // Only the FSM applies the sims' club, and only where a change cannot land mid-shot
+    static void ApplySimClub() {
+        GolfSimClubs::GsClubType sim_club = GsUISystem::SimClub();
+        if (sim_club != GolfSimClubs::kNotSelected && sim_club != GolfSimClubs::GetCurrentClubType()) {
+            GolfSimClubs::SetCurrentClubType(sim_club);
+        }
+    }
+
     static int signal_received;
     static void default_signal_handler(int signal_number)
     {
@@ -291,10 +299,7 @@ namespace golf_sim {
 
         // The last POST before arming was the stabilization status, so a club the sims picked
         // since the previous shot applies here and then holds through the hit and its analysis.
-        GolfSimClubs::GsClubType sim_club = GsUISystem::SimClub();
-        if (sim_club != GolfSimClubs::kNotSelected && sim_club != GolfSimClubs::GetCurrentClubType()) {
-            GolfSimClubs::SetCurrentClubType(sim_club);
-        }
+        ApplySimClub();
 
         // Arm Camera2 thread to start waiting for the external trigger
         g_cam2_thread.arm();
@@ -639,6 +644,9 @@ namespace golf_sim {
             return false;
         }
 
+        // A club the sims named in reply to the startup Initializing post replaces the configured default
+        ApplySimClub();
+
         GolfSimConfiguration::SetConstant("gs_config.ipc_interface.kMaxCam2ImageReceivedTimeMs", kMaxCam2ImageReceivedTimeMs);
 
         GolfSimConfiguration::SetConstant("gs_config.user_interface.kWebServerCamera2Image", kWebServerCamera2Image);
@@ -820,11 +828,7 @@ namespace golf_sim {
         bool kStartInPuttingMode = false;
         GolfSimConfiguration::SetConstant("gs_config.modes.kStartInPuttingMode", kStartInPuttingMode);
         
-        // A club the sims reported in reply to the Initializing post wins over the configured default
-        if (GsUISystem::SimClub() != GolfSimClubs::kNotSelected) {
-            GolfSimClubs::SetCurrentClubType(GsUISystem::SimClub());
-        }
-        else if (kStartInPuttingMode) {
+        if (kStartInPuttingMode) {
             GS_LOG_MSG(info, "Starting in Putting Mode.");
             GolfSimClubs::SetCurrentClubType(GolfSimClubs::GsClubType::kPutter);
         }
