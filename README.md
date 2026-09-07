@@ -4,6 +4,7 @@
   - [Project Page](#project-page)
 - [PiTrac - Start Here](#getting-started)
 - [PiTrac - Setup and Configuration](#setup-and-configuration)
+- [PiTrac - Licensing](#licensing)
 - [PiTrac - Join the Discord](#join-the-discord)
 
 ## Introducing PiTrac
@@ -31,6 +32,16 @@ The process of building your own PiTrac DIY Launch Monitor is described here at 
 
 ## [Setup and Configuration](https://docs.pitrac.org/software/pi-setup/)
 The instructions which are targeted toward getting setup on a step-by-step basis. These instructions start with a Raspberry Pi with nothing on it, and are meant to describe all the steps to get from that point to a working, compiled version of PiTrac.  A single RPi5 is currently our recommended path for everyone, however the path to stereoscopic vision may require two (if/when we head down that path).
+
+## Licensing
+
+PiTrac is distributed under two separate licenses.
+
+The software, documentation, and hardware designs are licensed under the GNU General Public License v2.0. See [`LICENSE`](LICENSE).
+
+PiTrac's trained machine-learning models are not covered by the GPL. They are licensed separately under [`LICENSE.MODEL.md`](LICENSE.MODEL.md), which sets out its own scope and terms. Read it before you use them.
+
+For licensing questions, get in touch through https://github.com/PiTracLM.
 
 ## [Join the Discord](https://discord.gg/gMQcBBQYHT)
 The PiTrac discord is where you can get help or show off your PiTrac build, discuss features and get to know other PiTrac builders. PiTrac is still a new project, so the Discord is a way to clear up any fuzzy parts of the initial ecosystem. Click the link above or copy this invite link in Discord: `https://discord.gg/gMQcBBQYHT`.

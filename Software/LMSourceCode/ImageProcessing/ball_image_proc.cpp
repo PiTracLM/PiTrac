@@ -204,7 +204,7 @@ namespace golf_sim {
     std::string BallImageProc::kStrobedBallDetectionMethod = "experimental";
     std::string BallImageProc::kBallPlacementDetectionMethod = "experimental";
     #ifdef _WIN32
-    std::string BallImageProc::kModelPath = "../../Software/LMSourceCode/ml_models/yolo26-ball-detector";
+    std::string BallImageProc::kModelPath = "../../Software/LMSourceCode/ml_assets/yolo26-ball-detector";
     #else
     std::string BallImageProc::kModelPath = "/etc/pitrac/models/yolo26-ball-detector";
     #endif
@@ -4197,7 +4197,7 @@ namespace golf_sim {
             std::string spin_model_path;
             GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kSpinModelPath", spin_model_path);
             if (spin_model_path.empty()) {
-                spin_model_path = "../ml_models/spin-predictor";
+                spin_model_path = "../ml_assets/spin-predictor";
             }
 
             float z_threshold = 60.0f;

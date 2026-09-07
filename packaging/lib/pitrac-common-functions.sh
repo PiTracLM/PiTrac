@@ -341,7 +341,7 @@ install_models() {
 
     log_info "Installing models for AI detection..."
 
-    local models_dir="$repo_root/Software/LMSourceCode/ml_models"
+    local models_dir="$repo_root/Software/LMSourceCode/ml_assets"
     if [[ ! -d "$models_dir" ]]; then
         log_warn "Models directory not found: $models_dir"
         return
