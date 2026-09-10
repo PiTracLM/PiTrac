@@ -126,7 +126,7 @@ function updateBallStatus(resultType, message, isPiTracRunning) {
             strip.classList.add('stabilizing');
             title.textContent = 'Ball Detected';
             setStripMessage(message || 'Waiting for ball to stabilize...');
-        } else if (normalizedType.includes('ball ready') || normalizedType.includes('ready')) {
+        } else if (normalizedType.includes('ball placed') || normalizedType.includes('ball ready') || normalizedType.includes('ready')) {
             strip.classList.add('ready');
             title.textContent = 'Ready to Hit!';
             setStripMessage(message || 'Ball is ready, take your shot');

@@ -32,7 +32,7 @@ module.exports = [
         rules: {
             'no-unused-vars': ['error', {
                 'argsIgnorePattern': '^_|^e$',
-                'varsIgnorePattern': '^(saveChanges|resetAll|reloadConfig|showDiff|exportConfig|importConfig|filterConfig|closeModal|setTheme|openImage|resetShot|controlPiTrac|startBtn|stopBtn|restartBtn|calibration)$'
+                'varsIgnorePattern': '^(saveChanges|resetAll|reloadConfig|showDiff|exportConfig|importConfig|filterConfig|closeModal|setTheme|openImage|resetShot|controlPiTrac|startBtn|stopBtn|restartBtn|calibration|showStatusMessage)$'
             }],
             'no-console': ['warn', { 'allow': ['warn', 'error'] }],
             'curly': ['error', 'multi-line'],
