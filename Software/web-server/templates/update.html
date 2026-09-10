@@ -4,7 +4,7 @@
 {% block title %}System Update - PiTrac{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="/static/css/update.css">
+<link rel="stylesheet" href="/static/css/update.css?v={{ asset_version }}">
 {% endblock %}
 
 {% block content %}
@@ -84,5 +84,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="/static/js/update.js"></script>
+<script src="/static/js/update.js?v={{ asset_version }}"></script>
 {% endblock %}

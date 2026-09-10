@@ -4,7 +4,7 @@
 {% block title %}PiTrac Calibration{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="/static/css/calibration.css">
+<link rel="stylesheet" href="/static/css/calibration.css?v={{ asset_version }}">
 {% endblock %}
 
 {% block content %}
@@ -523,6 +523,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="/static/js/distortion_calibration.js"></script>
-<script src="/static/js/calibration.js"></script>
+<script src="/static/js/distortion_calibration.js?v={{ asset_version }}"></script>
+<script src="/static/js/calibration.js?v={{ asset_version }}"></script>
 {% endblock %}

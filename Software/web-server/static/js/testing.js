@@ -1,4 +1,4 @@
-/* globals setTheme, closeModal */
+/* global requireStrobeSafe */
 
 const runningTools = new Set();
 let outputBuffer = [];

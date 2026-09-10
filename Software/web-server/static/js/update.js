@@ -1,6 +1,6 @@
+/* exported checkForUpdates, switchBranch, cancelUpdate, clearLog */
 let currentBranch = null;
 let selectedBranch = null;
-let isUpdating = false;
 
 async function loadBranches() {
     try {
@@ -225,7 +225,6 @@ function clearLog() {
 }
 
 function setUpdatingState(updating) {
-    isUpdating = updating;
     document.getElementById('checkBtn').disabled = updating;
     document.getElementById('updateBtn').disabled = updating;
     document.getElementById('switchBtn').disabled = updating;

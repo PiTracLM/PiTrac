@@ -4,6 +4,7 @@ import logging
 import os
 import shutil
 import subprocess
+import time
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import datetime
@@ -192,6 +193,7 @@ class PiTracServer:
     def __init__(self):
         self.app = FastAPI(title="PiTrac Dashboard", lifespan=self._lifespan)
         self.templates = Jinja2Templates(directory=str(self._BASE_DIR / "templates"))
+        self.templates.env.globals["asset_version"] = str(int(time.time()))
         self.connection_manager = ConnectionManager()
         self.shot_store = ShotDataStore()
         self.parser = ShotDataParser()

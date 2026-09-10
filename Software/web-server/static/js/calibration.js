@@ -1,3 +1,4 @@
+/* global requireStrobeSafe */
 /**
  * PiTrac Calibration UI Controller
  */
@@ -180,7 +181,6 @@ class CalibrationManager {
                 return;
             }
             this.showStep(3);
-        } else if (this.currentStep === 3) {
         }
     }
 

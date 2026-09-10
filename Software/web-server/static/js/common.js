@@ -1,4 +1,6 @@
 // Common functionality for all PiTrac pages
+/* global showStatusMessage */
+/* exported setTheme, controlPiTrac, requireStrobeSafe */
 
 if (typeof lucide !== 'undefined') {
     lucide.createIcons();

@@ -6,9 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}PiTrac Launch Monitor{% endblock %}</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <link rel="stylesheet" href="/static/css/pitrac.css">
+    <link href="/static/vendor/daisyui-5.7.47.css?v={{ asset_version }}" rel="stylesheet" type="text/css" />
+    <script src="/static/vendor/tailwindcss-browser-4.3.3.js?v={{ asset_version }}"></script>
+    <link rel="stylesheet" href="/static/css/pitrac.css?v={{ asset_version }}">
     {% block extra_css %}{% endblock %}
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -123,9 +123,9 @@
         <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
 
-    <script src="/static/js/lucide.min.js"></script>
-    <script src="/static/js/common.js"></script>
-    <script src="/static/js/sims.js"></script>
+    <script src="/static/js/lucide.min.js?v={{ asset_version }}"></script>
+    <script src="/static/js/common.js?v={{ asset_version }}"></script>
+    <script src="/static/js/sims.js?v={{ asset_version }}"></script>
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>

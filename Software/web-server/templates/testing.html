@@ -4,7 +4,7 @@
 {% block title %}Testing Tools - PiTrac{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="/static/css/testing.css">
+<link rel="stylesheet" href="/static/css/testing.css?v={{ asset_version }}">
 {% endblock %}
 
 {% block content %}
@@ -97,5 +97,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="/static/js/testing.js"></script>
+<script src="/static/js/testing.js?v={{ asset_version }}"></script>
 {% endblock %}

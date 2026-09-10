@@ -4,7 +4,7 @@
 {% block title %}PiTrac Launch Monitor{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="/static/css/dashboard.css">
+<link rel="stylesheet" href="/static/css/dashboard.css?v={{ asset_version }}">
 {% endblock %}
 
 {% block content %}
@@ -64,5 +64,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="/static/js/dashboard.js"></script>
+<script src="/static/js/dashboard.js?v={{ asset_version }}"></script>
 {% endblock %}

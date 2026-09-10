@@ -217,3 +217,11 @@ def test_server_port_defaults_to_8080(monkeypatch):
     import constants
     importlib.reload(constants)
     assert constants.SERVER_PORT == 8080
+
+
+def test_pages_use_vendored_assets_with_version(client):
+    html = client.get("/").text
+    assert "cdn.jsdelivr.net" not in html
+    assert "/static/vendor/daisyui-5.7.47.css?v=" in html
+    assert "/static/js/common.js?v=" in html
+    assert client.get("/static/vendor/daisyui-5.7.47.css").status_code == 200

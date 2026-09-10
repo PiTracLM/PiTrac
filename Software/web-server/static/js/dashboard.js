@@ -1,3 +1,4 @@
+/* exported openImage, resetShot, showStatusMessage */
 // Dashboard-specific functionality (theme and dropdown handled by common.js)
 let ws = null;
 let piTracRunning = false;

@@ -1,8 +1,7 @@
 // Configuration Manager JavaScript
-/* global saveChanges, resetAll, reloadConfig, showDiff,
-   filterConfig, closeModal, setTheme, openImage, resetShot, controlPiTrac,
-   resetValueFromDiff, resetAllFromDiff, clearSearch, searchConfig,
-   resetToDefault */
+/* exported saveChanges, resetAll, reloadConfig, showDiff, filterConfig,
+   closeModal, resetValueFromDiff, resetAllFromDiff, clearSearch,
+   searchConfig, resetToDefault */
 
 let currentConfig = {};
 let defaultConfig = {};
@@ -1402,18 +1401,14 @@ async function detectAndSetCameras(targetKey = null) {
         }
 
         const result = await response.json();
-        console.log('Camera detection result:', result);
 
         if (result.success && result.cameras && result.cameras.length > 0) {
             const config = result.configuration;
-            console.log('Configuration:', config);
 
             if (targetKey === 'cameras.slot1.type') {
                 const input = document.querySelector('.config-input[data-key="cameras.slot1.type"]');
-                console.log('Found slot1 input:', input);
                 if (input) {
                     const typeValue = String(config.slot1.type);
-                    console.log('Setting slot1 to:', typeValue);
                     input.value = typeValue;
 
                     // Trigger change event for select elements
@@ -1427,10 +1422,8 @@ async function detectAndSetCameras(targetKey = null) {
                 updateStatus(`Camera 1 detected: Type ${config.slot1.type}`, 'success');
             } else if (targetKey === 'cameras.slot2.type') {
                 const input = document.querySelector('.config-input[data-key="cameras.slot2.type"]');
-                console.log('Found slot2 input:', input);
                 if (input) {
                     const typeValue = String(config.slot2.type);
-                    console.log('Setting slot2 to:', typeValue);
                     input.value = typeValue;
 
                     // Trigger change event for select elements
@@ -1445,11 +1438,9 @@ async function detectAndSetCameras(targetKey = null) {
             } else {
                 const input1 = document.querySelector('.config-input[data-key="cameras.slot1.type"]');
                 const input2 = document.querySelector('.config-input[data-key="cameras.slot2.type"]');
-                console.log('Found inputs - slot1:', input1, 'slot2:', input2);
 
                 if (input1) {
                     const typeValue = String(config.slot1.type);
-                    console.log('Setting slot1 to:', typeValue);
                     input1.value = typeValue;
 
                     // Trigger change event for select elements
@@ -1463,7 +1454,6 @@ async function detectAndSetCameras(targetKey = null) {
 
                 if (input2) {
                     const typeValue = String(config.slot2.type);
-                    console.log('Setting slot2 to:', typeValue);
                     input2.value = typeValue;
 
                     // Trigger change event for select elements
