@@ -7,10 +7,10 @@ if (typeof lucide !== 'undefined') {
 
 // -- Helpers --
 
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+
 function escapeHtml(value) {
-    const div = document.createElement('div');
-    div.textContent = value == null ? '' : String(value);
-    return div.innerHTML;
+    return String(value ?? '').replace(/[&<>"']/g, c => HTML_ESCAPES[c]);
 }
 
 function formatNumber(value, decimals) {
@@ -27,7 +27,10 @@ async function api(path, { method = 'GET', body } = {}) {
     const text = await res.text();
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = null; }
-    if (!res.ok) throw new Error((data && (data.error || data.message)) || `${res.status} ${res.statusText}`);
+    if (!res.ok) {
+        const detail = data && typeof data.detail === 'string' && data.detail;
+        throw new Error((data && (data.error || data.message)) || detail || `${res.status} ${res.statusText}`);
+    }
     return data;
 }
 
@@ -197,7 +200,13 @@ async function checkPiTracStatus() {
     }
     updateStatusPill(status);
     if (!pitracActionInFlight && !status.offline) updatePiTracButtons(status.is_running);
-    piTracStatusSubscribers.forEach(fn => fn(status));
+    piTracStatusSubscribers.forEach(fn => {
+        try {
+            fn(status);
+        } catch (err) {
+            console.error('PiTrac status subscriber failed:', err);
+        }
+    });
     return status.is_running;
 }
 
