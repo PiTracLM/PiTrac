@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import result_item, status_row %}
+{% from "_macros.html" import status_row %}
 
 {% block title %}PiTrac Calibration{% endblock %}
 
@@ -88,7 +88,7 @@
                         <div class="camera-preview relative">
                             <img id="distortion-feed" alt="Camera feed" style="display: block;">
                             <div id="distortion-feed-overlay"
-                                 class="absolute top-2 left-2 mono text-sm font-bold pointer-events-none"
+                                 class="absolute top-2 left-2 font-mono text-sm font-bold pointer-events-none"
                                  style="display: none; text-shadow: 0 1px 3px rgba(0,0,0,0.9);"></div>
                             <div id="distortion-feed-placeholder" class="camera-placeholder">
                                 <p>Connecting to camera...</p>
@@ -384,10 +384,10 @@
                             <div class="card-body p-4">
                                 <h4 class="card-title text-primary text-base mb-2">Camera 1 - Tee Camera</h4>
                                 <div id="camera1-results">
-                                    {{ result_item("Status", "camera1-result-status") }}
-                                    {{ result_item("Completion Method", "camera1-completion-method") }}
-                                    {{ result_item("Focal Length", "camera1-focal") }}
-                                    {{ result_item("Camera Angles", "camera1-angles") }}
+                                    {{ status_row("Status", "camera1-result-status") }}
+                                    {{ status_row("Completion Method", "camera1-completion-method") }}
+                                    {{ status_row("Focal Length", "camera1-focal") }}
+                                    {{ status_row("Camera Angles", "camera1-angles") }}
                                 </div>
                             </div>
                         </div>
@@ -397,10 +397,10 @@
                             <div class="card-body p-4">
                                 <h4 class="card-title text-primary text-base mb-2">Camera 2 - Flight Camera</h4>
                                 <div id="camera2-results">
-                                    {{ result_item("Status", "camera2-result-status") }}
-                                    {{ result_item("Completion Method", "camera2-completion-method") }}
-                                    {{ result_item("Focal Length", "camera2-focal") }}
-                                    {{ result_item("Camera Angles", "camera2-angles") }}
+                                    {{ status_row("Status", "camera2-result-status") }}
+                                    {{ status_row("Completion Method", "camera2-completion-method") }}
+                                    {{ status_row("Focal Length", "camera2-focal") }}
+                                    {{ status_row("Camera Angles", "camera2-angles") }}
                                 </div>
                             </div>
                         </div>
@@ -492,9 +492,9 @@
                 <div class="card bg-base-300 border-2 border-base-300 transition-colors" id="strobe-result-card">
                     <div class="card-body p-4">
                         <h4 class="card-title text-sm text-primary" id="strobe-result-title">Calibration Result</h4>
-                        {{ result_item("DAC Setting", "strobe-result-dac") }}
-                        {{ result_item("LED Current", "strobe-result-current") }}
-                        {{ result_item("LDO Voltage", "strobe-result-ldo") }}
+                        {{ status_row("DAC Setting", "strobe-result-dac") }}
+                        {{ status_row("LED Current", "strobe-result-current") }}
+                        {{ status_row("LDO Voltage", "strobe-result-ldo") }}
                     </div>
                 </div>
             </div>

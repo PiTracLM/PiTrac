@@ -7,10 +7,6 @@ function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
-    ws.onopen = () => {
-        document.getElementById('ws-status-dot').classList.remove('disconnected');
-    };
-
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
         if (!piTracRunning) {
@@ -26,7 +22,6 @@ function connectWebSocket() {
     };
 
     ws.onclose = () => {
-        document.getElementById('ws-status-dot').classList.add('disconnected');
         setTimeout(connectWebSocket, 3000);
     };
 

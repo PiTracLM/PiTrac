@@ -1,98 +1,87 @@
 // sims.js - simulators drawer: live status over /ws/sims, connect/disconnect controls
+/* global api, toast, escapeHtml, openSocket */
 (function () {
-    let ws = null;
+    const STATUS = {
+        connected: { label: 'Connected', dot: 'bg-success' },
+        connecting: { label: 'Connecting', dot: 'bg-warning' },
+        error: { label: "Can't connect", dot: 'bg-error' },
+        off: { label: 'Not connected', dot: 'bg-base-content/30' },
+    };
+    const OPEN_KEY = 'pitrac-sims-open';
 
-    function statusColor(status) {
-        if (status === 'connected') return 'var(--color-success, #16a34a)';
-        if (status === 'connecting' || status === 'error') return 'var(--color-warning, #d97706)';
-        return 'var(--color-neutral, #9ca3af)';
+    function statusOf(name) {
+        return STATUS[name] || STATUS.off;
     }
 
     function aggregate(sims) {
-        if (sims.some((s) => s.status === 'connected')) return 'connected';
-        if (sims.some((s) => s.status === 'connecting' || s.status === 'error')) return 'connecting';
-        return 'off';
+        return ['error', 'connecting', 'connected'].find((st) => sims.some((s) => s.status === st)) || 'off';
     }
 
-    function render(sims) {
+    function rowHtml(s) {
+        const st = statusOf(s.status);
+        const action = s.status === 'connected' ? 'disconnect' : 'connect';
+        const label = s.status === 'connecting' ? 'Connecting' : s.status === 'connected' ? 'Disconnect' : 'Connect';
+        const button = s.target
+            ? `<button class="btn btn-xs ml-auto" data-sim="${escapeHtml(s.name)}" data-action="${action}" ${s.status === 'connecting' ? 'disabled' : ''}>${label}</button>`
+            : '';
+        const detail = s.target ? s.detail : s.detail || 'No host set in Configuration.';
+        const detailClass = s.status === 'error' || !s.target ? 'text-error' : 'opacity-70';
+        return `
+            <div class="border border-base-300 rounded-box p-3 mb-2">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="inline-block w-2 h-2 rounded-full ${st.dot}"></span>
+                    <span class="font-medium">${escapeHtml(s.display_name || s.name)}</span>
+                    <span class="text-sm opacity-80">${st.label}</span>
+                    ${button}
+                </div>
+                ${s.target ? `<div class="font-mono text-xs opacity-70 mt-1">${escapeHtml(s.target)}</div>` : ''}
+                ${detail && detail !== s.target ? `<div class="text-xs mt-1 break-words ${detailClass}">${escapeHtml(detail)}</div>` : ''}
+            </div>`;
+    }
+
+    function render(data) {
+        if (data.type !== 'sim_status') return;
+        const sims = data.sims || [];
+
         const dot = document.getElementById('sims-status-dot');
-        if (dot) dot.style.background = statusColor(aggregate(sims));
+        if (dot) dot.className = `w-2 h-2 rounded-full ${statusOf(aggregate(sims)).dot}`;
 
         const list = document.getElementById('sims-list');
         if (!list) return;
-        if (!sims.length) {
-            list.innerHTML =
-                '<p class="opacity-60 text-sm">No simulators enabled. Enable one in Configuration.</p>';
-            return;
-        }
-        list.innerHTML = sims
-            .map((s) => {
-                const connected = s.status === 'connected';
-                const connecting = s.status === 'connecting';
-                const action = connected ? 'disconnect' : 'connect';
-                const label = connecting ? 'Connecting…' : connected ? 'Disconnect' : 'Connect';
-                const disabled = connecting ? 'disabled' : '';
-                return `
-                <div class="border border-base-300 rounded-box p-3 mb-2">
-                    <div class="flex items-center gap-2">
-                        <span class="inline-block w-2 h-2 rounded-full" style="background:${statusColor(s.status)}"></span>
-                        <span class="font-medium">${s.display_name || s.name}</span>
-                        <span class="opacity-60 text-xs ml-auto">${s.status}</span>
-                    </div>
-                    <div class="opacity-70 text-xs mt-1">${s.target || ''} ${s.detail ? '· ' + s.detail : ''}</div>
-                    <button class="btn btn-xs mt-2" data-sim="${s.name}" data-action="${action}" ${disabled}>${label}</button>
-                </div>`;
-            })
-            .join('');
-
-        list.querySelectorAll('button[data-sim]').forEach((btn) => {
-            btn.addEventListener('click', async () => {
-                btn.disabled = true;
-                try {
-                    const r = await fetch(`/api/sims/${btn.dataset.sim}/${btn.dataset.action}`, {
-                        method: 'POST',
-                    });
-                    const data = await r.json();
-                    if (data.sims) render(data.sims);
-                } catch (e) {
-                    console.error('sim action failed', e);
-                } finally {
-                    btn.disabled = false;
-                }
-            });
-        });
+        list.innerHTML = sims.length
+            ? sims.map(rowHtml).join('')
+            : '<p class="text-sm opacity-70">No simulator is enabled yet. <a class="link link-primary" href="/config#setup">Set one up in Configuration</a></p>';
     }
 
-    async function loadInitial() {
+    async function onListClick(e) {
+        const btn = e.target.closest('button[data-sim]');
+        if (!btn) return;
+        btn.disabled = true;
         try {
-            const r = await fetch('/api/sims');
-            const data = await r.json();
-            render(data.sims || []);
-        } catch (e) {
-            console.error('failed to load sims', e);
+            const data = await api(`/api/sims/${btn.dataset.sim}/${btn.dataset.action}`, { method: 'POST' });
+            render({ type: 'sim_status', sims: data.sims });
+        } catch (err) {
+            toast(err.message, 'error');
+            btn.disabled = false;
         }
     }
 
-    function connectWs() {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${protocol}//${window.location.host}/ws/sims`);
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.type === 'sim_status') render(data.sims || []);
-        };
-        ws.onclose = () => setTimeout(connectWs, 3000);
-        ws.onerror = () => {
-            if (ws) ws.close();
-        };
+    function setOpen(drawer, btn, open) {
+        drawer.classList.toggle('hidden', !open);
+        btn.setAttribute('aria-expanded', String(open));
+        try { localStorage.setItem(OPEN_KEY, open ? '1' : ''); } catch { /* storage unavailable */ }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
         const btn = document.getElementById('sims-nav-btn');
         const drawer = document.getElementById('sims-drawer');
         if (btn && drawer) {
-            btn.addEventListener('click', () => drawer.classList.toggle('hidden'));
+            let open = false;
+            try { open = localStorage.getItem(OPEN_KEY) === '1'; } catch { /* storage unavailable */ }
+            setOpen(drawer, btn, open);
+            btn.addEventListener('click', () => setOpen(drawer, btn, drawer.classList.contains('hidden')));
         }
-        loadInitial();
-        connectWs();
+        document.getElementById('sims-list')?.addEventListener('click', onListClick);
+        openSocket('/ws/sims', render);
     });
 })();

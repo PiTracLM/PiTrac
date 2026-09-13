@@ -289,19 +289,19 @@ class PiTracServer:
             return {"sims": self.sim_manager.status()}
 
         @self.app.post("/api/sims/{name}/connect")
-        async def connect_sim(name: str) -> Dict[str, Any]:
+        async def connect_sim(name: str):
             try:
                 await self.sim_manager.connect(name)
             except KeyError:
-                raise HTTPException(status_code=404, detail=f"Unknown sim: {name}")
+                return JSONResponse(status_code=404, content={"error": f"Unknown sim: {name}"})
             return {"sims": self.sim_manager.status()}
 
         @self.app.post("/api/sims/{name}/disconnect")
-        async def disconnect_sim(name: str) -> Dict[str, Any]:
+        async def disconnect_sim(name: str):
             try:
                 await self.sim_manager.disconnect(name)
             except KeyError:
-                raise HTTPException(status_code=404, detail=f"Unknown sim: {name}")
+                return JSONResponse(status_code=404, content={"error": f"Unknown sim: {name}"})
             return {"sims": self.sim_manager.status()}
 
         @self.app.websocket("/ws/sims")
@@ -396,7 +396,8 @@ class PiTracServer:
         async def health_check() -> Dict[str, Union[str, bool, int]]:
             pitrac_running = False
             try:
-                result = subprocess.run(
+                result = await asyncio.to_thread(
+                    subprocess.run,
                     ["pgrep", "-f", "pitrac_lm"],
                     capture_output=True,
                     text=True,

@@ -1,10 +1,20 @@
 {% from "_macros.html" import pitrac_btn, nav_item %}
+{% set nav_pages = [
+    ("/", "home", "Dashboard"),
+    ("/config", "settings", "Configuration"),
+    ("/calibration", "crosshair", "Calibration"),
+    ("/history", "list", "Shot History"),
+    ("/logs", "file-text", "Logs"),
+    ("/testing", "flask-conical", "Testing"),
+    ("/update", "refresh-cw", "Update"),
+] %}
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}PiTrac Launch Monitor{% endblock %}</title>
+    <script>try{const t=localStorage.getItem('pitrac-theme')||'system';document.documentElement.dataset.theme=t==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):t;}catch{}</script>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <link href="/static/vendor/daisyui-5.7.47.css?v={{ asset_version }}" rel="stylesheet" type="text/css" />
     <script src="/static/vendor/tailwindcss-browser-4.3.3.js?v={{ asset_version }}"></script>
@@ -18,73 +28,51 @@
     <div class="max-w-[1400px] mx-auto animate-fade-in">
 
         <div class="navbar bg-base-200 rounded-box shadow-md border border-base-300 mb-4 px-3 min-h-0 py-2 gap-2">
-            <!-- Status dots -->
-            <div class="flex flex-col gap-1 pr-3 border-r border-base-300">
-                <div class="flex items-center gap-1.5">
-                    <div class="status-dot" id="ws-status-dot" title="WebSocket"></div>
-                    <span class="text-[0.6rem] font-semibold opacity-40 uppercase tracking-wide">WS</span>
-                </div>
-                <div class="flex items-center gap-1.5">
-                    <div class="status-dot" id="pitrac-status-dot" title="PiTrac"></div>
-                    <span class="text-[0.6rem] font-semibold opacity-40 uppercase tracking-wide">LM</span>
-                </div>
-            </div>
+            <a href="/" title="Dashboard" class="shrink-0">
+                <img src="/static/logos/PiTrac.svg" alt="PiTrac Logo" class="h-8 sm:h-10 header-logo">
+            </a>
 
-            <!-- Logo -->
-            <div class="flex-1 flex justify-center">
-                <a href="/" title="Dashboard">
-                    <img src="/static/logos/PiTrac.svg" alt="PiTrac Logo" class="h-10 header-logo">
-                </a>
-            </div>
+            <ul class="menu menu-horizontal menu-sm hidden xl:flex flex-nowrap gap-1 px-1">
+                {% for href, icon, label in nav_pages %}{{ nav_item(href, icon, label, request.url.path == href) }}{% endfor %}
+            </ul>
 
-            <!-- Desktop controls -->
-            <div class="hidden md:flex gap-2 mr-2 pitrac-controls">
-                {{ pitrac_btn("start", "play", "Start", "desktop", "btn-success") }}
-                {{ pitrac_btn("stop", "square", "Stop", "desktop", "btn-error") }}
-                {{ pitrac_btn("restart", "rotate-cw", "Restart", "desktop", "btn-warning") }}
-            </div>
+            <div class="flex-1"></div>
 
-            <!-- Simulators -->
-            <div class="relative">
-                <button id="sims-nav-btn" class="btn btn-ghost btn-square btn-sm" title="Simulators">
-                    <i data-lucide="radio" class="icon-md"></i>
-                    <span id="sims-status-dot" class="absolute top-1 right-1 w-2 h-2 rounded-full" style="background:var(--color-neutral, #9ca3af)"></span>
-                </button>
-            </div>
+            <span id="pitrac-status-pill" class="status-pill" role="status" title="Checking PiTrac status">Checking</span>
 
-            <!-- Menu -->
+            {{ pitrac_btn("start", "play", "Start", "btn-success") }}
+            {{ pitrac_btn("stop", "square", "Stop", "btn-error hidden") }}
+
+            <button id="sims-nav-btn" class="btn btn-ghost btn-sm gap-1.5 px-2" title="Simulators"
+                    aria-expanded="false" aria-controls="sims-drawer">
+                <span id="sims-status-dot" class="w-2 h-2 rounded-full bg-base-content/30"></span>
+                Sims
+            </button>
+
             <details class="dropdown dropdown-end" id="nav-dropdown">
-                <summary class="btn btn-ghost btn-square btn-sm">
+                <summary class="btn btn-ghost btn-square btn-sm" aria-label="Menu">
                     <i data-lucide="more-vertical" class="icon-md"></i>
                 </summary>
                 <ul class="menu dropdown-content bg-base-200 rounded-box z-50 w-56 p-2 shadow-xl border border-base-300 mt-2">
-                    <li class="menu-title md:hidden">PiTrac Controls</li>
-                    <li class="md:hidden">
-                        <div class="flex flex-col gap-1.5 p-1">
-                            {{ pitrac_btn("start", "play", "Start", "mobile", "btn-success w-full") }}
-                            {{ pitrac_btn("stop", "square", "Stop", "mobile", "btn-error w-full") }}
-                            {{ pitrac_btn("restart", "rotate-cw", "Restart", "mobile", "btn-warning w-full") }}
-                        </div>
+                    {% for href, icon, label in nav_pages %}
+                    {{ nav_item(href, icon, label, request.url.path == href, "xl:hidden") }}
+                    {% endfor %}
+                    <li class="xl:hidden"></li>
+                    <li id="pitrac-restart-item" class="hidden">
+                        <button id="pitrac-restart-btn" class="control-btn gap-2" onclick="controlPiTrac('restart')">
+                            <i data-lucide="rotate-cw" class="icon-menu"></i> Restart PiTrac
+                        </button>
                     </li>
-                    <div class="divider my-0 md:hidden"></div>
-                    {{ nav_item("/", "home", "Dashboard") }}
-                    {{ nav_item("/calibration", "crosshair", "Calibration") }}
-                    {{ nav_item("/config", "settings", "Configuration") }}
-                    {{ nav_item("/history", "list", "Shot History") }}
-                    {{ nav_item("/logs", "file-text", "Logs") }}
-                    {{ nav_item("/testing", "flask-conical", "Testing Tools") }}
-                    {{ nav_item("/update", "refresh-cw", "System Update") }}
-                    <div class="divider my-0"></div>
                     <li class="menu-title">Theme</li>
                     <li>
                         <div class="flex gap-2 p-1">
-                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-theme="light" title="Light" onclick="setTheme('light')">
+                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-mode="light" title="Light" onclick="setTheme('light')">
                                 <i data-lucide="sun"></i>
                             </button>
-                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-theme="dark" title="Dark" onclick="setTheme('dark')">
+                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-mode="dark" title="Dark" onclick="setTheme('dark')">
                                 <i data-lucide="moon"></i>
                             </button>
-                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-theme="system" title="System" onclick="setTheme('system')">
+                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-mode="system" title="System" onclick="setTheme('system')">
                                 <i data-lucide="monitor"></i>
                             </button>
                         </div>
@@ -93,30 +81,45 @@
             </details>
         </div>
 
-        <!-- Simulators drawer (toggled by #sims-nav-btn) -->
         <div id="sims-drawer" class="hidden bg-base-200 rounded-box border border-base-300 shadow-md mb-4 p-4">
             <h3 class="font-semibold mb-3 flex items-center gap-2">
                 <i data-lucide="radio" class="icon-sm"></i>
                 Simulators
             </h3>
-            <div id="sims-list"></div>
+            <div id="sims-list"><p class="text-sm opacity-60">Loading simulators...</p></div>
         </div>
 
         {% block content %}{% endblock %}
     </div>
 
-    <!-- Strobe safety modal (hidden, shown by JS) -->
+    <div id="toast-region" class="toast toast-bottom toast-end z-50" role="status" aria-live="polite"></div>
+
+    <dialog id="confirm-dialog" class="modal">
+        <div class="modal-box">
+            <h3 id="confirm-dialog-title" class="text-lg font-bold"></h3>
+            <p id="confirm-dialog-body" class="py-4"></p>
+            <form method="dialog" class="modal-action">
+                <button value="cancel" class="btn btn-ghost">Cancel</button>
+                <button value="confirm" id="confirm-dialog-ok" class="btn btn-primary">Confirm</button>
+            </form>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button value="cancel">close</button></form>
+    </dialog>
+
     <dialog id="strobe-safety-modal" class="modal">
         <div class="modal-box">
             <div class="text-center mb-4 text-error">
                 <i data-lucide="triangle-alert" class="icon-lg"></i>
             </div>
-            <h3 class="text-lg font-bold text-center">Strobe Calibration Required</h3>
+            <h3 class="text-lg font-bold text-center">Strobe calibration required</h3>
             <p class="py-4 text-center opacity-60" id="strobe-safety-msg">
                 V3 board requires strobe calibration before use.
             </p>
+            <p class="text-sm text-center">
+                Not a V3 board? <a href="/config#setup" class="link link-primary" onclick="this.closest('dialog').close()">Set the Connection Board Version</a>
+            </p>
             <div class="modal-action justify-center">
-                <a href="/calibration" class="btn btn-primary">Go to Calibration</a>
+                <a href="/calibration#strobe" class="btn btn-primary" onclick="this.closest('dialog').close()">Go to Calibration</a>
                 <form method="dialog"><button class="btn btn-ghost">Dismiss</button></form>
             </div>
         </div>

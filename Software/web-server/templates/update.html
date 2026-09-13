@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import result_item, status_row %}
+{% from "_macros.html" import status_row %}
 
 {% block title %}System Update - PiTrac{% endblock %}
 
@@ -21,7 +21,7 @@
             <!-- Status grid -->
             <div class="status-card grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6" id="statusCard">
                 {{ status_row("Current Branch", "currentBranch") }}
-                {{ status_row("Current Commit", "currentHash", extra_class="mono") }}
+                {{ status_row("Current Commit", "currentHash", extra_class="font-mono") }}
                 {{ status_row("Last Build", "lastBuild") }}
                 {{ status_row("Last Check", "lastCheck") }}
                 <div id="warningRow" style="display: none;">

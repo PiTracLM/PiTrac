@@ -29,8 +29,8 @@
 </div>
 {% endmacro %}
 
-{% macro pitrac_btn(action, icon, label, suffix, extra_class="") %}
-<button id="pitrac-{{ action }}-btn-{{ suffix }}"
+{% macro pitrac_btn(action, icon, label, extra_class="") %}
+<button id="pitrac-{{ action }}-btn"
         class="btn btn-sm gap-1 control-btn {{ action }}-btn {{ extra_class }}"
         onclick="controlPiTrac('{{ action }}')"
         title="{{ label }} PiTrac">
@@ -39,8 +39,21 @@
 </button>
 {% endmacro %}
 
-{% macro nav_item(href, icon, label) %}
-<li><a href="{{ href }}" class="gap-3"><i data-lucide="{{ icon }}" class="icon-menu"></i> {{ label }}</a></li>
+{% macro nav_item(href, icon, label, active=false, li_class="") %}
+<li{% if li_class %} class="{{ li_class }}"{% endif %}><a href="{{ href }}" class="gap-2{% if active %} bg-base-300 text-primary font-semibold{% endif %}"{% if active %} aria-current="page"{% endif %}><i data-lucide="{{ icon }}" class="icon-menu"></i> {{ label }}</a></li>
+{% endmacro %}
+
+{% macro page_header(icon, title, subtitle="") %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div class="flex items-center gap-3 min-w-0">
+        <i data-lucide="{{ icon }}" class="icon-md text-primary shrink-0"></i>
+        <div class="min-w-0">
+            <h1 class="text-xl sm:text-2xl font-bold leading-tight">{{ title }}</h1>
+            {% if subtitle %}<p class="text-sm opacity-60">{{ subtitle }}</p>{% endif %}
+        </div>
+    </div>
+    {% if caller is defined %}<div class="flex flex-wrap items-center gap-2">{{ caller() }}</div>{% endif %}
+</div>
 {% endmacro %}
 
 {% macro status_row(label, id, value="--", extra_class="") %}
@@ -50,9 +63,3 @@
 </div>
 {% endmacro %}
 
-{% macro result_item(label, id, value="--") %}
-<div class="flex justify-between py-1.5 border-b border-base-300 last:border-0">
-    <span class="text-sm opacity-60">{{ label }}</span>
-    <span class="text-sm font-medium" id="{{ id }}">{{ value }}</span>
-</div>
-{% endmacro %}

@@ -55,22 +55,44 @@ html[data-theme="light"] {
 .lucide.icon-lg { width: 48px; height: 48px; }
 .lucide.icon-menu { width: 20px; height: 20px; }
 
-/* Golf ball status dots — can't do this with daisyUI */
-.status-dot {
-    width: 0.75rem;
-    height: 0.75rem;
-    background-color: oklch(70% 0.14 160);
-    mask: url('/static/golf_ball.svg') center / contain no-repeat;
-    -webkit-mask: url('/static/golf_ball.svg') center / contain no-repeat;
-    filter: drop-shadow(0 0 3px oklch(70% 0.14 160));
-    transition: all 0.3s;
-    cursor: help;
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.125rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.5rem;
+    white-space: nowrap;
+    background: var(--color-base-300);
+    color: var(--color-base-content);
 }
+.status-pill::before {
+    content: '';
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--color-base-content) 35%, transparent);
+}
+.status-pill.is-running { background: color-mix(in oklab, var(--color-success) 20%, var(--color-base-300)); }
+.status-pill.is-running::before { background: var(--color-success); }
+.status-pill.is-offline { background: color-mix(in oklab, var(--color-error) 20%, var(--color-base-300)); }
+.status-pill.is-offline::before { background: var(--color-error); }
 
-.status-dot.disconnected {
-    background-color: oklch(65% 0.19 25);
-    filter: drop-shadow(0 0 3px oklch(65% 0.19 25));
-    animation: pulse 2s infinite;
+/* Log and command output panel */
+.terminal {
+    background: var(--color-neutral);
+    color: var(--color-neutral-content);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box, 0.5rem);
+    padding: 1rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    overflow-y: auto;
 }
 
 /* Logo invert for dark mode */
@@ -88,9 +110,6 @@ html[data-theme="light"] {
     border-color: transparent;
 }
 
-/* Control button color overrides — daisyUI btn-success/error/warning handle most of it,
-   but we keep these classes for JS compatibility */
-.control-btn.loading { animation: pulse 1s infinite; }
 .control-btn svg { width: 16px; height: 16px; }
 
 /* Animations */
@@ -110,6 +129,3 @@ html[data-theme="light"] {
 }
 
 .animate-fade-in { animation: fadeIn 0.4s ease-out; }
-
-/* Mono text helper */
-.mono { font-family: ui-monospace, monospace; }

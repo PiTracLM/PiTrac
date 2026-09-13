@@ -25,6 +25,16 @@ def test_connect_unknown_sim_returns_404(client):
     assert r.status_code == 404
 
 
+def test_connect_on_a_build_error_sim_returns_404_with_error(client, server_instance):
+    server_instance.sim_manager._build_errors = {
+        "gspro": {"name": "gspro", "display_name": "GSPro", "status": "error", "detail": "Invalid settings"},
+    }
+    assert [s["name"] for s in client.get("/api/sims").json()["sims"]] == ["gspro"]
+    r = client.post("/api/sims/gspro/connect")
+    assert r.status_code == 404
+    assert r.json()["error"] == "Unknown sim: gspro"
+
+
 def _install_on_shot_spy(server_instance):
     """Replace sim_manager.on_shot with an async spy that records its calls."""
     calls = []
