@@ -24,6 +24,7 @@ class TestCalibrationAPI:
         manager.current_camera = None
         manager.calibration_type = None
         manager.calibration_data = {"camera1": {"status": "not_calibrated"}, "camera2": {"status": "not_calibrated"}}
+        manager.busy_reason = Mock(return_value=None)
 
         manager.check_ball_location = AsyncMock(
             return_value={
@@ -304,3 +305,122 @@ class TestCalibrationAPI:
 
         response = client.post(f"/api/calibration/capture/{camera}")
         assert response.status_code == 200
+
+
+@pytest.fixture
+def started_server(server_instance):
+    server_instance.calibration_manager.loop = Mock()
+    return server_instance
+
+
+def test_calibration_data_reports_factory_defaults(client):
+    data = client.get("/api/calibration/data").json()
+    for camera in ("camera1", "camera2"):
+        assert data[camera]["lens_calibrated"] is False
+        assert data[camera]["position_calibrated"] is False
+
+
+def test_setup_status_fresh_install(client):
+    s = client.get("/api/setup/status").json()
+    assert s["board_version"] == 3
+    assert s["strobe"] == {"required": True, "safe": True, "reason": ""}
+    assert s["cameras"]["camera1"]["position_calibrated"] is False
+    assert s["cameras"]["camera2"]["lens_calibrated"] is False
+    assert "type" in s["cameras"]["camera1"]
+    assert s["simulators"] == {"enabled": [], "connected": []}
+    assert s["complete"] is False
+
+
+def test_setup_status_complete_when_everything_is_done(client, server_instance):
+    calibration = {}
+    for n in (1, 2):
+        calibration[f"gs_config.cameras.kCamera{n}CalibrationMatrix"] = [[1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0]]
+        calibration[f"gs_config.cameras.kCamera{n}FocalLength"] = 6.1
+        calibration[f"gs_config.cameras.kCamera{n}Angles"] = [1.5, -2.5]
+    assert server_instance.config_manager.set_calibration_batch(calibration)[0]
+    server_instance.config_manager.set_config("simulators.ogs.enabled", True)
+
+    s = client.get("/api/setup/status").json()
+    assert s["simulators"]["enabled"] == ["ogs"]
+    assert s["complete"] is True
+
+    server_instance.strobe_calibration_manager.is_strobe_safe.return_value = {
+        "safe": False, "board_version": 3, "reason": "V3 board requires strobe calibration before use."
+    }
+    s = client.get("/api/setup/status").json()
+    assert s["strobe"]["safe"] is False
+    assert s["strobe"]["reason"].startswith("V3 board")
+    assert s["complete"] is False
+
+
+def test_calibration_status_keeps_ball_keys_and_adds_distortion(client):
+    status = client.get("/api/calibration/status").json()
+    assert status["camera1"]["status"] == "idle"
+    assert status["camera2"]["status"] == "idle"
+    lens = status["distortion"]["camera1"]
+    assert lens["status"] == "idle"
+    assert lens["images_captured"] == 0
+    assert lens["target_images"] == 40
+    assert lens["requirements"] == {
+        "coverage": 0.0, "coverage_target": 0.8,
+        "tilt": 0.0, "tilt_target": 0.4,
+        "bins": {"small": 0, "medium": 0, "large": 0}, "bin_target": 3,
+    }
+
+
+def test_distortion_route_reports_rejection(client, started_server):
+    started_server.calibration_manager.distortion_status["camera1"]["status"] = "distortion_calibrating"
+    started_server.calibration_manager.run_distortion_calibration = AsyncMock()
+
+    data = client.post("/api/calibration/distortion/camera1").json()
+
+    assert data["status"] == "error"
+    assert "lens calibration" in data["message"]
+    started_server.calibration_manager.run_distortion_calibration.assert_not_called()
+
+
+def test_distortion_route_allows_its_own_feed(client, started_server):
+    started_server._active_cameras[0] = "lens calibration feed"
+    started_server.calibration_manager.run_distortion_calibration = AsyncMock()
+
+    data = client.post("/api/calibration/distortion/camera1", json={"target_images": 40}).json()
+
+    assert data["status"] == "started"
+
+
+def test_ball_calibration_refused_while_camera_busy(client, started_server):
+    cm = started_server.calibration_manager
+    cm.run_auto_calibration = AsyncMock()
+
+    started_server._active_cameras[0] = "lens preview"
+    data = client.post("/api/calibration/auto/camera1").json()
+    assert data == {"status": "error", "message": "Camera 1 is in use by the lens preview. Close it first."}
+
+    started_server._active_cameras.clear()
+    cm.distortion_status["camera2"]["status"] = "distortion_calibrating"
+    data = client.post("/api/calibration/auto/camera2").json()
+    assert data["status"] == "error"
+    assert "Camera 2" in data["message"]
+
+    cm.run_auto_calibration.assert_not_called()
+
+
+def test_ball_calibration_refused_while_pitrac_running(client, started_server):
+    started_server.calibration_manager.run_auto_calibration = AsyncMock()
+    started_server.pitrac_manager.is_running = Mock(return_value=True)
+
+    data = client.post("/api/calibration/auto/camera1").json()
+
+    assert data == {"status": "error", "message": "Stop PiTrac before calibrating"}
+    started_server.calibration_manager.run_auto_calibration.assert_not_called()
+
+
+def test_stop_route_targets_camera_and_kind(client, server_instance):
+    stop = AsyncMock(return_value={"status": "not_running"})
+    server_instance.calibration_manager.stop_calibration = stop
+
+    client.post("/api/calibration/stop", json={"camera": "camera2", "kind": "ball"})
+    stop.assert_awaited_with("camera2", "ball")
+
+    client.post("/api/calibration/stop")
+    stop.assert_awaited_with(None, None)

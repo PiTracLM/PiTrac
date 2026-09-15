@@ -75,7 +75,7 @@ const distortionCalibration = {
 
                 if (!this.currentCamera) return;
 
-                const status = data[this.currentCamera];
+                const status = data.distortion[this.currentCamera];
                 if (!status) return;
 
                 this._updateProgress(status);

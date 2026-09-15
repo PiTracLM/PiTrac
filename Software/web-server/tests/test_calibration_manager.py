@@ -86,7 +86,8 @@ class TestCalibrationManagerStatus:
         assert "camera1" in status
         assert "camera2" in status
 
-        for camera_status in status.values():
+        assert set(status["distortion"]) == {"camera1", "camera2"}
+        for camera_status in (status["camera1"], status["camera2"]):
             assert "status" in camera_status
             assert "message" in camera_status
             assert "progress" in camera_status
@@ -132,6 +133,7 @@ class TestCalibrationDataRetrieval:
             }
         }
 
+        mock_config_manager.calibration_data = {}
         manager = CalibrationManager(mock_config_manager)
         data = manager.get_calibration_data()
 
@@ -158,6 +160,7 @@ class TestCalibrationDataRetrieval:
             }
         }
 
+        mock_config_manager.calibration_data = {}
         manager = CalibrationManager(mock_config_manager)
         data = manager.get_calibration_data()
 
@@ -174,6 +177,7 @@ class TestCalibrationDataRetrieval:
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {}
 
+        mock_config_manager.calibration_data = {}
         manager = CalibrationManager(mock_config_manager)
         data = manager.get_calibration_data()
 
@@ -1103,26 +1107,26 @@ class TestStopDistortionCalibrationFlag:
         return CalibrationManager(cfg)
 
     def test_stop_signals_distortion_camera(self, manager):
-        manager.calibration_status["camera1"]["status"] = "distortion_calibrating"
+        manager.distortion_status["camera1"]["status"] = "distortion_calibrating"
 
         async def go():
             return await manager.stop_calibration(camera="camera1")
 
         result = asyncio.run(go())
-        assert manager.calibration_status["camera1"]["status"] == "stopping"
+        assert manager.distortion_status["camera1"]["status"] == "stopping"
         assert result["status"] == "stopping"
         assert "camera1" in result["cameras"]
 
     def test_stop_all_signals_both_distortion_cameras(self, manager):
-        manager.calibration_status["camera1"]["status"] = "distortion_calibrating"
-        manager.calibration_status["camera2"]["status"] = "distortion_calibrating"
+        manager.distortion_status["camera1"]["status"] = "distortion_calibrating"
+        manager.distortion_status["camera2"]["status"] = "distortion_calibrating"
 
         async def go():
             return await manager.stop_calibration()
 
         result = asyncio.run(go())
-        assert manager.calibration_status["camera1"]["status"] == "stopping"
-        assert manager.calibration_status["camera2"]["status"] == "stopping"
+        assert manager.distortion_status["camera1"]["status"] == "stopping"
+        assert manager.distortion_status["camera2"]["status"] == "stopping"
         assert result["status"] == "stopping"
         assert set(result["cameras"]) == {"camera1", "camera2"}
 
@@ -1242,3 +1246,89 @@ class TestTriggerModeSwitching:
         asyncio.run(go())
         mock_set.assert_called_once_with(1)
         assert manager._free_running_refs == 0
+
+
+class TestCalibrationStateAndJobIsolation:
+    @pytest.fixture
+    def manager(self):
+        cfg = Mock()
+        cfg.register_callback = Mock()
+        cfg.get_config.return_value = {}
+        cfg.calibration_data = {}
+        return CalibrationManager(cfg)
+
+    @staticmethod
+    def _process():
+        process = AsyncMock()
+        process.terminate = Mock()
+        process.returncode = None
+        return process
+
+    def test_calibrated_flags_come_from_saved_calibration(self, manager):
+        manager.config_manager.calibration_data = {
+            "gs_config": {
+                "cameras": {
+                    "kCamera1CalibrationMatrix": [[1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0]],
+                    "kCamera1FocalLength": 6.1,
+                    "kCamera1Angles": [1.5, -2.5],
+                    "kCamera2FocalLength": 6.0,
+                }
+            }
+        }
+
+        data = manager.get_calibration_data()
+
+        assert data["camera1"]["lens_calibrated"] is True
+        assert data["camera1"]["position_calibrated"] is True
+        assert data["camera2"]["lens_calibrated"] is False
+        assert data["camera2"]["position_calibrated"] is False
+
+    def test_stop_with_camera_only_stops_that_camera(self, manager):
+        cam1, cam2 = self._process(), self._process()
+        manager.current_processes.update({"camera1": cam1, "camera2": cam2})
+        manager.distortion_status["camera2"]["status"] = "distortion_calibrating"
+
+        result = asyncio.run(manager.stop_calibration(camera="camera1"))
+
+        assert result == {"status": "stopped", "cameras": ["camera1"]}
+        cam1.terminate.assert_called_once()
+        cam2.terminate.assert_not_called()
+        assert list(manager.current_processes) == ["camera2"]
+        assert manager.distortion_status["camera2"]["status"] == "distortion_calibrating"
+
+    def test_stop_kind_limits_the_job_type(self, manager):
+        cam1 = self._process()
+        manager.current_processes["camera1"] = cam1
+        manager.distortion_status["camera1"]["status"] = "distortion_calibrating"
+
+        result = asyncio.run(manager.stop_calibration(kind="distortion"))
+
+        assert result == {"status": "stopping", "cameras": ["camera1"]}
+        assert manager.distortion_status["camera1"]["status"] == "stopping"
+        cam1.terminate.assert_not_called()
+
+        result = asyncio.run(manager.stop_calibration(kind="ball"))
+
+        assert result == {"status": "stopped", "cameras": ["camera1"]}
+        cam1.terminate.assert_called_once()
+
+    def test_distortion_and_ball_status_are_separate(self, manager):
+        captures = []
+
+        async def capture(camera_index, output_path, gain):
+            captures.append(camera_index)
+            if len(captures) == 1:
+                manager.calibration_status["camera1"]["status"] = "completed"
+            else:
+                await manager.stop_calibration(camera="camera1", kind="distortion")
+            return None
+
+        manager._capture_image = capture
+        with patch("calibration_manager.asyncio.sleep", new=AsyncMock()):
+            result = asyncio.run(manager.run_distortion_calibration("camera1", target_images=5))
+
+        assert result["status"] == "stopped"
+        assert len(captures) == 2
+        assert manager.calibration_status["camera1"]["status"] == "completed"
+        assert manager.distortion_status["camera1"]["status"] == "stopped"
+        assert manager.get_status()["distortion"]["camera1"]["status"] == "stopped"

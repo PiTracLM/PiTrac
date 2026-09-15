@@ -33,12 +33,37 @@ DISTORTION_DEFAULT_TARGET_IMAGES = 40  # Hagemann 2021: 40+ images for sub-0.2% 
 DISTORTION_MAX_ATTEMPTS_MULTIPLIER = 5  # max_attempts = target * this
 DISTORTION_CAPTURE_INTERVAL = 2.0  # seconds between captures
 DISTORTION_CAPTURE_TIMEOUT = 10.0  # timeout for rpicam-still
+DISTORTION_MIN_PIXEL_COVERAGE = 0.80  # 10×10 pixel grid; reachable in ~40 frames per coupon-collector
+DISTORTION_MIN_TILT_FRACTION = 0.40
+DISTORTION_SIZE_BIN_MIN_SAMPLES = 3
 
 RPICAM_TUNING_FILE = "/usr/share/libcamera/ipa/rpi/pisp/imx296_noir.json"
 RPICAM_CAL_SHUTTER_US = 11000
 
 IMX296_TRIGGER_BINARY = "/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_trigger"
 IMX296_I2C_BUS = "4"
+
+
+def _distortion_requirements(pixel_coverage: float, tilted: int, good: int, size_bins: Dict[str, int]) -> Dict[str, Any]:
+    return {
+        "coverage": pixel_coverage,
+        "coverage_target": DISTORTION_MIN_PIXEL_COVERAGE,
+        "tilt": tilted / good if good > 0 else 0.0,
+        "tilt_target": DISTORTION_MIN_TILT_FRACTION,
+        "bins": dict(size_bins),
+        "bin_target": DISTORTION_SIZE_BIN_MIN_SAMPLES,
+    }
+
+
+def _idle_distortion_status() -> Dict[str, Any]:
+    return {
+        "status": "idle",
+        "message": "",
+        "progress": 0,
+        "images_captured": 0,
+        "target_images": DISTORTION_DEFAULT_TARGET_IMAGES,
+        "requirements": _distortion_requirements(0.0, 0, 0, {"small": 0, "medium": 0, "large": 0}),
+    }
 
 
 class CalibrationManager:
@@ -60,6 +85,7 @@ class CalibrationManager:
             "camera1": {"status": "idle", "message": "", "progress": 0, "last_run": None},
             "camera2": {"status": "idle", "message": "", "progress": 0, "last_run": None},
         }
+        self.distortion_status = {"camera1": _idle_distortion_status(), "camera2": _idle_distortion_status()}
         self.log_dir = Path.home() / ".pitrac" / "logs"
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -673,31 +699,38 @@ class CalibrationManager:
             return {"status": "error", "message": str(e)}
 
     def get_status(self) -> Dict[str, Any]:
-        """Get current calibration status for all cameras"""
-        return self.calibration_status
+        """Ball run status per camera, plus lens calibration runs under "distortion"."""
+        return {**self.calibration_status, "distortion": self.distortion_status}
+
+    def busy_reason(self, camera: str) -> Optional[str]:
+        label = camera.replace("camera", "Camera ")
+        if camera in self.current_processes or self.calibration_status[camera]["status"] in ("calibrating", "checking_ball"):
+            return f"{label} is already running a calibration"
+        if self.distortion_status[camera]["status"] in ("distortion_calibrating", "stopping"):
+            return f"{label} is running lens calibration"
+        return None
 
     def get_calibration_data(self) -> Dict[str, Any]:
         """Get current calibration data from config
 
         Returns calibration data including focal length, camera angles,
-        and distortion calibration (matrix + distortion vector).
+        and distortion calibration (matrix + distortion vector). The
+        *_calibrated flags are true only when the value was saved by a
+        calibration, not taken from the factory defaults.
         """
-        config = self.config_manager.get_config()
-        cameras = config.get("gs_config", {}).get("cameras", {})
+        cameras = self.config_manager.get_config().get("gs_config", {}).get("cameras", {})
+        saved = self.config_manager.calibration_data.get("gs_config", {}).get("cameras", {})
 
         return {
-            "camera1": {
-                "focal_length": cameras.get("kCamera1FocalLength"),
-                "angles": cameras.get("kCamera1Angles"),
-                "calibration_matrix": cameras.get("kCamera1CalibrationMatrix"),
-                "distortion_vector": cameras.get("kCamera1DistortionVector"),
-            },
-            "camera2": {
-                "focal_length": cameras.get("kCamera2FocalLength"),
-                "angles": cameras.get("kCamera2Angles"),
-                "calibration_matrix": cameras.get("kCamera2CalibrationMatrix"),
-                "distortion_vector": cameras.get("kCamera2DistortionVector"),
-            },
+            f"camera{n}": {
+                "focal_length": cameras.get(f"kCamera{n}FocalLength"),
+                "angles": cameras.get(f"kCamera{n}Angles"),
+                "calibration_matrix": cameras.get(f"kCamera{n}CalibrationMatrix"),
+                "distortion_vector": cameras.get(f"kCamera{n}DistortionVector"),
+                "lens_calibrated": f"kCamera{n}CalibrationMatrix" in saved,
+                "position_calibrated": f"kCamera{n}FocalLength" in saved and f"kCamera{n}Angles" in saved,
+            }
+            for n in (1, 2)
         }
 
     def _build_web_server_args(self) -> list:
@@ -856,6 +889,20 @@ class CalibrationManager:
 
         return False
 
+    def distortion_precheck(self, camera: str) -> Optional[str]:
+        if camera not in ["camera1", "camera2"]:
+            return "Invalid camera"
+        if reason := self.busy_reason(camera):
+            return reason
+        try:
+            import cv2
+            import numpy
+            import charuco_detector
+        except ImportError as e:
+            logger.error(f"Missing dependency for distortion calibration: {e}")
+            return f"Missing dependency: {e}"
+        return None
+
     async def run_distortion_calibration(
         self, camera: str, target_images: int = DISTORTION_DEFAULT_TARGET_IMAGES
     ) -> Dict[str, Any]:
@@ -873,19 +920,11 @@ class CalibrationManager:
         Returns:
             Dict with calibration results or error
         """
-        if camera not in ["camera1", "camera2"]:
-            return {"status": "error", "message": "Invalid camera"}
+        if error := self.distortion_precheck(camera):
+            return {"status": "error", "message": error}
 
-        if self.calibration_status[camera]["status"] in ["distortion_calibrating", "calibrating"]:
-            return {"status": "error", "message": "Calibration already running for this camera"}
-
-        try:
-            import cv2
-            import numpy as np
-            from charuco_detector import CompatibleCharucoDetector, CoverageTracker
-        except ImportError as e:
-            logger.error(f"Missing dependency for distortion calibration: {e}")
-            return {"status": "error", "message": f"Missing dependency: {e}"}
+        import cv2
+        from charuco_detector import CompatibleCharucoDetector, CoverageTracker
 
         detector = CompatibleCharucoDetector(
             squares_x=8, squares_y=11,
@@ -916,12 +955,11 @@ class CalibrationManager:
                 return "Board not fully visible -- make sure the full pattern is in frame and well-lit"
             return reasons
 
-        self.calibration_status[camera] = {
+        self.distortion_status[camera] = {
+            **_idle_distortion_status(),
             "status": "distortion_calibrating",
             "message": "Starting distortion calibration...",
-            "progress": 0,
             "last_run": datetime.now().isoformat(),
-            "images_captured": 0,
             "images_rejected": 0,
             "target_images": target_images,
             "coverage": None,
@@ -930,9 +968,6 @@ class CalibrationManager:
         camera_index = 0 if camera == "camera1" else 1
         await self.request_free_running(camera_index)
 
-        config = self.config_manager.get_config()
-        slot_key = "slot1" if camera == "camera1" else "slot2"
-        slot_config = config.get("cameras", {}).get(slot_key, {})
         gain_key = "kCamera1Gain" if camera == "camera1" else "kCamera2Gain"
         camera_gain = self.config_manager.get_config(f"gs_config.cameras.{gain_key}")
         if camera_gain is None:
@@ -950,9 +985,6 @@ class CalibrationManager:
 
         log_msg(f"Target: {target_images} images, camera index: {camera_index}")
 
-        min_pixel_coverage = 0.80   # 10×10 pixel grid; reachable in ~40 frames per coupon-collector
-        min_tilt_fraction = 0.40
-        size_bin_min_samples = 3
         size_bin_edges = (0.10, 0.16)  # standard ball-tracking distance gives ~0.12 = medium
         size_bins = {"small": 0, "medium": 0, "large": 0}
 
@@ -969,20 +1001,22 @@ class CalibrationManager:
                     coverage_tracker.get_pixel_coverage_fraction()
                     if coverage_tracker else 0.0
                 )
-                coverage_ok = pixel_cov >= min_pixel_coverage
-                tilt_ok = good_count > 0 and (tilted_count / good_count) >= min_tilt_fraction
-                size_ok = all(n >= size_bin_min_samples for n in size_bins.values())
+                coverage_ok = pixel_cov >= DISTORTION_MIN_PIXEL_COVERAGE
+                tilt_ok = good_count > 0 and (tilted_count / good_count) >= DISTORTION_MIN_TILT_FRACTION
+                size_ok = all(n >= DISTORTION_SIZE_BIN_MIN_SAMPLES for n in size_bins.values())
 
                 if good_count >= target_images and coverage_ok and tilt_ok and size_ok:
                     break
 
                 # Check if calibration was stopped
-                if self.calibration_status[camera]["status"] != "distortion_calibrating":
+                if self.distortion_status[camera]["status"] != "distortion_calibrating":
                     log_msg("Calibration stopped by user")
+                    self.distortion_status[camera]["status"] = "stopped"
+                    self.distortion_status[camera]["message"] = "Stopped"
                     return {"status": "stopped", "message": "Calibration stopped"}
 
                 hint = ""
-                short_bin = next((b for b, n in size_bins.items() if n < size_bin_min_samples), None)
+                short_bin = next((b for b, n in size_bins.items() if n < DISTORTION_SIZE_BIN_MIN_SAMPLES), None)
                 if not coverage_ok and coverage_tracker:
                     suggested = coverage_tracker.get_suggested_region()
                     hint = f"Move the board toward the {suggested} of the frame."
@@ -998,28 +1032,29 @@ class CalibrationManager:
                     hint = "Hold the board steady and visible."
 
                 image_progress = min(good_count / target_images, 1.0)
-                cov_progress = min(pixel_cov / min_pixel_coverage, 1.0)
-                tilt_prog = min((tilted_count / good_count) / min_tilt_fraction, 1.0) if good_count > 0 else 0
+                cov_progress = min(pixel_cov / DISTORTION_MIN_PIXEL_COVERAGE, 1.0)
+                tilt_prog = min((tilted_count / good_count) / DISTORTION_MIN_TILT_FRACTION, 1.0) if good_count > 0 else 0
                 size_prog = min(
-                    sum(min(n, size_bin_min_samples) for n in size_bins.values()) /
-                    (size_bin_min_samples * 3), 1.0
+                    sum(min(n, DISTORTION_SIZE_BIN_MIN_SAMPLES) for n in size_bins.values()) /
+                    (DISTORTION_SIZE_BIN_MIN_SAMPLES * 3), 1.0
                 )
                 progress = int(
                     (image_progress * 0.35 + cov_progress * 0.35 + tilt_prog * 0.15 + size_prog * 0.15) * 80
                 )
 
-                self.calibration_status[camera]["progress"] = progress
-                self.calibration_status[camera]["hint"] = hint
-                self.calibration_status[camera]["tilt_fraction"] = tilted_count / good_count if good_count > 0 else 0
-                self.calibration_status[camera]["pixel_coverage"] = pixel_cov
-                self.calibration_status[camera]["size_bins"] = dict(size_bins)
+                self.distortion_status[camera]["progress"] = progress
+                self.distortion_status[camera]["hint"] = hint
+                self.distortion_status[camera]["tilt_fraction"] = tilted_count / good_count if good_count > 0 else 0
+                self.distortion_status[camera]["requirements"] = _distortion_requirements(
+                    pixel_cov, tilted_count, good_count, size_bins
+                )
 
                 if good_count >= target_images and not (coverage_ok and tilt_ok and size_ok):
-                    self.calibration_status[camera]["message"] = (
+                    self.distortion_status[camera]["message"] = (
                         f"All {target_images} images captured -- collecting a few more for better accuracy."
                     )
                 else:
-                    self.calibration_status[camera]["message"] = (
+                    self.distortion_status[camera]["message"] = (
                         f"Captured {good_count} of {target_images} images"
                     )
 
@@ -1045,10 +1080,10 @@ class CalibrationManager:
                     rejected_count += 1
                     reasons = ", ".join(quality["reasons"])
                     log_msg(f"Attempt {attempt + 1}: Rejected - {reasons}")
-                    self.calibration_status[camera]["message"] = (
+                    self.distortion_status[camera]["message"] = (
                         f"Skipped: {friendly_rejection(reasons)}"
                     )
-                    self.calibration_status[camera]["images_rejected"] = rejected_count
+                    self.distortion_status[camera]["images_rejected"] = rejected_count
                     await asyncio.sleep(DISTORTION_CAPTURE_INTERVAL)
                     continue
 
@@ -1061,10 +1096,10 @@ class CalibrationManager:
                 if not detector.is_good_sample(params, sample_params):
                     rejected_count += 1
                     log_msg(f"Attempt {attempt + 1}: Too similar to existing sample")
-                    self.calibration_status[camera]["message"] = (
+                    self.distortion_status[camera]["message"] = (
                         "Skipped: board position too similar -- move it to a new area"
                     )
-                    self.calibration_status[camera]["images_rejected"] = rejected_count
+                    self.distortion_status[camera]["images_rejected"] = rejected_count
                     await asyncio.sleep(DISTORTION_CAPTURE_INTERVAL)
                     continue
 
@@ -1081,10 +1116,12 @@ class CalibrationManager:
 
                 coverage_tracker.update(corners)
                 coverage_data = coverage_tracker.to_dict()
-                self.calibration_status[camera]["coverage"] = coverage_data
-                self.calibration_status[camera]["images_captured"] = good_count
-                self.calibration_status[camera]["images_rejected"] = rejected_count
-                self.calibration_status[camera]["size_bins"] = dict(size_bins)
+                self.distortion_status[camera]["coverage"] = coverage_data
+                self.distortion_status[camera]["images_captured"] = good_count
+                self.distortion_status[camera]["images_rejected"] = rejected_count
+                self.distortion_status[camera]["requirements"] = _distortion_requirements(
+                    coverage_data["pixel_coverage"], tilted_count, good_count, size_bins
+                )
 
                 tilt_label = "tilted" if quality["tilt_score"] > 0.20 else "flat"
                 log_msg(
@@ -1098,7 +1135,7 @@ class CalibrationManager:
                 # Positive feedback with coaching hint
                 if good_count < target_images and coverage_tracker:
                     suggested = coverage_tracker.get_suggested_region()
-                    self.calibration_status[camera]["message"] = (
+                    self.distortion_status[camera]["message"] = (
                         f"Got it! ({good_count}/{target_images}) -- Try the {suggested} area next."
                     )
 
@@ -1107,8 +1144,8 @@ class CalibrationManager:
             if good_count < 3:
                 msg = "Could not capture enough usable images. Check lighting and board visibility."
                 log_msg(f"FAILED: Only captured {good_count} good images (need at least 3)")
-                self.calibration_status[camera]["status"] = "failed"
-                self.calibration_status[camera]["message"] = msg
+                self.distortion_status[camera]["status"] = "failed"
+                self.distortion_status[camera]["message"] = msg
                 self._write_distortion_log(log_file, log_lines)
                 return {"status": "failed", "message": msg, "log_file": str(log_file)}
 
@@ -1123,8 +1160,8 @@ class CalibrationManager:
                 log_msg(f"Proceeding with calibration despite unmet conditions: {', '.join(unmet)}")
 
             # Run calibration with outlier rejection
-            self.calibration_status[camera]["message"] = "Processing calibration..."
-            self.calibration_status[camera]["progress"] = 85
+            self.distortion_status[camera]["message"] = "Processing calibration..."
+            self.distortion_status[camera]["progress"] = 85
             log_msg(f"Running calibration on {good_count} images...")
 
             # k3 is non-trivial on this lens (~-0.13); fixing it biases k1/k2.
@@ -1160,14 +1197,14 @@ class CalibrationManager:
                 msg = (f"Calibration quality too low (RMS {rms:.2f}px). "
                        "Try again with the board in more varied positions and angles.")
                 log_msg(f"REJECTED: {msg}")
-                self.calibration_status[camera]["status"] = "failed"
-                self.calibration_status[camera]["message"] = msg
+                self.distortion_status[camera]["status"] = "failed"
+                self.distortion_status[camera]["message"] = msg
                 self._write_distortion_log(log_file, log_lines)
                 return {"status": "failed", "message": msg, "rms_error": float(rms),
                         "log_file": str(log_file)}
 
-            self.calibration_status[camera]["message"] = "Saving calibration results..."
-            self.calibration_status[camera]["progress"] = 95
+            self.distortion_status[camera]["message"] = "Saving calibration results..."
+            self.distortion_status[camera]["progress"] = 95
 
             self._save_distortion_results(camera, camera_matrix, dist_coeffs, rms)
             log_msg("Calibration results saved to configuration")
@@ -1178,11 +1215,11 @@ class CalibrationManager:
                 "Acceptable" if rms <= 0.9 else
                 "Poor"
             )
-            self.calibration_status[camera]["status"] = "completed"
-            self.calibration_status[camera]["message"] = (
+            self.distortion_status[camera]["status"] = "completed"
+            self.distortion_status[camera]["message"] = (
                 f"Calibration complete -- accuracy: {quality_label} (error: {rms:.2f}px)"
             )
-            self.calibration_status[camera]["progress"] = 100
+            self.distortion_status[camera]["progress"] = 100
 
             self._write_distortion_log(log_file, log_lines)
 
@@ -1201,8 +1238,8 @@ class CalibrationManager:
         except Exception as e:
             logger.error(f"Distortion calibration failed: {e}", exc_info=True)
             log_msg(f"ERROR: {e}")
-            self.calibration_status[camera]["status"] = "error"
-            self.calibration_status[camera]["message"] = str(e)
+            self.distortion_status[camera]["status"] = "error"
+            self.distortion_status[camera]["message"] = str(e)
             self._write_distortion_log(log_file, log_lines)
             return {"status": "error", "message": str(e), "log_file": str(log_file)}
         finally:
@@ -1387,71 +1424,46 @@ class CalibrationManager:
         except Exception as e:
             logger.error(f"Failed to write distortion log: {e}")
 
-    async def stop_calibration(self, camera: Optional[str] = None) -> Dict[str, Any]:
-        """Stop running calibration process(es)
+    async def stop_calibration(self, camera: Optional[str] = None, kind: Optional[str] = None) -> Dict[str, Any]:
+        """Stop running calibration jobs, optionally limited to one camera and one kind.
 
-        Handles both ball-based calibration (process termination) and
-        distortion calibration (status flag to break capture loop).
-
-        Args:
-            camera: Specific camera to stop, or None to stop all
-
-        Returns:
-            Dict with stop status
+        Ball jobs ("ball") are pitrac_lm processes and get terminated. Lens jobs
+        ("distortion") are flagged and their capture loop exits on its next pass.
         """
-        # Signal distortion calibration to stop via status flag
+        cameras = [camera] if camera else ["camera1", "camera2"]
+
         distortion_stopped = []
-        if camera:
-            if self.calibration_status[camera]["status"] == "distortion_calibrating":
-                self.calibration_status[camera]["status"] = "stopping"
-                self.calibration_status[camera]["message"] = "Stopping..."
-                distortion_stopped.append(camera)
-                logger.info(f"Signaled distortion calibration stop for {camera}")
-        else:
-            for cam in ["camera1", "camera2"]:
-                if self.calibration_status[cam]["status"] == "distortion_calibrating":
-                    self.calibration_status[cam]["status"] = "stopping"
-                    self.calibration_status[cam]["message"] = "Stopping..."
+        if kind in (None, "distortion"):
+            for cam in cameras:
+                if self.distortion_status[cam]["status"] == "distortion_calibrating":
+                    self.distortion_status[cam]["status"] = "stopping"
+                    self.distortion_status[cam]["message"] = "Stopping..."
                     distortion_stopped.append(cam)
                     logger.info(f"Signaled distortion calibration stop for {cam}")
 
-        async with self._process_lock:
-            if camera:
-                if camera in self.current_processes:
-                    try:
-                        process = self.current_processes[camera]
-                        await self._terminate_process_gracefully(process, camera)
-                        del self.current_processes[camera]
-                        logger.info(f"Calibration process stopped for {camera}")
-                        return {"status": "stopped", "camera": camera}
-                    except Exception as e:
-                        logger.error(f"Failed to stop calibration for {camera}: {e}")
-                        return {"status": "error", "message": str(e), "camera": camera}
-                if distortion_stopped:
-                    return {"status": "stopping", "cameras": distortion_stopped}
-                return {"status": "not_running", "camera": camera}
-            else:
-                if not self.current_processes:
-                    if distortion_stopped:
-                        return {"status": "stopping", "cameras": distortion_stopped}
-                    return {"status": "not_running"}
-
-                stopped_cameras = []
-                errors = []
-
-                for cam, process in list(self.current_processes.items()):
+        stopped = []
+        errors = []
+        if kind in (None, "ball"):
+            async with self._process_lock:
+                for cam in cameras:
+                    process = self.current_processes.pop(cam, None)
+                    if process is None:
+                        continue
                     try:
                         await self._terminate_process_gracefully(process, cam)
-                        stopped_cameras.append(cam)
+                        stopped.append(cam)
+                        logger.info(f"Calibration process stopped for {cam}")
                     except Exception as e:
                         logger.error(f"Failed to stop calibration for {cam}: {e}")
                         errors.append(f"{cam}: {e}")
 
-                self.current_processes.clear()
-
-                if errors:
-                    return {"status": "partial", "stopped": stopped_cameras, "errors": errors}
-                return {"status": "stopped", "cameras": stopped_cameras}
+        if errors:
+            return {"status": "partial", "stopped": stopped, "errors": errors}
+        if stopped:
+            return {"status": "stopped", "cameras": stopped + distortion_stopped}
+        if distortion_stopped:
+            return {"status": "stopping", "cameras": distortion_stopped}
+        return {"status": "not_running"}
 
     async def _terminate_process_gracefully(self, process: asyncio.subprocess.Process, camera: str) -> None:
         """Terminate a process gracefully with fallback to kill

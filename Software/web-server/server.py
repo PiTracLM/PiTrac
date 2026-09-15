@@ -636,6 +636,10 @@ class PiTracServer:
                 return {"status": "error", "message": safety["reason"]}
             if self.calibration_manager.loop is None:
                 return {"status": "error", "message": "Server still starting up, please retry in a moment"}
+            if self.pitrac_manager.is_running():
+                return {"status": "error", "message": "Stop PiTrac before calibrating"}
+            if reason := self._camera_busy(camera):
+                return {"status": "error", "message": reason}
             return await self.calibration_manager.run_auto_calibration(camera)
 
         @self.app.post("/api/calibration/manual/{camera}")
@@ -745,7 +749,7 @@ class PiTracServer:
                     await websocket.close()
                     return
 
-                self._active_cameras[camera_index] = "distortion-feed"
+                self._active_cameras[camera_index] = "lens calibration feed"
 
                 # Read actual resolution after first frame (accurate for rpicam-vid)
                 ret, first_frame = await asyncio.to_thread(cap.read)
@@ -795,7 +799,7 @@ class PiTracServer:
                         })
 
                     # Draw coverage grid overlay (single blend pass)
-                    status = self.calibration_manager.calibration_status.get(camera, {})
+                    status = self.calibration_manager.distortion_status.get(camera, {})
                     cov = status.get("coverage")
                     if cov and cov.get("grid"):
                         dh, dw = display.shape[:2]
@@ -880,7 +884,7 @@ class PiTracServer:
                     await websocket.close()
                     return
 
-                self._active_cameras[camera_index] = "undistort-preview"
+                self._active_cameras[camera_index] = "lens preview"
 
                 # Read actual resolution and precompute undistort maps
                 ret, first_frame = await asyncio.to_thread(cap.read)
@@ -972,6 +976,11 @@ class PiTracServer:
                 return {"status": "error", "message": "Server still starting up, please retry in a moment"}
             if self.pitrac_manager.is_running():
                 return {"status": "error", "message": "Stop PiTrac before running distortion calibration"}
+            reason = self._camera_busy(camera, own_feed="lens calibration feed") or (
+                self.calibration_manager.distortion_precheck(camera)
+            )
+            if reason:
+                return {"status": "error", "message": reason}
 
             target_images = 40
             try:
@@ -989,9 +998,50 @@ class PiTracServer:
             return {"status": "started", "message": f"Distortion calibration started for {camera}"}
 
         @self.app.post("/api/calibration/stop")
-        async def stop_calibration() -> Dict[str, Any]:
-            """Stop any running calibration process"""
-            return await self.calibration_manager.stop_calibration()
+        async def stop_calibration(request: Request) -> Dict[str, Any]:
+            """Stop running calibration jobs. Optional body {camera, kind} narrows which ones."""
+            try:
+                body = await request.json()
+            except ValueError:
+                body = None
+            if not isinstance(body, dict):
+                body = {}
+            camera, kind = body.get("camera"), body.get("kind")
+            if camera not in (None, "camera1", "camera2") or kind not in (None, "ball", "distortion"):
+                return {"status": "error", "message": "Invalid camera or kind"}
+            return await self.calibration_manager.stop_calibration(camera, kind)
+
+        @self.app.get("/api/setup/status")
+        async def setup_status() -> Dict[str, Any]:
+            """What a new build still needs: strobe calibration, camera calibrations, a simulator"""
+            board_version = self.config_manager.get_config("gs_config.strobing.kConnectionBoardVersion")
+            board_version = int(board_version) if board_version is not None else None
+            safety = self.strobe_calibration_manager.is_strobe_safe()
+            calibration = self.calibration_manager.get_calibration_data()
+            cameras = {
+                f"camera{n}": {
+                    "type": self.config_manager.get_config(f"cameras.slot{n}.type"),
+                    "lens_calibrated": calibration[f"camera{n}"]["lens_calibrated"],
+                    "position_calibrated": calibration[f"camera{n}"]["position_calibrated"],
+                }
+                for n in (1, 2)
+            }
+            sims = self.config_manager.get_config("simulators") or {}
+            enabled = [name for name, settings in sims.items() if isinstance(settings, dict) and settings.get("enabled")]
+            connected = [sim["name"] for sim in self.sim_manager.status() if sim["status"] == "connected"]
+            return {
+                "board_version": board_version,
+                "strobe": {
+                    "required": board_version == 3,
+                    "safe": safety["safe"],
+                    "reason": safety.get("reason", ""),
+                },
+                "cameras": cameras,
+                "simulators": {"enabled": enabled, "connected": connected},
+                "complete": safety["safe"]
+                and all(c["lens_calibrated"] and c["position_calibrated"] for c in cameras.values())
+                and bool(enabled),
+            }
 
         @self.app.get("/testing", response_class=HTMLResponse)
         async def testing_page(request: Request) -> Response:
@@ -1562,6 +1612,14 @@ class PiTracServer:
                 else:
                     logger.warning(f"Detected {key} = {value} is not a supported option; keeping the default")
         logger.info(f"Saved detected settings for {len(cameras)} camera(s)")
+
+    def _camera_busy(self, camera: str, own_feed: Optional[str] = None) -> Optional[str]:
+        if reason := self.calibration_manager.busy_reason(camera):
+            return reason
+        feed = self._active_cameras.get(0 if camera == "camera1" else 1)
+        if feed and feed != own_feed:
+            return f"{camera.replace('camera', 'Camera ')} is in use by the {feed}. Close it first."
+        return None
 
     def _testing_tool_refusal(self) -> Optional[Dict[str, Any]]:
         running = self.testing_manager.get_running_tools()
