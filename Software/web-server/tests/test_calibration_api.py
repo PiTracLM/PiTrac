@@ -1,6 +1,7 @@
 """Tests for calibration API endpoints"""
 
 import pytest
+from datetime import datetime
 from unittest.mock import Mock, AsyncMock, MagicMock
 
 from server import LENS_CALIBRATION_FEED, LENS_PREVIEW
@@ -325,7 +326,7 @@ def test_calibration_data_reports_factory_defaults(client):
 def test_setup_status_fresh_install(client):
     s = client.get("/api/setup/status").json()
     assert s["board_version"] == 3
-    assert s["strobe"] == {"required": True, "safe": True, "reason": ""}
+    assert s["strobe"] == {"required": True, "safe": True, "reason": "", "updated_at": None}
     assert s["cameras"]["camera1"]["position_calibrated"] is False
     assert s["cameras"]["camera2"]["lens_calibrated"] is False
     assert "type" in s["cameras"]["camera1"]
@@ -354,6 +355,27 @@ def test_setup_status_complete_when_everything_is_done(client, server_instance):
     assert s["strobe"]["safe"] is False
     assert s["strobe"]["reason"].startswith("V3 board")
     assert s["complete"] is False
+
+
+def test_setup_status_reports_when_each_calibration_was_saved(client, server_instance):
+    s = client.get("/api/setup/status").json()
+    for camera in ("camera1", "camera2"):
+        assert s["cameras"][camera]["lens_updated_at"] is None
+        assert s["cameras"][camera]["position_updated_at"] is None
+
+    config = server_instance.config_manager
+    assert config.set_calibration_batch({
+        "gs_config.cameras.kCamera1CalibrationMatrix": [[1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0]],
+        "gs_config.cameras.kCamera1FocalLength": 6.1,
+    })[0]
+    assert config.set_config("gs_config.strobing.kDAC_setting", 140)[0]
+
+    s = client.get("/api/setup/status").json()
+    lens = s["cameras"]["camera1"]["lens_updated_at"]
+    assert datetime.fromisoformat(lens)
+    assert s["cameras"]["camera1"]["position_updated_at"] == lens
+    assert datetime.fromisoformat(s["strobe"]["updated_at"]) >= datetime.fromisoformat(lens)
+    assert s["cameras"]["camera2"]["lens_updated_at"] is None
 
 
 def test_calibration_status_keeps_ball_keys_and_adds_distortion(client):

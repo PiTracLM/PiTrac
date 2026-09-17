@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import status_row %}
+{% from "_macros.html" import page_header, status_row %}
 
 {% block title %}PiTrac Calibration{% endblock %}
 
@@ -7,517 +7,228 @@
 <link rel="stylesheet" href="/static/css/calibration.css?v={{ asset_version }}">
 {% endblock %}
 
+{% set redo_strobe = "Redo if you change the LED board or power supply." %}
+{% set redo_lens = "Redo if you swap or refocus the lens or replace the camera." %}
+{% set redo_position = "Redo if PiTrac or a camera moves or gets bumped." %}
+{% set checklist = [
+    ("strobe", "strobe", "", "Strobe", redo_strobe),
+    ("lens-camera1", "lens", "camera1", "Lens, camera 1", redo_lens),
+    ("lens-camera2", "lens", "camera2", "Lens, camera 2", redo_lens),
+    ("position-camera1", "position", "camera1", "Position, camera 1", redo_position),
+    ("position-camera2", "position", "camera2", "Position, camera 2", redo_position),
+] %}
+
 {% block content %}
+{{ page_header("crosshair", "Calibration", "Do these in order. Each one only needs redoing when the hardware changes.") }}
+
 <div class="flex flex-col gap-4">
 
-    {# -- Status bar -- #}
     <div class="card bg-base-200 border border-base-300 shadow-sm">
-        <div class="card-body p-3 flex-row gap-4">
-            <div class="flex items-center gap-2">
-                <span class="text-sm opacity-60">System Mode:</span>
-                <span id="system-mode" class="text-sm font-semibold">Loading...</span>
-            </div>
-            <div class="flex items-center gap-2">
-                <span class="text-sm opacity-60">PiTrac Status:</span>
-                <span id="pitrac-status" class="text-sm font-semibold">Checking...</span>
+        <div class="card-body p-2 sm:p-4">
+            <ul class="list" id="checklist">
+                {% for row_id, section, camera, label, redo in checklist %}
+                <li class="list-row items-center" id="check-{{ row_id }}" {% if row_id == "strobe" %}hidden{% endif %}>
+                    <span class="check-num w-5 text-center font-mono opacity-50">{{ loop.index }}</span>
+                    <div class="min-w-0">
+                        <div class="font-medium">{{ label }}</div>
+                        <span class="check-badge badge badge-sm badge-ghost mt-1">Checking</span>
+                        <div class="check-note text-sm mt-1" hidden></div>
+                        <div class="text-xs opacity-60 mt-1">{{ redo }}</div>
+                    </div>
+                    <button class="check-btn btn btn-sm btn-ghost" onclick="calibration.open('{{ section }}', '{{ camera }}')">Calibrate</button>
+                </li>
+                {% endfor %}
+            </ul>
+            <div id="checklist-done" class="alert alert-success m-2" hidden>
+                <i data-lucide="circle-check"></i>
+                <span>PiTrac is calibrated. Start it from the header.</span>
             </div>
         </div>
     </div>
 
-    {# ================================================================ #}
-    {# Calibration tabs: Distortion / Ball / Strobe                      #}
-    {# ================================================================ #}
-    <div class="card bg-base-200 border border-base-300 shadow-sm overflow-hidden">
-        <div class="tabs tabs-border">
+    {# ---------------- Strobe ---------------- #}
+    <section id="strobe" class="cal-section card bg-base-200 border border-base-300 shadow-sm" hidden>
+        <div class="card-body p-4 sm:p-6 gap-4">
+            <div>
+                <h2 class="card-title">Strobe</h2>
+                <p class="text-sm opacity-70">Sets the current for the IR strobe LEDs so they flash bright without being overdriven. PiTrac will not fire the strobe until this is done.</p>
+            </div>
+            <p class="text-sm">Before you start: the V3 connector board and LED array are connected and powered.</p>
+            <div id="strobe-state" class="font-semibold">Strobe: checking</div>
 
-        {# ================================================================ #}
-        {# Tab 1: Lens Distortion Calibration                                #}
-        {# ================================================================ #}
-        <input type="radio" name="cal_tabs" class="tab" aria-label="Lens Distortion" checked />
-        <div class="tab-content bg-base-200 border-base-300 p-4 sm:p-6">
+            <div id="strobe-controls" class="flex flex-wrap items-center gap-3">
+                <label for="strobe-led-type" class="text-sm opacity-70">LED type</label>
+                <select id="strobe-led-type" class="select select-sm w-auto">
+                    <option value="v3" selected>V3 LED board (10 A)</option>
+                    <option value="legacy">Legacy 100 W LED (9 A)</option>
+                </select>
+                <button id="strobe-calibrate-btn" class="btn btn-primary btn-sm" onclick="calibration.startStrobeCalibration()">Calibrate</button>
+                <button id="strobe-cancel-btn" class="btn btn-error btn-sm" onclick="calibration.cancelStrobeCalibration()" hidden>Cancel</button>
+            </div>
 
-            <h2 class="text-xl font-semibold text-primary mb-2">Lens Distortion Calibration</h2>
-            <p class="text-sm opacity-60 mb-4">
-                One-time setup per lens using a ChArUco calibration board. Run this before ball-based calibration.
-                Not needed after camera repositioning &mdash; only when the lens changes.
-            </p>
+            <div id="strobe-progress-area" hidden>
+                <progress class="progress progress-primary w-full" id="strobe-progress-fill" value="0" max="100"></progress>
+                <div class="text-sm opacity-70 mt-1" id="strobe-progress-message">Starting</div>
+            </div>
 
-            {# ---- Camera selection / initial state ---- #}
-            <div id="distortion-camera-selection">
-                <div class="flex flex-wrap gap-2 items-center mb-4">
-                    <button class="btn btn-primary btn-sm gap-1" onclick="distortionCalibration.startCalibration('camera1')">
-                        <i data-lucide="camera" class="icon-sm"></i>
-                        Calibrate Camera 1
-                    </button>
-                    <span id="camera1-cal-status" class="text-xs opacity-70"></span>
-                    <div class="divider divider-horizontal mx-0"></div>
-                    <button class="btn btn-primary btn-sm gap-1" onclick="distortionCalibration.startCalibration('camera2')">
-                        <i data-lucide="camera" class="icon-sm"></i>
-                        Calibrate Camera 2
-                    </button>
-                    <span id="camera2-cal-status" class="text-xs opacity-70"></span>
-                    <div class="divider divider-horizontal mx-0"></div>
-                    <button class="btn btn-ghost btn-sm gap-1" onclick="distortionCalibration.printBoard()">
-                        <i data-lucide="printer" class="icon-sm"></i>
-                        Print Calibration Pattern
-                    </button>
-                </div>
-
-                <div class="bg-base-300 rounded-lg p-4 border border-base-300">
-                    <h3 class="font-semibold mb-3 text-primary">Instructions:</h3>
-                    <ol class="list-decimal list-inside space-y-1 opacity-60 text-sm">
-                        <li>Click "Print Calibration Pattern" and print at 100% scale (no "fit to page") on A4/Letter paper</li>
-                        <li><strong>Important:</strong> Mount the printed pattern on stiff cardboard or foam board &mdash; it must stay perfectly flat</li>
-                        <li>Click the button for the camera to calibrate</li>
-                        <li>Hold the board in front of the camera &mdash; the system auto-captures when quality is good</li>
-                        <li>Move the board to different positions and angles between captures</li>
-                        <li>The system collects ~40 images and finishes automatically when it has enough variety</li>
-                    </ol>
+            <div id="strobe-result-area" hidden>
+                <div class="card bg-base-300 border-2 border-base-300 transition-colors" id="strobe-result-card">
+                    <div class="card-body p-4">
+                        <h3 class="font-semibold" id="strobe-result-title">Calibrated</h3>
+                        <p class="text-sm opacity-70" id="strobe-result-message"></p>
+                    </div>
                 </div>
             </div>
 
-            {# ---- Progress state ---- #}
-            <div id="distortion-progress" style="display: none;">
-                <h3 id="distortion-camera-title" class="text-lg font-semibold mb-3 text-primary"></h3>
+            <details class="collapse collapse-arrow bg-base-300 border border-base-300">
+                <summary class="collapse-title text-sm font-semibold">Hardware details</summary>
+                <div class="collapse-content">
+                    {{ status_row("Saved DAC setting", "strobe-saved-dac") }}
+                    {{ status_row("Last run DAC setting", "strobe-result-dac") }}
+                    {{ status_row("Last run LED current", "strobe-result-current") }}
+                    {{ status_row("Last run LDO voltage", "strobe-result-ldo") }}
+                </div>
+            </details>
+        </div>
+    </section>
 
-                <div class="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-4 mb-4">
+    {# ---------------- Lens ---------------- #}
+    <section id="lens" class="cal-section card bg-base-200 border border-base-300 shadow-sm" hidden>
+        <div class="card-body p-4 sm:p-6 gap-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <h2 class="card-title">Lens</h2>
+                    <p class="text-sm opacity-70">Measures how the lens bends the picture so PiTrac can straighten it. Redo it only after changing or refocusing a lens.</p>
+                </div>
+                <div class="join" role="radiogroup" aria-label="Camera">
+                    <input class="join-item btn btn-sm" type="radio" name="lens-camera" value="camera1" aria-label="Camera 1" checked>
+                    <input class="join-item btn btn-sm" type="radio" name="lens-camera" value="camera2" aria-label="Camera 2">
+                </div>
+            </div>
 
-                    {# Live camera feed #}
-                    <div>
-                        <h4 class="text-sm font-semibold mb-2">Live Feed</h4>
-                        <div class="camera-preview relative">
-                            <img id="distortion-feed" alt="Camera feed" style="display: block;">
-                            <div id="distortion-feed-overlay"
-                                 class="absolute top-2 left-2 font-mono text-sm font-bold pointer-events-none"
-                                 style="display: none; text-shadow: 0 1px 3px rgba(0,0,0,0.9);"></div>
-                            <div id="distortion-feed-placeholder" class="camera-placeholder">
-                                <p>Connecting to camera...</p>
-                            </div>
-                        </div>
+            <div id="lens-setup" class="flex flex-col gap-4">
+                <div id="lens-locked" class="alert alert-warning alert-soft" hidden></div>
+                <div id="lens-result"></div>
+                <ol class="list-decimal list-inside space-y-1 text-sm">
+                    <li>Print the pattern at 100% scale, not "fit to page".
+                        <button class="btn btn-ghost btn-xs gap-1" onclick="distortionCalibration.printBoard()">
+                            <i data-lucide="printer" class="icon-sm"></i> Print pattern
+                        </button>
+                    </li>
+                    <li>Measure one square with a ruler. It should be 23 mm across. If not, fix the printer scale and print again.</li>
+                    <li>Mount the sheet flat on stiff card or foam board. Any bend spoils the result.</li>
+                    <li>Camera 2 only: take off its IR-pass filter so it can see the pattern. Put it back when you are done.</li>
+                    <li>Stop PiTrac from the header.</li>
+                </ol>
+                <div class="flex flex-wrap gap-2">
+                    <button class="btn btn-primary btn-sm gap-1" id="lens-start-btn" onclick="distortionCalibration.startCalibration()">
+                        <i data-lucide="camera" class="icon-sm"></i> Start lens calibration
+                    </button>
+                    <button class="btn btn-ghost btn-sm gap-1" id="undistort-preview-btn" onclick="distortionCalibration.toggleUndistortPreview()" hidden>
+                        <i data-lucide="eye" class="icon-sm"></i> Preview
+                    </button>
+                </div>
+
+                <div id="undistort-preview-section" hidden>
+                    <div class="join mb-2">
+                        <button class="btn btn-sm join-item btn-active" onclick="distortionCalibration.setPreviewMode('side_by_side')" id="mode-side_by_side">Side by side</button>
+                        <button class="btn btn-sm join-item" onclick="distortionCalibration.setPreviewMode('raw')" id="mode-raw">Raw</button>
+                        <button class="btn btn-sm join-item" onclick="distortionCalibration.setPreviewMode('undistorted')" id="mode-undistorted">Straightened</button>
+                    </div>
+                    <div class="camera-preview">
+                        <img id="undistort-feed" alt="Lens preview" hidden>
+                        <div id="undistort-placeholder" class="absolute inset-0 flex items-center justify-center p-4 text-center text-white/70">Connecting to camera</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="lens-progress" class="flex flex-col gap-4" hidden>
+                <h3 id="lens-progress-title" class="font-semibold"></h3>
+                <div class="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-4">
+                    <div class="camera-preview">
+                        <img id="distortion-feed" alt="Camera feed" hidden>
+                        <div id="distortion-feed-overlay"
+                             class="absolute top-2 left-2 font-mono text-sm font-bold pointer-events-none"
+                             style="text-shadow: 0 1px 3px rgba(0,0,0,0.9);" hidden></div>
+                        <div id="distortion-feed-placeholder" class="absolute inset-0 flex items-center justify-center p-4 text-center text-white/70">Connecting to camera</div>
                     </div>
 
-                    {# Progress + coverage sidebar #}
                     <div class="flex flex-col gap-3">
                         <div>
-                            <div class="progress-bar relative">
-                                <div class="progress-fill" id="distortion-progress-bar"></div>
-                                <span id="distortion-progress-pct"
-                                      class="absolute inset-0 flex items-center justify-center text-[0.7rem] font-bold text-base-content pointer-events-none">0%</span>
+                            <div class="flex items-center gap-2">
+                                <progress class="progress progress-primary flex-1" id="distortion-progress-bar" value="0" max="100"></progress>
+                                <span id="distortion-progress-pct" class="text-xs font-mono w-9 text-right">0%</span>
                             </div>
-                            <div id="distortion-status" class="text-sm font-semibold mt-1">Starting...</div>
-                            <div id="distortion-details" class="text-xs opacity-60"></div>
-                            <div id="distortion-hint" class="text-xs text-warning min-h-[1.25rem] mt-1"></div>
+                            <div id="distortion-status" class="text-sm font-semibold mt-1">Starting</div>
+                            <div id="distortion-hint" class="text-sm text-warning min-h-5 mt-1"></div>
                         </div>
 
-                        <div id="distortion-coverage-section">
-                            <h4 class="text-sm font-semibold mb-1">Board Positions</h4>
-                            <p class="text-xs opacity-60 mb-2">
-                                Each square lights up when the board has been held in that part of the frame.
-                            </p>
+                        <ul class="text-sm space-y-1" id="lens-requirements">
+                            <li id="req-images"></li>
+                            <li id="req-coverage"></li>
+                            <li id="req-tilt"></li>
+                            <li id="req-distance"></li>
+                        </ul>
+
+                        <div>
+                            <div class="text-xs opacity-70 mb-1">Where the board has been</div>
                             <div id="distortion-coverage-grid" class="coverage-grid"></div>
-                            <div id="distortion-coverage-text" class="text-xs opacity-60 mt-1"></div>
-                        </div>
-
-                        <div class="text-sm">
-                            <div class="font-semibold mb-1">Requirements:</div>
-                            <div id="req-images" class="flex items-center gap-1.5 text-xs opacity-60">
-                                <i data-lucide="square" class="icon-sm"></i>
-                                <span>0/40 images captured</span>
-                            </div>
-                            <div id="req-coverage" class="flex items-center gap-1.5 text-xs opacity-60">
-                                <i data-lucide="square" class="icon-sm"></i>
-                                <span>0/9 areas covered</span>
-                            </div>
-                            <div id="req-tilt" class="flex items-center gap-1.5 text-xs opacity-60">
-                                <i data-lucide="square" class="icon-sm"></i>
-                                <span>Need some tilted angles</span>
-                            </div>
                         </div>
                     </div>
                 </div>
 
-                <details class="collapse collapse-arrow bg-base-300 border border-base-300 mb-4">
-                    <summary class="collapse-title text-sm font-semibold">Show detailed log</summary>
+                <details class="collapse collapse-arrow bg-base-300 border border-base-300">
+                    <summary class="collapse-title text-sm font-semibold">Detailed log</summary>
                     <div class="collapse-content">
-                        <div id="distortion-log-content" class="log-content"></div>
+                        <div id="distortion-log-content" class="terminal h-48"></div>
                     </div>
                 </details>
 
-                <button class="btn btn-error btn-sm" onclick="distortionCalibration.stopCalibration()">
-                    Stop Calibration
-                </button>
-            </div>
-
-            {# ---- Results state ---- #}
-            <div id="distortion-results" style="display: none;">
-                <div id="distortion-results-data"></div>
-
-                <div class="flex flex-wrap gap-2 mt-4">
-                    <button class="btn btn-ghost btn-sm gap-1" onclick="distortionCalibration.reset()">
-                        <i data-lucide="arrow-left" class="icon-sm"></i>
-                        Back to Camera Selection
-                    </button>
-                    <button class="btn btn-primary btn-sm gap-1" id="undistort-preview-btn" onclick="distortionCalibration.toggleUndistortPreview()">
-                        <i data-lucide="eye" class="icon-sm"></i>
-                        Show Undistort Preview
-                    </button>
-                </div>
-
-                <div id="undistort-preview-section" class="mt-4" style="display: none;">
-                    <div class="join mb-2">
-                        <button class="btn btn-sm join-item btn-active" onclick="distortionCalibration.setPreviewMode('side_by_side')" id="mode-side_by_side">Side by Side</button>
-                        <button class="btn btn-sm join-item" onclick="distortionCalibration.setPreviewMode('raw')" id="mode-raw">Raw</button>
-                        <button class="btn btn-sm join-item" onclick="distortionCalibration.setPreviewMode('undistorted')" id="mode-undistorted">Undistorted</button>
-                    </div>
-                    <div class="camera-preview">
-                        <img id="undistort-feed" alt="Undistort preview" style="display: block;">
-                    </div>
+                <div>
+                    <button class="btn btn-error btn-sm" onclick="distortionCalibration.stopCalibration()">Stop</button>
                 </div>
             </div>
         </div>
+    </section>
 
-        {# ================================================================ #}
-        {# Tab 2: Ball-based Calibration                                     #}
-        {# ================================================================ #}
-        <input type="radio" name="cal_tabs" class="tab" aria-label="Ball Calibration" />
-        <div class="tab-content bg-base-200 border-base-300 p-4 sm:p-6">
-
-            {# -- Wizard step indicators -- #}
-            <ul class="steps w-full mb-6">
-                <li class="step step-primary" data-step="1">Setup</li>
-                <li class="step" data-step="2">Verify</li>
-                <li class="step" data-step="3">Calibrate</li>
-                <li class="step" data-step="4">Complete</li>
-            </ul>
-
-            {# ---- Step 1: Setup ---- #}
-            <div class="wizard-content" id="step1">
-                <h2 class="text-xl font-semibold mb-4 text-primary">Calibration Setup</h2>
-
-                <div class="bg-base-300 rounded-lg p-4 mb-6 border border-base-300">
-                    <h3 class="font-semibold mb-3 text-primary">Before You Begin:</h3>
-                    <ol class="list-decimal list-inside space-y-1 opacity-60">
-                        <li>Ensure both cameras are properly connected</li>
-                        <li>Place a golf ball at the tee position</li>
-                        <li>Make sure the hitting area is well-lit</li>
-                        <li>Remove any obstructions from camera view</li>
-                    </ol>
+    {# ---------------- Position ---------------- #}
+    <section id="position" class="cal-section card bg-base-200 border border-base-300 shadow-sm" hidden>
+        <div class="card-body p-4 sm:p-6 gap-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <h2 class="card-title">Position</h2>
+                    <p class="text-sm opacity-70">Measures where each camera points so PiTrac can place the ball in 3D. Redo it after moving or bumping a camera.</p>
                 </div>
-
-                <div class="mb-6">
-                    <h3 class="font-semibold mb-3 text-primary">Select Camera to Calibrate:</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <label class="camera-option cursor-pointer">
-                            <input type="radio" name="camera" value="camera1" class="hidden peer" checked>
-                            <div class="card bg-base-300 border-2 border-base-300 peer-checked:border-primary hover:-translate-y-0.5 transition-all">
-                                <div class="card-body items-center p-4">
-                                    <span class="font-semibold">Camera 1</span>
-                                    <span class="text-xs opacity-60">Tee Camera (Top/Angled or Straight)</span>
-                                </div>
-                            </div>
-                        </label>
-                        <label class="camera-option cursor-pointer">
-                            <input type="radio" name="camera" value="camera2" class="hidden peer">
-                            <div class="card bg-base-300 border-2 border-base-300 peer-checked:border-primary hover:-translate-y-0.5 transition-all">
-                                <div class="card-body items-center p-4">
-                                    <span class="font-semibold">Camera 2</span>
-                                    <span class="text-xs opacity-60">Flight Camera (Bottom/Straight)</span>
-                                </div>
-                            </div>
-                        </label>
-                        <label class="camera-option cursor-pointer">
-                            <input type="radio" name="camera" value="both" class="hidden peer">
-                            <div class="card bg-base-300 border-2 border-base-300 peer-checked:border-primary hover:-translate-y-0.5 transition-all">
-                                <div class="card-body items-center p-4">
-                                    <span class="font-semibold">Both Cameras</span>
-                                    <span class="text-xs opacity-60">Full System Calibration</span>
-                                </div>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="flex justify-end pt-4 border-t border-base-300">
-                    <button class="btn btn-primary" onclick="calibration.nextStep()">
-                        Next: Verify Ball Placement
-                    </button>
+                <div class="join" role="radiogroup" aria-label="Camera">
+                    <input class="join-item btn btn-sm" type="radio" name="position-camera" value="camera1" aria-label="Camera 1" checked>
+                    <input class="join-item btn btn-sm" type="radio" name="position-camera" value="camera2" aria-label="Camera 2">
+                    <input class="join-item btn btn-sm" type="radio" name="position-camera" value="both" aria-label="Both">
                 </div>
             </div>
 
-            {# ---- Step 2: Verify ---- #}
-            <div class="wizard-content" id="step2" style="display: none;">
-                <h2 class="text-xl font-semibold mb-4 text-primary">Verify Ball Placement</h2>
+            <ol class="list-decimal list-inside space-y-1 text-sm">
+                <li>Set up the calibration rig in front of PiTrac.</li>
+                <li>Camera 1: put one ball on the floor at the Ball 1 spot.</li>
+                <li>Camera 2: put one ball at the Ball 2 spot on the rig, in mid-air.</li>
+                <li>Stop PiTrac from the header.</li>
+            </ol>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div id="position-locked" class="alert alert-warning alert-soft" hidden></div>
 
-                    {# Camera 1 #}
-                    <div class="card bg-base-300 border border-base-300" id="camera1-view">
-                        <div class="card-body p-4">
-                            <h4 class="card-title text-base">Camera 1 - Tee Camera (Top/Angled or Straight)</h4>
-                            <div class="camera-preview">
-                                <img id="camera1-image" src="" alt="Camera 1 preview" style="display: none;">
-                                <div class="camera-placeholder">
-                                    <p>Click "Calibrate Camera 1" to verify setup</p>
-                                </div>
-                            </div>
-                            <div class="flex gap-2">
-                                <button class="btn btn-primary btn-sm" onclick="calibration.runAutoCalibration('camera1', event)">
-                                    Calibrate Camera 1
-                                </button>
-                                <button class="btn btn-ghost btn-sm" onclick="calibration.checkBallLocation('camera1', event)">
-                                    Check Ball Location
-                                </button>
-                            </div>
-                            <div id="camera1-ball-status"></div>
-                        </div>
-                    </div>
-
-                    {# Camera 2 #}
-                    <div class="card bg-base-300 border border-base-300" id="camera2-view">
-                        <div class="card-body p-4">
-                            <h4 class="card-title text-base">Camera 2 - Flight Camera (Bottom/Straight)</h4>
-                            <div class="camera-preview">
-                                <img id="camera2-image" src="" alt="Camera 2 preview" style="display: none;">
-                                <div class="camera-placeholder">
-                                    <p>Click "Calibrate Camera 2" to verify setup</p>
-                                </div>
-                            </div>
-                            <div class="flex gap-2">
-                                <button class="btn btn-primary btn-sm" onclick="calibration.runAutoCalibration('camera2', event)">
-                                    Calibrate Camera 2
-                                </button>
-                                <button class="btn btn-ghost btn-sm" onclick="calibration.checkBallLocation('camera2', event)">
-                                    Check Ball Location
-                                </button>
-                            </div>
-                            <div id="camera2-ball-status"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="verification-message" class="alert alert-info mb-4">
-                    <span>Capture images and verify ball is properly positioned for calibration.</span>
-                </div>
-
-                <div class="flex justify-between pt-4 border-t border-base-300">
-                    <button class="btn btn-ghost" onclick="calibration.prevStep()">Back</button>
-                    <button class="btn btn-primary" onclick="calibration.nextStep()" id="verify-next" disabled>
-                        Next: Start Calibration
-                    </button>
-                </div>
+            <div class="flex flex-wrap gap-2">
+                <button class="btn btn-primary btn-sm" id="position-start-btn" onclick="calibration.startPosition()">Calibrate</button>
+                <button class="btn btn-error btn-sm" id="position-stop-btn" onclick="calibration.stopPosition()" hidden>Stop</button>
             </div>
 
-            {# ---- Step 3: Calibrate ---- #}
-            <div class="wizard-content" id="step3" style="display: none;">
-                <h2 class="text-xl font-semibold mb-4 text-primary">Calibration Process</h2>
-
-                <div class="calibration-options">
-                    <h3 class="font-semibold mb-3 text-primary">Select Calibration Method:</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="method-card card bg-base-300 border-2 border-base-300 hover:border-primary hover:-translate-y-1 transition-all cursor-pointer"
-                             onclick="calibration.selectMethod('auto')">
-                            <div class="card-body items-center text-center">
-                                <h4 class="card-title text-base">Automatic Calibration</h4>
-                                <p class="text-sm opacity-60 mb-2">Recommended for most users. Automatically detects and calibrates camera parameters.</p>
-                                <button class="btn btn-primary btn-sm">Use Auto Calibration</button>
-                            </div>
-                        </div>
-                        <div class="method-card card bg-base-300 border-2 border-base-300 hover:border-primary hover:-translate-y-1 transition-all cursor-pointer"
-                             onclick="calibration.selectMethod('manual')">
-                            <div class="card-body items-center text-center">
-                                <h4 class="card-title text-base">Manual Calibration</h4>
-                                <p class="text-sm opacity-60 mb-2">Advanced users only. Manually adjust camera parameters with real-time feedback.</p>
-                                <button class="btn btn-ghost btn-sm">Use Manual Calibration</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {# Progress panel (hidden until method selected) #}
-                <div class="bg-base-300 rounded-lg p-4 mt-4 border border-base-300" id="calibration-progress" style="display: none;">
-                    <h3 class="font-semibold mb-3 text-primary">Calibration in Progress...</h3>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div id="progress-camera1">
-                            <h4 class="text-sm font-semibold mb-2">Camera 1</h4>
-                            <progress class="progress progress-primary w-full" id="camera1-progress" value="0" max="100"></progress>
-                            <div class="text-xs opacity-60 mt-1" id="camera1-status">Waiting...</div>
-                            <div class="text-success text-xs mt-1" id="camera1-details"></div>
-                        </div>
-                        <div id="progress-camera2">
-                            <h4 class="text-sm font-semibold mb-2">Camera 2</h4>
-                            <progress class="progress progress-primary w-full" id="camera2-progress" value="0" max="100"></progress>
-                            <div class="text-xs opacity-60 mt-1" id="camera2-status">Waiting...</div>
-                            <div class="text-success text-xs mt-1" id="camera2-details"></div>
-                        </div>
-                    </div>
-
-                    <div class="mt-4">
-                        <h4 class="text-sm font-semibold mb-2">Process Log:</h4>
-                        <div id="calibration-log-content" class="log-content"></div>
-                    </div>
-
-                    <div class="flex justify-center mt-4">
-                        <button class="btn btn-error" onclick="calibration.stopCalibration()">
-                            Stop Calibration
-                        </button>
-                    </div>
-                </div>
-
-                <div class="flex justify-between pt-4 border-t border-base-300 mt-4">
-                    <button class="btn btn-ghost" onclick="calibration.prevStep()">Back</button>
-                </div>
+            <div id="position-progress" hidden>
+                <progress class="progress progress-primary w-full"></progress>
+                <div class="text-sm font-semibold mt-1" id="position-progress-title"></div>
+                <div class="text-sm opacity-70" id="position-progress-message"></div>
             </div>
 
-            {# ---- Step 4: Complete ---- #}
-            <div class="wizard-content" id="step4" style="display: none;">
-                <h2 class="text-xl font-semibold mb-4 text-primary">Calibration Complete</h2>
-
-                <div class="text-center">
-                    <div class="text-5xl mb-4">&#127881;</div>
-
-                    <h3 class="font-semibold mb-3 text-primary">Calibration Results:</h3>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-left">
-                        {# Camera 1 results #}
-                        <div class="card bg-base-300 border border-base-300" id="camera1-result-card">
-                            <div class="card-body p-4">
-                                <h4 class="card-title text-primary text-base mb-2">Camera 1 - Tee Camera</h4>
-                                <div id="camera1-results">
-                                    {{ status_row("Status", "camera1-result-status") }}
-                                    {{ status_row("Completion Method", "camera1-completion-method") }}
-                                    {{ status_row("Focal Length", "camera1-focal") }}
-                                    {{ status_row("Camera Angles", "camera1-angles") }}
-                                </div>
-                            </div>
-                        </div>
-
-                        {# Camera 2 results #}
-                        <div class="card bg-base-300 border border-base-300" id="camera2-result-card">
-                            <div class="card-body p-4">
-                                <h4 class="card-title text-primary text-base mb-2">Camera 2 - Flight Camera</h4>
-                                <div id="camera2-results">
-                                    {{ status_row("Status", "camera2-result-status") }}
-                                    {{ status_row("Completion Method", "camera2-completion-method") }}
-                                    {{ status_row("Focal Length", "camera2-focal") }}
-                                    {{ status_row("Camera Angles", "camera2-angles") }}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bg-base-300 rounded-lg p-4 mb-6 text-left border border-base-300">
-                        <h3 class="font-semibold mb-3 text-primary">Next Steps:</h3>
-                        <ol class="list-decimal list-inside space-y-1 opacity-60">
-                            <li>Test the calibration by hitting a few shots</li>
-                            <li>Verify ball detection is working correctly</li>
-                            <li>Fine-tune settings if needed in Configuration</li>
-                        </ol>
-                    </div>
-                </div>
-
-                <div class="flex justify-between pt-4 border-t border-base-300">
-                    <button class="btn btn-ghost" onclick="calibration.restart()">Calibrate Again</button>
-                    <button class="btn btn-primary" onclick="window.location.href='/'">Return to Dashboard</button>
-                </div>
-            </div>
+            <div id="position-results" class="flex flex-col gap-2"></div>
         </div>
-
-        {# ================================================================ #}
-        {# Tab 3: Strobe Calibration (V3 board only)                         #}
-        {# ================================================================ #}
-        <input type="radio" name="cal_tabs" class="tab" aria-label="Strobe" id="strobe-tab-input" />
-        <div class="tab-content bg-base-200 border-base-300 p-4 sm:p-6" id="strobe-tab-content">
-
-            <h2 class="text-xl font-semibold text-primary mb-3">Strobe Calibration</h2>
-
-            {# Strobe status row #}
-            <div class="flex flex-wrap gap-x-6 gap-y-1 bg-base-300 rounded-lg px-3 py-2 mb-4 border border-base-300 text-sm">
-                <div class="flex items-center gap-2">
-                    <span class="opacity-60">Board:</span>
-                    <span id="strobe-board-version" class="font-semibold">Loading...</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="opacity-60">Saved DAC:</span>
-                    <span id="strobe-saved-dac" class="font-semibold">Loading...</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="opacity-60">State:</span>
-                    <span id="strobe-state" class="font-semibold">Idle</span>
-                </div>
-            </div>
-
-            <div id="strobe-board-warning" class="alert alert-error mb-4" style="display: none;">
-                <span>
-                    Strobe calibration requires a V3 Connector Board.
-                    <a href="/config" class="underline">Set your board version</a>
-                    in Configuration &gt; System &gt; Connection Board Version.
-                </span>
-            </div>
-
-            {# Controls #}
-            <div id="strobe-controls" class="mb-4 space-y-3">
-                <div class="flex items-center gap-3">
-                    <label for="strobe-led-type" class="text-sm font-semibold opacity-60 min-w-[80px]">LED Type:</label>
-                    <select id="strobe-led-type" class="select select-sm">
-                        <option value="v3" selected>V3 LED Board (10A)</option>
-                        <option value="legacy">Legacy 100W LED (9A)</option>
-                    </select>
-                </div>
-                <div class="flex items-center gap-3">
-                    <button id="strobe-calibrate-btn" class="btn btn-primary btn-sm" onclick="calibration.startStrobeCalibration()">
-                        Calibrate
-                    </button>
-                    <button id="strobe-cancel-btn" class="btn btn-error btn-sm" onclick="calibration.cancelStrobeCalibration()" style="display: none;">
-                        Cancel
-                    </button>
-                </div>
-                <!-- Re-enable once safe LDO voltage threshold is determined -->
-                <div class="flex items-center gap-3" style="display: none;">
-                    <button id="strobe-diagnostics-btn" class="btn btn-ghost btn-sm" onclick="calibration.readStrobeDiagnostics()">
-                        Read Diagnostics
-                    </button>
-                </div>
-            </div>
-
-            {# Progress #}
-            <div id="strobe-progress-area" style="display: none;" class="mb-4">
-                <h4 class="text-sm font-semibold mb-2">Calibration Progress</h4>
-                <progress class="progress progress-primary w-full" id="strobe-progress-fill" value="0" max="100"></progress>
-                <div class="text-xs opacity-60 mt-1" id="strobe-progress-message">Starting...</div>
-            </div>
-
-            {# Results #}
-            <div id="strobe-result-area" style="display: none;">
-                <div class="card bg-base-300 border-2 border-base-300 transition-colors" id="strobe-result-card">
-                    <div class="card-body p-4">
-                        <h4 class="card-title text-sm text-primary" id="strobe-result-title">Calibration Result</h4>
-                        {{ status_row("DAC Setting", "strobe-result-dac") }}
-                        {{ status_row("LED Current", "strobe-result-current") }}
-                        {{ status_row("LDO Voltage", "strobe-result-ldo") }}
-                    </div>
-                </div>
-            </div>
-
-            {# Diagnostics #}
-            <div id="strobe-diagnostics-area" style="display: none;" class="mt-4">
-                <h4 class="text-sm font-semibold mb-2">Hardware Diagnostics</h4>
-                <div class="calibration-data-grid" id="strobe-diagnostics-grid"></div>
-                <div id="strobe-diagnostics-warning" class="alert alert-error mt-3" style="display: none;"></div>
-            </div>
-        </div>
-        </div>
-    </div>
-
-    {# ================================================================ #}
-    {# Current Calibration Data (always visible, below tabs)             #}
-    {# ================================================================ #}
-    <div class="card bg-base-200 border border-base-300 shadow-sm">
-        <div class="card-body p-4 sm:p-6">
-            <h3 class="text-lg font-semibold text-primary mb-3">Current Calibration Data</h3>
-            <div id="current-calibration-data" class="calibration-data-grid"></div>
-        </div>
-    </div>
+    </section>
 
 </div>
 {% endblock %}

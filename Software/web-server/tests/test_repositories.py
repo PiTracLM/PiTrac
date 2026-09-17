@@ -143,6 +143,15 @@ class TestKeyValueRepository:
         repo.replace_all(flat)
         assert repo.load() == flat
 
+    def test_updated_at_only_moves_for_changed_values(self, db):
+        repo = KeyValueRepository(db, "calibration")
+        repo.replace_all({"lens": 1, "position": 2})
+        db.execute("UPDATE calibration SET updated_at = '2026-01-01T00:00:00'")
+        repo.replace_all({"lens": 9, "position": 2})
+        assert repo.updated_at("position") == "2026-01-01T00:00:00"
+        assert repo.updated_at("lens") > "2026-01-01T00:00:00"
+        assert repo.updated_at("missing") is None
+
     def test_rejects_unknown_table(self, db):
         with pytest.raises(ValueError):
             KeyValueRepository(db, "shots")

@@ -44,8 +44,9 @@ function openSocket(path, onMessage, { onOpen, onClose } = {}) {
         clearTimeout(timer);
         timer = null;
         ws = new WebSocket(url);
+        ws.binaryType = 'arraybuffer';
         ws.onopen = () => onOpen && onOpen();
-        ws.onmessage = (e) => onMessage(JSON.parse(e.data));
+        ws.onmessage = (e) => onMessage(typeof e.data === 'string' ? JSON.parse(e.data) : e.data);
         ws.onclose = () => {
             if (onClose) onClose();
             if (!stopped && !timer) timer = setTimeout(connect, 3000);
@@ -54,7 +55,10 @@ function openSocket(path, onMessage, { onOpen, onClose } = {}) {
     };
     document.addEventListener('visibilitychange', () => { if (!document.hidden) connect(); });
     connect();
-    return { close() { stopped = true; clearTimeout(timer); if (ws) ws.close(); } };
+    return {
+        send(msg) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); },
+        close() { stopped = true; clearTimeout(timer); if (ws) ws.close(); },
+    };
 }
 
 function toast(message, type = 'info', { sticky = type === 'error', actionHref = null, actionLabel = null, onAction = null } = {}) {

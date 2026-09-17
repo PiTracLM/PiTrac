@@ -1021,11 +1021,14 @@ class PiTracServer:
             board_version = int(board_version) if board_version is not None else None
             safety = self.strobe_calibration_manager.is_strobe_safe()
             calibration = self.calibration_manager.get_calibration_data()
+            updated_at = self.config_manager.calibration_updated_at
             cameras = {
                 f"camera{n}": {
                     "type": self.config_manager.get_config(f"cameras.slot{n}.type"),
                     "lens_calibrated": calibration[f"camera{n}"]["lens_calibrated"],
                     "position_calibrated": calibration[f"camera{n}"]["position_calibrated"],
+                    "lens_updated_at": updated_at(f"gs_config.cameras.kCamera{n}CalibrationMatrix"),
+                    "position_updated_at": updated_at(f"gs_config.cameras.kCamera{n}FocalLength"),
                 }
                 for n in (1, 2)
             }
@@ -1038,6 +1041,7 @@ class PiTracServer:
                     "required": board_version == 3,
                     "safe": safety["safe"],
                     "reason": safety.get("reason", ""),
+                    "updated_at": updated_at(self.strobe_calibration_manager.DAC_CONFIG_KEY),
                 },
                 "cameras": cameras,
                 "simulator": {"enabled": enabled, "connected": connected},

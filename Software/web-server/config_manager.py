@@ -375,6 +375,10 @@ class ConfigurationManager:
         with self._lock:
             return copy.deepcopy(self.merged_config)
 
+    def calibration_updated_at(self, key: str) -> Optional[str]:
+        """When a saved calibration value last changed, or None if it was never saved"""
+        return self._calibration.updated_at(key)
+
     def get_default(self, key: Optional[str] = None) -> Any:
         """Get default value from metadata"""
         if key is None:
