@@ -3,6 +3,8 @@
 import pytest
 from unittest.mock import Mock, AsyncMock, MagicMock
 
+from server import LENS_CALIBRATION_FEED, LENS_PREVIEW
+
 
 @pytest.fixture(autouse=True)
 def mock_strobe_safety(server_instance):
@@ -327,7 +329,8 @@ def test_setup_status_fresh_install(client):
     assert s["cameras"]["camera1"]["position_calibrated"] is False
     assert s["cameras"]["camera2"]["lens_calibrated"] is False
     assert "type" in s["cameras"]["camera1"]
-    assert s["simulators"] == {"enabled": [], "connected": []}
+    assert s["simulator"]["enabled"] == []
+    assert s["simulator"]["connected"] == []
     assert s["complete"] is False
 
 
@@ -341,7 +344,7 @@ def test_setup_status_complete_when_everything_is_done(client, server_instance):
     server_instance.config_manager.set_config("simulators.ogs.enabled", True)
 
     s = client.get("/api/setup/status").json()
-    assert s["simulators"]["enabled"] == ["ogs"]
+    assert s["simulator"]["enabled"] == ["ogs"]
     assert s["complete"] is True
 
     server_instance.strobe_calibration_manager.is_strobe_safe.return_value = {
@@ -380,7 +383,7 @@ def test_distortion_route_reports_rejection(client, started_server):
 
 
 def test_distortion_route_allows_its_own_feed(client, started_server):
-    started_server._active_cameras[0] = "lens calibration feed"
+    started_server._active_cameras[0] = LENS_CALIBRATION_FEED
     started_server.calibration_manager.run_distortion_calibration = AsyncMock()
 
     data = client.post("/api/calibration/distortion/camera1", json={"target_images": 40}).json()
@@ -392,7 +395,7 @@ def test_ball_calibration_refused_while_camera_busy(client, started_server):
     cm = started_server.calibration_manager
     cm.run_auto_calibration = AsyncMock()
 
-    started_server._active_cameras[0] = "lens preview"
+    started_server._active_cameras[0] = LENS_PREVIEW
     data = client.post("/api/calibration/auto/camera1").json()
     assert data == {"status": "error", "message": "Camera 1 is in use by the lens preview. Close it first."}
 

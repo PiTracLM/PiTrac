@@ -1332,3 +1332,13 @@ class TestCalibrationStateAndJobIsolation:
         assert manager.calibration_status["camera1"]["status"] == "completed"
         assert manager.distortion_status["camera1"]["status"] == "stopped"
         assert manager.get_status()["distortion"]["camera1"]["status"] == "stopped"
+
+    def test_failed_spawn_does_not_leave_camera_busy(self, manager):
+        with patch("calibration_manager.asyncio.create_subprocess_exec", side_effect=FileNotFoundError("sudo")):
+            result = asyncio.run(manager.run_auto_calibration("camera1"))
+
+        assert result["status"] == "error"
+        assert manager.calibration_status["camera1"]["status"] == "failed"
+        assert manager.calibration_status["camera1"]["message"].startswith("Could not start calibration")
+        assert manager.busy_reason("camera1") is None
+        assert manager._active_calibrations == {}

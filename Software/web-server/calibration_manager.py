@@ -496,11 +496,11 @@ class CalibrationManager:
             if camera in self.current_processes:
                 raise Exception(f"A calibration process is already running for {camera}")
 
-            log_fh = open(log_file, "w")
             try:
-                process = await asyncio.create_subprocess_exec(
-                    *cmd, stdout=log_fh, stderr=asyncio.subprocess.STDOUT, env=env
-                )
+                with open(log_file, "w") as log_fh:
+                    process = await asyncio.create_subprocess_exec(
+                        *cmd, stdout=log_fh, stderr=asyncio.subprocess.STDOUT, env=env
+                    )
 
                 self.current_processes[camera] = process
                 logger.info(f"{camera}: Process started (PID {process.pid})")
@@ -509,9 +509,10 @@ class CalibrationManager:
                 logger.error(f"Failed to start calibration process: {e}")
                 async with self._calibration_lock:
                     self._active_calibrations.pop(session_id, None)
-                raise
-            finally:
-                log_fh.close()
+                message = f"Could not start calibration: {e}"
+                self.calibration_status[camera]["status"] = "failed"
+                self.calibration_status[camera]["message"] = message
+                return {"status": "error", "message": message}
 
         try:
             completion_result = await self.wait_for_calibration_completion(process, session_id, timeout=timeout)

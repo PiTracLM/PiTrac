@@ -52,6 +52,9 @@ CHARUCO_SQUARES_Y = 11
 CHARUCO_SQUARE_LENGTH = 0.023
 CHARUCO_MARKER_LENGTH = 0.017
 
+LENS_CALIBRATION_FEED = "lens calibration feed"
+LENS_PREVIEW = "lens preview"
+
 # Locked to defeat AE/AWB/tuning drift across calibration frames (sub-pixel
 # corner bias). Tuning file matches production rcPi5GS.sh; shutter is shorter
 # than production (11 vs 20 ms) to limit hand-tremor blur.
@@ -749,7 +752,7 @@ class PiTracServer:
                     await websocket.close()
                     return
 
-                self._active_cameras[camera_index] = "lens calibration feed"
+                self._active_cameras[camera_index] = LENS_CALIBRATION_FEED
 
                 # Read actual resolution after first frame (accurate for rpicam-vid)
                 ret, first_frame = await asyncio.to_thread(cap.read)
@@ -884,7 +887,7 @@ class PiTracServer:
                     await websocket.close()
                     return
 
-                self._active_cameras[camera_index] = "lens preview"
+                self._active_cameras[camera_index] = LENS_PREVIEW
 
                 # Read actual resolution and precompute undistort maps
                 ret, first_frame = await asyncio.to_thread(cap.read)
@@ -976,7 +979,7 @@ class PiTracServer:
                 return {"status": "error", "message": "Server still starting up, please retry in a moment"}
             if self.pitrac_manager.is_running():
                 return {"status": "error", "message": "Stop PiTrac before running distortion calibration"}
-            reason = self._camera_busy(camera, own_feed="lens calibration feed") or (
+            reason = self._camera_busy(camera, own_feed=LENS_CALIBRATION_FEED) or (
                 self.calibration_manager.distortion_precheck(camera)
             )
             if reason:
@@ -1037,7 +1040,7 @@ class PiTracServer:
                     "reason": safety.get("reason", ""),
                 },
                 "cameras": cameras,
-                "simulators": {"enabled": enabled, "connected": connected},
+                "simulator": {"enabled": enabled, "connected": connected},
                 "complete": safety["safe"]
                 and all(c["lens_calibrated"] and c["position_calibrated"] for c in cameras.values())
                 and bool(enabled),
