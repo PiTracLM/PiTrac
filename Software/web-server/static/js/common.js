@@ -53,11 +53,17 @@ function openSocket(path, onMessage, { onOpen, onClose } = {}) {
         };
         ws.onerror = () => ws.close();
     };
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) connect(); });
+    const onVisible = () => { if (!document.hidden) connect(); };
+    document.addEventListener('visibilitychange', onVisible);
     connect();
     return {
         send(msg) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); },
-        close() { stopped = true; clearTimeout(timer); if (ws) ws.close(); },
+        close() {
+            stopped = true;
+            clearTimeout(timer);
+            document.removeEventListener('visibilitychange', onVisible);
+            if (ws) ws.close();
+        },
     };
 }
 

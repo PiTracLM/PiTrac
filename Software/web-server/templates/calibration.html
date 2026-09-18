@@ -25,6 +25,10 @@
 
     <div class="card bg-base-200 border border-base-300 shadow-sm">
         <div class="card-body p-2 sm:p-4">
+            <div id="checklist-error" class="alert alert-error alert-soft m-2" hidden>
+                <span>Could not load the calibration status.</span>
+                <button class="btn btn-sm" onclick="calibration.refresh()">Retry</button>
+            </div>
             <ul class="list" id="checklist">
                 {% for row_id, section, camera, label, redo in checklist %}
                 <li class="list-row items-center" id="check-{{ row_id }}" {% if row_id == "strobe" %}hidden{% endif %}>

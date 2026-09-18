@@ -5,6 +5,7 @@ const distortionCalibration = {
     camera: null,
     pollInterval: null,
     feed: null,
+    feedPending: null,
     preview: null,
     previewMode: 'side_by_side',
 
@@ -34,29 +35,30 @@ const distortionCalibration = {
         });
     },
 
+    // A run keeps its status poll while the section is closed, so it can finish there; entering only reopens the feed.
     async enter() {
-        if (this.camera) return;
-        const status = await api('/api/calibration/status').catch(() => null);
-        if (status) calibration.status = status;
+        if (this.camera) {
+            if (!this.feed) this._startFeed(this.camera).catch(() => {});
+            return;
+        }
+        await calibration.refresh();
         const running = ['camera1', 'camera2'].find(c => this.isActive(calibration.status?.distortion?.[c]));
         if (!running) {
             this.showSetup();
             return;
         }
+        const attached = this.attach(running);
+        this.startStatusPolling();
         try {
-            await this.attach(running);
-            this.startStatusPolling();
+            await attached;
         } catch (error) {
             document.getElementById('distortion-status').textContent = error.message;
-            this.startStatusPolling();
         }
     },
 
     leave() {
-        this._stopPolling();
         this._stopFeed();
         this._stopPreview();
-        this.camera = null;
     },
 
     renderLock() {
@@ -201,8 +203,14 @@ const distortionCalibration = {
     async finish(outcome, message = '') {
         this._stopPolling();
         this._stopFeed();
-        calibration.runEnded('lens', this.camera, outcome === 'error' ? message || 'Calibration failed' : null);
+        const camera = this.camera;
+        calibration.runEnded('lens', camera, outcome === 'error' ? message || 'Calibration failed' : null);
         this.camera = null;
+        if (calibration.section !== 'lens' && outcome !== 'stopped') {
+            const label = camera === 'camera1' ? 'camera 1' : 'camera 2';
+            toast(outcome === 'success' ? `Lens calibration for ${label} finished` : `Lens calibration for ${label} did not finish`,
+                outcome === 'success' ? 'success' : 'error', { actionLabel: 'View', onAction: () => calibration.open('lens', camera) });
+        }
         this.log(outcome === 'success' ? 'Calibration complete' : `Calibration ended: ${message || outcome}`);
 
         const result = document.getElementById('lens-result');
@@ -283,29 +291,24 @@ const distortionCalibration = {
         if (oldSrc.startsWith('blob:')) URL.revokeObjectURL(oldSrc);
     },
 
-    // Resolves on the first frame, so the camera is open before the run starts.
+    // Resolves on the first frame, so the camera is open before the run starts. Rejects if the feed is closed first.
     _startFeed(camera) {
         this._stopFeed();
         this._resetView('distortion-feed', 'distortion-feed-placeholder', 'Connecting to camera');
         return new Promise((resolve, reject) => {
-            let first = true;
-            const fail = (message) => {
-                clearTimeout(timeout);
-                this._stopFeed();
-                document.getElementById('distortion-feed-placeholder').textContent = message;
-                reject(new Error(message));
-            };
-            const timeout = setTimeout(() => fail('The camera feed did not start. Check that the camera is connected.'), 10000);
+            const timeout = setTimeout(() => this._stopFeed('The camera feed did not start. Check that the camera is connected.'), 10000);
+            this.feedPending = { timeout, reject };
             const feed = openSocket('/ws/distortion-feed', (msg) => {
+                if (this.feed !== feed) return;
                 if (msg instanceof ArrayBuffer) {
-                    if (first) {
-                        first = false;
+                    if (this.feedPending) {
                         clearTimeout(timeout);
+                        this.feedPending = null;
                         resolve();
                     }
                     this._showFrame('distortion-feed', msg);
                 } else if (msg.error) {
-                    fail(msg.error);
+                    this._stopFeed(msg.error);
                 } else if (msg.type === 'metrics') {
                     this._updateFeedOverlay(msg);
                 }
@@ -330,7 +333,12 @@ const distortionCalibration = {
         }
     },
 
-    _stopFeed() {
+    _stopFeed(error) {
+        if (this.feedPending) {
+            clearTimeout(this.feedPending.timeout);
+            this.feedPending.reject(new Error(error || 'The camera feed was closed'));
+            this.feedPending = null;
+        }
         if (this.feed) {
             this.feed.close();
             this.feed = null;
@@ -339,7 +347,9 @@ const distortionCalibration = {
         if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
         img.removeAttribute('src');
         img.hidden = true;
-        document.getElementById('distortion-feed-placeholder').hidden = false;
+        const placeholder = document.getElementById('distortion-feed-placeholder');
+        placeholder.hidden = false;
+        if (error) placeholder.textContent = error;
         document.getElementById('distortion-feed-overlay').hidden = true;
     },
 

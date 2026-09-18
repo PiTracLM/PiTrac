@@ -16,6 +16,11 @@
     object-fit: contain;
 }
 
+.check-badge .lucide {
+    width: 12px;
+    height: 12px;
+}
+
 /* ---- Lens coverage grid (ChArUco) ---- */
 .coverage-grid {
     display: grid;
