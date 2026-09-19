@@ -39,9 +39,6 @@
 .status-strip-message {
     font-size: 0.875rem;
     color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 /* Status strip states */

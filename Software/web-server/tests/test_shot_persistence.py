@@ -27,6 +27,16 @@ class TestShotPersistence:
         client.post("/api/internal/shot-result", json={"result_type": 2, "message": "waiting"})
         assert server_instance.session_repo.list() == []
 
+    def test_status_after_hit_keeps_last_shot(self, client):
+        client.post("/api/internal/shot-result", json=make_hit_payload())
+        client.post("/api/internal/shot-result", json={"result_type": 2, "message": "waiting"})
+        shot = client.get("/api/shot").json()
+        assert shot["result_type"] == "Waiting For Ball"
+        assert shot["shot_id"] == 1717236000123
+        assert shot["images"] == make_hit_payload()["images"]
+        assert shot["speed"] == round(65.0 * 2.23694, 1)
+        assert shot["side_spin"] == -310
+
     def test_club_change_not_persisted(self, client, server_instance):
         client.post("/api/internal/shot-result",
                     json={"result_type": 10, "message": "Club type was set to Putter"})

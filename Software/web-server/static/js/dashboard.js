@@ -6,7 +6,7 @@ const STRIP_STATES = {
     'Initializing':                       ['initializing', 'Starting up', 'PiTrac is starting.'],
     'Waiting For Ball':                   ['waiting', 'Place a ball', 'Put a ball on the tee.'],
     'Waiting For Simulator':              ['waiting', 'Waiting for simulator', 'Connect a simulator to continue.'],
-    'Waiting For Placement To Stabilize': ['stabilizing', 'Ball detected', 'Hold still...'],
+    'Waiting For Placement To Stabilize': ['stabilizing', 'Ball detected', 'Let the ball settle.'],
     'Ball Placed':                        ['ready', 'Ready. Hit it.', ''],
     'Hit':                                ['hit', 'Shot recorded', ''],
     'Multiple Balls Present':             ['error', 'More than one ball', 'Remove the extra balls.'],
@@ -21,6 +21,8 @@ let setup = null;
 let cameraLabels = {};
 let sims = null;
 let freshSocket = true;
+let hitTime = '';
+let shownImage = null;
 
 const byId = (id) => document.getElementById(id);
 
@@ -28,7 +30,8 @@ function stripState() {
     if (running === null) return ['initializing', 'Checking PiTrac', ''];
     if (offline) return ['initializing', 'PiTrac is offline', "Can't reach the PiTrac web server."];
     if (!running) {
-        return ['initializing', 'PiTrac is stopped', strobeBlocked() ? 'Finish setup before starting.' : 'Start it to begin.'];
+        const message = strobeBlocked() ? setup.strobe.reason || 'Finish setup before starting.' : 'Start it to begin.';
+        return ['initializing', 'PiTrac is stopped', message];
     }
     return shotState || ['initializing', 'PiTrac is running', ''];
 }
@@ -37,13 +40,20 @@ function strobeBlocked() {
     return !!setup && !setup.strobe.safe;
 }
 
+function setText(el, text) {
+    if (el.textContent !== text) el.textContent = text;
+}
+
 function renderStrip() {
     const [state, title, message] = stripState();
     const stopped = running === false && !offline;
-    byId('status-strip').classList.remove(...STRIP_CLASSES);
-    byId('status-strip').classList.add(state);
-    byId('status-strip-title').textContent = title;
-    byId('status-strip-message').textContent = message;
+    const strip = byId('status-strip');
+    if (!strip.classList.contains(state)) {
+        strip.classList.remove(...STRIP_CLASSES);
+        strip.classList.add(state);
+    }
+    setText(byId('status-strip-title'), title);
+    setText(byId('status-strip-message'), message);
     document.querySelector('.status-strip-separator').hidden = !message;
     byId('strip-start-btn').hidden = !stopped || strobeBlocked();
     byId('strip-setup-btn').hidden = !stopped || !strobeBlocked();
@@ -54,8 +64,13 @@ function shotStateFor(data) {
     const def = STRIP_STATES[data.result_type];
     if (!def) return null;
     const [state, title, message] = def;
-    if (state === 'hit' && data.timestamp) {
-        return [state, title, new Date(data.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })];
+    if (state === 'hit') {
+        hitTime = data.timestamp ? new Date(data.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+        return [state, title, hitTime ? `Shot at ${hitTime}` : ''];
+    }
+    // The C++ sends Waiting For Ball right after every Hit; keep the shot up until the next ball shows
+    if (data.result_type === 'Waiting For Ball' && shotState && shotState[0] === 'hit') {
+        return ['hit', shotState[1], hitTime ? `Shot at ${hitTime}. Place the next ball.` : 'Place the next ball.'];
     }
     return [state, title, message || (state === 'error' ? data.message || '' : '')];
 }
@@ -75,8 +90,12 @@ function setMetric(id, text, dir = '') {
 // Negative is left, the sign the C++ sends and the sims pass straight through to GSPro HLA and SideSpin
 function setSidedMetric(id, value, decimals) {
     const text = formatNumber(value, decimals);
-    const n = Number(text);
-    setMetric(id, n < 0 ? text.slice(1) : text, n < 0 ? 'L' : n > 0 ? 'R' : '');
+    if (text === '--') {
+        setMetric(id, text);
+        return;
+    }
+    const n = Number(text) || 0;
+    setMetric(id, Math.abs(n).toFixed(decimals), n < 0 ? 'L' : n > 0 ? 'R' : '');
 }
 
 function renderMetrics(data) {
@@ -102,7 +121,10 @@ function renderImage(path) {
     img.className = 'shot-image';
     img.addEventListener('click', () => window.open(`/images/${encodeURI(path)}`, '_blank'));
     byId('image-panel-inner').replaceChildren(img);
+    shownImage = path;
 }
+
+const shotDir = (path) => path.slice(0, path.lastIndexOf('/'));
 
 function renderStoredShot(shot) {
     renderMetrics(shot);
@@ -118,13 +140,12 @@ function onMessage(data) {
         return;
     }
     if (!('result_type' in data) || data.type) return;
+    renderMetrics(data);
     if (freshSocket) {
         freshSocket = false;
-        renderStoredShot(data);
-    } else {
-        renderMetrics(data);
+        const stored = data.images && data.images[0];
+        if (stored && !(shownImage && shotDir(shownImage) === shotDir(stored))) renderImage(stored);
     }
-    if (running === false) return;
     const next = shotStateFor(data);
     if (next) {
         shotState = next;
@@ -183,7 +204,7 @@ function setupRows() {
         href: '/config#setup',
     }];
     if (setup.strobe.required) {
-        rows.push({ label: 'Strobe', detail: setup.strobe.safe ? '' : 'Needed before PiTrac can start.', done: setup.strobe.safe, action: 'Calibrate', href: '/calibration#strobe' });
+        rows.push({ label: 'Strobe', detail: setup.strobe.safe ? '' : setup.strobe.reason || 'Needed before PiTrac can start.', done: setup.strobe.safe, action: 'Calibrate', href: '/calibration#strobe' });
     }
     for (const [kind, title] of [['lens', 'Lens'], ['position', 'Position']]) {
         for (const n of [1, 2]) {
@@ -245,7 +266,7 @@ async function loadSetup() {
 
 onPiTracStatus((s) => {
     const now = s.is_running && !s.offline;
-    if (running === false && now) shotState = null;
+    if (running && !now) shotState = null;
     running = now;
     offline = s.offline;
     renderStrip();

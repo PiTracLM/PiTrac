@@ -336,14 +336,8 @@ class PiTracServer:
             is_status = result_type_str in self.parser._get_status_message_strings()
 
             if is_status:
-                current = self.shot_store.get()
-                shot_data = ShotData(
-                    speed=current.speed,
-                    carry=current.carry,
-                    launch_angle=current.launch_angle,
-                    side_angle=current.side_angle,
-                    back_spin=current.back_spin,
-                    side_spin=current.side_spin,
+                shot_data = replace(
+                    self.shot_store.get(),
                     result_type=result_type_str,
                     message=message,
                     timestamp=datetime.now().isoformat(),

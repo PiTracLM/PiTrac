@@ -11,11 +11,11 @@
 <div class="grid grid-cols-1 lg:grid-cols-[minmax(320px,1fr)_minmax(400px,1.2fr)] gap-4">
 
     <div class="status-strip initializing col-span-full flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 rounded-box bg-base-200 border border-base-300 shadow-sm"
-         id="status-strip" role="status">
+         id="status-strip">
         <div class="shrink-0 flex items-center justify-center w-9 h-9">
             <div class="ball-icon w-full h-full"></div>
         </div>
-        <div class="flex-1 min-w-48 flex items-baseline gap-x-2 flex-wrap">
+        <div class="flex-1 min-w-48 flex items-baseline gap-x-2 flex-wrap" role="status">
             <span class="font-bold text-base whitespace-nowrap" id="status-strip-title">Checking PiTrac</span>
             <span class="status-strip-separator text-base-content/40 text-sm select-none" hidden>&middot;</span>
             <span class="status-strip-message" id="status-strip-message"></span>
