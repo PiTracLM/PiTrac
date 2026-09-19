@@ -52,7 +52,7 @@ const distortionCalibration = {
         try {
             await attached;
         } catch (error) {
-            document.getElementById('distortion-status').textContent = error.message;
+            if (!error.cancelled) document.getElementById('distortion-status').textContent = error.message;
         }
     },
 
@@ -114,6 +114,11 @@ const distortionCalibration = {
             this.log('Calibration started');
             this.startStatusPolling();
         } catch (error) {
+            if (error.cancelled) {
+                this.camera = null;
+                this.showSetup();
+                return;
+            }
             this.finish('error', error.message || 'Check that the camera is connected and not in use by another program.');
         }
     },
@@ -336,7 +341,7 @@ const distortionCalibration = {
     _stopFeed(error) {
         if (this.feedPending) {
             clearTimeout(this.feedPending.timeout);
-            this.feedPending.reject(new Error(error || 'The camera feed was closed'));
+            this.feedPending.reject(error ? new Error(error) : Object.assign(new Error('The camera feed was closed'), { cancelled: true }));
             this.feedPending = null;
         }
         if (this.feed) {
