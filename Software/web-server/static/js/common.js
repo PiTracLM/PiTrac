@@ -165,7 +165,7 @@ async function controlPiTrac(action) {
         spinner.remove();
         setTimeout(() => {
             pitracActionInFlight = false;
-            window.checkPiTracStatus();
+            checkPiTracStatus();
         }, 1000);
     }
 }
@@ -253,6 +253,5 @@ document.addEventListener('click', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     checkPiTracStatus();
-    // Indirect call so page-specific wrappers (e.g. dashboard.js) take effect.
-    setInterval(() => window.checkPiTracStatus(), 5000);
+    setInterval(checkPiTracStatus, 5000);
 });

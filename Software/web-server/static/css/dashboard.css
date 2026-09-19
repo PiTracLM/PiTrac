@@ -1,9 +1,13 @@
-/* Dashboard — custom styles that daisyUI/Tailwind can't cover */
+/* Dashboard: custom styles that daisyUI/Tailwind can't cover */
 
 /* Left accent border on all metric cards */
 .metric-card {
     border-left: 3px solid var(--color-primary);
 }
+
+.metric-number { font-size: clamp(2.5rem, 5vw, 3.25rem); }
+.metric-card.hero .metric-number { font-size: clamp(3.25rem, 7vw, 4.5rem); }
+.metric-unit { font-size: clamp(1rem, 1.8vw, 1.25rem); }
 
 /* Metric value pop animation on update */
 .metric-number.updated {
@@ -17,7 +21,7 @@
     100% { transform: scale(1); }
 }
 
-/* Status strip — accent left border changes per state */
+/* Status strip: accent left border changes per state */
 .status-strip {
     border-left: 3px solid color-mix(in oklch, var(--color-base-content) 30%, transparent);
     transition: all 0.3s ease;
@@ -31,7 +35,7 @@
     transition: all 0.3s ease;
 }
 
-/* Status strip message — in CSS because JS resets className */
+/* Status strip message */
 .status-strip-message {
     font-size: 0.875rem;
     color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
@@ -39,7 +43,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.status-strip-message.error { color: var(--color-error); }
 
 /* Status strip states */
 .status-strip.initializing { border-left-color: var(--color-info); }
@@ -90,7 +93,7 @@
     background-color: var(--color-error);
 }
 
-/* Image panel inner — in CSS because JS resets className directly */
+/* Image panel inner */
 .image-panel-inner {
     flex: 1;
     display: flex;
@@ -100,7 +103,7 @@
     min-height: 300px;
 }
 
-/* Empty state — centered with a ring around the golf ball */
+/* Empty state: centered with a ring around the golf ball */
 .image-empty-state {
     display: flex;
     flex-direction: column;
@@ -150,11 +153,11 @@
 
 @media (max-width: 767px) {
     .status-strip-separator { display: none; }
-    .metric-number { font-size: 1.75rem !important; }
-    .metric-card.hero .metric-number { font-size: 2.5rem !important; }
+    .metric-number { font-size: 1.75rem; }
+    .metric-card.hero .metric-number { font-size: 2.5rem; }
 }
 
 @media (min-width: 1400px) {
-    .metric-card.hero .metric-number { font-size: 5rem !important; }
-    .metric-number { font-size: 3.5rem !important; }
+    .metric-number { font-size: 3.5rem; }
+    .metric-card.hero .metric-number { font-size: 5rem; }
 }

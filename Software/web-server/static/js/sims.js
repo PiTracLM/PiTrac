@@ -42,6 +42,7 @@
     function render(data) {
         if (data.type !== 'sim_status') return;
         const sims = data.sims || [];
+        document.dispatchEvent(new CustomEvent('pitrac:sims', { detail: sims }));
 
         const dot = document.getElementById('sims-status-dot');
         if (dot) dot.className = `w-2 h-2 rounded-full ${statusOf(aggregate(sims)).dot}`;

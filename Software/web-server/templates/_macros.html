@@ -1,30 +1,22 @@
-{# Reusable UI macros — import with {% from "_macros.html" import ... %} #}
+{# Reusable UI macros, import with {% from "_macros.html" import ... %} #}
 
 {#
-  metric_card — renders a single metric display card.
+  metric_card: renders a single metric display card. Font sizes live in dashboard.css.
 
   Args:
     label        : display label (e.g. "Ball Speed")
-    value_id     : id placed on the value span (JS updates this by id)
-    unit         : unit string, e.g. "mph", "rpm", "&deg;" — rendered as raw HTML
-    initial_value: Jinja expression string or literal shown on first render (default "0.0")
-    value_style  : inline style for the value span (clamp font-size)
-    unit_style   : inline style for the unit span  (clamp font-size)
+    value_id     : id placed on the value block (JS updates it by id)
+    unit         : unit string, e.g. "mph", "rpm", "&deg;", rendered as raw HTML
     card_classes : extra classes appended to the card shell
-    value_classes: extra classes appended to the value span
+    body_padding : padding class for the card body
 #}
-{% macro metric_card(label, value_id, unit, initial_value="0.0",
-                     value_style="font-size: clamp(2.5rem, 5vw, 3.25rem);",
-                     unit_style="font-size: clamp(1rem, 1.8vw, 1.25rem);",
-                     card_classes="", value_classes="",
-                     body_padding="p-4") %}
+{% macro metric_card(label, value_id, unit, card_classes="", body_padding="p-4") %}
 <div class="card bg-base-200 border border-base-300 shadow-sm metric-card hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 {{ card_classes }}">
     <div class="card-body {{ body_padding }}">
         <div class="text-xs font-semibold uppercase tracking-widest text-base-content/40">{{ label }}</div>
-        <div class="metric-number text-base-content font-bold leading-tight tabular-nums {{ value_classes }}"
-             id="{{ value_id }}"
-             style="{{ value_style }}">{{ initial_value }}<span class="metric-unit text-base-content/40 font-normal ml-1"
-                 style="{{ unit_style }}">{{ unit | safe }}</span></div>
+        <div class="metric-number text-base-content font-bold leading-tight tabular-nums" id="{{ value_id }}"><span
+             class="metric-value">--</span><span class="metric-unit text-base-content/40 font-normal ml-1">{{ unit | safe }}<span
+             class="metric-dir"></span></span></div>
     </div>
 </div>
 {% endmacro %}
