@@ -466,6 +466,11 @@ class PiTracServer:
             metadata = self.config_manager.load_configurations_metadata()
             return metadata.get("settings", {})
 
+        @self.app.get("/api/config/calibrated")
+        async def get_calibrated_keys() -> List[str]:
+            """Keys whose current value comes from the calibration layer"""
+            return self.config_manager.get_calibrated_keys()
+
         @self.app.get("/api/config/diff")
         async def get_config_diff() -> Dict[str, Any]:
             """Get differences between user settings and defaults"""
@@ -525,7 +530,7 @@ class PiTracServer:
 
             if success:
                 await self.connection_manager.broadcast({"type": "config_reset"})
-                return {"success": True, "message": message}
+                return {"success": True, "message": message, "calibration_kept": True}
 
             return JSONResponse(status_code=500, content={"error": message})
 

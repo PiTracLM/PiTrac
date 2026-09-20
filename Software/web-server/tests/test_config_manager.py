@@ -170,7 +170,7 @@ class TestConfigManager:
         config_manager.set_config("gs_config.cameras.kCamera1Gain", "3.5")
         config_manager.reload()
 
-        assert config_manager.get_config("gs_config.cameras.kCamera1Gain") == "3.5"
+        assert config_manager.get_config("gs_config.cameras.kCamera1Gain") == 3.5
 
     def test_reset_all_clears_settings_and_keeps_calibration(self, config_manager, db):
         config_manager.set_config("gs_config.cameras.kCamera1Gain", "3.5")
@@ -187,7 +187,7 @@ class TestConfigManager:
 
         config_manager.set_config("gs_config.cameras.kCamera1Gain", "3.5")
 
-        assert seen == [("gs_config.cameras.kCamera1Gain", "3.5")]
+        assert seen == [("gs_config.cameras.kCamera1Gain", 3.5)]
 
     def test_imports_json_files_once_at_startup(self, db, legacy_dir):
         (legacy_dir / "user_settings.json").write_text(json.dumps({
@@ -325,8 +325,8 @@ class TestConfigManager:
         })
 
         assert not ok
-        assert KeyValueRepository(db, "settings").load() == {"gs_config.cameras.kCamera1Gain": "3.5"}
-        assert config_manager.get_config("gs_config.cameras.kCamera1Gain") == "3.5"
+        assert KeyValueRepository(db, "settings").load() == {"gs_config.cameras.kCamera1Gain": 3.5}
+        assert config_manager.get_config("gs_config.cameras.kCamera1Gain") == 3.5
 
     @patch.dict(os.environ, {"HOME": "/test/home"})
     def test_default_paths(self):
@@ -871,3 +871,93 @@ class TestBuildGeneratedConfig:
         assert "kGolferOrientation" in cfg.get("gs_config", {}).get("player", {})
         # former environment setting — cameras.slot1.type
         assert "type" in cfg.get("cameras", {}).get("slot1", {})
+
+
+class TestConfigTypes:
+    @pytest.mark.parametrize("key,value,expected", [
+        ("cameras.slot1.type", 5, "5"),
+        ("simulators.gspro.enabled", "false", False),
+        ("simulators.gspro.enabled", "true", True),
+        ("simulators.gspro.enabled", 1, True),
+        ("gs_config.cameras.kHLAOffset", "1.5", 1.5),
+        ("gs_config.cameras.kHLAOffset", 2, 2.0),
+        ("simulators.gspro.port", "921", 921),
+        ("gs_config.cameras.kCamera1Gain", "2.5", 2.5),
+    ])
+    def test_coerce_value(self, config_manager, key, value, expected):
+        result = config_manager.coerce_value(key, value)
+        assert result == expected
+        assert type(result) is type(expected)
+
+    @pytest.mark.parametrize("key,value", [
+        ("simulators.gspro.enabled", "maybe"),
+        ("gs_config.cameras.kHLAOffset", "abc"),
+        ("simulators.gspro.port", None),
+    ])
+    def test_coerce_value_rejects_garbage(self, config_manager, key, value):
+        with pytest.raises(ValueError):
+            config_manager.coerce_value(key, value)
+
+    def test_float_range_enforced(self, config_manager):
+        ok, _, _ = config_manager.set_config("gs_config.cameras.kHLAOffset", 999)
+        assert not ok
+        assert config_manager.get_config("gs_config.cameras.kHLAOffset") == 0.0
+
+    def test_set_config_stores_typed_value(self, config_manager):
+        config_manager.set_config("simulators.gspro.enabled", "true")
+        assert config_manager.get_user_settings()["simulators"]["gspro"]["enabled"] is True
+
+    def test_select_default_round_trip_is_not_custom(self, config_manager):
+        config_manager.set_config("cameras.slot1.type", 5)
+        assert "cameras.slot1.type" not in config_manager.get_diff()
+        assert "cameras" not in config_manager.get_user_settings()
+
+    @pytest.mark.parametrize("host,ok", [
+        ("192.168.1.10", True),
+        ("gaming-pc.local", True),
+        ("", True),
+        ("1.2.3.4:921", False),
+        ("999.1.1.1", False),
+        ("<b>x</b>", False),
+        ("-bad.example", False),
+    ])
+    def test_sim_host_validation(self, config_manager, host, ok):
+        valid, message = config_manager.validate_config("simulators.gspro.host", host)
+        assert valid is ok
+        if not ok:
+            assert message == "Enter an IP address or hostname without a port"
+
+    def test_internal_keys_not_in_categories(self, config_manager):
+        cats = config_manager.get_categories()
+        assert "gs_config.strobing.kDAC_setting" not in json.dumps(cats)
+        assert config_manager.get_default("gs_config.strobing.kDAC_setting") is None
+        assert config_manager.set_config("gs_config.strobing.kDAC_setting", 120)[0]
+        assert config_manager.get_config("gs_config.strobing.kDAC_setting") == 120
+
+    def test_setup_flag_in_metadata(self, config_manager):
+        settings = config_manager.load_configurations_metadata()["settings"]
+        setup = {k for k, v in settings.items() if v.get("setup")}
+        assert {"system.mode", "cameras.slot1.type", "cameras.slot1.lens", "simulators.gspro.host"} <= setup
+        assert "gs_config.cameras.kHLAOffset" not in setup
+
+    def test_calibrated_keys(self, config_manager):
+        assert config_manager.get_calibrated_keys() == []
+        config_manager.set_calibration_batch({"gs_config.cameras.kCamera1FocalLength": 6.1})
+        assert config_manager.get_calibrated_keys() == ["gs_config.cameras.kCamera1FocalLength"]
+
+    def test_import_rejects_bad_types(self, config_manager):
+        ok, message = config_manager.import_config(
+            {"user_settings": {"gs_config": {"cameras": {"kHLAOffset": 999}}}}
+        )
+        assert not ok
+        assert "kHLAOffset" in message
+        assert config_manager.get_user_settings() == {}
+
+    def test_import_coerces_values(self, config_manager):
+        ok, _ = config_manager.import_config(
+            {"user_settings": {"simulators": {"gspro": {"enabled": "true"}}, "cameras": {"slot1": {"type": 4}}}}
+        )
+        assert ok
+        user = config_manager.get_user_settings()
+        assert user["simulators"]["gspro"]["enabled"] is True
+        assert user["cameras"]["slot1"]["type"] == "4"

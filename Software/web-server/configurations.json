@@ -234,6 +234,7 @@
       "displayName": "Pi Configuration Mode",
       "description": "Single Pi with dual cameras (most common) or Dual Pi setup (one camera per Pi)",
       "type": "select",
+      "setup": true,
       "options": {
         "single": "Single Pi (2 cameras on 1 Pi)",
         "dual": "Dual Pi (1 camera per Pi)"
@@ -253,6 +254,7 @@
       "displayName": "Connection Board Version",
       "description": "The original Ver. 1.0 board inverts the external shutter signal, so this setting tells the system whether to pre-invert the signal or not.",
       "type": "select",
+      "setup": true,
       "options": {
         "1": "Version 1.0",
         "2": "Version 2.0",
@@ -279,6 +281,7 @@
       "displayName": "Enclosure Version",
       "description": "The enclosure version (type) can affect various aspects of the system.  For example, the distance of the reference ball in the calibration rig, as different enclosures position the cameras at different locations.",
       "type": "select",
+      "setup": true,
       "options": {
         "2": "Version 2.0 (Circa 2025 - Flat base bottom under a tower with triangular supports on the sides of the floors)",
         "3": "Version 3.0 (Circa 2026 - Streamlined tower with stacked modules)"
@@ -293,6 +296,7 @@
       "displayName": "Start in Putting Mode",
       "description": "Start the system in putting mode for short game practice",
       "type": "boolean",
+      "setup": true,
       "default": false,
       "requiresRestart": false
     },
@@ -303,6 +307,7 @@
       "displayName": "Golfer Orientation",
       "description": "Golfer handedness - affects ball detection and swing analysis",
       "type": "select",
+      "setup": true,
       "options": {
         "right_handed": "Right Handed",
         "left_handed": "Left Handed"
@@ -317,6 +322,7 @@
       "displayName": "Practice Ball Mode",
       "description": "Enable for lightweight practice/foam balls - adjusts detection parameters",
       "type": "boolean",
+      "setup": true,
       "default": false,
       "requiresRestart": true
     },
@@ -327,6 +333,7 @@
       "displayName": "Camera 1 Type",
       "description": "Type of camera connected to slot 1 (CAM0 port)",
       "type": "select",
+      "setup": true,
       "options": {
         "1": "Pi Camera v1.3 - OV5647 sensor (DEPRECATED)",
         "2": "Pi Camera v2 - IMX219 sensor (DEPRECATED)",
@@ -339,10 +346,12 @@
     },
     "cameras.slot1.lens": {
       "category": "Cameras",
-      "subcategory": "advanced",
+      "subcategory": "basic",
+      "basicSubcategory": "Hardware",
       "displayName": "Camera 1 Lens",
       "description": "Lens type for camera 1",
       "type": "select",
+      "setup": true,
       "options": {
         "1": "6mm - Standard lens",
         "2": "3.6mm M12 - Wide angle lens",
@@ -382,6 +391,7 @@
         "system.mode": "single"
       },
       "type": "select",
+      "setup": true,
       "options": {
         "1": "Pi Camera v1.3 - OV5647 sensor (DEPRECATED)",
         "2": "Pi Camera v2 - IMX219 sensor (DEPRECATED)",
@@ -394,13 +404,15 @@
     },
     "cameras.slot2.lens": {
       "category": "Cameras",
-      "subcategory": "advanced",
+      "subcategory": "basic",
+      "basicSubcategory": "Hardware",
       "displayName": "Camera 2 Lens",
       "description": "Lens type for camera 2 - Only used in single Pi mode",
       "visibleWhen": {
         "system.mode": "single"
       },
       "type": "select",
+      "setup": true,
       "options": {
         "1": "6mm - Standard lens",
         "2": "3.6mm M12 - Wide angle lens",
@@ -440,8 +452,8 @@
       "options": {
         "trace": "Trace - Most verbose, for deep debugging",
         "debug": "Debug - Detailed debugging information",
-        "info": "Info - Normal operational messages",
-        "warn": "Warning - Important notices (default)",
+        "info": "Info - Normal operational messages (default)",
+        "warn": "Warning - Important notices",
         "error": "Error - Only errors"
       },
       "default": "info",
@@ -567,7 +579,7 @@
       "subcategory": "advanced",
       "advancedSubcategory": "Cameras",
       "displayName": "Camera 1 Saturation",
-      "description": "Brightness/gain setting for Camera 1",
+      "description": "Color saturation for camera 1. 1.0 is neutral.",
       "type": "float",
       "min": 0.0,
       "max": 2.0,
@@ -580,7 +592,7 @@
       "subcategory": "advanced",
       "advancedSubcategory": "Cameras",
       "displayName": "Camera 2 Saturation",
-      "description": "Brightness/gain setting for Camera 2",
+      "description": "Color saturation for camera 2. 1.0 is neutral.",
       "type": "float",
       "min": 0.0,
       "max": 2.0,
@@ -645,6 +657,7 @@
       "displayName": "OpenGolfSim Enabled",
       "description": "Show OpenGolfSim in the simulators drawer and allow connecting",
       "type": "boolean",
+      "setup": true,
       "default": false,
       "requiresRestart": false
     },
@@ -655,6 +668,7 @@
       "displayName": "OpenGolfSim Auto-Connect",
       "description": "Open the OpenGolfSim connection automatically when the server starts",
       "type": "boolean",
+      "setup": true,
       "default": false,
       "requiresRestart": false
     },
@@ -665,6 +679,7 @@
       "displayName": "OpenGolfSim Host",
       "description": "IP address of the device running OpenGolfSim (e.g. the iPad)",
       "type": "ip_address",
+      "setup": true,
       "default": "",
       "requiresRestart": false
     },
@@ -675,6 +690,7 @@
       "displayName": "OpenGolfSim Port",
       "description": "OpenGolfSim Developer API port",
       "type": "number",
+      "setup": true,
       "min": 1,
       "max": 65535,
       "default": 3111,
@@ -699,6 +715,7 @@
       "displayName": "GSPro Enabled",
       "description": "Show GSPro in the simulators drawer and allow connecting",
       "type": "boolean",
+      "setup": true,
       "default": false,
       "requiresRestart": false
     },
@@ -709,6 +726,7 @@
       "displayName": "GSPro Auto-Connect",
       "description": "Open the GSPro connection automatically when the server starts",
       "type": "boolean",
+      "setup": true,
       "default": false,
       "requiresRestart": false
     },
@@ -719,6 +737,7 @@
       "displayName": "GSPro Host",
       "description": "IP address of the computer running GSPro Connect (e.g., 192.168.1.100)",
       "type": "ip_address",
+      "setup": true,
       "default": "",
       "requiresRestart": false
     },
@@ -729,6 +748,7 @@
       "displayName": "GSPro Port",
       "description": "GSPro Connect port",
       "type": "integer",
+      "setup": true,
       "min": 1,
       "max": 65535,
       "default": 921,
@@ -741,6 +761,7 @@
       "displayName": "E6 Connect Enabled",
       "description": "Show E6 Connect (TruGolf) in the simulators drawer and allow connecting",
       "type": "boolean",
+      "setup": true,
       "default": false,
       "requiresRestart": false
     },
@@ -751,6 +772,7 @@
       "displayName": "E6 Connect Auto-Connect",
       "description": "Open the E6 Connect connection automatically when the server starts",
       "type": "boolean",
+      "setup": true,
       "default": false,
       "requiresRestart": false
     },
@@ -761,6 +783,7 @@
       "displayName": "E6 Connect Host",
       "description": "IP address of the computer running E6 Connect (e.g., 192.168.1.100)",
       "type": "ip_address",
+      "setup": true,
       "default": "",
       "requiresRestart": false
     },
@@ -771,6 +794,7 @@
       "displayName": "E6 Connect Port",
       "description": "E6 Connect TruSimAPI port",
       "type": "integer",
+      "setup": true,
       "min": 1,
       "max": 65535,
       "default": 2483,
@@ -799,8 +823,7 @@
     },
     "gs_config.ball_identification.kCLAHEClipLimit": {
       "category": "Ball Detection",
-      "subcategory": "basic",
-      "basicSubcategory": "Ball Detection",
+      "subcategory": "advanced",
       "displayName": "CLAHE Clip Limit",
       "description": "Contrast enhancement strength (1-40)",
       "type": "integer",
@@ -811,8 +834,7 @@
     },
     "gs_config.ball_position.kExpectedBallRadiusPixelsAt40cm": {
       "category": "Ball Detection",
-      "subcategory": "basic",
-      "basicSubcategory": "Ball Detection",
+      "subcategory": "advanced",
       "displayName": "Expected Ball Radius (pixels)",
       "description": "Expected ball size at 40cm distance - critical for distance calculations",
       "type": "number",
@@ -841,8 +863,7 @@
     },
     "gs_config.strobing.kStandardBallSpeedSlowdownPercentage": {
       "category": "Strobing",
-      "subcategory": "basic",
-      "basicSubcategory": "Strobing",
+      "subcategory": "advanced",
       "displayName": "Standard Ball Speed Adjustment",
       "description": "Speed adjustment for standard golf balls (%)",
       "type": "number",
@@ -854,8 +875,7 @@
     },
     "gs_config.strobing.kPracticeBallSpeedSlowdownPercentage": {
       "category": "Strobing",
-      "subcategory": "basic",
-      "basicSubcategory": "Strobing",
+      "subcategory": "advanced",
       "displayName": "Practice Ball Speed Adjustment",
       "description": "Speed adjustment for practice/foam balls (%)",
       "type": "number",
@@ -867,8 +887,7 @@
     },
     "gs_config.strobing.kPuttingBallSpeedSlowdownPercentage": {
       "category": "Strobing",
-      "subcategory": "basic",
-      "basicSubcategory": "Strobing",
+      "subcategory": "advanced",
       "displayName": "Putting Speed Adjustment",
       "description": "Speed adjustment in putting mode (%)",
       "type": "number",
@@ -922,8 +941,7 @@
     },
     "gs_config.logging.kLogIntermediateExposureImagesToFile": {
       "category": "Logging",
-      "subcategory": "basic",
-      "basicSubcategory": "Storage",
+      "subcategory": "advanced",
       "displayName": "Log Exposure Images",
       "description": "Save intermediate exposure images for debugging",
       "type": "boolean",
@@ -932,8 +950,7 @@
     },
     "gs_config.logging.kLogIntermediateSpinImagesToFile": {
       "category": "Logging",
-      "subcategory": "basic",
-      "basicSubcategory": "Storage",
+      "subcategory": "advanced",
       "displayName": "Log Spin Images",
       "description": "Save spin analysis images",
       "type": "boolean",
@@ -942,8 +959,7 @@
     },
     "gs_config.logging.kLogWebserverImagesToFile": {
       "category": "Logging",
-      "subcategory": "basic",
-      "basicSubcategory": "Storage",
+      "subcategory": "advanced",
       "displayName": "Log Web Server Images",
       "description": "Save images for web server display",
       "type": "boolean",
@@ -952,8 +968,7 @@
     },
     "gs_config.logging.kLogDiagnosticImagesToUniqueFiles": {
       "category": "Logging",
-      "subcategory": "basic",
-      "basicSubcategory": "Storage",
+      "subcategory": "advanced",
       "displayName": "Use Unique Filenames",
       "description": "Save diagnostic images with unique names (vs overwriting)",
       "type": "boolean",
@@ -962,8 +977,7 @@
     },
     "gs_config.logging.kLinuxBaseImageLoggingDir": {
       "category": "Storage",
-      "subcategory": "basic",
-      "basicSubcategory": "Storage",
+      "subcategory": "advanced",
       "displayName": "Image Directory",
       "description": "Base directory for saving images",
       "type": "path",

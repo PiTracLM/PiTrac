@@ -1,5 +1,7 @@
 """Tests for configuration API endpoints"""
 
+import json
+
 import pytest
 
 from utils.mock_factories import MockConfigManagerFactory
@@ -228,3 +230,28 @@ class TestConfigurationAPI:
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, dict)
+
+
+@pytest.mark.unit
+class TestConfigRealManager:
+    def test_internal_keys_not_in_categories(self, client):
+        cats = client.get("/api/config/categories").json()
+        assert "kDAC_setting" not in json.dumps(cats)
+
+    def test_metadata_carries_setup_flag(self, client):
+        meta = client.get("/api/config/metadata").json()
+        assert meta["cameras.slot1.type"]["setup"] is True
+
+    def test_select_round_trip_is_not_a_diff(self, client):
+        assert client.put("/api/config/cameras.slot1.type", json={"value": 5}).status_code == 200
+        assert "cameras.slot1.type" not in client.get("/api/config/diff").json()["data"]
+
+    def test_sim_host_rules(self, client):
+        assert client.put("/api/config/simulators.gspro.host", json={"value": "gaming-pc.local"}).status_code == 200
+        bad = client.put("/api/config/simulators.gspro.host", json={"value": "1.2.3.4:921"})
+        assert bad.status_code == 400
+        assert bad.json()["error"] == "Enter an IP address or hostname without a port"
+
+    def test_calibrated_and_reset_all(self, client):
+        assert client.get("/api/config/calibrated").json() == []
+        assert client.post("/api/config/reset").json()["calibration_kept"] is True

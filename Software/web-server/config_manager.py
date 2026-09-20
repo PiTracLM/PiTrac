@@ -10,9 +10,12 @@ startup into whichever of those tables is still empty, then renamed to *.importe
 """
 
 import copy
+import ipaddress
 import json
 import logging
+import math
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from threading import RLock
@@ -92,6 +95,22 @@ def _as_integer(value: Any) -> Any:
         return int(float(value))
     except (TypeError, ValueError, OverflowError):
         return value
+
+
+_HOSTNAME_LABEL = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
+HOST_ERROR = "Enter an IP address or hostname without a port"
+
+
+def _is_valid_host(host: str) -> bool:
+    if host == "":
+        return True
+    try:
+        ipaddress.IPv4Address(host)
+        return True
+    except ValueError:
+        pass
+    labels = host.split(".")
+    return len(host) <= 253 and not labels[-1].isdigit() and all(_HOSTNAME_LABEL.match(label) for label in labels)
 
 
 def _unflatten(flat: Dict[str, Any]) -> Dict[str, Any]:
@@ -375,6 +394,10 @@ class ConfigurationManager:
         with self._lock:
             return copy.deepcopy(self.merged_config)
 
+    def get_calibrated_keys(self) -> List[str]:
+        with self._lock:
+            return sorted(_flatten(self.calibration_data))
+
     def calibration_updated_at(self, key: str) -> Optional[str]:
         """When a saved calibration value last changed, or None if it was never saved"""
         return self._calibration.updated_at(key)
@@ -419,6 +442,49 @@ class ConfigurationManager:
         with self._lock:
             return copy.deepcopy(self.user_settings)
 
+    def coerce_value(self, key: str, value: Any) -> Any:
+        """Convert a submitted value to the type its metadata declares.
+
+        Raises ValueError with a plain message when it cannot be converted.
+        Keys without metadata pass through unchanged.
+        """
+        setting_type = self.load_configurations_metadata().get("settings", {}).get(key, {}).get("type", "")
+
+        if setting_type in ("select", "string", "text", "path", "ip_address"):
+            if value is None or isinstance(value, (dict, list)):
+                raise ValueError("Must be text")
+            return str(value).strip() if setting_type == "ip_address" else str(value)
+
+        if setting_type == "boolean":
+            if isinstance(value, str) and value.lower() in ("true", "false"):
+                return value.lower() == "true"
+            if value in (True, False):
+                return bool(value)
+            raise ValueError("Must be true or false")
+
+        if setting_type in ("integer", "number", "float"):
+            if isinstance(value, bool) or value is None:
+                raise ValueError("Must be a number")
+            try:
+                number = float(value)
+                if not math.isfinite(number):
+                    raise ValueError
+                if setting_type == "integer":
+                    return int(number)
+                if setting_type == "number" and number.is_integer():
+                    return int(number)
+                return number
+            except (TypeError, ValueError, OverflowError):
+                raise ValueError("Must be a number") from None
+
+        if setting_type == "array" and isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                raise ValueError("Invalid JSON array format") from None
+
+        return value
+
     def set_config(self, key: str, value: Any) -> Tuple[bool, str, bool]:
         """Set configuration value
 
@@ -437,16 +503,10 @@ class ConfigurationManager:
             default_value = self.get_default(key)
             is_calibration = self._is_calibration_field(key)
 
-            # Auto-convert JSON string to array if setting type is array
-            metadata = self.load_configurations_metadata()
-            settings_metadata = metadata.get("settings", {})
-            if key in settings_metadata:
-                setting_type = settings_metadata[key].get("type", "")
-                if setting_type == "array" and isinstance(value, str):
-                    try:
-                        value = json.loads(value)
-                    except json.JSONDecodeError:
-                        return False, "Invalid JSON array format", False
+            is_valid, error_msg = self.validate_config(key, value)
+            if not is_valid:
+                return False, error_msg, False
+            value = self.coerce_value(key, value)
 
             if value == default_value:
                 if is_calibration:
@@ -619,6 +679,11 @@ class ConfigurationManager:
         Returns:
             Tuple of (is_valid, error_message)
         """
+        try:
+            value = self.coerce_value(key, value)
+        except ValueError as e:
+            return False, str(e)
+
         with self._lock:
             metadata = self.load_configurations_metadata()
             settings_metadata = metadata.get("settings", {})
@@ -643,11 +708,11 @@ class ConfigurationManager:
                     if str_value not in valid_options:
                         return False, f"Must be one of: {', '.join(valid_options)}"
 
-            elif setting_type == "boolean":
-                if not isinstance(value, bool) and value not in [True, False, "true", "false"]:
-                    return False, "Must be true or false"
+            elif setting_type == "ip_address":
+                if not _is_valid_host(value):
+                    return False, HOST_ERROR
 
-            elif setting_type in ("number", "integer"):
+            elif setting_type in ("number", "integer", "float"):
                 try:
                     num_val = float(value)
                     if "min" in setting_info and num_val < setting_info["min"]:
@@ -658,15 +723,7 @@ class ConfigurationManager:
                     return False, "Must be a number"
 
             elif setting_type == "array":
-                # Handle JSON string representation of arrays
-                if isinstance(value, str):
-                    try:
-                        parsed = json.loads(value)
-                        if not isinstance(parsed, list):
-                            return False, "Must be a valid array"
-                    except json.JSONDecodeError:
-                        return False, "Must be a valid JSON array"
-                elif not isinstance(value, list):
+                if not isinstance(value, list):
                     return False, "Must be an array"
 
             return True, ""
@@ -844,7 +901,7 @@ class ConfigurationManager:
             # Determine if this is a basic or advanced setting
             subcategory = setting_info.get("subcategory", "advanced")
 
-            if category in categories:
+            if category in categories and not setting_info.get("internal"):
                 categories[category][subcategory].append(key)
 
         # No auto-categorization - all items must have explicit categories
@@ -897,6 +954,16 @@ class ConfigurationManager:
             }
             return export_data
 
+    def _coerce_imported(self, nested: Dict[str, Any]) -> Dict[str, Any]:
+        """Coerce and validate every known key of an imported tree; raises ValueError naming the key."""
+        flat = {}
+        for key, value in _flatten(nested).items():
+            is_valid, error = self.validate_config(key, value)
+            if not is_valid:
+                raise ValueError(f"{key}: {error}")
+            flat[key] = self.coerce_value(key, value)
+        return _unflatten(flat)
+
     def import_config(self, import_data: Dict[str, Any]) -> Tuple[bool, str]:
         """Import configuration from exported data
 
@@ -914,15 +981,11 @@ class ConfigurationManager:
                 new_user = None
                 new_cal = None
 
-                if "user_settings" in import_data:
-                    val = import_data["user_settings"]
-                    if isinstance(val, dict):
-                        new_user = copy.deepcopy(val)
+                if isinstance(import_data.get("user_settings"), dict):
+                    new_user = self._coerce_imported(import_data["user_settings"])
 
-                if "calibration_data" in import_data:
-                    val = import_data["calibration_data"]
-                    if isinstance(val, dict):
-                        new_cal = copy.deepcopy(val)
+                if isinstance(import_data.get("calibration_data"), dict):
+                    new_cal = self._coerce_imported(import_data["calibration_data"])
 
                 with self._db.transaction() as conn:
                     if new_user is not None:
@@ -939,6 +1002,8 @@ class ConfigurationManager:
                 self._rebuild_merged_config()
                 after = self.merged_config
 
+            except ValueError as e:
+                return False, str(e)
             except Exception as e:
                 logger.error(f"Error importing configuration: {e}")
                 return False, f"Import failed: {e}"
