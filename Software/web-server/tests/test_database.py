@@ -22,16 +22,16 @@ class TestDatabase:
             row["name"]
             for row in db.query("SELECT name FROM sqlite_master WHERE type='table'")
         }
-        assert {"sessions", "shots", "shot_images", "settings", "calibration"} <= tables
+        assert {"sessions", "shots", "shot_images", "settings", "calibration", "simulators"} <= tables
 
     def test_user_version_matches_latest_migration(self, db):
         version = db.query("PRAGMA user_version")[0][0]
-        assert version == 2
+        assert version == 3
 
     def test_reopening_is_idempotent(self, tmp_path):
         Database(tmp_path / "test.db").close()
         again = Database(tmp_path / "test.db")
-        assert again.query("PRAGMA user_version")[0][0] == 2
+        assert again.query("PRAGMA user_version")[0][0] == 3
         again.close()
 
     def test_wal_mode_enabled(self, db):
@@ -59,7 +59,7 @@ class TestDatabase:
         version = db2.query("PRAGMA user_version")[0][0]
         db2.close()
 
-        assert version == 2
+        assert version == 3
 
     def test_fk_enforcement(self, db):
         # Inserting a shot with a session_id that doesn't exist must fail

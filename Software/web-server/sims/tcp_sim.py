@@ -19,6 +19,12 @@ logger = logging.getLogger(__name__)
 _RECONNECT_BACKOFF_SEC = [1, 2, 5, 10]
 _MAX_UNPARSED_CHARS = 64 * 1024
 
+HOST_FIELD = {"key": "host", "label": "Host", "type": "host", "required": True, "default": ""}
+
+
+def port_field(default: int) -> Dict[str, object]:
+    return {"key": "port", "label": "Port", "type": "integer", "default": default, "min": 1, "max": 65535}
+
 
 def clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
@@ -52,11 +58,6 @@ class TcpSim(SimInterface):
         self._reconnect_task: Optional[asyncio.Task] = None
         self._want_connected = False
         self._conn_lock = asyncio.Lock()
-
-    def info(self) -> Dict[str, str]:
-        data = super().info()
-        data["target"] = f"{self.host}:{self.port}" if self.host else ""
-        return data
 
     async def connect(self) -> None:
         self._want_connected = True

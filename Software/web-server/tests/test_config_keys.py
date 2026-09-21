@@ -14,9 +14,6 @@ SCHEMA = HERE.parent / "configurations.json"
 KEY_LITERAL = re.compile(r'(?<!#include )"((?:gs_config|cameras)\.[\w.]*)"')
 CALL_LITERAL = re.compile(r'(?:SetConstant|GetConfigString|apply_enum)\(\s*"([^"]+)"\s*[,)]')
 
-# Keys sim_manager.py builds from the simulator name
-UNCHECKED_PREFIXES = ("simulators.",)
-
 DEFINITION = re.compile(r"^[ \t]*(?:static\s+)?([\w:<>]+(?:[ \t]+[\w:<>]+)?)[ \t]+(?:(\w+)::)?(\w+)\s*=\s*([^;]+);", re.M)
 INTEGER_TYPES = {"int", "long", "unsigned int", "uint"}
 SET_CONSTANT = re.compile(r'SetConstant\(\s*"([^"]+)"\s*,\s*([\w:]+)\s*\)')
@@ -61,7 +58,6 @@ def test_every_schema_key_has_a_reader():
         for key in settings
         if key not in read_by_cpp
         and key not in web_source
-        and not key.startswith(UNCHECKED_PREFIXES)
     )
     assert unread == []
 

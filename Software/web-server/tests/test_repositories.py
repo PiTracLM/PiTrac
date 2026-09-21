@@ -6,7 +6,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from db.database import Database
-from db.repositories import KeyValueRepository, SessionRepository, ShotRepository
+from db.repositories import KeyValueRepository, SessionRepository, ShotRepository, SimulatorRepository
 from models import ShotData
 
 
@@ -155,3 +155,27 @@ class TestKeyValueRepository:
     def test_rejects_unknown_table(self, db):
         with pytest.raises(ValueError):
             KeyValueRepository(db, "shots")
+
+
+@pytest.mark.unit
+class TestSimulatorRepository:
+    def test_add_get_list_update_delete(self, db):
+        repo = SimulatorRepository(db)
+        first = repo.add("gspro", "GSPro", True, {"host": "10.0.0.5", "port": 921})
+        second = repo.add("gspro", "GSPro 2", False, {"host": "10.0.0.6", "port": 922})
+
+        assert repo.get(first["id"]) == first
+        assert first["on"] is True and first["settings"] == {"host": "10.0.0.5", "port": 921}
+        assert [s["id"] for s in repo.list()] == [first["id"], second["id"]]
+
+        db.execute("UPDATE simulators SET updated_at = '2026-01-01T00:00:00'")
+        updated = repo.update(second["id"], name="Garage", on=True, settings={"host": "10.0.0.7", "port": 922})
+        assert (updated["name"], updated["on"], updated["settings"]["host"]) == ("Garage", True, "10.0.0.7")
+        assert updated["updated_at"] > "2026-01-01T00:00:00"
+        assert updated["created_at"] == second["created_at"]
+
+        assert repo.delete(first["id"]) is True
+        assert repo.delete(first["id"]) is False
+        assert repo.get(first["id"]) is None
+        assert repo.update("missing", name="x", on=False, settings={}) is None
+        assert [s["id"] for s in repo.list()] == [second["id"]]

@@ -35,12 +35,12 @@ from log_files import (
     tail_lines,
     truncate_if_over,
 )
-from db.repositories import SessionRepository, ShotRepository
+from db.repositories import KeyValueRepository, SessionRepository, ShotRepository, SimulatorRepository
 from managers import ConnectionManager, ShotDataStore
 from models import ShotData
 from parsers import ShotDataParser
 from pitrac_manager import PiTracProcessManager
-from sim_manager import SimManager
+from sim_manager import SimManager, SimSettingsError, import_legacy_settings
 from strobe_calibration_manager import StrobeCalibrationManager
 from testing_tools_manager import TestingToolsManager
 from update_manager import UpdateManager
@@ -215,10 +215,10 @@ class PiTracServer:
         self.image_cap_mb = metadata.get("storage", {}).get("imageStorageCapMB", {}).get("default", 5000)
         self.retention = ImageRetention(self.session_repo, self.shot_repo, IMAGES_DIR, self.image_cap_mb)
         self.sim_connection_manager = ConnectionManager()
-        self.sim_manager = SimManager(
-            self.config_manager,
-            broadcast=self.sim_connection_manager.broadcast,
-        )
+        sim_repo = SimulatorRepository(self.db)
+        if import_legacy_settings(KeyValueRepository(self.db, "settings"), sim_repo):
+            self.config_manager.reload()
+        self.sim_manager = SimManager(sim_repo, broadcast=self.sim_connection_manager.broadcast)
         self.shutdown_flag = False
         self.background_tasks: set[asyncio.Task] = set()
         self._active_cameras: Dict[int, str] = {}  # camera_index -> endpoint name
@@ -287,25 +287,63 @@ class PiTracServer:
             logger.info("Shot data reset via API")
             return {"status": "reset", "timestamp": shot_data.timestamp}
 
+        def sim_error(e: Exception) -> JSONResponse:
+            if isinstance(e, SimSettingsError):
+                return JSONResponse(status_code=400, content={"error": str(e), "fields": e.fields})
+            return JSONResponse(status_code=404, content={"error": "Unknown simulator"})
+
+        async def json_body(request: Request) -> Any:
+            try:
+                return await request.json()
+            except ValueError:
+                return None
+
+        @self.app.get("/api/sims/types")
+        async def get_sim_types() -> List[Dict[str, Any]]:
+            return self.sim_manager.types()
+
         @self.app.get("/api/sims")
-        async def get_sims() -> Dict[str, Any]:
-            return {"sims": self.sim_manager.status()}
+        async def get_sims() -> List[Dict[str, Any]]:
+            return self.sim_manager.status()
 
-        @self.app.post("/api/sims/{name}/connect")
-        async def connect_sim(name: str):
+        @self.app.post("/api/sims")
+        async def create_sim(request: Request):
             try:
-                await self.sim_manager.connect(name)
-            except KeyError:
-                return JSONResponse(status_code=404, content={"error": f"Unknown sim: {name}"})
-            return {"sims": self.sim_manager.status()}
+                return self.sim_manager.create(await json_body(request))
+            except SimSettingsError as e:
+                return sim_error(e)
 
-        @self.app.post("/api/sims/{name}/disconnect")
-        async def disconnect_sim(name: str):
+        @self.app.post("/api/sims/test")
+        async def test_sim(request: Request):
             try:
-                await self.sim_manager.disconnect(name)
+                return await self.sim_manager.test_connection(await json_body(request))
+            except SimSettingsError as e:
+                return sim_error(e)
+
+        @self.app.put("/api/sims/{sim_id}")
+        async def update_sim(sim_id: str, request: Request):
+            try:
+                return self.sim_manager.update(sim_id, await json_body(request))
+            except (SimSettingsError, KeyError) as e:
+                return sim_error(e)
+
+        @self.app.delete("/api/sims/{sim_id}")
+        async def delete_sim(sim_id: str):
+            try:
+                self.sim_manager.delete(sim_id)
+            except KeyError as e:
+                return sim_error(e)
+            return {"deleted": sim_id}
+
+        @self.app.post("/api/sims/{sim_id}/{action}")
+        async def sim_action(sim_id: str, action: str):
+            if action not in ("connect", "disconnect") or self.sim_manager.repo.get(sim_id) is None:
+                return JSONResponse(status_code=404, content={"error": "Unknown simulator"})
+            try:
+                await getattr(self.sim_manager, action)(sim_id)
             except KeyError:
-                return JSONResponse(status_code=404, content={"error": f"Unknown sim: {name}"})
-            return {"sims": self.sim_manager.status()}
+                return JSONResponse(status_code=409, content={"error": "Turn this simulator on first"})
+            return self.sim_manager.status()
 
         @self.app.websocket("/ws/sims")
         async def websocket_sims(websocket: WebSocket) -> None:
@@ -1015,7 +1053,7 @@ class PiTracServer:
 
         @self.app.get("/api/setup/status")
         async def setup_status() -> Dict[str, Any]:
-            """What a new build still needs: strobe calibration, camera calibrations, a simulator"""
+            """What a new build still needs: strobe calibration and camera calibrations. Simulators are optional."""
             board_version = self.config_manager.get_config("gs_config.strobing.kConnectionBoardVersion")
             board_version = int(board_version) if board_version is not None else None
             safety = self.strobe_calibration_manager.is_strobe_safe()
@@ -1031,9 +1069,7 @@ class PiTracServer:
                 }
                 for n in (1, 2)
             }
-            sims = self.config_manager.get_config("simulators") or {}
-            enabled = [name for name, settings in sims.items() if isinstance(settings, dict) and settings.get("enabled")]
-            connected = [sim["name"] for sim in self.sim_manager.status() if sim["status"] == "connected"]
+            sims = [{key: sim[key] for key in ("id", "name", "type", "on", "status")} for sim in self.sim_manager.status()]
             return {
                 "board_version": board_version,
                 "strobe": {
@@ -1043,10 +1079,9 @@ class PiTracServer:
                     "updated_at": updated_at(self.strobe_calibration_manager.DAC_CONFIG_KEY),
                 },
                 "cameras": cameras,
-                "simulator": {"enabled": enabled, "connected": connected},
+                "simulator": {"instances": sims, "connected": [sim["name"] for sim in sims if sim["status"] == "connected"]},
                 "complete": safety["safe"]
-                and all(c["lens_calibrated"] and c["position_calibrated"] for c in cameras.values())
-                and bool(enabled),
+                and all(c["lens_calibrated"] and c["position_calibrated"] for c in cameras.values()),
             }
 
         @self.app.get("/testing", response_class=HTMLResponse)
@@ -1574,7 +1609,6 @@ class PiTracServer:
         logger.info("Starting PiTrac Web Server...")
         loop = asyncio.get_event_loop()
         self.calibration_manager.loop = loop
-        self.sim_manager.loop = loop
         await self.calibration_manager._replay_pending_updates()
 
         # V3 boards: write calibrated DAC value to hardware before any strobe fires.

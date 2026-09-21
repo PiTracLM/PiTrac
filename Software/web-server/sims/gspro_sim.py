@@ -7,7 +7,7 @@ import math
 from typing import Callable, Dict, Optional
 
 from models import ShotData
-from sims.tcp_sim import TcpSim, round1
+from sims.tcp_sim import HOST_FIELD, TcpSim, port_field, round1
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +79,9 @@ def build_heartbeat(ball_detected: bool) -> Dict[str, object]:
 
 
 class GSProSim(TcpSim):
-    name = "gspro"
+    type = "gspro"
     display_name = "GSPro"
+    FIELDS = [HOST_FIELD, port_field(921)]
     READS = True
 
     def __init__(

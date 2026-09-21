@@ -330,8 +330,7 @@ def test_setup_status_fresh_install(client):
     assert s["cameras"]["camera1"]["position_calibrated"] is False
     assert s["cameras"]["camera2"]["lens_calibrated"] is False
     assert "type" in s["cameras"]["camera1"]
-    assert s["simulator"]["enabled"] == []
-    assert s["simulator"]["connected"] == []
+    assert s["simulator"] == {"instances": [], "connected": []}
     assert s["complete"] is False
 
 
@@ -342,10 +341,16 @@ def test_setup_status_complete_when_everything_is_done(client, server_instance):
         calibration[f"gs_config.cameras.kCamera{n}FocalLength"] = 6.1
         calibration[f"gs_config.cameras.kCamera{n}Angles"] = [1.5, -2.5]
     assert server_instance.config_manager.set_calibration_batch(calibration)[0]
-    server_instance.config_manager.set_config("simulators.ogs.enabled", True)
 
     s = client.get("/api/setup/status").json()
-    assert s["simulator"]["enabled"] == ["ogs"]
+    assert s["complete"] is True
+
+    sim = client.post("/api/sims", json={"type": "ogs", "name": "iPad", "settings": {"host": "ipad.local"}}).json()
+    s = client.get("/api/setup/status").json()
+    assert s["simulator"] == {
+        "instances": [{"id": sim["id"], "name": "iPad", "type": "ogs", "on": True, "status": "off"}],
+        "connected": [],
+    }
     assert s["complete"] is True
 
     server_instance.strobe_calibration_manager.is_strobe_safe.return_value = {

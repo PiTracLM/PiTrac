@@ -29,7 +29,9 @@ async function api(path, { method = 'GET', body } = {}) {
     try { data = text ? JSON.parse(text) : null; } catch { data = null; }
     if (!res.ok) {
         const detail = data && typeof data.detail === 'string' && data.detail;
-        throw new Error((data && (data.error || data.message)) || detail || `${res.status} ${res.statusText}`);
+        const err = new Error((data && (data.error || data.message)) || detail || `${res.status} ${res.statusText}`);
+        err.data = data;
+        throw err;
     }
     return data;
 }

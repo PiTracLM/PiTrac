@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Awaitable, Callable, Dict, Optional
+from typing import Awaitable, Callable, Dict, List, Optional
 
 from models import ShotData
 
@@ -23,8 +23,10 @@ class SimInterface(ABC):
     simulator expects. SimManager owns the collection and the status broadcast.
     """
 
-    name = "sim"
+    type = "sim"
     display_name = "Simulator"
+    # The settings form: [{key, label, type ("host" or "integer"), default, required, min, max, advanced}]
+    FIELDS: List[Dict[str, object]] = []
 
     def __init__(self) -> None:
         self._status = STATUS_OFF
@@ -50,12 +52,7 @@ class SimInterface(ABC):
                 logger.warning(f"sim status callback failed: {e}")
 
     def info(self) -> Dict[str, str]:
-        return {
-            "name": self.name,
-            "display_name": self.display_name,
-            "status": self._status,
-            "detail": self._detail,
-        }
+        return {"status": self._status, "detail": self._detail}
 
     @abstractmethod
     async def connect(self) -> None:

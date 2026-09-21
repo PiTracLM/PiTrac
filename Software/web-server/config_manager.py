@@ -36,6 +36,10 @@ _RENAMED_SETTINGS = {
     f"{_OLD_SIM}.E6.kE6InterMessageDelayMs": "simulators.e6.inter_message_delay_ms",
     f"{_OLD_SIM}.kLaunchMonitorIdString": None,
 }
+_MODEL_KINDS = {
+    "gs_config.ball_identification.kModelPath": "ball",
+    "gs_config.spin_analysis.kSpinModelPath": "spin",
+}
 
 
 def _deep_merge(base: Dict, override: Dict) -> Dict:
@@ -97,7 +101,7 @@ def _as_integer(value: Any) -> Any:
         return value
 
 
-_HOSTNAME_LABEL = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
+_HOSTNAME_LABEL = re.compile(r"[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?")
 HOST_ERROR = "Enter an IP address or hostname without a port"
 
 
@@ -110,7 +114,46 @@ def _is_valid_host(host: str) -> bool:
     except ValueError:
         pass
     labels = host.split(".")
-    return len(host) <= 253 and not labels[-1].isdigit() and all(_HOSTNAME_LABEL.match(label) for label in labels)
+    return len(host) <= 253 and not labels[-1].isdigit() and all(_HOSTNAME_LABEL.fullmatch(label) for label in labels)
+
+
+def coerce(setting_type: str, value: Any) -> Any:
+    """Convert a submitted value to a metadata type; raises ValueError with a plain message."""
+    if setting_type in ("select", "string", "text", "path", "ip_address"):
+        if value is None or isinstance(value, (dict, list)):
+            raise ValueError("Must be text")
+        return str(value).strip() if setting_type == "ip_address" else str(value)
+
+    if setting_type == "boolean":
+        # The generated config writes booleans as "1" and "0"
+        if isinstance(value, str) and value.lower() in ("true", "false", "1", "0"):
+            return value.lower() in ("true", "1")
+        if value in (True, False):
+            return bool(value)
+        raise ValueError("Must be true or false")
+
+    if setting_type in ("integer", "number", "float"):
+        if isinstance(value, bool) or value is None:
+            raise ValueError("Must be a number")
+        try:
+            number = float(value)
+            if not math.isfinite(number):
+                raise ValueError
+            if setting_type == "integer":
+                return int(number)
+            if setting_type == "number" and number.is_integer():
+                return int(number)
+            return number
+        except (TypeError, ValueError, OverflowError):
+            raise ValueError("Must be a number") from None
+
+    if setting_type == "array" and isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            raise ValueError("Invalid JSON array format") from None
+
+    return value
 
 
 def _unflatten(flat: Dict[str, Any]) -> Dict[str, Any]:
@@ -248,13 +291,12 @@ class ConfigurationManager:
         logger.info(f"Imported {path} into the {repo.table} table, renamed to {target.name}")
 
     def _move_renamed_keys(self) -> None:
-        """Move stored settings to their renamed keys in one write; an old sim address also meant connect at startup"""
+        """Move stored settings to their renamed keys in one write; an old sim address also meant the sim was on"""
         stored = self._settings.load()
         old_keys = [key for key in _RENAMED_SETTINGS if key in stored]
         if not old_keys:
             return
 
-        schema = self._raw_metadata.get("settings", {})
         moved = {key: value for key, value in stored.items() if key not in _RENAMED_SETTINGS}
         for old in old_keys:
             new, value = _RENAMED_SETTINGS[old], stored[old]
@@ -264,21 +306,10 @@ class ConfigurationManager:
             if new in stored:
                 logger.info(f"Dropping stored setting {old}={value!r}, {new} is already set")
                 continue
-            meta = schema.get(new, {})
-            if meta.get("type") == "integer":
-                value = _as_integer(value)
-                if not isinstance(value, int):
-                    logger.warning(f"Dropping stored setting {old}={value!r}, {new} needs an integer")
-                    continue
-            if value == meta.get("default"):
-                logger.info(f"Dropping stored setting {old}={value!r}, it equals the default of {new}")
-                continue
             moved[new] = value
             logger.info(f"Moved stored setting {old} to {new}")
             if new.endswith(".host") and isinstance(value, str) and value.strip():
-                sim = new.rsplit(".", 1)[0]
-                moved.setdefault(f"{sim}.enabled", True)
-                moved.setdefault(f"{sim}.auto_connect", True)
+                moved.setdefault(f"{new.rsplit('.', 1)[0]}.enabled", True)
 
         self._settings.replace_all(moved)
 
@@ -448,42 +479,7 @@ class ConfigurationManager:
         Raises ValueError with a plain message when it cannot be converted.
         Keys without metadata pass through unchanged.
         """
-        setting_type = self.load_configurations_metadata().get("settings", {}).get(key, {}).get("type", "")
-
-        if setting_type in ("select", "string", "text", "path", "ip_address"):
-            if value is None or isinstance(value, (dict, list)):
-                raise ValueError("Must be text")
-            return str(value).strip() if setting_type == "ip_address" else str(value)
-
-        if setting_type == "boolean":
-            if isinstance(value, str) and value.lower() in ("true", "false"):
-                return value.lower() == "true"
-            if value in (True, False):
-                return bool(value)
-            raise ValueError("Must be true or false")
-
-        if setting_type in ("integer", "number", "float"):
-            if isinstance(value, bool) or value is None:
-                raise ValueError("Must be a number")
-            try:
-                number = float(value)
-                if not math.isfinite(number):
-                    raise ValueError
-                if setting_type == "integer":
-                    return int(number)
-                if setting_type == "number" and number.is_integer():
-                    return int(number)
-                return number
-            except (TypeError, ValueError, OverflowError):
-                raise ValueError("Must be a number") from None
-
-        if setting_type == "array" and isinstance(value, str):
-            try:
-                return json.loads(value)
-            except json.JSONDecodeError:
-                raise ValueError("Invalid JSON array format") from None
-
-        return value
+        return coerce(self.load_configurations_metadata().get("settings", {}).get(key, {}).get("type", ""), value)
 
     def set_config(self, key: str, value: Any) -> Tuple[bool, str, bool]:
         """Set configuration value
@@ -694,8 +690,8 @@ class ConfigurationManager:
             setting_type = setting_info.get("type", "")
 
             if setting_type == "select" and "options" in setting_info:
-                if key in ("gs_config.ball_identification.kModelPath", "gs_config.spin_analysis.kSpinModelPath"):
-                    available_models = self.get_available_models()
+                if key in _MODEL_KINDS:
+                    available_models = self.get_available_models(_MODEL_KINDS[key])
                     if available_models:
                         valid_options = list(available_models.values())
                         str_value = str(value)
@@ -803,9 +799,10 @@ class ConfigurationManager:
                 str_value = str(Path(str_value).expanduser())
             current[final_key] = str_value
 
-    def get_available_models(self) -> Dict[str, str]:
+    def get_available_models(self, kind: str) -> Dict[str, str]:
         """
-        Discover available YOLO models from the models directory.
+        Discover available YOLO models of one kind ("ball" or "spin") from the models directory.
+        A directory whose name contains "spin" holds a spin model; every other one holds a ball model.
         Returns a dict of {display_name: model_dir_path} for dropdown options.
         The C++ backend loads NCNN model files from the selected directory.
         """
@@ -826,7 +823,7 @@ class ConfigurationManager:
                 continue
 
             for model_dir in base_dir.iterdir():
-                if model_dir.is_dir():
+                if model_dir.is_dir() and ("spin" in model_dir.name.lower()) == (kind == "spin"):
                     for pattern in model_file_patterns:
                         if (model_dir / pattern).exists():
                             display_name = model_dir.name
@@ -848,11 +845,10 @@ class ConfigurationManager:
             with open(config_path, "r") as f:
                 metadata = json.load(f)
 
-            model_options = self.get_available_models()
-            if model_options and "settings" in metadata:
-                for model_key in ("gs_config.ball_identification.kModelPath", "gs_config.spin_analysis.kSpinModelPath"):
-                    if model_key in metadata["settings"]:
-                        metadata["settings"][model_key]["options"] = model_options
+            for model_key, kind in _MODEL_KINDS.items():
+                model_options = self.get_available_models(kind)
+                if model_options and model_key in metadata.get("settings", {}):
+                    metadata["settings"][model_key]["options"] = model_options
 
             self._metadata_cache = metadata
             return metadata
@@ -872,7 +868,6 @@ class ConfigurationManager:
             "categoryList",
             [
                 "Cameras",
-                "Simulators",
                 "Ball Detection",
                 "AI Detection",
                 "Storage",

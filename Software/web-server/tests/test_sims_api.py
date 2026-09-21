@@ -1,38 +1,116 @@
+import asyncio
 import time
 
+import httpx
 import pytest
 
 from models import ShotData
 
 
-def test_ogs_config_defaults_resolve(server_instance):
-    cm = server_instance.config_manager
-    assert cm.get_config("simulators.ogs.enabled") is False
-    assert cm.get_config("simulators.ogs.auto_connect") is False
-    assert cm.get_config("simulators.ogs.host") == ""
-    assert cm.get_config("simulators.ogs.port") == 3111
-    assert cm.get_config("simulators.ogs.keepalive_sec") == 5
+def test_sim_types(client):
+    types = {t["type"]: t for t in client.get("/api/sims/types").json()}
+    assert [t for t in types] == ["gspro", "e6", "ogs"]
+    assert types["gspro"]["display_name"] == "GSPro"
+    assert [f["key"] for f in types["e6"]["fields"]] == ["host", "port", "inter_message_delay_ms"]
+    assert types["ogs"]["fields"][2]["advanced"] is True
 
 
-def test_get_sims_endpoint(client):
-    r = client.get("/api/sims")
-    assert r.status_code == 200
-    assert isinstance(r.json().get("sims"), list)
+def test_create_list_update_delete(client):
+    first = client.post("/api/sims", json={"type": "gspro", "settings": {"host": "10.0.0.5"}})
+    assert first.status_code == 200
+    first = first.json()
+    assert (first["name"], first["on"], first["status"], first["target"]) == ("GSPro", True, "off", "10.0.0.5:921")
+    second = client.post("/api/sims", json={"type": "gspro", "on": False, "settings": {"host": "10.0.0.6"}}).json()
+    assert second["name"] == "GSPro 2"
+    assert [s["id"] for s in client.get("/api/sims").json()] == [first["id"], second["id"]]
+
+    updated = client.put(f"/api/sims/{second['id']}", json={"settings": {"port": 922}})
+    assert updated.status_code == 200
+    assert updated.json()["settings"] == {"host": "10.0.0.6", "port": 922}
+
+    assert client.delete(f"/api/sims/{first['id']}").status_code == 200
+    assert [s["id"] for s in client.get("/api/sims").json()] == [second["id"]]
+    assert client.delete(f"/api/sims/{first['id']}").status_code == 404
+    assert client.put(f"/api/sims/{first['id']}", json={"on": True}).status_code == 404
 
 
-def test_connect_unknown_sim_returns_404(client):
-    r = client.post("/api/sims/nope/connect")
-    assert r.status_code == 404
-
-
-def test_connect_on_a_build_error_sim_returns_404_with_error(client, server_instance):
-    server_instance.sim_manager._build_errors = {
-        "gspro": {"name": "gspro", "display_name": "GSPro", "status": "error", "detail": "Invalid settings"},
+def test_invalid_fields_are_a_400_with_the_field_errors(client):
+    r = client.post("/api/sims", json={"type": "gspro", "settings": {"host": "1.2.3.4:921", "port": 0}})
+    assert r.status_code == 400
+    assert r.json()["fields"] == {
+        "host": "Enter an IP address or hostname without a port",
+        "port": "Port must be between 1 and 65535",
     }
-    assert [s["name"] for s in client.get("/api/sims").json()["sims"]] == ["gspro"]
-    r = client.post("/api/sims/gspro/connect")
-    assert r.status_code == 404
-    assert r.json()["error"] == "Unknown sim: gspro"
+    assert r.json()["error"]
+    assert client.post("/api/sims", content=b"not json").status_code == 400
+    assert client.get("/api/sims").json() == []
+
+
+def test_connect_and_disconnect(client, server_instance):
+    off = client.post("/api/sims", json={"type": "gspro", "on": False, "settings": {"host": "10.0.0.5"}}).json()
+    assert client.post("/api/sims/nope/connect").status_code == 404
+    assert client.post(f"/api/sims/{off['id']}/connect").status_code == 409
+
+    calls = []
+
+    class _Sim:
+        status = "off"
+
+        def info(self):
+            return {"status": self.status, "detail": ""}
+
+        async def connect(self):
+            calls.append("connect")
+
+        async def disconnect(self):
+            calls.append("disconnect")
+
+    server_instance.sim_manager._sims[off["id"]] = _Sim()
+    r = client.post(f"/api/sims/{off['id']}/connect")
+    assert r.status_code == 200
+    assert r.json()[0]["id"] == off["id"]
+    assert client.post(f"/api/sims/{off['id']}/disconnect").status_code == 200
+    assert calls == ["connect", "disconnect"]
+
+
+@pytest.mark.asyncio
+async def test_test_route_succeeds_against_a_listening_simulator(server_instance):
+    async def handle(reader, writer):
+        await reader.read()
+
+    server = await asyncio.start_server(handle, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    try:
+        async with _client(server_instance) as client:
+            r = await client.post("/api/sims/test", json={"type": "gspro", "settings": {"host": "127.0.0.1", "port": port}})
+    finally:
+        server.close()
+    assert r.status_code == 200
+    assert r.json() == {"ok": True, "message": f"Connected to GSPro at 127.0.0.1:{port}"}
+    assert server_instance.sim_manager.status() == []
+
+
+@pytest.mark.asyncio
+async def test_test_route_reports_the_error_on_a_closed_port(server_instance):
+    server = await asyncio.start_server(lambda r, w: None, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    server.close()
+    await server.wait_closed()
+    async with _client(server_instance) as client:
+        r = await client.post("/api/sims/test", json={"type": "gspro", "settings": {"host": "127.0.0.1", "port": port}})
+    assert r.status_code == 200
+    assert r.json()["ok"] is False
+    assert r.json()["message"].startswith(f"Could not connect to GSPro at 127.0.0.1:{port}: ")
+
+
+def test_test_route_validates_fields(client):
+    r = client.post("/api/sims/test", json={"type": "gspro", "settings": {}})
+    assert r.status_code == 400
+    assert r.json()["fields"] == {"host": "Host is required"}
+
+
+def _client(server_instance):
+    return httpx.AsyncClient(transport=httpx.ASGITransport(app=server_instance.app), base_url="http://test")
 
 
 def _install_on_shot_spy(server_instance):
@@ -105,7 +183,7 @@ def test_status_reply_carries_armed_and_club(client, server_instance):
     status = {"result_type": 2, "message": "Waiting for ball to be teed up."}
     r = client.post("/api/internal/shot-result", json=status)
     assert r.json() == {"status": "ok", "armed": True}
-    server_instance.sim_manager.set_club("gspro", "putter")
+    server_instance.sim_manager.set_club("abc", "putter")
     r = client.post("/api/internal/shot-result", json=status)
     assert r.json() == {"status": "ok", "armed": True, "club": "putter"}
 
@@ -130,7 +208,7 @@ def test_club_change_is_not_shown_on_the_dashboard(client, server_instance):
 
     server_instance.connection_manager.broadcast = spy
     before = server_instance.shot_store.get()
-    server_instance.sim_manager.set_club("gspro", "putter")
+    server_instance.sim_manager.set_club("abc", "putter")
     r = client.post("/api/internal/shot-result", json={
         "result_type": 10,
         "message": "Club type was set to Putter",

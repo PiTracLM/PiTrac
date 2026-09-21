@@ -19,7 +19,6 @@ let offline = false;
 let shotState = null;
 let setup = null;
 let cameraLabels = {};
-let sims = null;
 let freshSocket = true;
 let hitTime = '';
 let shownImage = null;
@@ -164,36 +163,7 @@ async function resetShot() {
     }
 }
 
-// -- Simulators --
-
-function connectedSims() {
-    if (sims) return sims.filter((s) => s.status === 'connected').map((s) => s.display_name || s.name);
-    return setup ? setup.simulator.connected : [];
-}
-
-function renderSimChip() {
-    const names = connectedSims();
-    byId('sim-chip-text').textContent = names.length ? `${names.join(', ')} connected` : 'No simulator connected';
-    byId('sim-chip-dot').className = `w-2 h-2 rounded-full ${names.length ? 'bg-success' : 'bg-base-content/30'}`;
-    byId('sim-chip').hidden = false;
-}
-
-function openSimsDrawer() {
-    const drawer = byId('sims-drawer');
-    if (drawer && drawer.classList.contains('hidden')) byId('sims-nav-btn').click();
-}
-
 // -- Setup readiness --
-
-function simulatorRow() {
-    const enabled = sims ? sims.map((s) => s.display_name || s.name) : setup.simulator.enabled;
-    const connected = connectedSims();
-    if (connected.length) return { label: 'Simulator', detail: `${connected.join(', ')} connected`, done: true };
-    if (enabled.length) {
-        return { label: 'Simulator', detail: `${enabled.join(', ')} is set up but not connected.`, action: 'Open Sims', onClick: true };
-    }
-    return { label: 'Simulator', detail: 'Pick GSPro, E6, or OpenGolfSim.', action: 'Set up', href: '/config#setup' };
-}
 
 function setupRows() {
     const camera = (n) => cameraLabels[setup.cameras[`camera${n}`].type] || setup.cameras[`camera${n}`].type || 'not set';
@@ -212,16 +182,13 @@ function setupRows() {
             rows.push({ label: `${title}, camera ${n}`, detail: '', done, action: 'Calibrate', href: '/calibration' });
         }
     }
-    rows.push(simulatorRow());
     return rows;
 }
 
 function rowHtml(row) {
     const status = row.done
         ? '<span class="flex items-center gap-1 text-success text-sm"><i data-lucide="circle-check" class="icon-sm"></i>Done</span>'
-        : row.href
-            ? `<a class="btn btn-sm" href="${escapeHtml(row.href)}">${escapeHtml(row.action)}</a>`
-            : `<button class="btn btn-sm" data-open-sims>${escapeHtml(row.action)}</button>`;
+        : `<a class="btn btn-sm" href="${escapeHtml(row.href)}">${escapeHtml(row.action)}</a>`;
     return `
         <li class="list-row items-center">
             <i data-lucide="${row.done ? 'circle-check' : 'circle-dashed'}" class="icon-sm ${row.done ? 'text-success' : 'opacity-50'}"></i>
@@ -250,7 +217,6 @@ async function loadSetup() {
         return;
     }
     renderStrip();
-    if (!sims) renderSimChip();
     if (setup.complete) return;
     try {
         const meta = await api('/api/config/metadata');
@@ -272,21 +238,11 @@ onPiTracStatus((s) => {
     renderStrip();
 });
 
-document.addEventListener('pitrac:sims', (e) => {
-    sims = e.detail;
-    renderSimChip();
-    if (setup) renderSetup();
-});
-
 renderStoredShot(JSON.parse(byId('initial-shot').textContent));
 renderStrip();
 
 byId('strip-start-btn').addEventListener('click', () => controlPiTrac('start'));
 byId('btn-reset').addEventListener('click', resetShot);
-byId('sim-chip').addEventListener('click', openSimsDrawer);
-byId('setup-rows').addEventListener('click', (e) => {
-    if (e.target.closest('[data-open-sims]')) openSimsDrawer();
-});
 
 openSocket('/ws', onMessage, { onOpen: () => { freshSocket = true; } });
 loadSetup();

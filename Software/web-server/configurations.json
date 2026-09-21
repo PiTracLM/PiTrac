@@ -650,167 +650,6 @@
       "default": 0.0,
       "requiresRestart": false
     },
-    "simulators.ogs.enabled": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "OpenGolfSim Enabled",
-      "description": "Show OpenGolfSim in the simulators drawer and allow connecting",
-      "type": "boolean",
-      "setup": true,
-      "default": false,
-      "requiresRestart": false
-    },
-    "simulators.ogs.auto_connect": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "OpenGolfSim Auto-Connect",
-      "description": "Open the OpenGolfSim connection automatically when the server starts",
-      "type": "boolean",
-      "setup": true,
-      "default": false,
-      "requiresRestart": false
-    },
-    "simulators.ogs.host": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "OpenGolfSim Host",
-      "description": "IP address of the device running OpenGolfSim (e.g. the iPad)",
-      "type": "ip_address",
-      "setup": true,
-      "default": "",
-      "requiresRestart": false
-    },
-    "simulators.ogs.port": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "OpenGolfSim Port",
-      "description": "OpenGolfSim Developer API port",
-      "type": "number",
-      "setup": true,
-      "min": 1,
-      "max": 65535,
-      "default": 3111,
-      "requiresRestart": false
-    },
-    "simulators.ogs.keepalive_sec": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "OpenGolfSim Keepalive (sec)",
-      "description": "How often to re-send the device-ready heartbeat so OpenGolfSim keeps the monitor connected",
-      "type": "number",
-      "min": 1,
-      "max": 60,
-      "default": 5,
-      "requiresRestart": false
-    },
-    "simulators.gspro.enabled": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "GSPro Enabled",
-      "description": "Show GSPro in the simulators drawer and allow connecting",
-      "type": "boolean",
-      "setup": true,
-      "default": false,
-      "requiresRestart": false
-    },
-    "simulators.gspro.auto_connect": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "GSPro Auto-Connect",
-      "description": "Open the GSPro connection automatically when the server starts",
-      "type": "boolean",
-      "setup": true,
-      "default": false,
-      "requiresRestart": false
-    },
-    "simulators.gspro.host": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "GSPro Host",
-      "description": "IP address of the computer running GSPro Connect (e.g., 192.168.1.100)",
-      "type": "ip_address",
-      "setup": true,
-      "default": "",
-      "requiresRestart": false
-    },
-    "simulators.gspro.port": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "GSPro Port",
-      "description": "GSPro Connect port",
-      "type": "integer",
-      "setup": true,
-      "min": 1,
-      "max": 65535,
-      "default": 921,
-      "requiresRestart": false
-    },
-    "simulators.e6.enabled": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "E6 Connect Enabled",
-      "description": "Show E6 Connect (TruGolf) in the simulators drawer and allow connecting",
-      "type": "boolean",
-      "setup": true,
-      "default": false,
-      "requiresRestart": false
-    },
-    "simulators.e6.auto_connect": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "E6 Connect Auto-Connect",
-      "description": "Open the E6 Connect connection automatically when the server starts",
-      "type": "boolean",
-      "setup": true,
-      "default": false,
-      "requiresRestart": false
-    },
-    "simulators.e6.host": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "E6 Connect Host",
-      "description": "IP address of the computer running E6 Connect (e.g., 192.168.1.100)",
-      "type": "ip_address",
-      "setup": true,
-      "default": "",
-      "requiresRestart": false
-    },
-    "simulators.e6.port": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "E6 Connect Port",
-      "description": "E6 Connect TruSimAPI port",
-      "type": "integer",
-      "setup": true,
-      "min": 1,
-      "max": 65535,
-      "default": 2483,
-      "requiresRestart": false
-    },
-    "simulators.e6.inter_message_delay_ms": {
-      "category": "Simulators",
-      "subcategory": "advanced",
-      "displayName": "E6 Connect Inter-Message Delay (ms)",
-      "description": "Delay between the ball data, club data and send-shot messages of each shot",
-      "type": "integer",
-      "min": 0,
-      "max": 500,
-      "default": 50,
-      "requiresRestart": false
-    },
     "gs_config.ball_identification.kUseCLAHEProcessing": {
       "category": "Ball Detection",
       "subcategory": "basic",
@@ -3766,7 +3605,6 @@
   "categoryList": [
     "System",
     "Cameras",
-    "Simulators",
     "Ball Detection",
     "AI Detection",
     "Storage",
@@ -3800,11 +3638,6 @@
       "displayName": "Cameras",
       "description": "Camera hardware and settings",
       "icon": "camera"
-    },
-    "Simulators": {
-      "displayName": "Simulator Interfaces",
-      "description": "Golf simulator connections",
-      "icon": "game"
     },
     "Strobing": {
       "displayName": "LED Strobing",
@@ -3854,10 +3687,6 @@
     "Cameras": {
       "displayName": "Cameras",
       "order": 3
-    },
-    "Simulators": {
-      "displayName": "Simulators",
-      "order": 4
     },
     "Ball Detection": {
       "displayName": "Ball Detection",

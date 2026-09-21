@@ -7,7 +7,7 @@ from typing import Callable, Dict, Optional
 from models import ShotData
 from sim_interface import STATUS_CONNECTED, STATUS_CONNECTING, STATUS_ERROR
 from sims import e6_auth
-from sims.tcp_sim import TcpSim, clamp, round1
+from sims.tcp_sim import HOST_FIELD, TcpSim, clamp, port_field, round1
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,14 @@ def build_ball_data(shot: ShotData) -> Dict[str, object]:
 
 
 class E6Sim(TcpSim):
-    name = "e6"
+    type = "e6"
     display_name = "E6 Connect"
+    FIELDS = [
+        HOST_FIELD,
+        port_field(2483),
+        {"key": "inter_message_delay_ms", "label": "Delay between shot messages (ms)", "type": "integer",
+         "default": 50, "min": 0, "max": 500, "advanced": True},
+    ]
     READS = True
     CONNECTED_ON_OPEN = False
     AUTH_TIMEOUT_SEC = 10

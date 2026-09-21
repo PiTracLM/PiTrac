@@ -1,4 +1,5 @@
 import json
+import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -153,3 +154,53 @@ class KeyValueRepository:
             rows.append((key, encoded, prev_updated if prev_value == encoded else now))
         conn.execute(f"DELETE FROM {self.table}")
         conn.executemany(f"INSERT INTO {self.table} (key, value, updated_at) VALUES (?, ?, ?)", rows)
+
+
+class SimulatorRepository:
+    def __init__(self, db: Database):
+        self.db = db
+
+    @staticmethod
+    def _row(row) -> Dict[str, Any]:
+        return {
+            "id": row["id"],
+            "type": row["type"],
+            "name": row["name"],
+            "on": bool(row["enabled"]),
+            "settings": json.loads(row["settings"]),
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+
+    def list(self) -> List[Dict[str, Any]]:
+        return [self._row(r) for r in self.db.query("SELECT * FROM simulators ORDER BY rowid")]
+
+    def get(self, sim_id: str) -> Optional[Dict[str, Any]]:
+        rows = self.db.query("SELECT * FROM simulators WHERE id = ?", (sim_id,))
+        return self._row(rows[0]) if rows else None
+
+    def add(self, sim_type: str, name: str, on: bool, settings: Dict[str, Any]) -> Dict[str, Any]:
+        with self.db.transaction() as conn:
+            sim_id = self.add_in(conn, sim_type, name, on, settings)
+        return self.get(sim_id)
+
+    def add_in(self, conn, sim_type: str, name: str, on: bool, settings: Dict[str, Any]) -> str:
+        sim_id = uuid.uuid4().hex
+        now = datetime.now().isoformat()
+        conn.execute(
+            """INSERT INTO simulators (id, type, name, enabled, settings, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (sim_id, sim_type, name, int(on), json.dumps(settings), now, now),
+        )
+        return sim_id
+
+    def update(self, sim_id: str, name: str, on: bool, settings: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        self.db.execute(
+            "UPDATE simulators SET name = ?, enabled = ?, settings = ?, updated_at = ? WHERE id = ?",
+            (name, int(on), json.dumps(settings), datetime.now().isoformat(), sim_id),
+        )
+        return self.get(sim_id)
+
+    def delete(self, sim_id: str) -> bool:
+        with self.db.transaction() as conn:
+            return conn.execute("DELETE FROM simulators WHERE id = ?", (sim_id,)).rowcount > 0

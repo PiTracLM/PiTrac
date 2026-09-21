@@ -246,12 +246,6 @@ class TestConfigRealManager:
         assert client.put("/api/config/cameras.slot1.type", json={"value": 5}).status_code == 200
         assert "cameras.slot1.type" not in client.get("/api/config/diff").json()["data"]
 
-    def test_sim_host_rules(self, client):
-        assert client.put("/api/config/simulators.gspro.host", json={"value": "gaming-pc.local"}).status_code == 200
-        bad = client.put("/api/config/simulators.gspro.host", json={"value": "1.2.3.4:921"})
-        assert bad.status_code == 400
-        assert bad.json()["error"] == "Enter an IP address or hostname without a port"
-
     def test_calibrated_and_reset_all(self, client):
         assert client.get("/api/config/calibrated").json() == []
         assert client.post("/api/config/reset").json()["calibration_kept"] is True

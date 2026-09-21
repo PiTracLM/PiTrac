@@ -6,7 +6,7 @@ import math
 from typing import Dict, Optional
 
 from models import ShotData
-from sims.tcp_sim import TcpSim, clamp
+from sims.tcp_sim import HOST_FIELD, TcpSim, clamp, port_field
 
 _READY = {"type": "device", "status": "ready"}
 
@@ -30,8 +30,14 @@ def build_shot_payload(shot: ShotData) -> Dict[str, object]:
 
 
 class OGSSim(TcpSim):
-    name = "ogs"
+    type = "ogs"
     display_name = "OpenGolfSim"
+    FIELDS = [
+        HOST_FIELD,
+        port_field(3111),
+        {"key": "keepalive_sec", "label": "Keepalive (seconds)", "type": "integer",
+         "default": 5, "min": 1, "max": 60, "advanced": True},
+    ]
 
     def __init__(self, host: str, port: int = 3111, keepalive_sec: int = 5) -> None:
         super().__init__(host, port)

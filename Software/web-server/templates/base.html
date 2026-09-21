@@ -27,7 +27,7 @@
 <body class="bg-base-100 text-base-content min-h-screen p-2 sm:p-4">
     <div class="max-w-[1400px] mx-auto animate-fade-in">
 
-        <div class="navbar bg-base-200 rounded-box shadow-md border border-base-300 mb-4 px-3 min-h-0 py-2 gap-2">
+        <div class="navbar relative bg-base-200 rounded-box shadow-md border border-base-300 mb-4 px-3 min-h-0 py-2 gap-2">
             <a href="/" title="Dashboard" class="shrink-0">
                 <img src="/static/logos/PiTrac.svg" alt="PiTrac Logo" class="h-8 sm:h-10 header-logo">
             </a>
@@ -43,11 +43,21 @@
             {{ pitrac_btn("start", "play", "Start", "btn-success") }}
             {{ pitrac_btn("stop", "square", "Stop", "btn-error hidden") }}
 
-            <button id="sims-nav-btn" class="btn btn-ghost btn-sm gap-1.5 px-2" title="Simulators"
-                    aria-expanded="false" aria-controls="sims-drawer">
-                <span id="sims-status-dot" class="w-2 h-2 rounded-full bg-base-content/30"></span>
-                Sims
-            </button>
+            <details class="dropdown dropdown-end max-sm:static" id="sims-menu">
+                <summary id="sims-nav-btn" class="btn btn-sm gap-1.5 px-2 bg-base-100 border-base-300 font-normal"
+                         aria-label="Simulator" aria-expanded="false" aria-controls="sims-panel">
+                    <span id="sims-status-dot" class="w-2 h-2 rounded-full hidden"></span>
+                    <i data-lucide="radio" class="icon-sm sm:hidden"></i>
+                    <span id="sims-nav-label" class="hidden sm:inline">Simulator</span>
+                    <i data-lucide="chevron-down" class="icon-sm hidden sm:inline-block opacity-60"></i>
+                </summary>
+                <div id="sims-panel" class="dropdown-content bg-base-200 rounded-box z-50 w-[22rem] max-w-[calc(100vw-2rem)] p-2 shadow-xl border border-base-300 mt-2">
+                    <div id="sims-list"><p class="text-sm opacity-60 p-2">Loading simulators</p></div>
+                    <button type="button" id="sims-add-btn" class="btn btn-sm btn-primary w-full mt-2 gap-1.5">
+                        <i data-lucide="plus" class="icon-sm"></i> Add simulator
+                    </button>
+                </div>
+            </details>
 
             <details class="dropdown dropdown-end" id="nav-dropdown">
                 <summary class="btn btn-ghost btn-square btn-sm" aria-label="Menu">
@@ -81,14 +91,6 @@
             </details>
         </div>
 
-        <div id="sims-drawer" class="hidden bg-base-200 rounded-box border border-base-300 shadow-md mb-4 p-4">
-            <h3 class="font-semibold mb-3 flex items-center gap-2">
-                <i data-lucide="radio" class="icon-sm"></i>
-                Simulators
-            </h3>
-            <div id="sims-list"><p class="text-sm opacity-60">Loading simulators...</p></div>
-        </div>
-
         {% block content %}{% endblock %}
     </div>
 
@@ -104,6 +106,29 @@
             </form>
         </div>
         <form method="dialog" class="modal-backdrop"><button value="cancel">close</button></form>
+    </dialog>
+
+    <dialog id="sim-editor" class="modal" aria-labelledby="sim-editor-title">
+        <div class="modal-box max-w-lg">
+            <h3 id="sim-editor-title" class="text-lg font-bold">Add simulator</h3>
+            <div id="sim-editor-types" class="py-4">
+                <p class="text-sm opacity-70 mb-3">Pick the simulator PiTrac should send shots to.</p>
+                <div id="sim-editor-type-list" class="grid grid-cols-1 sm:grid-cols-3 gap-2"></div>
+                <form method="dialog" class="modal-action">
+                    <button class="btn btn-ghost">Cancel</button>
+                </form>
+            </div>
+            <form id="sim-editor-form" class="hidden" novalidate>
+                <div id="sim-editor-fields" class="py-2"></div>
+                <div id="sim-editor-result" class="text-sm min-h-5 break-words" role="status" aria-live="polite"></div>
+                <div class="modal-action flex-wrap">
+                    <button type="button" id="sim-editor-test" class="btn">Test connection</button>
+                    <button type="button" id="sim-editor-cancel" class="btn btn-ghost">Cancel</button>
+                    <button type="submit" id="sim-editor-save" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
 
     <dialog id="strobe-safety-modal" class="modal">

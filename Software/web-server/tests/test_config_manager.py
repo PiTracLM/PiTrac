@@ -7,9 +7,10 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from config_manager import ConfigurationManager as ConfigManager
+from config_manager import ConfigurationManager as ConfigManager, _is_valid_host
 from db.database import Database
-from db.repositories import KeyValueRepository
+from db.repositories import KeyValueRepository, SimulatorRepository
+from sim_manager import import_legacy_settings
 
 
 @pytest.fixture
@@ -79,17 +80,6 @@ class TestConfigManager:
         assert "maximum" in error.lower() or "at most" in error.lower()
 
         is_valid, _ = config_manager.validate_config("gs_config.cameras.kCamera1Gain", "8.0")
-        assert is_valid
-
-    def test_config_validation_port(self, config_manager):
-        """Test configuration validation for network ports"""
-        is_valid, _ = config_manager.validate_config("simulators.gspro.port", "0")
-        assert not is_valid
-
-        is_valid, _ = config_manager.validate_config("simulators.gspro.port", "70000")
-        assert not is_valid
-
-        is_valid, _ = config_manager.validate_config("simulators.gspro.port", "8080")
         assert is_valid
 
     def test_reset_all(self, setup_config_files):
@@ -201,7 +191,6 @@ class TestConfigManager:
         expected_settings = {
             "simulators.gspro.host": "10.0.0.5",
             "simulators.gspro.enabled": True,
-            "simulators.gspro.auto_connect": True,
             "cameras.slot1.type": "4",
         }
         expected_calibration = {
@@ -365,89 +354,76 @@ OLD_SIM = "gs_config.golf_simulator_interfaces"
 
 
 class TestRenamedSimKeys:
-    def _start(self, db, rows):
-        KeyValueRepository(db, "settings").replace_all(rows)
-        ConfigManager(db)
-        return KeyValueRepository(db, "settings").load()
+    """The oldest sim keys move to simulators.<type>.*, which the server then turns into instances"""
 
-    def test_gspro_rows_move_and_turn_the_sim_on(self, db):
-        rows = self._start(db, {
+    def _start(self, db, rows):
+        settings = KeyValueRepository(db, "settings")
+        settings.replace_all(rows)
+        ConfigManager(db)
+        sims = SimulatorRepository(db)
+        import_legacy_settings(settings, sims)
+        return settings.load(), {s["type"]: (s["on"], s["settings"]) for s in sims.list()}
+
+    def test_gspro_rows_become_an_instance_that_is_on(self, db):
+        rows, sims = self._start(db, {
             f"{OLD_SIM}.GSPro.kGSProConnectAddress": "10.0.0.5",
             f"{OLD_SIM}.GSPro.kGSProConnectPort": 9210,
             f"{OLD_SIM}.kLaunchMonitorIdString": "My LM",
             "cameras.slot1.type": "4",
         })
 
-        assert rows == {
-            "simulators.gspro.host": "10.0.0.5",
-            "simulators.gspro.port": 9210,
-            "simulators.gspro.enabled": True,
-            "simulators.gspro.auto_connect": True,
-            "cameras.slot1.type": "4",
-        }
+        assert rows == {"cameras.slot1.type": "4"}
+        assert sims == {"gspro": (True, {"host": "10.0.0.5", "port": 9210})}
 
-    def test_e6_rows_move_and_turn_the_sim_on(self, db):
-        rows = self._start(db, {
+    def test_e6_rows_become_an_instance_that_is_on(self, db):
+        rows, sims = self._start(db, {
             f"{OLD_SIM}.E6.kE6ConnectAddress": "10.0.0.6",
             f"{OLD_SIM}.E6.kE6ConnectPort": "2484",
             f"{OLD_SIM}.E6.kE6InterMessageDelayMs": 75,
         })
 
-        assert rows == {
-            "simulators.e6.host": "10.0.0.6",
-            "simulators.e6.port": 2484,
-            "simulators.e6.inter_message_delay_ms": 75,
-            "simulators.e6.enabled": True,
-            "simulators.e6.auto_connect": True,
-        }
-
-    def test_empty_address_moves_nothing_and_enables_nothing(self, db):
-        rows = self._start(db, {f"{OLD_SIM}.GSPro.kGSProConnectAddress": "", "cameras.slot1.type": "4"})
-
-        assert rows == {"cameras.slot1.type": "4"}
-
-    def test_values_equal_to_the_default_leave_no_row(self, db):
-        rows = self._start(db, {
-            f"{OLD_SIM}.GSPro.kGSProConnectPort": "921",
-            f"{OLD_SIM}.E6.kE6ConnectPort": 2483,
-            f"{OLD_SIM}.E6.kE6InterMessageDelayMs": 50,
-        })
-
         assert rows == {}
+        assert sims == {"e6": (True, {"host": "10.0.0.6", "port": 2484, "inter_message_delay_ms": 75})}
 
-    def test_integer_value_that_cannot_be_coerced_is_dropped(self, db):
-        rows = self._start(db, {
-            f"{OLD_SIM}.GSPro.kGSProConnectPort": "abc",
+    def test_no_address_makes_no_instance(self, db):
+        for address in ("", None):
+            rows, sims = self._start(db, {
+                f"{OLD_SIM}.GSPro.kGSProConnectAddress": address,
+                f"{OLD_SIM}.GSPro.kGSProConnectPort": "921",
+                f"{OLD_SIM}.E6.kE6InterMessageDelayMs": 50,
+                "cameras.slot1.type": "4",
+            })
+
+            assert rows == {"cameras.slot1.type": "4"}
+            assert sims == {}
+
+    def test_values_that_do_not_validate_take_the_default(self, db):
+        rows, sims = self._start(db, {
+            f"{OLD_SIM}.E6.kE6ConnectAddress": "10.0.0.6",
             f"{OLD_SIM}.E6.kE6ConnectPort": "inf",
             f"{OLD_SIM}.E6.kE6InterMessageDelayMs": None,
         })
 
-        assert rows == {}
-
-    def test_non_string_address_does_not_enable_the_sim(self, db):
-        rows = self._start(db, {f"{OLD_SIM}.GSPro.kGSProConnectAddress": None})
-
-        assert "simulators.gspro.enabled" not in rows
-        assert "simulators.gspro.auto_connect" not in rows
+        assert sims == {"e6": (True, {"host": "10.0.0.6", "port": 2483, "inter_message_delay_ms": 50})}
 
     def test_never_overwrites_a_new_key_already_set(self, db):
-        rows = self._start(db, {
+        rows, sims = self._start(db, {
             f"{OLD_SIM}.GSPro.kGSProConnectAddress": "10.0.0.5",
             "simulators.gspro.host": "10.0.0.9",
         })
 
-        assert rows == {"simulators.gspro.host": "10.0.0.9"}
+        assert sims == {"gspro": (False, {"host": "10.0.0.9", "port": 921})}
 
     def test_second_start_changes_nothing(self, db):
         self._start(db, {f"{OLD_SIM}.GSPro.kGSProConnectAddress": "10.0.0.5"})
-        ConfigManager(db).set_config("simulators.gspro.enabled", False)
         settings = KeyValueRepository(db, "settings")
-        before = settings.load()
+        before = SimulatorRepository(db).list()
 
         ConfigManager(db)
+        assert import_legacy_settings(settings, SimulatorRepository(db)) is False
 
-        assert settings.load() == before
-        assert "simulators.gspro.enabled" not in before
+        assert settings.load() == {}
+        assert SimulatorRepository(db).list() == before
 
 
 class TestArrayHandling:
@@ -876,12 +852,14 @@ class TestBuildGeneratedConfig:
 class TestConfigTypes:
     @pytest.mark.parametrize("key,value,expected", [
         ("cameras.slot1.type", 5, "5"),
-        ("simulators.gspro.enabled", "false", False),
-        ("simulators.gspro.enabled", "true", True),
-        ("simulators.gspro.enabled", 1, True),
+        ("gs_config.modes.kStartInPuttingMode", "false", False),
+        ("gs_config.modes.kStartInPuttingMode", "true", True),
+        ("gs_config.modes.kStartInPuttingMode", 1, True),
+        ("gs_config.modes.kStartInPuttingMode", "1", True),
+        ("gs_config.modes.kStartInPuttingMode", "0", False),
         ("gs_config.cameras.kHLAOffset", "1.5", 1.5),
         ("gs_config.cameras.kHLAOffset", 2, 2.0),
-        ("simulators.gspro.port", "921", 921),
+        ("gs_config.cameras.kCamera1SearchCenterX", "921", 921),
         ("gs_config.cameras.kCamera1Gain", "2.5", 2.5),
     ])
     def test_coerce_value(self, config_manager, key, value, expected):
@@ -890,9 +868,9 @@ class TestConfigTypes:
         assert type(result) is type(expected)
 
     @pytest.mark.parametrize("key,value", [
-        ("simulators.gspro.enabled", "maybe"),
+        ("gs_config.modes.kStartInPuttingMode", "maybe"),
         ("gs_config.cameras.kHLAOffset", "abc"),
-        ("simulators.gspro.port", None),
+        ("gs_config.cameras.kCamera1SearchCenterX", None),
     ])
     def test_coerce_value_rejects_garbage(self, config_manager, key, value):
         with pytest.raises(ValueError):
@@ -904,8 +882,8 @@ class TestConfigTypes:
         assert config_manager.get_config("gs_config.cameras.kHLAOffset") == 0.0
 
     def test_set_config_stores_typed_value(self, config_manager):
-        config_manager.set_config("simulators.gspro.enabled", "true")
-        assert config_manager.get_user_settings()["simulators"]["gspro"]["enabled"] is True
+        config_manager.set_config("gs_config.modes.kStartInPuttingMode", "true")
+        assert config_manager.get_user_settings()["gs_config"]["modes"]["kStartInPuttingMode"] is True
 
     def test_select_default_round_trip_is_not_custom(self, config_manager):
         config_manager.set_config("cameras.slot1.type", 5)
@@ -920,12 +898,11 @@ class TestConfigTypes:
         ("999.1.1.1", False),
         ("<b>x</b>", False),
         ("-bad.example", False),
+        ("a\n.example", False),
+        ("gaming-pc\n", False),
     ])
-    def test_sim_host_validation(self, config_manager, host, ok):
-        valid, message = config_manager.validate_config("simulators.gspro.host", host)
-        assert valid is ok
-        if not ok:
-            assert message == "Enter an IP address or hostname without a port"
+    def test_host_rule(self, host, ok):
+        assert _is_valid_host(host) is ok
 
     def test_internal_keys_not_in_categories(self, config_manager):
         cats = config_manager.get_categories()
@@ -937,7 +914,8 @@ class TestConfigTypes:
     def test_setup_flag_in_metadata(self, config_manager):
         settings = config_manager.load_configurations_metadata()["settings"]
         setup = {k for k, v in settings.items() if v.get("setup")}
-        assert {"system.mode", "cameras.slot1.type", "cameras.slot1.lens", "simulators.gspro.host"} <= setup
+        assert {"system.mode", "cameras.slot1.type", "cameras.slot1.lens"} <= setup
+        assert not any(key.startswith("simulators.") for key in settings)
         assert "gs_config.cameras.kHLAOffset" not in setup
 
     def test_calibrated_keys(self, config_manager):
@@ -955,9 +933,36 @@ class TestConfigTypes:
 
     def test_import_coerces_values(self, config_manager):
         ok, _ = config_manager.import_config(
-            {"user_settings": {"simulators": {"gspro": {"enabled": "true"}}, "cameras": {"slot1": {"type": 4}}}}
+            {"user_settings": {"gs_config": {"modes": {"kStartInPuttingMode": "1"}}, "cameras": {"slot1": {"type": 4}}}}
         )
         assert ok
         user = config_manager.get_user_settings()
-        assert user["simulators"]["gspro"]["enabled"] is True
+        assert user["gs_config"]["modes"]["kStartInPuttingMode"] is True
         assert user["cameras"]["slot1"]["type"] == "4"
+
+
+class TestModelLists:
+    @pytest.fixture
+    def models_dir(self, config_manager, tmp_path):
+        root = tmp_path / "models"
+        for name in ("spin-predictor", "yolo26-ball-detector"):
+            (root / name).mkdir(parents=True)
+            (root / name / "best.ncnn.param").touch()
+        config_manager._raw_metadata["systemPaths"]["modelSearchPaths"]["default"] = [str(root)]
+        config_manager._metadata_cache = None
+        return root
+
+    def test_spin_in_the_name_makes_a_spin_model(self, config_manager, models_dir):
+        spin = str((models_dir / "spin-predictor").resolve())
+        ball = str((models_dir / "yolo26-ball-detector").resolve())
+        assert config_manager.get_available_models("spin") == {"spin-predictor": spin}
+        assert config_manager.get_available_models("ball") == {"yolo26-ball-detector": ball}
+
+        settings = config_manager.load_configurations_metadata()["settings"]
+        assert settings["gs_config.spin_analysis.kSpinModelPath"]["options"] == {"spin-predictor": spin}
+        assert settings["gs_config.ball_identification.kModelPath"]["options"] == {"yolo26-ball-detector": ball}
+
+    def test_a_ball_model_is_not_a_valid_spin_model(self, config_manager, models_dir):
+        ball = str((models_dir / "yolo26-ball-detector").resolve())
+        assert config_manager.validate_config("gs_config.ball_identification.kModelPath", ball)[0]
+        assert not config_manager.validate_config("gs_config.spin_analysis.kSpinModelPath", ball)[0]
