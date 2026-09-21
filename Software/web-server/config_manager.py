@@ -953,6 +953,10 @@ class ConfigurationManager:
         """Coerce and validate every known key of an imported tree; raises ValueError naming the key."""
         flat = {}
         for key, value in _flatten(nested).items():
+            # Simulators live in their own table; an old export's keys would migrate into a duplicate instance
+            if key.startswith("simulators."):
+                logger.info(f"Not importing {key}, simulators are added from the navbar now")
+                continue
             is_valid, error = self.validate_config(key, value)
             if not is_valid:
                 raise ValueError(f"{key}: {error}")

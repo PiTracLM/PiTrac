@@ -11,6 +11,7 @@
     let sims = [];
     let typesPromise = null;
     let editing = null;
+    let renderedHtml = null;
 
     const byId = (id) => document.getElementById(id);
 
@@ -40,7 +41,7 @@
             const connecting = s.status === 'connecting';
             const verb = s.status === 'connected' ? 'disconnect' : 'connect';
             const label = connecting ? 'Connecting' : s.status === 'connected' ? 'Disconnect' : 'Connect';
-            action = `<button type="button" class="btn btn-xs" data-id="${id}" data-action="${verb}" ${connecting ? 'disabled' : ''}>${label}</button>`;
+            action = `<button type="button" class="btn btn-xs" data-id="${id}" data-action="${verb}" data-key="${id}:connect" ${connecting ? 'disabled' : ''}>${label}</button>`;
         }
         const detail = s.on && s.status === 'error' && s.detail
             ? `<div class="text-xs text-error break-words mt-1">${escapeHtml(s.detail)}</div>` : '';
@@ -55,15 +56,15 @@
                         </div>
                         ${detail}
                     </div>
-                    <input type="checkbox" class="toggle toggle-sm mt-0.5" data-id="${id}" data-action="toggle"
+                    <input type="checkbox" class="toggle toggle-sm mt-0.5" data-id="${id}" data-action="toggle" data-key="${id}:toggle"
                            aria-label="${escapeHtml(s.name)} on" ${s.on ? 'checked' : ''}>
-                    <details class="dropdown dropdown-end">
-                        <summary class="btn btn-ghost btn-xs btn-square" aria-label="More for ${escapeHtml(s.name)}">
+                    <details class="dropdown dropdown-end" data-menu="${id}">
+                        <summary class="btn btn-ghost btn-xs btn-square" data-key="${id}:menu" aria-label="More for ${escapeHtml(s.name)}">
                             <i data-lucide="ellipsis-vertical" class="icon-sm"></i>
                         </summary>
                         <ul class="menu dropdown-content bg-base-200 rounded-box z-50 w-32 p-1 shadow-xl border border-base-300">
-                            <li><button type="button" data-id="${id}" data-action="edit"><i data-lucide="pencil" class="icon-sm"></i>Edit</button></li>
-                            <li><button type="button" class="text-error" data-id="${id}" data-action="delete"><i data-lucide="trash-2" class="icon-sm"></i>Delete</button></li>
+                            <li><button type="button" data-id="${id}" data-action="edit" data-key="${id}:edit"><i data-lucide="pencil" class="icon-sm"></i>Edit</button></li>
+                            <li><button type="button" class="text-error" data-id="${id}" data-action="delete" data-key="${id}:delete"><i data-lucide="trash-2" class="icon-sm"></i>Delete</button></li>
                         </ul>
                     </details>
                 </div>
@@ -71,6 +72,13 @@
             </li>`;
     }
 
+    function closeRowMenus(except) {
+        byId('sims-list')?.querySelectorAll('details[data-menu][open]').forEach((d) => {
+            if (d !== except) d.open = false;
+        });
+    }
+
+    // Status messages arrive every few seconds while a sim retries, so keep the open row menu and focus across renders
     function render(list) {
         sims = list;
         const { label, dot } = summary();
@@ -82,10 +90,18 @@
         }
         const el = byId('sims-list');
         if (!el) return;
-        el.innerHTML = sims.length
+        const html = sims.length
             ? `<ul>${sims.map(rowHtml).join('')}</ul>`
             : '<p class="text-sm opacity-70 p-2">No simulators yet. Simulators are optional.</p>';
+        if (html === renderedHtml) return;
+        renderedHtml = html;
+        const openMenu = el.querySelector('details[data-menu][open]')?.dataset.menu;
+        const focused = el.contains(document.activeElement) ? document.activeElement.dataset.key : null;
+        el.innerHTML = html;
         if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [el] });
+        const menu = [...el.querySelectorAll('details[data-menu]')].find((d) => d.dataset.menu === openMenu);
+        if (menu) menu.open = true;
+        if (focused) [...el.querySelectorAll('[data-key]')].find((n) => n.dataset.key === focused)?.focus();
     }
 
     async function refresh() {
@@ -147,8 +163,9 @@
             render(await api(`/api/sims/${encodeURIComponent(sim.id)}/${action}`, { method: 'POST' }));
         } catch (err) {
             toast(err.message, 'error');
-            el.disabled = false;
         }
+        // An unchanged status skips the render and leaves this button in place
+        el.disabled = false;
     }
 
     // -- Editor dialog --
@@ -335,12 +352,24 @@
         const menu = byId('sims-menu');
         if (!menu) return;
         const btn = byId('sims-nav-btn');
-        menu.addEventListener('toggle', () => btn.setAttribute('aria-expanded', String(menu.open)));
+        menu.addEventListener('toggle', () => {
+            btn.setAttribute('aria-expanded', String(menu.open));
+            if (!menu.open) closeRowMenus();
+        });
+        byId('sims-list').addEventListener('toggle', (e) => {
+            if (e.target.open) closeRowMenus(e.target);
+        }, true);
         document.addEventListener('click', (e) => {
             if (menu.open && !menu.contains(e.target)) menu.open = false;
+            closeRowMenus(e.target.closest('details[data-menu]'));
         });
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && menu.open) {
+            if (e.key !== 'Escape') return;
+            const row = byId('sims-list').querySelector('details[data-menu][open]');
+            if (row) {
+                row.open = false;
+                row.querySelector('summary').focus();
+            } else if (menu.open) {
                 menu.open = false;
                 btn.focus();
             }

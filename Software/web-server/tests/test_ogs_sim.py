@@ -122,6 +122,7 @@ async def test_connect_timeout_is_a_connect_failure(monkeypatch):
     await asyncio.wait_for(sim.connect(), 1)
 
     assert sim.status == "error"
+    assert sim.info()["detail"] == "no answer within 0.05 seconds"
     assert sim._writer is None
     assert sim._reconnect_task is not None
     await sim.disconnect()

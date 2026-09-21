@@ -223,6 +223,36 @@ async def test_on_shot_fans_out_and_isolates_failures(mgr):
 
 
 @pytest.mark.asyncio
+async def test_shot_reaches_the_rest_when_a_reload_drops_a_sim_mid_send(mgr):
+    class _Dropped(_StubSim):
+        async def send_shot(self, shot):
+            mgr._sims.pop("dropped")
+            await asyncio.sleep(0)
+            self.shots.append(shot)
+
+    first, dropped, last = _StubSim(), _Dropped(), _StubSim()
+    for sim in (first, dropped, last):
+        sim.connected = True
+    mgr._sims = {"first": first, "dropped": dropped, "last": last}
+    shot = ShotData(speed=100)
+    await mgr.on_shot(shot)
+    assert (first.shots, last.shots) == ([shot], [shot])
+
+    class _DroppedOnBall(_StubSim):
+        async def on_ball_state(self, ball_detected):
+            mgr._sims.pop("dropped")
+            await asyncio.sleep(0)
+
+    first, last = _StubSim(), _StubSim()
+    dropped = _DroppedOnBall()
+    for sim in (first, dropped, last):
+        sim.connected = True
+    mgr._sims = {"first": first, "dropped": dropped, "last": last}
+    await mgr.on_status("Ball Placed")
+    assert (first.ball_states, last.ball_states) == ([True], [True])
+
+
+@pytest.mark.asyncio
 async def test_ball_state_changes_reach_sims_once(mgr):
     sim = _StubSim()
     sim.connected = True
@@ -494,3 +524,20 @@ def test_old_values_that_do_not_validate_fall_back_to_defaults(db, repo):
     (sim,) = repo.list()
     assert sim["settings"] == {"host": "", "port": 921}
     assert settings.load() == {}
+
+
+def test_old_keys_matching_an_existing_instance_make_no_duplicate(db, repo):
+    repo.add("gspro", "Garage", True, {"host": "10.0.0.5", "port": 921})
+    settings = _legacy(db, {"simulators.gspro.host": "10.0.0.5", "simulators.gspro.enabled": True})
+
+    assert import_legacy_settings(settings, repo) is True
+
+    assert [s["name"] for s in repo.list()] == ["Garage"]
+    assert settings.load() == {}
+
+
+def test_old_keys_with_another_host_still_make_an_instance(db, repo):
+    repo.add("gspro", "Garage", True, {"host": "10.0.0.5", "port": 921})
+    settings = _legacy(db, {"simulators.gspro.host": "10.0.0.6", "simulators.gspro.enabled": True})
+    import_legacy_settings(settings, repo)
+    assert [s["name"] for s in repo.list()] == ["Garage", "GSPro"]

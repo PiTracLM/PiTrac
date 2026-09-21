@@ -85,7 +85,11 @@ class TcpSim(SimInterface):
                 if not self._want_connected:
                     return
                 logger.warning(f"{self.display_name} connect failed: {e!r}")
-                await self._set_status(STATUS_ERROR, str(e) or type(e).__name__)
+                if isinstance(e, asyncio.TimeoutError):
+                    detail = f"no answer within {self.CONNECT_TIMEOUT_SEC} seconds"
+                else:
+                    detail = str(e) or type(e).__name__
+                await self._set_status(STATUS_ERROR, detail)
                 self._schedule_reconnect()
                 return
             # A disconnect during any await above already tore down and set the status

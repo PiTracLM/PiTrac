@@ -284,22 +284,32 @@ class TestConfigManager:
         assert KeyValueRepository(db, "settings").load() == {"gs_config.cameras.kCamera1Gain": "2.5"}
 
     def test_reset_all_notifies_changed_keys(self, config_manager):
-        config_manager.set_config("simulators.ogs.host", "10.0.0.9")
+        config_manager.set_config("gs_config.cameras.kHLAOffset", 1.5)
         seen = []
-        config_manager.register_callback("simulators.", lambda k, v: seen.append((k, v)))
+        config_manager.register_callback("gs_config.cameras", lambda k, v: seen.append((k, v)))
 
         config_manager.reset_all()
 
-        assert seen == [("simulators.ogs.host", config_manager.get_default("simulators.ogs.host"))]
+        assert seen == [("gs_config.cameras.kHLAOffset", config_manager.get_default("gs_config.cameras.kHLAOffset"))]
 
     def test_import_config_notifies_changed_keys(self, config_manager):
         seen = []
-        config_manager.register_callback("simulators.", lambda k, v: seen.append((k, v)))
+        config_manager.register_callback("gs_config.cameras", lambda k, v: seen.append((k, v)))
 
-        ok, _ = config_manager.import_config({"user_settings": {"simulators": {"ogs": {"host": "10.0.0.9"}}}})
+        ok, _ = config_manager.import_config({"user_settings": {"gs_config": {"cameras": {"kHLAOffset": 1.5}}}})
 
         assert ok
-        assert seen == [("simulators.ogs.host", "10.0.0.9")]
+        assert seen == [("gs_config.cameras.kHLAOffset", 1.5)]
+
+    def test_import_config_drops_old_simulator_keys(self, config_manager, db):
+        ok, _ = config_manager.import_config({"user_settings": {
+            "simulators": {"gspro": {"host": "10.0.0.5", "enabled": True}},
+            "cameras": {"slot1": {"type": "4"}},
+        }})
+
+        assert ok
+        assert config_manager.get_user_settings() == {"cameras": {"slot1": {"type": "4"}}}
+        assert KeyValueRepository(db, "settings").load() == {"cameras.slot1.type": "4"}
 
     def test_import_config_failure_leaves_settings_untouched(self, config_manager, db):
         config_manager.set_config("gs_config.cameras.kCamera1Gain", "3.5")

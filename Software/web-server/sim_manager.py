@@ -95,6 +95,7 @@ def import_legacy_settings(settings: KeyValueRepository, sims: SimulatorReposito
     old = {key: value for key, value in stored.items() if key.startswith("simulators.")}
     if not old:
         return False
+    existing = {(s["type"], s["settings"].get("host"), s["settings"].get("port")) for s in sims.list()}
     with settings.db.transaction() as conn:
         for cls in SIM_TYPES.values():
             prefix = f"simulators.{cls.type}."
@@ -110,6 +111,9 @@ def import_legacy_settings(settings: KeyValueRepository, sims: SimulatorReposito
             for key, error in errors.items():
                 logger.warning(f"Old {cls.display_name} setting {key}={values.get(key)!r} not kept: {error}")
             fields = {field["key"]: field.get("default") for field in cls.FIELDS} | clean
+            if (cls.type, fields.get("host"), fields.get("port")) in existing:
+                logger.info(f"Old {cls.display_name} settings match a saved simulator, not adding another")
+                continue
             sims.add_in(conn, cls.type, cls.display_name, on, fields)
             logger.info(f"Moved the old {cls.display_name} settings into a simulator named {cls.display_name}")
         settings.replace_all_in(conn, {key: value for key, value in stored.items() if key not in old})
@@ -282,7 +286,8 @@ class SimManager:
             logger.warning(f"sim {sim_id} disconnect failed: {e}")
 
     async def on_shot(self, shot: ShotData) -> None:
-        for sim_id, sim in self._sims.items():
+        # A reload can drop or add a sim while a send is awaited
+        for sim_id, sim in list(self._sims.items()):
             if sim.status != STATUS_CONNECTED:
                 continue
             try:
@@ -295,7 +300,8 @@ class SimManager:
         if ball_detected is None or ball_detected == self._ball_detected:
             return
         self._ball_detected = ball_detected
-        for sim_id, sim in self._sims.items():
+        # A reload can drop or add a sim while a send is awaited
+        for sim_id, sim in list(self._sims.items()):
             if sim.status != STATUS_CONNECTED:
                 continue
             try:
