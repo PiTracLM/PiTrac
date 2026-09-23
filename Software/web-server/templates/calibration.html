@@ -7,17 +7,6 @@
 <link rel="stylesheet" href="/static/css/calibration.css?v={{ asset_version }}">
 {% endblock %}
 
-{% set redo_strobe = "Redo if you change the LED board or power supply." %}
-{% set redo_lens = "Redo if you swap or refocus the lens or replace the camera." %}
-{% set redo_position = "Redo if PiTrac or a camera moves or gets bumped." %}
-{% set checklist = [
-    ("strobe", "strobe", "", "Strobe", redo_strobe),
-    ("lens-camera1", "lens", "camera1", "Lens, camera 1", redo_lens),
-    ("lens-camera2", "lens", "camera2", "Lens, camera 2", redo_lens),
-    ("position-camera1", "position", "camera1", "Position, camera 1", redo_position),
-    ("position-camera2", "position", "camera2", "Position, camera 2", redo_position),
-] %}
-
 {% block content %}
 {{ page_header("crosshair", "Calibration", "Do these in order. Each one only needs redoing when the hardware changes.") }}
 
@@ -29,20 +18,8 @@
                 <span>Could not load the calibration status.</span>
                 <button class="btn btn-sm" onclick="calibration.refresh()">Retry</button>
             </div>
-            <ul class="list" id="checklist">
-                {% for row_id, section, camera, label, redo in checklist %}
-                <li class="list-row items-center" id="check-{{ row_id }}" {% if row_id == "strobe" %}hidden{% endif %}>
-                    <span class="check-num w-5 text-center font-mono opacity-50">{{ loop.index }}</span>
-                    <div class="min-w-0">
-                        <div class="font-medium">{{ label }}</div>
-                        <span class="check-badge badge badge-sm badge-ghost mt-1">Checking</span>
-                        <div class="check-note text-sm mt-1" hidden></div>
-                        <div class="text-xs opacity-60 mt-1">{{ redo }}</div>
-                    </div>
-                    <button class="check-btn btn btn-sm btn-ghost" onclick="calibration.open('{{ section }}', '{{ camera }}')">Calibrate</button>
-                </li>
-                {% endfor %}
-            </ul>
+            <p class="text-sm px-2 pt-2 sm:p-0" id="setup-summary"></p>
+            <ul class="list" id="checklist"></ul>
             <div id="checklist-done" class="alert alert-success m-2" hidden>
                 <i data-lucide="circle-check"></i>
                 <span>PiTrac is calibrated. Start it from the header.</span>
@@ -101,7 +78,7 @@
         <div class="card-body p-4 sm:p-6 gap-4">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0">
-                    <h2 class="card-title">Lens</h2>
+                    <h2 class="card-title">Lens calibration</h2>
                     <p class="text-sm opacity-70">Measures how the lens bends the picture so PiTrac can straighten it. Redo it only after changing or refocusing a lens.</p>
                 </div>
                 <div class="join" role="radiogroup" aria-label="Camera">
@@ -195,18 +172,18 @@
         </div>
     </section>
 
-    {# ---------------- Position ---------------- #}
-    <section id="position" class="cal-section card bg-base-200 border border-base-300 shadow-sm" hidden>
+    {# ---------------- Ball ---------------- #}
+    <section id="ball" class="cal-section card bg-base-200 border border-base-300 shadow-sm" hidden>
         <div class="card-body p-4 sm:p-6 gap-4">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0">
-                    <h2 class="card-title">Position</h2>
+                    <h2 class="card-title">Ball calibration</h2>
                     <p class="text-sm opacity-70">Measures where each camera points so PiTrac can place the ball in 3D. Redo it after moving or bumping a camera.</p>
                 </div>
                 <div class="join" role="radiogroup" aria-label="Camera">
-                    <input class="join-item btn btn-sm" type="radio" name="position-camera" value="camera1" aria-label="Camera 1" checked>
-                    <input class="join-item btn btn-sm" type="radio" name="position-camera" value="camera2" aria-label="Camera 2">
-                    <input class="join-item btn btn-sm" type="radio" name="position-camera" value="both" aria-label="Both">
+                    <input class="join-item btn btn-sm" type="radio" name="ball-camera" value="camera1" aria-label="Camera 1" checked>
+                    <input class="join-item btn btn-sm" type="radio" name="ball-camera" value="camera2" aria-label="Camera 2">
+                    <input class="join-item btn btn-sm" type="radio" name="ball-camera" value="both" aria-label="Both">
                 </div>
             </div>
 
@@ -238,6 +215,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="/static/js/setup.js?v={{ asset_version }}"></script>
 <script src="/static/js/distortion_calibration.js?v={{ asset_version }}"></script>
 <script src="/static/js/calibration.js?v={{ asset_version }}"></script>
 {% endblock %}

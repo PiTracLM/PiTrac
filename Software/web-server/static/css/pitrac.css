@@ -129,3 +129,9 @@ html[data-theme="light"] {
 }
 
 .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+
+/* Setup checklist: the action drops under the text on phones */
+@media (max-width: 639px) {
+    .list .list-row > .setup-action { grid-row-start: 2; grid-column-start: 2; }
+}
+.setup-action:empty { display: none; }

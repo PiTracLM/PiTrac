@@ -1,5 +1,6 @@
 // Dashboard: status strip, shot metrics, shot image, setup readiness
-/* global openSocket, onPiTracStatus, formatNumber, api, escapeHtml, controlPiTrac */
+/* global openSocket, onPiTracStatus, formatNumber, api, controlPiTrac,
+   setupStatusRequest, setupHidden, setSetupHidden, setupChecklist, renderSetupChecklist, setupSummaryHtml, loadCameraLabels */
 
 // Keys are the exact result_type strings from parsers.py; anything else leaves the strip as it is
 const STRIP_STATES = {
@@ -165,66 +166,20 @@ async function resetShot() {
 
 // -- Setup readiness --
 
-function setupRows() {
-    const camera = (n) => cameraLabels[setup.cameras[`camera${n}`].type] || setup.cameras[`camera${n}`].type || 'not set';
-    const rows = [{
-        label: 'Hardware',
-        detail: `${setup.board_version ? `V${setup.board_version} board` : 'Board not set'}, camera 1 ${camera(1)}, camera 2 ${camera(2)}`,
-        action: 'Review',
-        href: '/config#setup',
-    }];
-    if (setup.strobe.required) {
-        rows.push({ label: 'Strobe', detail: setup.strobe.safe ? '' : setup.strobe.reason || 'Needed before PiTrac can start.', done: setup.strobe.safe, action: 'Calibrate', href: '/calibration#strobe' });
-    }
-    for (const [kind, title] of [['lens', 'Lens'], ['position', 'Position']]) {
-        for (const n of [1, 2]) {
-            const done = setup.cameras[`camera${n}`][`${kind}_calibrated`];
-            rows.push({ label: `${title}, camera ${n}`, detail: '', done, action: 'Calibrate', href: '/calibration' });
-        }
-    }
-    return rows;
-}
-
-function rowHtml(row) {
-    const status = row.done
-        ? '<span class="flex items-center gap-1 text-success text-sm"><i data-lucide="circle-check" class="icon-sm"></i>Done</span>'
-        : `<a class="btn btn-sm" href="${escapeHtml(row.href)}">${escapeHtml(row.action)}</a>`;
-    return `
-        <li class="list-row items-center">
-            <i data-lucide="${row.done ? 'circle-check' : 'circle-dashed'}" class="icon-sm ${row.done ? 'text-success' : 'opacity-50'}"></i>
-            <div class="min-w-0">
-                <div class="font-medium">${escapeHtml(row.label)}</div>
-                ${row.detail ? `<div class="text-sm opacity-70 break-words">${escapeHtml(row.detail)}</div>` : ''}
-            </div>
-            ${status}
-        </li>`;
-}
-
 function renderSetup() {
     const card = byId('setup-card');
-    card.hidden = !setup || setup.complete;
+    card.hidden = !setup || setup.complete || setupHidden();
     if (card.hidden) return;
-    const list = byId('setup-rows');
-    list.innerHTML = setupRows().map(rowHtml).join('');
-    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [list] });
+    byId('setup-summary').innerHTML = setupSummaryHtml(setup, cameraLabels);
+    renderSetupChecklist(byId('setup-rows'), setupChecklist(setup), { base: '/calibration' });
 }
 
 async function loadSetup() {
-    try {
-        setup = await api('/api/setup/status');
-    } catch (err) {
-        console.error('Could not load setup status:', err);
-        return;
-    }
+    setup = await setupStatusRequest;
+    if (!setup) return;
     renderStrip();
     if (setup.complete) return;
-    try {
-        const meta = await api('/api/config/metadata');
-        const options = (meta['cameras.slot1.type'] || {}).options || {};
-        cameraLabels = Object.fromEntries(Object.entries(options).map(([value, label]) => [value, label.split(' - ')[0]]));
-    } catch (err) {
-        console.error('Could not load camera labels:', err);
-    }
+    cameraLabels = await loadCameraLabels();
     renderSetup();
 }
 
@@ -243,6 +198,11 @@ renderStrip();
 
 byId('strip-start-btn').addEventListener('click', () => controlPiTrac('start'));
 byId('btn-reset').addEventListener('click', resetShot);
+byId('setup-hide-btn').addEventListener('click', () => {
+    setSetupHidden(true);
+    renderSetup();
+});
+document.addEventListener('pitrac:setup-shown', renderSetup);
 
 openSocket('/ws', onMessage, { onOpen: () => { freshSocket = true; } });
 loadSetup();

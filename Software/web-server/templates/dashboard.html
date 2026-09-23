@@ -29,8 +29,16 @@
     </div>
 
     <div class="card bg-base-200 border border-base-300 shadow-sm col-span-full" id="setup-card" hidden>
-        <div class="card-body p-2 sm:p-4">
-            <h2 class="card-title text-base px-2 pt-2 sm:p-0">Finish setting up PiTrac</h2>
+        <div class="card-body p-2 sm:p-4 gap-1">
+            <div class="flex items-start justify-between gap-2 px-2 pt-2 sm:p-0">
+                <div class="min-w-0">
+                    <h2 class="card-title text-base">Finish setting up PiTrac</h2>
+                    <p class="text-sm mt-1" id="setup-summary"></p>
+                </div>
+                <button class="btn btn-ghost btn-sm gap-1 shrink-0" id="setup-hide-btn">
+                    <i data-lucide="x" class="icon-sm"></i> Hide
+                </button>
+            </div>
             <ul class="list" id="setup-rows"></ul>
         </div>
     </div>
@@ -54,5 +62,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="/static/js/setup.js?v={{ asset_version }}"></script>
 <script src="/static/js/dashboard.js?v={{ asset_version }}"></script>
 {% endblock %}

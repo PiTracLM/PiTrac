@@ -1,12 +1,13 @@
 {% from "_macros.html" import pitrac_btn, nav_item %}
+{# top: in the navbar from md up and in the menu below md. Other pages are always in the menu. #}
 {% set nav_pages = [
-    ("/", "home", "Dashboard"),
-    ("/config", "settings", "Configuration"),
-    ("/calibration", "crosshair", "Calibration"),
-    ("/history", "list", "Shot History"),
-    ("/logs", "file-text", "Logs"),
-    ("/testing", "flask-conical", "Testing"),
-    ("/update", "refresh-cw", "Update"),
+    ("/", "home", "Dashboard", true),
+    ("/history", "list", "Shot History", true),
+    ("/config", "settings", "Configuration", false),
+    ("/calibration", "crosshair", "Calibration", false),
+    ("/logs", "file-text", "Logs", false),
+    ("/testing", "flask-conical", "Testing", false),
+    ("/update", "refresh-cw", "Update", false),
 ] %}
 <!DOCTYPE html>
 <html lang="en">
@@ -32,8 +33,8 @@
                 <img src="/static/logos/PiTrac.svg" alt="PiTrac Logo" class="h-8 sm:h-10 header-logo">
             </a>
 
-            <ul class="menu menu-horizontal menu-sm hidden xl:flex flex-nowrap gap-1 px-1">
-                {% for href, icon, label in nav_pages %}{{ nav_item(href, icon, label, request.url.path == href) }}{% endfor %}
+            <ul class="menu menu-horizontal menu-sm hidden md:flex flex-nowrap gap-1 px-1">
+                {% for href, icon, label, top in nav_pages if top %}{{ nav_item(href, icon, label, request.url.path == href) }}{% endfor %}
             </ul>
 
             <div class="flex-1"></div>
@@ -64,10 +65,15 @@
                     <i data-lucide="more-vertical" class="icon-md"></i>
                 </summary>
                 <ul class="menu dropdown-content bg-base-200 rounded-box z-50 w-56 p-2 shadow-xl border border-base-300 mt-2">
-                    {% for href, icon, label in nav_pages %}
-                    {{ nav_item(href, icon, label, request.url.path == href, "xl:hidden") }}
+                    {% for href, icon, label, top in nav_pages %}
+                    {{ nav_item(href, icon, label, request.url.path == href, "md:hidden" if top else "") }}
                     {% endfor %}
-                    <li class="xl:hidden"></li>
+                    <li></li>
+                    <li id="setup-show-item" class="hidden">
+                        <button class="gap-2" onclick="showSetupChecklist()">
+                            <i data-lucide="list-checks" class="icon-menu"></i> Show setup checklist
+                        </button>
+                    </li>
                     <li id="pitrac-restart-item" class="hidden">
                         <button id="pitrac-restart-btn" class="control-btn gap-2" onclick="controlPiTrac('restart')">
                             <i data-lucide="rotate-cw" class="icon-menu"></i> Restart PiTrac

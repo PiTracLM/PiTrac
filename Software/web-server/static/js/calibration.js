@@ -1,34 +1,15 @@
-/* global requireStrobeSafe, escapeHtml, toast, confirmDialog, api, formatNumber, distortionCalibration */
+/* global requireStrobeSafe, escapeHtml, toast, confirmDialog, api, formatNumber, distortionCalibration, setSetupStatus,
+   SETUP_CAMERAS, setupLock, setupChecklist, renderSetupChecklist, setupSummaryHtml, loadCameraLabels */
 
-const CAMERAS = ['camera1', 'camera2'];
+const CAMERAS = SETUP_CAMERAS;
 const CAMERA_LABELS = { camera1: 'Camera 1', camera2: 'Camera 2' };
 const POSITION_DURATION = { camera1: 'about 30 s', camera2: 'about 2 minutes' };
-const SECTIONS = ['strobe', 'lens', 'position'];
+const SECTIONS = ['strobe', 'lens', 'ball'];
 const LOCK_NOTES = {
     unknown: 'Could not load the calibration status. Use Retry in the checklist above.',
     strobe: 'Calibrate the strobe first. It is the first row in the checklist above.',
     lens: (camera) => `Calibrate the lens for ${CAMERA_LABELS[camera].toLowerCase()} first.`,
 };
-
-const LOCKED_BADGE = 'badge-ghost text-base-content/60';
-const BADGES = {
-    done: ['Done', 'badge-soft badge-success'],
-    stale: ['Redo recommended', 'badge-soft badge-warning'],
-    running: ['Running', 'badge-soft badge-info'],
-    needs: ['Needs calibration', 'badge-soft badge-warning'],
-    factory: ['Factory default', 'badge-soft badge-ghost'],
-    strobe: ['Do the strobe first', LOCKED_BADGE],
-    lens: ['Do the lens first', LOCKED_BADGE],
-    unknown: ['Status unavailable', LOCKED_BADGE],
-};
-const LOCKED_STATES = ['strobe', 'lens', 'unknown'];
-
-function shortDate(iso) {
-    const date = new Date(iso);
-    if (!iso || Number.isNaN(date.getTime())) return '';
-    const sameYear = date.getFullYear() === new Date().getFullYear();
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: sameYear ? undefined : 'numeric' });
-}
 
 class CalibrationPage {
     constructor() {
@@ -42,10 +23,11 @@ class CalibrationPage {
         this.positionStopped = false;
         this.positionPollTimer = null;
         this.redoFailures = {};
+        this.cameraLabels = {};
 
-        window.addEventListener('hashchange', () => this.showSection(location.hash.slice(1)));
+        window.addEventListener('hashchange', () => this.openHash());
         window.addEventListener('pagehide', () => this.cleanup());
-        document.querySelectorAll('input[name="position-camera"]').forEach(input => {
+        document.querySelectorAll('input[name="ball-camera"]').forEach(input => {
             input.addEventListener('change', () => this.renderPosition());
         });
         this.init();
@@ -54,6 +36,10 @@ class CalibrationPage {
     async init() {
         await this.refresh();
         this.loadStrobeSettings();
+        loadCameraLabels().then(labels => {
+            this.cameraLabels = labels;
+            this.renderChecklist();
+        });
 
         if (this.strobeRunning) {
             this.open('strobe');
@@ -68,12 +54,19 @@ class CalibrationPage {
         }
         const positionCamera = CAMERAS.find(c => this.status?.[c]?.status === 'calibrating');
         if (positionCamera) {
-            this.open('position', positionCamera);
+            this.open('ball', positionCamera);
             this.setPositionRunning(true);
             this.showPositionProgress(positionCamera, true);
             return;
         }
-        this.showSection(location.hash.slice(1));
+        this.openHash();
+    }
+
+    // Links carry the camera as #lens-camera2; #position is the old name of #ball
+    openHash() {
+        const [name, camera] = location.hash.slice(1).split('-');
+        const section = name === 'position' ? 'ball' : name;
+        if (SECTIONS.includes(section)) this.open(section, CAMERAS.includes(camera) ? camera : undefined);
     }
 
     cleanup() {
@@ -93,55 +86,25 @@ class CalibrationPage {
         document.getElementById('checklist-error').hidden = !!this.setup;
         if (status) this.status = status;
         if (strobe) this.strobeRunning = strobe.state === 'calibrating';
+        setSetupStatus(setup);
         this.renderChecklist();
     }
 
     // -- Checklist --
 
-    lockReason(section, camera) {
-        const s = this.setup;
-        if (section === 'strobe') return null;
-        if (!s) return 'unknown';
-        if (s.strobe.required && !s.strobe.safe) return 'strobe';
-        if (section === 'position' && !s.cameras[camera].lens_calibrated) return 'lens';
-        return null;
-    }
-
     lockNote(section, cameras) {
-        const reasons = cameras.map(c => [c, this.lockReason(section, c)]).filter(([, r]) => r);
+        const reasons = cameras.map(c => [c, setupLock(this.setup, section, c)]).filter(([, r]) => r);
         if (!reasons.length) return null;
         if (reasons.some(([, r]) => r === 'unknown')) return LOCK_NOTES.unknown;
         if (reasons.some(([, r]) => r === 'strobe')) return LOCK_NOTES.strobe;
         return reasons.map(([c]) => LOCK_NOTES.lens(c)).join(' ');
     }
 
-    rowState(section, camera) {
-        const s = this.setup;
-        if (section === 'strobe') {
-            if (this.strobeRunning) return 'running';
-            if (!s) return 'unknown';
-            return s.strobe.safe ? 'done' : 'needs';
-        }
-        const running = section === 'lens'
+    isRunning(step, camera) {
+        if (step === 'strobe') return this.strobeRunning;
+        return step === 'lens'
             ? distortionCalibration.isActive(this.status?.distortion?.[camera])
             : this.status?.[camera]?.status === 'calibrating';
-        if (running) return 'running';
-        const locked = this.lockReason(section, camera);
-        if (locked) return locked;
-        const cam = s.cameras[camera];
-        if (section === 'lens') return cam.lens_calibrated ? 'done' : 'factory';
-        if (!cam.position_calibrated) return 'factory';
-        return this.lensNewerThanPosition(cam) ? 'stale' : 'done';
-    }
-
-    lensNewerThanPosition(cam) {
-        return !!(cam.lens_updated_at && cam.position_updated_at
-            && new Date(cam.lens_updated_at) > new Date(cam.position_updated_at));
-    }
-
-    updatedAt(section, camera) {
-        if (section === 'strobe') return this.setup.strobe.updated_at;
-        return this.setup.cameras[camera][`${section}_updated_at`];
     }
 
     wasDone(section, camera) {
@@ -160,43 +123,15 @@ class CalibrationPage {
     }
 
     renderChecklist() {
-        document.getElementById('check-strobe').hidden = !this.setup?.strobe.required;
-
-        let nextFound = false;
-        let allDone = true;
-        document.querySelectorAll('#checklist > li:not([hidden])').forEach((row, i) => {
-            const rowId = row.id.slice('check-'.length);
-            const [section, camera] = rowId.split('-');
-            const state = this.rowState(section, camera);
-            const locked = LOCKED_STATES.includes(state);
-            const primary = !nextFound && !locked && state !== 'done';
-            if (primary) nextFound = true;
-            if (state !== 'done') allDone = false;
-
-            const [label, color] = BADGES[state];
-            const date = state === 'done' ? shortDate(this.updatedAt(section, camera)) : '';
-            row.querySelector('.check-num').textContent = i + 1;
-            const badge = row.querySelector('.check-badge');
-            badge.className = `check-badge badge badge-sm mt-1 ${color}`;
-            badge.textContent = date ? `${label}, ${date}` : label;
-            if (locked) {
-                badge.prepend(Object.assign(document.createElement('i'), { className: 'icon-sm' }));
-                badge.firstChild.dataset.lucide = 'lock';
-                lucide.createIcons({ nodes: [badge] });
-            }
-
-            const failure = state === 'running' ? null : this.redoFailures[rowId];
-            const note = row.querySelector('.check-note');
-            note.textContent = failure || (state === 'stale' ? 'The lens was recalibrated after this.' : '');
-            note.className = `check-note text-sm mt-1 ${failure ? 'text-error' : 'text-warning'}`;
-            note.hidden = !note.textContent;
-
-            const btn = row.querySelector('.check-btn');
-            btn.className = `check-btn btn btn-sm ${primary ? 'btn-primary' : 'btn-ghost'}`;
-            btn.textContent = { done: 'Redo', stale: 'Redo', running: 'View' }[state] || 'Calibrate';
-            btn.disabled = locked;
+        const items = setupChecklist(this.setup, {
+            running: (step, camera) => this.isRunning(step, camera),
+            failures: this.redoFailures,
         });
-        document.getElementById('checklist-done').hidden = !allDone;
+        renderSetupChecklist(document.getElementById('checklist'), items, { hints: true });
+        const summary = document.getElementById('setup-summary');
+        summary.hidden = !this.setup;
+        if (this.setup) summary.innerHTML = setupSummaryHtml(this.setup, this.cameraLabels);
+        document.getElementById('checklist-done').hidden = !this.setup || !items.every(item => item.state === 'done');
 
         this.renderStrobeState();
         this.renderPosition();
@@ -226,7 +161,7 @@ class CalibrationPage {
     // -- Position --
 
     positionCameras() {
-        const choice = document.querySelector('input[name="position-camera"]:checked').value;
+        const choice = document.querySelector('input[name="ball-camera"]:checked').value;
         return choice === 'both' ? CAMERAS : [choice];
     }
 
@@ -238,7 +173,7 @@ class CalibrationPage {
         document.getElementById('position-start-btn').hidden = this.positionRunning || !!note;
         document.getElementById('position-stop-btn').hidden = !this.positionRunning;
         document.getElementById('position-progress').hidden = !this.positionRunning;
-        document.querySelectorAll('input[name="position-camera"]').forEach(i => { i.disabled = this.positionRunning; });
+        document.querySelectorAll('input[name="ball-camera"]').forEach(i => { i.disabled = this.positionRunning; });
     }
 
     setPositionRunning(running) {
@@ -361,7 +296,7 @@ class CalibrationPage {
     async stopPosition() {
         const camera = this.positionCamera;
         const ok = await confirmDialog({
-            title: 'Stop position calibration?',
+            title: 'Stop ball calibration?',
             body: `This stops the run on ${CAMERA_LABELS[camera].toLowerCase()}.`,
             confirmLabel: 'Stop',
             danger: true,

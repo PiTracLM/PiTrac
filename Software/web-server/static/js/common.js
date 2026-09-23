@@ -1,5 +1,6 @@
 // Common functionality for all PiTrac pages
-/* exported setTheme, controlPiTrac, requireStrobeSafe, escapeHtml, toast, confirmDialog, api, openSocket, onPiTracStatus, formatNumber */
+/* exported setTheme, controlPiTrac, requireStrobeSafe, escapeHtml, toast, confirmDialog, api, openSocket, onPiTracStatus, formatNumber,
+   setupStatusRequest, setSetupStatus, setupHidden, setSetupHidden, showSetupChecklist */
 
 if (typeof lucide !== 'undefined') {
     lucide.createIcons();
@@ -244,6 +245,42 @@ function showStrobeSafetyModal(reason) {
     modal.showModal();
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
+
+// -- Setup checklist menu item --
+
+const SETUP_HIDDEN_KEY = 'pitrac-setup-hidden';
+let setupIncomplete = false;
+
+function setupHidden() {
+    try { return localStorage.getItem(SETUP_HIDDEN_KEY) === '1'; } catch { return false; }
+}
+
+function setSetupHidden(hidden) {
+    try {
+        if (hidden) localStorage.setItem(SETUP_HIDDEN_KEY, '1');
+        else localStorage.removeItem(SETUP_HIDDEN_KEY);
+    } catch { /* storage blocked: the card just stays visible */ }
+    const item = document.getElementById('setup-show-item');
+    if (item) item.classList.toggle('hidden', !(setupIncomplete && setupHidden()));
+}
+
+function setSetupStatus(setup) {
+    if (!setup) return;
+    setupIncomplete = !setup.complete;
+    setSetupHidden(setupIncomplete && setupHidden());
+}
+
+function showSetupChecklist() {
+    setSetupHidden(false);
+    if (location.pathname === '/') document.dispatchEvent(new Event('pitrac:setup-shown'));
+    else location.href = '/';
+}
+
+const setupStatusRequest = api('/api/setup/status').catch((err) => {
+    console.error('Could not load setup status:', err);
+    return null;
+});
+setupStatusRequest.then(setSetupStatus);
 
 // -- Init --
 
