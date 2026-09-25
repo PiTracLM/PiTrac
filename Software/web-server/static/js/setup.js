@@ -1,12 +1,12 @@
 // Setup checklist rules and renderer, shared by the dashboard card and the calibration page
 /* global escapeHtml, api */
-/* exported SETUP_CAMERAS, setupLock, setupChecklist, renderSetupChecklist, setupSummaryHtml, loadCameraLabels */
+/* exported SETUP_CAMERAS, cameraName, setupLock, setupChecklist, renderSetupChecklist, setupSummaryHtml, loadCameraLabels */
 
 const SETUP_CAMERAS = ['camera1', 'camera2'];
 const SETUP_STEPS = [
-    { step: 'strobe', hash: 'strobe', title: 'Strobe', hint: 'Redo if you change the LED board or power supply.' },
-    { step: 'lens', hash: 'lens', title: 'Lens calibration', hint: 'Redo if you swap or refocus the lens or replace the camera.' },
-    { step: 'position', hash: 'ball', title: 'Ball calibration', hint: 'Redo if PiTrac or a camera moves or gets bumped.' },
+    { step: 'strobe', hash: 'strobe', noun: 'strobe', title: 'Strobe', hint: 'Redo if you change the LED board or power supply.' },
+    { step: 'lens', hash: 'lens', noun: 'lens', title: 'Lens calibration', hint: 'Redo if you swap or refocus the lens or replace the camera.' },
+    { step: 'position', hash: 'ball', noun: 'ball', title: 'Ball calibration', hint: 'Redo if PiTrac or a camera moves or gets bumped.' },
 ];
 
 const LOCKED = ['strobe', 'lens', 'unknown'];
@@ -69,8 +69,8 @@ function lineText(setup, step, camera, state) {
         const date = shortDate(step === 'strobe' ? setup.strobe.updated_at : setup.cameras[camera][`${step}_updated_at`]);
         return date ? `Done, ${date}` : 'Done';
     }
-    const reason = setup?.strobe.reason || '';
-    if (step === 'strobe' && state === 'todo' && reason && !reason.includes('requires strobe calibration')) return reason;
+    // A saved calibration that is still not safe means it was not applied; the reason says why
+    if (step === 'strobe' && state === 'todo' && setup.strobe.updated_at && setup.strobe.reason) return setup.strobe.reason;
     return LINE_TEXT[state];
 }
 
@@ -99,7 +99,7 @@ function setupChecklist(setup, { running = () => false, failures = {} } = {}) {
             };
         });
         const live = lines.find(l => l.state === 'running');
-        const next = lines.find(l => l.state === 'todo' || l.state === 'stale');
+        const next = lines.find(l => l.state === 'todo') || lines.find(l => l.state === 'stale');
         const done = lines.filter(l => l.state === 'done').map(l => l.camera);
         let action = null;
         if (live) {
@@ -119,7 +119,8 @@ const icon = (name, classes) => `<i data-lucide="${name}" class="icon-sm ${class
 
 function lineHtml(line) {
     const [name, iconClass, textClass] = LINE_LOOK[LOCKED.includes(line.state) ? 'locked' : line.state];
-    const label = line.camera ? `<span class="font-medium">${cameraName(line.camera)}</span> <span class="text-base-content/40">&middot;</span> ` : '';
+    const muted = LOCKED.includes(line.state) ? 'text-base-content/50' : '';
+    const label = line.camera ? `<span class="font-medium ${muted}">${cameraName(line.camera)}</span> <span class="text-base-content/40">&middot;</span> ` : '';
     const note = line.note ? `<span class="block text-xs mt-0.5 ${line.noteClass}">${escapeHtml(line.note)}</span>` : '';
     return `
         <li class="flex items-start gap-1.5">
@@ -132,18 +133,19 @@ function actionHtml(item, base) {
     const { action } = item;
     if (!action) return '';
     const href = (camera) => escapeHtml(`${base}#${item.hash}${camera ? `-${camera}` : ''}`);
+    const aria = (verb, camera) => `${verb} ${item.noun}${verb === 'Calibrate' ? '' : ' calibration'}${camera ? `, ${cameraName(camera).toLowerCase()}` : ''}`;
     if (action.kind === 'go') {
-        const style = action.primary ? 'btn-primary' : action.label === 'View' ? 'btn-ghost' : '';
-        return `<a class="btn btn-sm ${style}" href="${href(action.camera)}">${escapeHtml(action.label)}</a>`;
+        const verb = action.label.split(' ')[0];
+        return `<a class="btn btn-sm ${action.primary ? 'btn-primary' : ''}" href="${href(action.camera)}" aria-label="${aria(verb, action.camera)}">${escapeHtml(action.label)}</a>`;
     }
     if (action.cameras.length === 1 && !action.cameras[0]) {
-        return `<a class="btn btn-sm btn-ghost" href="${href('')}">Redo</a>`;
+        return `<a class="btn btn-sm" href="${href('')}" aria-label="${aria('Redo')}">Redo</a>`;
     }
     return `
         <details class="setup-redo dropdown sm:dropdown-end">
-            <summary class="btn btn-sm btn-ghost gap-1" aria-label="Redo ${escapeHtml(item.title.toLowerCase())}">Redo ${icon('chevron-down', 'opacity-60')}</summary>
+            <summary class="btn btn-sm gap-1" aria-label="${aria('Redo')}">Redo ${icon('chevron-down', 'opacity-60')}</summary>
             <ul class="menu dropdown-content bg-base-100 rounded-box z-20 w-40 p-1 mt-1 shadow-lg border border-base-300">
-                ${action.cameras.map(c => `<li><a href="${href(c)}">${cameraName(c)}</a></li>`).join('')}
+                ${action.cameras.map(c => `<li><a href="${href(c)}" aria-label="${aria('Redo', c)}">${cameraName(c)}</a></li>`).join('')}
             </ul>
         </details>`;
 }

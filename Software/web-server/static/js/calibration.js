@@ -1,14 +1,13 @@
-/* global requireStrobeSafe, escapeHtml, toast, confirmDialog, api, formatNumber, distortionCalibration, setSetupStatus,
-   SETUP_CAMERAS, setupLock, setupChecklist, renderSetupChecklist, setupSummaryHtml, loadCameraLabels */
+/* global requireStrobeSafe, escapeHtml, toast, confirmDialog, api, formatNumber, distortionCalibration, setSetupStatus, setupStatusRequest,
+   SETUP_CAMERAS, cameraName, setupLock, setupChecklist, renderSetupChecklist, setupSummaryHtml, loadCameraLabels */
 
 const CAMERAS = SETUP_CAMERAS;
-const CAMERA_LABELS = { camera1: 'Camera 1', camera2: 'Camera 2' };
 const POSITION_DURATION = { camera1: 'about 30 s', camera2: 'about 2 minutes' };
 const SECTIONS = ['strobe', 'lens', 'ball'];
 const LOCK_NOTES = {
     unknown: 'Could not load the calibration status. Use Retry in the checklist above.',
     strobe: 'Calibrate the strobe first. It is the first row in the checklist above.',
-    lens: (camera) => `Calibrate the lens for ${CAMERA_LABELS[camera].toLowerCase()} first.`,
+    lens: (camera) => `Calibrate the lens for ${cameraName(camera).toLowerCase()} first.`,
 };
 
 class CalibrationPage {
@@ -34,7 +33,7 @@ class CalibrationPage {
     }
 
     async init() {
-        await this.refresh();
+        await this.refresh(setupStatusRequest);
         this.loadStrobeSettings();
         loadCameraLabels().then(labels => {
             this.cameraLabels = labels;
@@ -76,9 +75,9 @@ class CalibrationPage {
         distortionCalibration._stopPolling();
     }
 
-    async refresh() {
+    async refresh(setupRequest = api('/api/setup/status')) {
         const [setup, status, strobe] = await Promise.all([
-            api('/api/setup/status'),
+            setupRequest,
             api('/api/calibration/status'),
             api('/api/strobe-calibration/status'),
         ].map(p => p.catch(() => null)));
@@ -214,7 +213,7 @@ class CalibrationPage {
         const cam = this.setup?.cameras?.[camera];
         this.positionBefore = { calibrated: !!cam?.position_calibrated, updatedAt: cam?.position_updated_at ?? null };
         document.getElementById('position-progress-title').textContent =
-            `Calibrating ${CAMERA_LABELS[camera].toLowerCase()}, ${POSITION_DURATION[camera]}`;
+            `Calibrating ${cameraName(camera).toLowerCase()}, ${POSITION_DURATION[camera]}`;
         document.getElementById('position-progress-message').textContent = '';
         clearInterval(this.positionPollTimer);
         this.positionPollTimer = setInterval(async () => {
@@ -252,7 +251,7 @@ class CalibrationPage {
             this.runEnded('position', camera, ok || this.positionStopped ? null : message || 'Calibration failed', before.calibrated);
         }
         const partialLine = partial ? '<div class="text-sm font-semibold">Some new values were saved before it ended. Run it again.</div>' : '';
-        const label = CAMERA_LABELS[camera];
+        const label = cameraName(camera);
         const box = document.createElement('div');
         if (this.positionStopped) {
             box.className = 'alert alert-soft';
@@ -297,7 +296,7 @@ class CalibrationPage {
         const camera = this.positionCamera;
         const ok = await confirmDialog({
             title: 'Stop ball calibration?',
-            body: `This stops the run on ${CAMERA_LABELS[camera].toLowerCase()}.`,
+            body: `This stops the run on ${cameraName(camera).toLowerCase()}.`,
             confirmLabel: 'Stop',
             danger: true,
         });
