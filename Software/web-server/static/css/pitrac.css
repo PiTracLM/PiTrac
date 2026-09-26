@@ -48,6 +48,10 @@ html[data-theme="light"] {
     --color-error-content: #ffffff;
 }
 
+/* Chrome's base-select (opted into by daisyUI) clips long option text at the padding edge, under the arrow;
+   the classic rendering ellipsizes before it */
+select.select { appearance: none; }
+
 /* Lucide icon sizing */
 .lucide { width: 20px; height: 20px; vertical-align: middle; }
 .lucide.icon-sm { width: 16px; height: 16px; }

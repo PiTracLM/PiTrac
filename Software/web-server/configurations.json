@@ -279,12 +279,12 @@
       "subcategory": "basic",
       "basicSubcategory": "System",
       "displayName": "Enclosure Version",
-      "description": "The enclosure version (type) can affect various aspects of the system.  For example, the distance of the reference ball in the calibration rig, as different enclosures position the cameras at different locations.",
+      "description": "Version 2.0 (2025) has a flat base under a tower with triangular supports on the sides of the floors. Version 3.0 (2026) is a streamlined tower with stacked modules. The enclosure sets where the cameras sit, which changes things like the reference ball distance in the calibration rig.",
       "type": "select",
       "setup": true,
       "options": {
-        "2": "Version 2.0 (Circa 2025 - Flat base bottom under a tower with triangular supports on the sides of the floors)",
-        "3": "Version 3.0 (Circa 2026 - Streamlined tower with stacked modules)"
+        "2": "Version 2.0 (2025, flat base)",
+        "3": "Version 3.0 (2026, stacked modules)"
       },
       "default": "2",
       "requiresRestart": true

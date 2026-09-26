@@ -20,8 +20,10 @@
     let dependencies = new Set();
     const pending = new Map();
     const errors = new Map();
-    // Tags of our own writes, so their /ws echo is not reported as a change from another device
-    const selfEcho = new Set();
+    // Tags of our own writes (key, config_reset, config_import) to the time they were sent, so their /ws echo
+    // is not reported as a change from another device. Tags expire because a dropped socket never echoes.
+    const selfEcho = new Map();
+    const ECHO_MS = 5000;
     const view = { category: null, search: '' };
     let showAdvanced = false;
     let piTracRunning = false;
@@ -175,12 +177,13 @@
         return range ? `${range}, default ${def}` : `Default ${def}`;
     }
 
-    function renderRow(key, prefix) {
+    function renderRow(key, prefix, restartNoted) {
         const m = meta[key] || {};
         const id = `${prefix}-${key}`;
         const row = el('div', 'config-row');
         row.dataset.key = key;
         row.hidden = !visible(key);
+        if (restartNoted) row.dataset.restartNoted = '1';
 
         const info = el('div', 'min-w-0');
         const head = el('div', 'flex flex-wrap items-center gap-1.5');
@@ -192,8 +195,22 @@
         const hint = numberHint(key);
         if (hint) info.append(el('p', 'text-xs opacity-50 mt-0.5', hint));
 
+        const control = createControl(key, id);
+        const error = el('p', 'row-error text-xs text-error');
+        error.id = `${id}-error`;
+        control.setAttribute('aria-describedby', error.id);
+        // Saving the default over a calibrated value deletes the calibration entry
+        if (calibrated.has(key)) {
+            control.disabled = true;
+            const note = el('p', 'text-xs opacity-60 mt-0.5', 'Set by calibration. Redo it on the ');
+            const link = el('a', 'link', 'Calibration page');
+            link.href = '/calibration';
+            note.append(link, '.');
+            info.append(note);
+        }
+
         const side = el('div', 'config-row-control');
-        side.append(createControl(key, id), el('p', 'row-error text-xs text-error'), el('div', 'row-actions flex flex-wrap justify-end gap-1'));
+        side.append(control, error, el('div', 'row-actions flex flex-wrap justify-end gap-1'));
         row.append(info, side);
         refreshRow(row);
         return row;
@@ -207,7 +224,7 @@
         if (isPending) tags.push(['Unsaved', 'badge-warning badge-soft']);
         if (isCalibrated) tags.push(['Calibrated', 'badge-info badge-soft']);
         else if (isCustom(key)) tags.push(['Custom', 'badge-primary badge-soft']);
-        if (meta[key]?.requiresRestart) tags.push(['Needs restart', 'badge-outline opacity-60']);
+        if (meta[key]?.requiresRestart && !row.dataset.restartNoted) tags.push(['Needs restart', 'badge-outline opacity-60']);
         if (isAdvanced(key)) tags.push(['Advanced', 'badge-outline opacity-60']);
         row.querySelector('.row-badges').replaceChildren(...tags.map(([text, tone]) => badge(text, tone)));
 
@@ -231,10 +248,12 @@
         return wrap;
     }
 
-    function group(name, keys, prefix, extra) {
+    function group(name, keys, prefix, { extra, restartNote } = {}) {
         const wrap = el('div', 'config-group');
         if (name) wrap.append(groupHeading(name, extra));
-        keys.forEach((key) => wrap.append(renderRow(key, prefix)));
+        const noted = restartNote && keys.every((key) => meta[key]?.requiresRestart);
+        if (noted) wrap.append(el('p', 'text-xs opacity-60 mt-1', 'Changes here apply after PiTrac restarts.'));
+        keys.forEach((key) => wrap.append(renderRow(key, prefix, noted)));
         return wrap;
     }
 
@@ -291,7 +310,9 @@
         byId('category-list').replaceChildren(...items.map(([category, count]) => {
             const btn = el('button', 'justify-between');
             btn.type = 'button';
-            btn.classList.toggle('menu-active', !view.search && category === view.category);
+            const active = !view.search && category === view.category;
+            btn.classList.toggle('menu-active', active);
+            if (active) btn.setAttribute('aria-current', 'true');
             btn.append(el('span', '', category), el('span', 'opacity-60 tabular-nums', String(count)));
             btn.addEventListener('click', () => selectCategory(category));
             const li = el('li');
@@ -362,8 +383,8 @@
         detect.type = 'button';
         detect.addEventListener('click', () => detectCameras(detect));
         byId('setup-groups').replaceChildren(
-            group('Hardware', keys.filter((key) => !GOLFER_KEYS.includes(key)), 'setup', detect),
-            group('Golfer', GOLFER_KEYS.filter((key) => keys.includes(key)), 'setup'),
+            group('Hardware', keys.filter((key) => !GOLFER_KEYS.includes(key)), 'setup', { extra: detect, restartNote: true }),
+            group('Golfer', GOLFER_KEYS.filter((key) => keys.includes(key)), 'setup', { restartNote: true }),
         );
     }
 
@@ -436,10 +457,10 @@
         let restart = false;
         let count = 0;
         for (const [key, value] of [...pending]) {
-            selfEcho.add(key);
+            selfEcho.set(key, Date.now());
             try {
                 const res = await api(`/api/config/${key}`, { method: 'PUT', body: { value } });
-                pending.delete(key);
+                if (sameValue(key, pending.get(key), value)) pending.delete(key);
                 errors.delete(key);
                 restart = restart || !!res?.requires_restart;
                 count += 1;
@@ -483,7 +504,7 @@
     }
 
     async function putDefault(key) {
-        selfEcho.add(key);
+        selfEcho.set(key, Date.now());
         try {
             await api(`/api/config/${key}`, { method: 'PUT', body: { value: defaultOf(key) } });
         } catch (err) {
@@ -582,7 +603,7 @@
             confirmLabel: 'Import',
         });
         if (!ok) return;
-        selfEcho.add('config_import');
+        selfEcho.set('config_import', Date.now());
         try {
             await api('/api/config/import', { method: 'POST', body: data });
         } catch (err) {
@@ -602,7 +623,7 @@
             danger: true,
         });
         if (!ok) return;
-        selfEcho.add('config_reset');
+        selfEcho.set('config_reset', Date.now());
         try {
             await api('/api/config/reset', { method: 'POST' });
         } catch (err) {
@@ -652,7 +673,10 @@
 
     function onSocket(data) {
         if (!data || typeof data.type !== 'string' || !data.type.startsWith('config_')) return;
-        if (selfEcho.delete(data.type === 'config_update' ? data.key : data.type)) return;
+        const tag = data.type === 'config_update' ? data.key : data.type;
+        const sentAt = selfEcho.get(tag);
+        selfEcho.delete(tag);
+        if (sentAt !== undefined && Date.now() - sentAt < ECHO_MS) return;
         clearTimeout(remoteTimer);
         remoteTimer = setTimeout(async () => {
             try {
@@ -693,6 +717,11 @@
         document.addEventListener('click', (e) => {
             if (more.open && !more.contains(e.target)) more.open = false;
         });
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape' || !more.open) return;
+            more.open = false;
+            more.querySelector('summary').focus();
+        });
         byId('import-file').addEventListener('change', (e) => {
             const file = e.target.files[0];
             e.target.value = '';
@@ -707,7 +736,7 @@
         document.addEventListener('change', onEdit);
 
         onPiTracStatus((status) => { piTracRunning = status.is_running; });
-        openSocket('/ws', onSocket);
+        openSocket('/ws', onSocket, { onOpen: () => selfEcho.clear() });
         load();
     });
 
