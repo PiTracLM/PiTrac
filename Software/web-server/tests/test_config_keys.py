@@ -53,10 +53,12 @@ def test_every_schema_key_has_a_reader():
     read_by_cpp = cpp_keys()
 
     settings = json.loads(SCHEMA.read_text())["settings"]
+    read_by_config_page = {k for s in settings.values() for k in s.get("visibleWhen", {})}
     unread = sorted(
         key
         for key in settings
         if key not in read_by_cpp
+        and key not in read_by_config_page
         and key not in web_source
     )
     assert unread == []

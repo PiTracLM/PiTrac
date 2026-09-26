@@ -527,13 +527,13 @@ class CameraDetector:
             {
                 "value": 4,
                 "label": "Pi Global Shutter",
-                "description": "IMX296 Color (RECOMMENDED)",
+                "description": "IMX296 Color",
                 "status": "supported",
             },
             {
                 "value": 5,
                 "label": "InnoMaker IMX296",
-                "description": "IMX296 Mono",
+                "description": "IMX296 Mono (RECOMMENDED)",
                 "status": "supported",
             },
         ]

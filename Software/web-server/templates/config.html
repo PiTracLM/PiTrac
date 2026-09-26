@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import page_header %}
 
 {% block title %}PiTrac Configuration{% endblock %}
 
@@ -7,76 +8,84 @@
 {% endblock %}
 
 {% block content %}
-<!-- Status bar -->
-<div class="status-bar card bg-base-200 border border-base-300 shadow-sm flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4 p-3 mb-4">
-    <div class="status-left flex items-center gap-3 flex-1 min-w-0">
-        <div class="config-status-indicator badge badge-outline gap-2 py-3 px-3">
-            <span class="config-status-label text-sm opacity-60">Modified:</span>
-            <span class="config-status-value text-sm font-bold" id="modifiedCount">0</span>
+{% call page_header("settings", "Configuration") %}
+<button type="button" id="discard-btn" class="btn btn-sm btn-ghost" disabled>Discard</button>
+<button type="button" id="save-btn" class="btn btn-sm btn-primary" disabled>Save</button>
+<details class="dropdown dropdown-end" id="config-more">
+    <summary class="btn btn-sm btn-ghost btn-square" aria-label="More actions">
+        <i data-lucide="ellipsis-vertical" class="icon-sm"></i>
+    </summary>
+    <ul class="menu dropdown-content bg-base-200 rounded-box z-40 w-52 p-2 shadow-xl border border-base-300 mt-2">
+        <li><button type="button" data-action="diff"><i data-lucide="git-compare" class="icon-sm"></i>Diff from defaults</button></li>
+        <li><button type="button" data-action="export"><i data-lucide="download" class="icon-sm"></i>Export</button></li>
+        <li><button type="button" data-action="import"><i data-lucide="upload" class="icon-sm"></i>Import</button></li>
+        <li><button type="button" data-action="reset-all" class="text-error"><i data-lucide="rotate-ccw" class="icon-sm"></i>Reset all</button></li>
+    </ul>
+</details>
+<input type="file" id="import-file" accept=".json,application/json" hidden>
+{% endcall %}
+
+<div class="flex flex-col gap-4">
+    <section id="setup" class="card bg-base-200 border border-base-300 shadow-sm scroll-mt-4">
+        <div class="card-body p-4 sm:p-6 gap-4">
+            <div>
+                <h2 class="text-lg font-semibold">Setup</h2>
+                <p class="text-sm opacity-70">Your hardware and how you play. Set these once.</p>
+            </div>
+            <div id="setup-groups" class="flex flex-col">
+                <div class="skeleton h-14 w-full mb-2"></div>
+                <div class="skeleton h-14 w-full mb-2"></div>
+                <div class="skeleton h-14 w-full"></div>
+            </div>
+            <div class="flex flex-wrap items-center gap-3 pt-3 border-t border-base-300">
+                <span class="text-sm opacity-60">Simulators are optional.</span>
+                <button type="button" id="manage-sims-btn" class="btn btn-sm">Manage simulators</button>
+            </div>
         </div>
-        <div id="statusMessage" class="status-message text-sm flex-1 min-w-0 truncate"></div>
-    </div>
-    <div class="status-right flex flex-wrap gap-2 shrink-0">
-        <button class="btn btn-primary btn-sm" onclick="saveChanges()" id="saveBtn" disabled>
-            Save Changes
-        </button>
-        <button class="btn btn-ghost btn-sm" onclick="reloadConfig()">
-            Reload
-        </button>
-        <button class="btn btn-outline btn-sm" onclick="showDiff()">
-            Diff
-        </button>
-        <button class="btn btn-error btn-sm" onclick="resetAll()">
-            Reset
-        </button>
-    </div>
+    </section>
+
+    <section class="card bg-base-200 border border-base-300 shadow-sm">
+        <div class="card-body p-4 sm:p-6 gap-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-semibold">Settings</h2>
+                    <p id="custom-count" class="text-sm opacity-70"></p>
+                </div>
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" id="advanced-toggle" class="toggle toggle-sm">
+                    Show advanced settings
+                </label>
+            </div>
+            <label class="input input-sm w-full">
+                <i data-lucide="search" class="icon-sm opacity-50"></i>
+                <input type="search" id="search-input" placeholder="Search settings" aria-label="Search settings">
+            </label>
+            <div class="grid grid-cols-1 md:grid-cols-[13rem_minmax(0,1fr)] gap-4">
+                <nav aria-label="Categories">
+                    <select id="category-select" class="select select-sm w-full md:hidden" aria-label="Category"></select>
+                    <ul id="category-list" class="menu menu-sm w-full p-0 hidden md:flex"></ul>
+                </nav>
+                <div id="settings-rows" class="min-w-0">
+                    <div class="skeleton h-14 w-full mb-2"></div>
+                    <div class="skeleton h-14 w-full mb-2"></div>
+                    <div class="skeleton h-14 w-full"></div>
+                </div>
+            </div>
+        </div>
+    </section>
 </div>
 
-<!-- Main config layout -->
-<div class="config-container grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-4 mt-4">
-    <!-- Sidebar -->
-    <div class="category-sidebar card bg-base-200 border border-base-300 shadow-sm p-4 h-fit sticky top-4">
-        <h3 class="text-lg font-semibold text-primary mb-3">Categories</h3>
-        <ul id="categoryList" class="category-list menu bg-base-200 rounded-box p-0">
-        </ul>
+<dialog id="diff-dialog" class="modal" aria-labelledby="diff-title">
+    <div class="modal-box max-w-3xl">
+        <h3 id="diff-title" class="text-lg font-semibold">Diff from defaults</h3>
+        <p id="diff-summary" class="text-sm opacity-70 mt-1"></p>
+        <div id="diff-body" class="mt-4 overflow-x-auto"></div>
+        <form method="dialog" class="modal-action">
+            <button class="btn">Close</button>
+        </form>
     </div>
-
-    <!-- Config panel -->
-    <div class="config-panel flex flex-col gap-4">
-        <div class="search-container flex gap-2">
-            <input type="text"
-                   id="searchInput"
-                   placeholder="Search settings..."
-                   class="search-input input w-full"
-                   oninput="searchConfig()">
-            <button onclick="clearSearch()" class="clear-search btn btn-ghost btn-sm">Clear</button>
-        </div>
-
-        <div id="configContent" class="config-content card bg-base-200 border border-base-300 shadow-sm p-4 min-h-[500px]">
-        </div>
-    </div>
-</div>
-
-<!-- Loading overlay -->
-<div id="loading" class="config-loading-overlay">
-    <span class="loading loading-spinner loading-lg text-primary"></span>
-    <p class="mt-3 opacity-60">Loading configuration...</p>
-</div>
-
-<!-- Confirm/diff modal (JS toggles .active class on #confirmModal) -->
-<div id="confirmModal">
-    <div class="modal-content bg-base-200 rounded-box shadow-xl border border-base-300 w-[95%] max-w-4xl max-h-[85vh] overflow-auto">
-        <div class="modal-header flex justify-between items-center p-5 border-b border-base-300">
-            <h2 id="modalTitle" class="text-lg font-bold text-primary">Confirm</h2>
-            <button class="modal-close btn btn-ghost btn-sm btn-square" onclick="closeModal()">&times;</button>
-        </div>
-        <div class="modal-body p-5" id="modalBody">
-        </div>
-        <div class="modal-footer flex justify-end gap-3 p-5 border-t border-base-300">
-            <button class="btn btn-primary btn-sm" id="modalConfirmBtn">Confirm</button>
-        </div>
-    </div>
-</div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
 {% endblock %}
 
 {% block extra_scripts %}
