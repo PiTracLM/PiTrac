@@ -1,4 +1,4 @@
-{% from "_macros.html" import pitrac_btn, nav_item %}
+{% from "_macros.html" import nav_item %}
 {# top: in the navbar from md up and in the menu below md. Other pages are always in the menu. #}
 {% set nav_pages = [
     ("/", "home", "Dashboard", true),
@@ -39,18 +39,19 @@
 
             <div class="flex-1"></div>
 
-            <span id="pitrac-status-pill" class="status-pill" role="status" title="Checking PiTrac status">Checking</span>
-
-            {{ pitrac_btn("start", "play", "Start", "btn-success") }}
-            {{ pitrac_btn("stop", "square", "Stop", "btn-error hidden") }}
+            <button type="button" id="pitrac-btn" class="btn btn-sm bg-base-300 border-base-300 font-medium gap-2"
+                    onclick="if (this.dataset.action) controlPiTrac(this.dataset.action)" aria-label="Checking PiTrac status" disabled>
+                <span class="w-2 h-2 rounded-full bg-base-content/40"></span>
+            </button>
+            <span id="pitrac-status-live" class="sr-only" role="status"></span>
 
             <details class="dropdown dropdown-end max-sm:static" id="sims-menu">
-                <summary id="sims-nav-btn" class="btn btn-sm gap-1.5 px-2 bg-base-100 border-base-300 font-normal"
+                <summary id="sims-nav-btn" class="btn btn-sm bg-base-300 border-base-300 font-medium gap-2"
                          aria-label="Simulator" aria-expanded="false" aria-controls="sims-panel">
                     <span id="sims-status-dot" class="w-2 h-2 rounded-full hidden"></span>
-                    <i data-lucide="radio" class="icon-sm sm:hidden"></i>
+                    <i id="sims-radio-icon" data-lucide="radio" class="icon-sm opacity-70"></i>
                     <span id="sims-nav-label" class="hidden sm:inline">Simulator</span>
-                    <i data-lucide="chevron-down" class="icon-sm hidden sm:inline-block opacity-60"></i>
+                    <i data-lucide="chevron-down" class="icon-sm opacity-60"></i>
                 </summary>
                 <div id="sims-panel" class="dropdown-content bg-base-200 rounded-box z-50 w-[22rem] max-w-[calc(100vw-2rem)] p-2 shadow-xl border border-base-300 mt-2">
                     <div id="sims-list"><p class="text-sm opacity-60 p-2">Loading simulators</p></div>
@@ -61,8 +62,8 @@
             </details>
 
             <details class="dropdown dropdown-end" id="nav-dropdown">
-                <summary class="btn btn-ghost btn-square btn-sm" aria-label="Menu">
-                    <i data-lucide="more-vertical" class="icon-md"></i>
+                <summary class="btn btn-sm btn-ghost btn-square" aria-label="Menu">
+                    <i data-lucide="more-vertical" class="icon-sm"></i>
                 </summary>
                 <ul class="menu dropdown-content bg-base-200 rounded-box z-50 w-56 p-2 shadow-xl border border-base-300 mt-2">
                     {% for href, icon, label, top in nav_pages %}

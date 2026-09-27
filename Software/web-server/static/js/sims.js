@@ -85,6 +85,7 @@
         const dotEl = byId('sims-status-dot');
         if (dotEl) {
             dotEl.className = `w-2 h-2 rounded-full ${dot || 'hidden'}`;
+            byId('sims-radio-icon').classList.toggle('hidden', !!dot);
             byId('sims-nav-label').textContent = label;
             byId('sims-nav-btn').setAttribute('aria-label', label);
         }

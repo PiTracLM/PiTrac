@@ -147,16 +147,18 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
 const PITRAC_OK_STATUSES = ['started', 'already_running', 'stopped', 'not_running'];
 
 let pitracActionInFlight = false;
+let pitracPending = null;
+let pitracState = null;
+
+const PITRAC_PENDING_WORDS = { start: 'Starting...', stop: 'Stopping...', restart: 'Restarting...' };
 
 async function controlPiTrac(action) {
     if ((action === 'start' || action === 'restart') && !(await requireStrobeSafe())) {return;}
 
     pitracActionInFlight = true;
+    pitracPending = action;
     document.querySelectorAll('.control-btn').forEach(b => { b.disabled = true; });
-    const spinner = document.createElement('span');
-    spinner.className = 'loading loading-spinner loading-xs';
-    const btn = document.getElementById(`pitrac-${action}-btn`);
-    if (btn) btn.prepend(spinner);
+    renderPiTracButton();
 
     try {
         const data = await api(`/api/pitrac/${action}`, { method: 'POST' });
@@ -165,7 +167,6 @@ async function controlPiTrac(action) {
     } catch (err) {
         toast(err.message, 'error', { actionHref: '/logs', actionLabel: 'Open logs' });
     } finally {
-        spinner.remove();
         setTimeout(() => {
             pitracActionInFlight = false;
             checkPiTracStatus();
@@ -174,13 +175,8 @@ async function controlPiTrac(action) {
 }
 
 function updatePiTracButtons(isRunning) {
-    const set = (id, visible) => {
-        const el = document.getElementById(id);
-        if (el) el.classList.toggle('hidden', !visible);
-    };
-    set('pitrac-start-btn', !isRunning);
-    set('pitrac-stop-btn', isRunning);
-    set('pitrac-restart-item', isRunning);
+    const restart = document.getElementById('pitrac-restart-item');
+    if (restart) restart.classList.toggle('hidden', !isRunning);
     document.querySelectorAll('.control-btn').forEach(b => { b.disabled = false; });
 }
 
@@ -192,15 +188,55 @@ function onPiTracStatus(fn) {
     piTracStatusSubscribers.push(fn);
 }
 
-function updateStatusPill({ is_running, pid, offline }) {
-    const pill = document.getElementById('pitrac-status-pill');
-    if (!pill) return;
+function renderPiTracButton() {
+    const btn = document.getElementById('pitrac-btn');
+    if (!btn || !pitracState) return;
+    const { is_running, pid, offline } = pitracState;
     const state = offline ? 'offline' : is_running ? 'running' : 'stopped';
-    const label = { running: 'Running', stopped: 'Stopped', offline: 'Offline' }[state];
-    pill.className = `status-pill is-${state}`;
-    if (pill.textContent !== label) pill.textContent = label;
-    pill.title = offline ? 'Cannot reach the PiTrac web server'
+    const stateWord = { running: 'Running', stopped: 'Stopped', offline: 'Offline' }[state];
+    const dot = { running: 'bg-success', stopped: 'bg-base-content/40', offline: 'bg-warning' }[state];
+    let action = null;
+    if (pitracPending) action = { word: PITRAC_PENDING_WORDS[pitracPending] };
+    else if (!offline) action = is_running
+        ? { word: 'Stop', icon: 'square', color: 'text-error', run: 'stop' }
+        : { word: 'Start', icon: 'play', color: 'text-success', run: 'start' };
+
+    const key = `${state}|${pitracPending}`;
+    btn.disabled = !action || !!pitracPending;
+    btn.dataset.action = action?.run || '';
+    btn.title = offline ? 'Cannot reach the PiTrac web server'
         : is_running ? `PiTrac is running (PID ${pid})` : 'PiTrac is stopped';
+    btn.setAttribute('aria-label', offline ? 'PiTrac is offline.'
+        : pitracPending ? `PiTrac is ${stateWord.toLowerCase()}. ${PITRAC_PENDING_WORDS[pitracPending]}`
+        : `PiTrac is ${stateWord.toLowerCase()}. ${action.word} PiTrac.`);
+    const live = document.getElementById('pitrac-status-live');
+    if (live && live.textContent !== stateWord) live.textContent = stateWord;
+    if (btn.dataset.rendered === key) return;
+    btn.dataset.rendered = key;
+
+    const part = (cls, text) => {
+        const el = document.createElement('span');
+        el.className = cls;
+        el.textContent = text;
+        return el;
+    };
+    const dotEl = part(`w-2 h-2 rounded-full ${dot}`, '');
+    const stateEl = part('hidden sm:inline', stateWord);
+    const nodes = [dotEl, stateEl];
+    if (action) {
+        nodes.push(part('opacity-30 hidden sm:inline', '|'));
+        if (pitracPending) {
+            nodes.push(part('loading loading-spinner loading-xs', ''));
+        } else {
+            const icon = document.createElement('i');
+            icon.dataset.lucide = action.icon;
+            icon.className = `icon-sm ${action.color}`;
+            nodes.push(icon);
+        }
+        nodes.push(part(`hidden sm:inline ${action.color || ''}`, action.word));
+    }
+    btn.replaceChildren(...nodes);
+    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [btn] });
 }
 
 async function checkPiTracStatus() {
@@ -211,7 +247,9 @@ async function checkPiTracStatus() {
     } catch {
         status = { is_running: false, pid: null, offline: true };
     }
-    updateStatusPill(status);
+    pitracState = status;
+    if (!pitracActionInFlight) pitracPending = null;
+    renderPiTracButton();
     if (!pitracActionInFlight && !status.offline) updatePiTracButtons(status.is_running);
     piTracStatusSubscribers.forEach(fn => {
         try {

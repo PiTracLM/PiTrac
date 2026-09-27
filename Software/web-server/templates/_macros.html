@@ -21,16 +21,6 @@
 </div>
 {% endmacro %}
 
-{% macro pitrac_btn(action, icon, label, extra_class="") %}
-<button id="pitrac-{{ action }}-btn"
-        class="btn btn-sm gap-1 control-btn {{ action }}-btn {{ extra_class }}"
-        onclick="controlPiTrac('{{ action }}')"
-        title="{{ label }} PiTrac">
-    <i data-lucide="{{ icon }}" class="icon-sm"></i>
-    <span class="btn-text">{{ label }}</span>
-</button>
-{% endmacro %}
-
 {% macro nav_item(href, icon, label, active=false, li_class="") %}
 <li{% if li_class %} class="{{ li_class }}"{% endif %}><a href="{{ href }}" class="gap-2{% if active %} bg-base-300 text-primary font-semibold{% endif %}"{% if active %} aria-current="page"{% endif %}><i data-lucide="{{ icon }}" class="icon-menu"></i> {{ label }}</a></li>
 {% endmacro %}

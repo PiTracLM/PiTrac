@@ -59,31 +59,6 @@ select.select { appearance: none; }
 .lucide.icon-lg { width: 48px; height: 48px; }
 .lucide.icon-menu { width: 20px; height: 20px; }
 
-.status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.125rem 0.625rem;
-    border-radius: 9999px;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    line-height: 1.5rem;
-    white-space: nowrap;
-    background: var(--color-base-300);
-    color: var(--color-base-content);
-}
-.status-pill::before {
-    content: '';
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 9999px;
-    background: color-mix(in oklab, var(--color-base-content) 35%, transparent);
-}
-.status-pill.is-running { background: color-mix(in oklab, var(--color-success) 20%, var(--color-base-300)); }
-.status-pill.is-running::before { background: var(--color-success); }
-.status-pill.is-offline { background: color-mix(in oklab, var(--color-error) 20%, var(--color-base-300)); }
-.status-pill.is-offline::before { background: var(--color-error); }
-
 /* Log and command output panel */
 .terminal {
     background: var(--color-neutral);
@@ -113,8 +88,6 @@ select.select { appearance: none; }
     color: var(--color-primary-content) !important;
     border-color: transparent;
 }
-
-.control-btn svg { width: 16px; height: 16px; }
 
 /* Animations */
 @keyframes pulse {
