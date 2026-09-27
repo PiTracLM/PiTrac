@@ -1,6 +1,5 @@
-/* Update page — only styles daisyUI/Tailwind can't handle */
+/* Update page: commit rows and build log line colors */
 
-/* Commit list items (built dynamically by JS) */
 .commit-item {
     display: flex;
     align-items: baseline;
@@ -33,24 +32,8 @@
     white-space: nowrap;
 }
 
-/* Terminal-style build log */
 .build-log {
-    background: #1e1e1e;
-    color: #d4d4d4;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 0.8125rem;
-    line-height: 1.5;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    overflow-y: auto;
     max-height: 400px;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-}
-
-[data-theme="dark"] .build-log {
-    background: #0d1117;
-    border: 1px solid oklch(15% 0.008 275);
 }
 
 .log-line {
@@ -58,17 +41,10 @@
     padding: 0.125rem 0.5rem;
 }
 
-.log-line.error { color: #f48771; }
-.log-line.update { color: #9cdcfe; }
-.log-line.git { color: #b5cea8; }
-.log-line.build { color: #d4d4d4; }
+.log-line.error { color: var(--color-error); }
+.log-line.update { color: var(--color-info); }
+.log-line.git { color: var(--color-success); }
 
-/* Update banner — position hook only; colours come from DaisyUI alert variants */
-.update-banner {
-    margin-bottom: 1.25rem;
-}
-
-/* Mobile */
 @media (max-width: 768px) {
     .commit-item {
         flex-direction: column;

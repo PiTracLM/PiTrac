@@ -1323,8 +1323,8 @@ class PiTracServer:
             return await self.update_manager.get_branches()
 
         @self.app.get("/api/update/check")
-        async def check_for_updates() -> Dict[str, Any]:
-            return await self.update_manager.check_for_updates()
+        async def check_for_updates(branch: Optional[str] = None) -> Dict[str, Any]:
+            return await self.update_manager.check_for_updates(branch=branch)
 
         @self.app.post("/api/update/start")
         async def start_update(request: Request) -> Dict[str, Any]:
@@ -1390,7 +1390,7 @@ class PiTracServer:
             services.append(
                 {
                     "id": "pitrac",
-                    "name": "PiTrac Camera 1",
+                    "name": "Launch monitor",
                     "status": "running" if pitrac_status["is_running"] else "stopped",
                     "pid": pitrac_status.get("pid"),
                 }

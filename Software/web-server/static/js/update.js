@@ -1,27 +1,36 @@
-/* exported checkForUpdates, switchBranch, cancelUpdate, clearLog */
+/* global api, escapeHtml, confirmDialog */
+/* exported checkForUpdates, switchBranch, cancelUpdate, startUpdate, onBranchChange */
 let currentBranch = null;
 let selectedBranch = null;
 
+const $ = id => document.getElementById(id);
+
 async function loadBranches() {
     try {
-        const resp = await fetch('/api/update/branches');
-        const data = await resp.json();
+        const data = await api('/api/update/branches');
         if (data.status !== 'ok') {
             showBanner(data.message, 'error');
             return;
         }
 
         currentBranch = data.current_branch;
-        const select = document.getElementById('branchSelect');
+        $('currentBranch').textContent = currentBranch;
+        const select = $('branchSelect');
         select.innerHTML = '';
 
-        data.branches.forEach(b => {
+        const addOption = (name, label) => {
             const opt = document.createElement('option');
-            opt.value = b.name;
-            opt.textContent = b.name + (b.name === currentBranch ? ' (current)' : '');
-            if (b.name === currentBranch) opt.selected = true;
+            opt.value = name;
+            opt.textContent = label;
             select.appendChild(opt);
-        });
+        };
+
+        const current = data.branches.find(b => b.name === currentBranch);
+        addOption(currentBranch, currentBranch + ' (current)' + (current ? ', ' + current.last_commit : ''));
+        data.branches
+            .filter(b => b.name !== currentBranch)
+            .forEach(b => addOption(b.name, b.name + ', ' + b.last_commit));
+        select.value = currentBranch;
 
         onBranchChange();
     } catch (e) {
@@ -30,50 +39,43 @@ async function loadBranches() {
 }
 
 function onBranchChange() {
-    const select = document.getElementById('branchSelect');
-    selectedBranch = select.value;
+    selectedBranch = $('branchSelect').value;
     const isSwitching = selectedBranch && selectedBranch !== currentBranch;
 
-    document.getElementById('updateBtn').style.display = isSwitching ? 'none' : '';
-    document.getElementById('switchBtn').style.display = isSwitching ? '' : 'none';
-
-    if (!isSwitching) {
-        document.getElementById('commitsSection').style.display = 'none';
-    }
+    $('updateBtn').classList.toggle('hidden', isSwitching);
+    $('switchBtn').classList.toggle('hidden', !isSwitching);
+    $('commitsSection').classList.add('hidden');
 }
 
 async function checkForUpdates() {
-    const btn = document.getElementById('checkBtn');
+    const btn = $('checkBtn');
     setBtnLoading(btn, true);
 
     try {
-        const resp = await fetch('/api/update/check');
-        const data = await resp.json();
+        const query = selectedBranch ? '?branch=' + encodeURIComponent(selectedBranch) : '';
+        const data = await api('/api/update/check' + query);
 
         if (data.status !== 'ok') {
             showBanner(data.message, 'error');
             return;
         }
 
-        document.getElementById('currentBranch').textContent = data.current_branch;
-        document.getElementById('currentHash').textContent = data.current_hash;
-        document.getElementById('lastBuild').textContent = formatTime(data.last_build);
-        document.getElementById('lastCheck').textContent = formatTime(data.last_check);
+        $('currentBranch').textContent = data.current_branch;
+        $('currentHash').textContent = data.current_hash;
+        $('lastBuild').textContent = formatTime(data.last_build);
+        $('lastCheck').textContent = formatTime(data.last_check);
 
-        if (data.warning) {
-            document.getElementById('warningRow').style.display = '';
-            document.getElementById('warningText').textContent = data.warning;
-        } else {
-            document.getElementById('warningRow').style.display = 'none';
-        }
+        $('warningRow').classList.toggle('hidden', !data.warning);
+        if (data.warning) $('warningText').textContent = data.warning;
 
         if (data.updates_available && data.commits.length > 0) {
             showCommits(data.commits);
-            document.getElementById('updateBtn').disabled = false;
+            $('updateBtn').disabled = false;
+            hideBanner();
         } else {
-            document.getElementById('commitsSection').style.display = 'none';
-            document.getElementById('updateBtn').disabled = true;
-            showBanner('Already up to date on ' + data.current_branch, 'success');
+            $('commitsSection').classList.add('hidden');
+            $('updateBtn').disabled = true;
+            showBanner('Already up to date on ' + (selectedBranch || data.current_branch), 'success');
         }
     } catch (e) {
         showBanner('Check failed: ' + e.message, 'error');
@@ -83,8 +85,8 @@ async function checkForUpdates() {
 }
 
 function showCommits(commits) {
-    document.getElementById('commitCount').textContent = commits.length;
-    const list = document.getElementById('commitList');
+    $('commitCount').textContent = commits.length;
+    const list = $('commitList');
     list.innerHTML = '';
 
     commits.forEach(c => {
@@ -97,25 +99,34 @@ function showCommits(commits) {
         list.appendChild(item);
     });
 
-    document.getElementById('commitsSection').style.display = '';
+    $('commitsSection').classList.remove('hidden');
 }
 
 async function startUpdate(force) {
     const body = { force: force };
-    const branch = document.getElementById('branchSelect').value;
-    if (branch && branch !== currentBranch) {
+    const branch = $('branchSelect').value;
+    const isSwitching = branch && branch !== currentBranch;
+    if (isSwitching) {
         body.branch = branch;
     }
+
+    const confirmed = await confirmDialog(isSwitching
+        ? {
+            title: `Switch to ${branch} and rebuild?`,
+            body: 'This rebuilds everything and can take several minutes.',
+            confirmLabel: 'Switch and rebuild',
+        }
+        : {
+            title: 'Update and rebuild?',
+            body: 'PiTrac stops until the rebuild finishes.',
+            confirmLabel: 'Update and rebuild',
+        });
+    if (!confirmed) return;
 
     setUpdatingState(true);
 
     try {
-        const resp = await fetch('/api/update/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
-        const data = await resp.json();
+        const data = await api('/api/update/start', { method: 'POST', body });
 
         if (data.status !== 'started') {
             showBanner(data.message, 'error');
@@ -123,7 +134,7 @@ async function startUpdate(force) {
             return;
         }
 
-        document.getElementById('logSection').style.display = '';
+        $('logSection').classList.remove('hidden');
         showBanner('Update in progress. The server will restart when done.', 'info');
         pollStatus();
     } catch (e) {
@@ -137,10 +148,19 @@ function switchBranch() {
 }
 
 async function cancelUpdate() {
+    const confirmed = await confirmDialog({
+        title: 'Cancel the update?',
+        body: 'Cancelling now may leave PiTrac half-installed.',
+        confirmLabel: 'Cancel update',
+        danger: true,
+    });
+    if (!confirmed) return;
+
     try {
-        await fetch('/api/update/cancel', { method: 'POST' });
+        await api('/api/update/cancel', { method: 'POST' });
+        stopPolling();
         setUpdatingState(false);
-        showBanner('Update cancelled.', 'info');
+        showBanner('Update cancelled.', 'error');
     } catch (e) {
         showBanner('Failed to cancel: ' + e.message, 'error');
     }
@@ -148,29 +168,28 @@ async function cancelUpdate() {
 
 let pollTimer = null;
 
-function pollStatus() {
+function stopPolling() {
     if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+}
+
+function pollStatus() {
+    stopPolling();
 
     pollTimer = setInterval(async () => {
         try {
-            const resp = await fetch('/api/update/status');
-            const data = await resp.json();
+            const data = await api('/api/update/status');
 
             renderLog(data.log_tail || []);
 
             if (data.status === 'idle' || data.status === 'failed') {
-                clearInterval(pollTimer);
-                pollTimer = null;
+                stopPolling();
                 setUpdatingState(false);
-
-                if (data.status === 'failed') {
-                    showBanner('Update failed: ' + (data.error || 'unknown error'), 'error');
-                }
+                showLastResult(data);
             }
-        } catch (e) {
-            // Server likely restarting — wait and try to reconnect
-            clearInterval(pollTimer);
-            pollTimer = null;
+        } catch {
+            // Server likely restarting, wait and try to reconnect
+            stopPolling();
             showBanner('Server restarting... reconnecting.', 'info');
             waitForRestart();
         }
@@ -184,15 +203,19 @@ function waitForRestart() {
     const timer = setInterval(async () => {
         attempts++;
         try {
-            const resp = await fetch('/health');
-            if (resp.ok) {
-                clearInterval(timer);
-                showBanner('Update complete! Server restarted.', 'success');
-                setUpdatingState(false);
-                loadBranches();
-                loadStatus();
+            const health = await fetch('/health');
+            if (!health.ok) throw new Error('not ready');
+            clearInterval(timer);
+            const data = await api('/api/update/status');
+            setUpdatingState(false);
+            if (data.last_result === 'success') {
+                showBanner('Update complete. Server restarted.', 'success');
+            } else {
+                showLastResult(data, 'Server restarted, but the update did not report success.');
             }
-        } catch (e) {
+            loadBranches();
+            loadStatus();
+        } catch {
             if (attempts >= maxAttempts) {
                 clearInterval(timer);
                 showBanner('Server did not come back after 60s. Check logs.', 'error');
@@ -203,7 +226,8 @@ function waitForRestart() {
 }
 
 function renderLog(lines) {
-    const el = document.getElementById('buildLog');
+    const el = $('buildLog');
+    const follow = el.scrollHeight - el.scrollTop - el.clientHeight <= 40;
     el.innerHTML = '';
 
     lines.forEach(line => {
@@ -212,41 +236,43 @@ function renderLog(lines) {
         if (line.includes('[ERROR]')) div.classList.add('error');
         else if (line.includes('[UPDATE]')) div.classList.add('update');
         else if (line.includes('[GIT]')) div.classList.add('git');
-        else div.classList.add('build');
         div.textContent = line;
         el.appendChild(div);
     });
 
-    el.scrollTop = el.scrollHeight;
-}
-
-function clearLog() {
-    document.getElementById('buildLog').innerHTML = '';
+    if (follow) el.scrollTop = el.scrollHeight;
 }
 
 function setUpdatingState(updating) {
-    document.getElementById('checkBtn').disabled = updating;
-    document.getElementById('updateBtn').disabled = updating;
-    document.getElementById('switchBtn').disabled = updating;
-    document.getElementById('branchSelect').disabled = updating;
-    document.getElementById('cancelBtn').style.display = updating ? '' : 'none';
+    $('checkBtn').disabled = updating;
+    $('updateBtn').disabled = updating;
+    $('switchBtn').disabled = updating;
+    $('branchSelect').disabled = updating;
+    $('cancelBtn').classList.toggle('hidden', !updating);
 
-    if (!updating) {
-        document.getElementById('updateBtn').style.display = '';
-        document.getElementById('switchBtn').style.display = 'none';
-        onBranchChange();
-    }
+    if (!updating) onBranchChange();
 }
 
 function showBanner(message, type) {
-    let banner = document.querySelector('.update-banner');
-    if (!banner) {
-        banner = document.createElement('div');
-        const section = document.querySelector('.update-section');
-        section.insertBefore(banner, section.querySelector('.status-card'));
-    }
-    banner.className = 'update-banner alert alert-' + type;
+    const banner = $('updateBanner');
+    banner.className = 'alert alert-' + type + ' -mt-2';
     banner.textContent = message;
+}
+
+function hideBanner() {
+    $('updateBanner').className = 'alert hidden';
+}
+
+function showLastResult(data, fallback) {
+    if (data.last_result === 'success') {
+        showBanner('Last update: ' + formatTime(data.last_update), 'success');
+    } else if (data.last_result === 'failed') {
+        showBanner('Last update failed: ' + (data.error || 'unknown error'), 'error');
+    } else if (data.last_result === 'cancelled') {
+        showBanner('Last update was cancelled.', 'error');
+    } else if (fallback) {
+        showBanner(fallback, 'error');
+    }
 }
 
 function setBtnLoading(btn, loading) {
@@ -265,29 +291,27 @@ function setBtnLoading(btn, loading) {
 
 async function loadStatus() {
     try {
-        const resp = await fetch('/api/update/status');
-        const data = await resp.json();
+        const data = await api('/api/update/status');
 
-        if (!data.configured) {
-            showBanner('Update system not configured. Run sudo ./build.sh dev first.', 'error');
-            return;
-        }
+        $('notConfigured').classList.toggle('hidden', data.configured);
+        $('updateControls').classList.toggle('hidden', !data.configured);
+        if (!data.configured) return false;
 
-        document.getElementById('lastBuild').textContent = formatTime(data.last_build);
-        document.getElementById('lastCheck').textContent = formatTime(data.last_check);
+        $('lastBuild').textContent = formatTime(data.last_build);
+        $('lastCheck').textContent = formatTime(data.last_check);
 
-        if (data.last_update) {
-            showBanner('Last update: ' + formatTime(data.last_update), 'success');
-        }
+        showLastResult(data);
 
         if (data.status === 'updating') {
             setUpdatingState(true);
-            document.getElementById('logSection').style.display = '';
+            $('logSection').classList.remove('hidden');
             renderLog(data.log_tail || []);
             pollStatus();
         }
+        return true;
     } catch (e) {
         console.error('Failed to load status:', e);
+        return false;
     }
 }
 
@@ -298,13 +322,6 @@ function formatTime(iso) {
     return d.toLocaleString();
 }
 
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    loadStatus();
-    loadBranches();
+document.addEventListener('DOMContentLoaded', async () => {
+    if (await loadStatus()) loadBranches();
 });

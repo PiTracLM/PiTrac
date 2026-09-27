@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import page_header %}
 
 {% block title %}PiTrac Logs{% endblock %}
 
@@ -7,65 +8,54 @@
 {% endblock %}
 
 {% block content %}
-<div class="logs-container flex flex-col gap-4 h-[calc(100vh-90px)]">
+<div class="flex flex-col h-[calc(100vh-90px)] min-h-[28rem]">
 
-    <!-- Header / controls -->
-    <div class="card bg-base-200 border border-base-300 shadow-sm p-4 mx-2 sm:mx-4">
-        <div class="flex flex-wrap items-center gap-4 md:gap-6">
+    {% call page_header("file-text", "Logs") %}
+        <label for="serviceSelect" class="sr-only">Service</label>
+        <select id="serviceSelect" class="select select-sm w-48">
+            <option value="">Loading services...</option>
+        </select>
+        <span id="serviceStatus" class="badge badge-soft hidden"></span>
+        <button id="pauseButton" class="btn btn-sm btn-ghost" aria-label="Pause log stream" title="Pause log stream">
+            <span id="pauseIcon" class="inline-flex"><i data-lucide="pause" class="icon-sm"></i></span>
+            <span class="btn-text max-md:hidden">Pause</span>
+        </button>
+        <button id="clearButton" class="btn btn-sm btn-ghost" aria-label="Clear view" title="Clear view">
+            <i data-lucide="eraser" class="icon-sm"></i>
+            <span class="btn-text max-md:hidden">Clear view</span>
+        </button>
+        <button id="downloadButton" class="btn btn-sm btn-ghost" aria-label="Download log" title="Download log">
+            <i data-lucide="download" class="icon-sm"></i>
+            <span class="btn-text max-md:hidden">Download</span>
+        </button>
+    {% endcall %}
 
-            <!-- Service picker -->
-            <div class="flex items-center gap-3 min-w-[220px] max-md:w-full max-md:flex-col max-md:items-stretch">
-                <label for="serviceSelect" class="font-semibold whitespace-nowrap">Service:</label>
-                <select id="serviceSelect" class="select select-sm flex-1">
-                    <option value="">Loading services...</option>
-                </select>
+    <div class="card bg-base-200 border border-base-300 shadow-sm flex-1 min-h-0 p-4 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            <div class="flex items-center gap-2" role="status">
+                <span id="connectionDot" class="inline-block size-2 rounded-full bg-base-content/30"></span>
+                <span id="connectionText">Not connected</span>
             </div>
-
-            <!-- Service status + log stream connection -->
-            <div class="flex items-center gap-4 flex-1">
-                <span id="serviceStatus" class="service-status" style="display: none;"></span>
-
-                <div class="flex items-center gap-2 text-sm">
-                    <span class="status-indicator disconnected" id="connectionIndicator"></span>
-                    <span class="opacity-60 text-xs uppercase tracking-wide">Log Stream:</span>
-                    <span id="connectionText">Disconnected</span>
-                </div>
-            </div>
-
-            <!-- Action buttons -->
-            <div class="flex gap-2 max-md:w-full max-md:mt-2">
-                <button id="pauseButton" class="btn btn-sm btn-ghost max-md:flex-1">
-                    <i data-lucide="pause" class="icon-sm" id="pauseIcon"></i>
-                    <span class="btn-text max-md:hidden">Pause</span>
-                </button>
-                <button id="clearButton" class="btn btn-sm btn-ghost text-error max-md:flex-1">
-                    <i data-lucide="trash-2" class="icon-sm"></i>
-                    <span class="btn-text max-md:hidden">Clear</span>
-                </button>
-                <button id="downloadButton" class="btn btn-sm btn-ghost max-md:flex-1">
-                    <i data-lucide="download" class="icon-sm"></i>
-                    <span class="btn-text max-md:hidden">Download</span>
-                </button>
-            </div>
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="errorsOnly" class="toggle toggle-sm">
+                <span>Errors only</span>
+            </label>
+            <label for="logFilter" class="sr-only">Filter lines</label>
+            <input type="search" id="logFilter" class="input input-sm flex-1 min-w-[10rem] max-w-xs" placeholder="Filter lines" autocomplete="off">
         </div>
-    </div>
 
-    <!-- Log viewer + stats -->
-    <div class="card bg-base-200 border border-base-300 shadow-sm flex-1 mx-2 sm:mx-4 mb-4 p-4 flex flex-col overflow-hidden">
-        <div class="log-viewer empty" id="logViewer"></div>
-
-        <div class="divider my-1"></div>
+        <div class="terminal log-viewer flex-1 min-h-0" id="logViewer" data-empty="Not connected" tabindex="0" aria-label="Log output"></div>
 
         <div class="flex flex-wrap gap-x-6 gap-y-1 text-sm">
-            <div class="stat-item flex items-center gap-2">
+            <div class="flex items-center gap-2">
                 <span class="font-semibold opacity-60">Lines:</span>
                 <span class="font-mono" id="lineCount">0</span>
             </div>
-            <div class="stat-item flex items-center gap-2">
+            <div class="flex items-center gap-2">
                 <span class="font-semibold opacity-60">Errors:</span>
                 <span class="font-mono" id="errorCount">0</span>
             </div>
-            <div class="stat-item flex items-center gap-2">
+            <div class="flex items-center gap-2">
                 <span class="font-semibold opacity-60">Warnings:</span>
                 <span class="font-mono" id="warningCount">0</span>
             </div>

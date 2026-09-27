@@ -239,6 +239,10 @@ class TestLogsAPI:
                 time.sleep(0.1)
                 assert True
 
+    def test_logs_services_label(self, client):
+        names = [s["name"] for s in client.get("/api/logs/services").json()["services"]]
+        assert "Launch monitor" in names
+
     def test_get_log_services_structure(self, client):
         """Test the structure of log services response"""
         response = client.get("/api/logs/services")
