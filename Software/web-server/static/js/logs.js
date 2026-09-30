@@ -118,6 +118,7 @@ function connectSocket(service) {
             clearLogs();
             resetScrollbackState(null);
             pausedQueue = [];
+            updatePauseButton();
             viewerEl().dataset.empty = 'Waiting for log lines...';
             updateConnectionStatus(true);
             sock.send({ service });
@@ -134,17 +135,17 @@ function closeSocket() {
 }
 
 function handleMessage(data) {
-    if (data.type === 'anchor') {
-        const isRestart = currentAnchor !== null;
-        resetScrollbackState({ file: data.file, offset: data.offset });
-        if (isRestart) addEntry(makeLogEntry('pitrac restarted', 'info'));
-        return;
-    }
-
     if (isPaused) {
         pausedQueue.push(data);
         if (pausedQueue.length > maxLogLines) pausedQueue.shift();
         updatePauseButton();
+        return;
+    }
+
+    if (data.type === 'anchor') {
+        const isRestart = currentAnchor !== null;
+        resetScrollbackState({ file: data.file, offset: data.offset });
+        if (isRestart) addEntry(makeLogEntry('pitrac restarted', 'info'));
         return;
     }
     appendLog(data);
@@ -289,7 +290,7 @@ function togglePause() {
     if (!isPaused) {
         const queued = pausedQueue;
         pausedQueue = [];
-        queued.forEach(appendLog);
+        queued.forEach(handleMessage);
         const viewer = viewerEl();
         viewer.scrollTop = viewer.scrollHeight;
     }

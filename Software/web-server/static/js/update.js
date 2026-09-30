@@ -157,7 +157,11 @@ async function cancelUpdate() {
     if (!confirmed) return;
 
     try {
-        await api('/api/update/cancel', { method: 'POST' });
+        const data = await api('/api/update/cancel', { method: 'POST' });
+        if (data.status !== 'cancelled') {
+            showBanner(data.message, 'error');
+            return;
+        }
         stopPolling();
         setUpdatingState(false);
         showBanner('Update cancelled.', 'error');
@@ -188,7 +192,13 @@ function pollStatus() {
                 showLastResult(data);
             }
         } catch {
-            // Server likely restarting, wait and try to reconnect
+            // One failed poll is retried; only an unreachable /health means a restart
+            try {
+                const health = await fetch('/health');
+                if (health.ok) return;
+            } catch {
+                // fall through to restart handling
+            }
             stopPolling();
             showBanner('Server restarting... reconnecting.', 'info');
             waitForRestart();
@@ -205,8 +215,13 @@ function waitForRestart() {
         try {
             const health = await fetch('/health');
             if (!health.ok) throw new Error('not ready');
-            clearInterval(timer);
             const data = await api('/api/update/status');
+            clearInterval(timer);
+            if (data.status === 'updating') {
+                setUpdatingState(true);
+                pollStatus();
+                return;
+            }
             setUpdatingState(false);
             if (data.last_result === 'success') {
                 showBanner('Update complete. Server restarted.', 'success');
@@ -307,10 +322,12 @@ async function loadStatus() {
             $('logSection').classList.remove('hidden');
             renderLog(data.log_tail || []);
             pollStatus();
+            return false;
         }
         return true;
     } catch (e) {
         console.error('Failed to load status:', e);
+        showBanner('Failed to load update status: ' + e.message, 'error');
         return false;
     }
 }
