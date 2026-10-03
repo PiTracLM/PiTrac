@@ -153,7 +153,7 @@ class TestingToolsManager:
         # One tool at a time: they share config_manager.transient_overrides
         running = next(iter(self.running_processes), None)
         if running:
-            return {"status": "error", "message": f"Tool {running} is already running"}
+            return {"status": "error", "message": f"{self.tools[running]['name']} is already running"}
         # Reserved with no await since the check, so a run arriving during the spawn sees it
         self.running_processes[tool_id] = None
         self.started_at[tool_id] = time.time()
@@ -304,11 +304,12 @@ class TestingToolsManager:
         Returns:
             Dict with status
         """
+        name = self.tools.get(tool_id, {}).get("name", tool_id)
         if tool_id not in self.running_processes:
-            return {"status": "error", "message": f"Tool {tool_id} is not running"}
+            return {"status": "error", "message": f"{name} is not running"}
         process = self.running_processes[tool_id]
         if process is None:
-            return {"status": "error", "message": f"Tool {tool_id} is still starting"}
+            return {"status": "error", "message": f"{name} is still starting"}
 
         try:
             self.stopping.add(tool_id)

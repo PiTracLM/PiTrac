@@ -120,7 +120,7 @@ class TestRunTool:
         with patch("asyncio.create_subprocess_exec") as create:
             result = await testing_manager.run_tool("camera1_still")
 
-        assert result == {"status": "error", "message": "Tool pulse_test is already running"}
+        assert result == {"status": "error", "message": "Strobe Pulse Test is already running"}
         create.assert_not_called()
         assert mock_config_manager.transient_overrides == {"logging": {"level": "trace"}}
 
@@ -141,7 +141,7 @@ class TestRunTool:
             release.set()
             first_result = await first
 
-        assert second == {"status": "error", "message": "Tool pulse_test is already running"}
+        assert second == {"status": "error", "message": "Strobe Pulse Test is already running"}
         assert first_result == {"status": "error", "message": "spawn failed"}
         assert testing_manager.running_processes == {}
 
@@ -323,7 +323,7 @@ class TestStopTool:
 
         result = await testing_manager.stop_tool("pulse_test")
 
-        assert result == {"status": "error", "message": "Tool pulse_test is still starting"}
+        assert result == {"status": "error", "message": "Strobe Pulse Test is still starting"}
         assert testing_manager.running_processes == {"pulse_test": None}
 
     @pytest.mark.asyncio
@@ -397,7 +397,7 @@ class TestStopTool:
                 log_read.set()
                 await first
 
-        assert second == {"status": "error", "message": "Tool pulse_test is already running"}
+        assert second == {"status": "error", "message": "Strobe Pulse Test is already running"}
         assert testing_manager.running_processes == {}
         assert mock_config_manager.transient_overrides == {}
 

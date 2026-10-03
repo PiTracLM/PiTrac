@@ -60,7 +60,7 @@ class TestPiTracAPI:
         response = client.post(f"/api/pitrac/{action}")
 
         assert response.json()["status"] == "error"
-        assert "pulse_test" in response.json()["message"]
+        assert "Strobe Pulse Test" in response.json()["message"]
         launch.assert_not_called()
 
     def test_pitrac_status(self, client, server_instance):

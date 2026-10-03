@@ -18,7 +18,7 @@
 
     <div class="card bg-base-200 border border-base-300 shadow-sm">
         <div class="card-body p-4 sm:p-6">
-            <h2 class="text-xl font-semibold text-primary mb-4">Image pipeline</h2>
+            <h2 class="text-lg font-semibold mb-4">Image pipeline</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                 <div class="flex flex-col gap-4">
                     <div class="upload-area flex flex-col items-center justify-center gap-4 w-full min-h-[200px]
@@ -47,7 +47,7 @@
     {% for id, title in [("hardware", "Hardware tests"), ("camera", "Camera tests"), ("calibration", "Calibration tests"), ("testing", "Testing suite")] %}
     <div class="card bg-base-200 border border-base-300 shadow-sm">
         <div class="card-body p-4 sm:p-6">
-            <h2 class="text-xl font-semibold text-primary mb-4">{{ title }}</h2>
+            <h2 class="text-lg font-semibold mb-4">{{ title }}</h2>
             <div class="grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4" id="{{ id }}-tools"></div>
         </div>
     </div>

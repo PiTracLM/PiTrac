@@ -71,14 +71,19 @@ async function loadStorageUsage() {
 // -- Sessions --
 
 async function loadSessions({ more = false } = {}) {
+    const moreBtn = byId('sessions-more');
+    if (more && moreBtn.disabled) return;
     const offset = more ? sessions.length : 0;
     const limit = more ? PAGE_SIZE : Math.max(PAGE_SIZE, sessions.length);
     let data;
+    if (more) moreBtn.disabled = true;
     try {
         data = await api(`/api/sessions?limit=${limit}&offset=${offset}`);
     } catch (err) {
         toast(`Could not load sessions: ${err.message}`, 'error');
         return;
+    } finally {
+        if (more) moreBtn.disabled = false;
     }
     sessions = more ? sessions.concat(data.sessions) : data.sessions;
     hasMore = data.has_more;
@@ -97,7 +102,7 @@ function renderSessions() {
         const pick = el('button', 'session-pick flex-1 min-w-0 text-left px-3 py-2');
         pick.append(el('div', 'text-sm font-medium truncate', sessionLabel(s.started_at)),
             el('div', 'text-xs opacity-60', shotCount(s.shot_count)));
-        const del = el('button', 'session-delete btn btn-ghost btn-sm btn-square text-error');
+        const del = el('button', 'session-delete btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-error focus-visible:text-error');
         del.setAttribute('aria-label', `Delete session from ${sessionLabel(s.started_at)}`);
         del.title = 'Delete session';
         del.innerHTML = '<i data-lucide="trash-2" class="icon-sm"></i>';
@@ -170,10 +175,9 @@ function renderSessionHeader() {
     const session = sessions.find(s => s.id === selectedId);
     if (!session) return;
     byId('session-title').textContent = sessionLabel(session.started_at);
-    const speeds = shots.map(s => s.speed).filter(v => v != null);
-    const parts = [shotCount(shots.length || session.shot_count)];
-    if (speeds.length) parts.push(`Average ball speed ${formatNumber(speeds.reduce((a, b) => a + b, 0) / speeds.length, 1)} mph`);
-    byId('session-summary').textContent = parts.join(' · ');
+    const speeds = shots.map(s => s.speed).filter(v => v > 0);
+    const average = speeds.length ? `${formatNumber(speeds.reduce((a, b) => a + b, 0) / speeds.length, 1)} mph` : '--';
+    byId('session-summary').textContent = `${shotCount(shots.length || session.shot_count)} · Average ball speed ${average}`;
 }
 
 async function loadShots() {
@@ -200,6 +204,7 @@ async function loadShots() {
 
 function renderShots() {
     const wrap = byId('shots-wrap');
+    const focusedId = document.activeElement?.closest?.('.shot-row')?.dataset.shotId;
     if (!shots.length) {
         wrap.replaceChildren(el('p', 'p-6 text-center text-sm opacity-60', 'No shots in this session.'));
         return;
@@ -222,6 +227,7 @@ function renderShots() {
     });
     table.append(body);
     wrap.replaceChildren(table);
+    if (focusedId) wrap.querySelector(`.shot-row[data-shot-id="${focusedId}"]`)?.focus();
     if (expandedId !== null && shots.some(s => s.id === expandedId)) expandShot(expandedId);
     else expandedId = null;
 }

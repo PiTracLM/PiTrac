@@ -1097,6 +1097,8 @@ class PiTracServer:
         @self.app.post("/api/testing/run/{tool_id}")
         async def run_testing_tool(tool_id: str) -> Dict[str, Any]:
             """Run a specific testing tool"""
+            if tool_id not in self.testing_manager.tools:
+                return {"status": "error", "message": f"Unknown tool: {tool_id}"}
             safety = self.strobe_calibration_manager.is_strobe_safe()
             if not safety["safe"]:
                 return {"status": "error", "message": safety["reason"]}
@@ -1664,7 +1666,8 @@ class PiTracServer:
         running = self.testing_manager.get_running_tools()
         if not running:
             return None
-        return {"status": "error", "message": f"Testing tool {running[0]} is running. Stop it before starting PiTrac."}
+        name = self.testing_manager.tools[running[0]]["name"]
+        return {"status": "error", "message": f"{name} is running. Stop it before starting PiTrac."}
 
     async def _run_tool_async(self, tool_id: str) -> None:
         """Helper method to run a testing tool asynchronously"""

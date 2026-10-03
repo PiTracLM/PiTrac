@@ -84,22 +84,13 @@ class TestTestingToolsAPI:
         assert "started" in data["message"]
 
     @patch("testing_tools_manager.TestingToolsManager.run_tool")
-    def test_run_nonexistent_testing_tool(self, mock_run_tool, client):
-        """Test running a non-existent testing tool"""
-        mock_run_tool.return_value = {
-            "success": False,
-            "tool_id": "nonexistent_tool",
-            "status": "failed",
-            "message": "Tool not found",
-            "error": "Tool 'nonexistent_tool' not found",
-        }
-
+    def test_run_nonexistent_testing_tool(self, mock_run_tool, client, server_instance):
+        """An unknown tool is refused without starting a run or storing a result"""
         response = client.post("/api/testing/run/nonexistent_tool")
         assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "started"
-        assert data["tool_id"] == "nonexistent_tool"
-        assert "started" in data["message"]
+        assert response.json() == {"status": "error", "message": "Unknown tool: nonexistent_tool"}
+        mock_run_tool.assert_not_called()
+        assert server_instance.testing_manager.last_results == {}
 
     @patch("testing_tools_manager.TestingToolsManager.stop_tool")
     def test_stop_testing_tool_success(self, mock_stop_tool, client):
@@ -225,7 +216,7 @@ class TestTestingToolsAPI:
             "success": False,
             "tool_id": "pulse_test",
             "status": "already_running",
-            "message": "Tool is already running",
+            "message": "Strobe Pulse Test is already running",
             "pid": 12345,
         }
 

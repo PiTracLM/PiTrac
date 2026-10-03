@@ -17,7 +17,7 @@
     <div id="history-main" class="grid grid-cols-1 lg:grid-cols-[18rem_minmax(0,1fr)] gap-4 items-start">
 
         <div class="card bg-base-200 border border-base-300 shadow-sm hidden lg:flex flex-col sticky top-4 max-h-[calc(100vh-2rem)]">
-            <h2 class="p-3 border-b border-base-300 font-semibold text-sm uppercase tracking-wide opacity-60">Sessions</h2>
+            <h2 class="p-3 border-b border-base-300 text-xs font-semibold uppercase tracking-wide text-base-content/60">Sessions</h2>
             <div id="sessions-list" class="overflow-y-auto p-2 flex flex-col gap-1">
                 <div class="flex justify-center py-6"><span class="loading loading-spinner loading-md text-primary"></span></div>
             </div>
@@ -28,14 +28,14 @@
 
         <div class="flex gap-2 items-center lg:hidden">
             <select id="sessions-select" class="select w-full" aria-label="Session"></select>
-            <button id="session-delete-phone" class="btn btn-ghost btn-square text-error" aria-label="Delete this session" title="Delete this session">
+            <button id="session-delete-phone" class="btn btn-ghost btn-square text-base-content/40 hover:text-error focus-visible:text-error" aria-label="Delete this session" title="Delete this session">
                 <i data-lucide="trash-2" class="icon-sm"></i>
             </button>
         </div>
 
         <div class="card bg-base-200 border border-base-300 shadow-sm min-w-0">
             <div class="p-4 border-b border-base-300">
-                <h2 id="session-title" class="font-semibold">&nbsp;</h2>
+                <h2 id="session-title" class="text-lg font-semibold">&nbsp;</h2>
                 <p id="session-summary" class="text-sm opacity-60">&nbsp;</p>
             </div>
             <div id="shots-wrap" class="overflow-x-auto">

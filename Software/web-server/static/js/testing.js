@@ -136,7 +136,7 @@ function finishTool(toolId, result, live) {
     const name = tools[toolId]?.name || toolId;
     if (result.status === 'success') {
         if (result.image_url) showOutput(toolId);
-        else toast(`${name} passed`, 'success');
+        else toast(`${name} passed`, 'success', result.output ? { actionLabel: 'View output', onAction: () => showOutput(toolId) } : {});
     } else if (result.status === 'error') {
         toast(result.message || `${name} could not run`, 'error');
     } else if (result.status !== 'stopped') {
