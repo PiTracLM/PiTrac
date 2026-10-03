@@ -1,309 +1,368 @@
 // Shot history page
-let selectedSessionId = null;
+/* global api, toast, confirmDialog, openSocket, formatNumber, formatSided */
 
-function emptyState(msg, isError = false) {
-    const tone = isError ? 'text-error' : 'opacity-40';
-    return `<div class="text-sm ${tone} text-center py-4">${escapeHtml(msg)}</div>`;
+const PAGE_SIZE = 50;
+
+// Stems from the image filename defaults in configurations.json (gs_config.user_interface.kWebServer*)
+const IMAGE_LABELS = {
+    spin_ball_1_gray_image1: 'Spin, ball 1',
+    spin_ball_2_gray_image1: 'Spin, ball 2',
+    ball1_rotated_by_best_angles: 'Spin, best fit rotation',
+    ball_exposure_candidates: 'Ball exposure candidates',
+    log_cam2_last_strobed_img: 'Camera 2 strobed shot',
+    log_ball_final_found_ball_img: 'Teed ball',
+    log_cam1_search_area_img: 'Camera 1 search area',
+};
+
+const COLUMNS = [
+    ['Speed (mph)', (s) => formatNumber(s.speed, 1)],
+    ['Launch (°)', (s) => formatNumber(s.launch_angle, 1)],
+    ['Side (°)', (s) => formatSided(s.side_angle, 1)],
+    ['Back spin (rpm)', (s) => formatNumber(s.back_spin, 0)],
+    ['Side spin (rpm)', (s) => formatSided(s.side_spin, 0)],
+];
+
+let sessions = [];
+let hasMore = false;
+let selectedId = null;
+let shots = [];
+let expandedId = null;
+let shotsRequest = 0;
+const shotDetails = new Map();
+
+const byId = (id) => document.getElementById(id);
+
+function el(tag, className = '', text = '') {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text) node.textContent = text;
+    return node;
 }
 
-function loadingState() {
-    return '<div class="flex justify-center py-6"><span class="loading loading-spinner loading-md text-primary"></span></div>';
+function sessionLabel(iso) {
+    const d = new Date(iso);
+    const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const today = new Date();
+    const days = Math.round((new Date(today).setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86400000);
+    if (days === 0) return `Today, ${time}`;
+    if (days === 1) return `Yesterday, ${time}`;
+    const opts = { month: 'short', day: 'numeric' };
+    if (d.getFullYear() !== today.getFullYear()) opts.year = 'numeric';
+    return `${d.toLocaleDateString([], opts)}, ${time}`;
+}
+
+const shotCount = (n) => `${n} shot${n === 1 ? '' : 's'}`;
+
+function formatMb(mb) {
+    return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`;
 }
 
 async function loadStorageUsage() {
+    const target = byId('storage-usage');
     try {
-        const resp = await fetch('/api/storage/usage');
-        const data = await resp.json();
-        const el = document.getElementById('storage-usage');
-        const used = data.used_mb >= 1024
-            ? (data.used_mb / 1024).toFixed(1) + ' GB'
-            : data.used_mb + ' MB';
-        const cap = data.cap_mb >= 1024
-            ? (data.cap_mb / 1024).toFixed(1) + ' GB'
-            : data.cap_mb + ' MB';
-        el.textContent = `${used} of ${cap} used`;
+        const data = await api('/api/storage/usage');
+        target.textContent = `Images use ${formatMb(data.used_mb)} of ${formatMb(data.cap_mb)}`;
     } catch (err) {
         console.error('Failed to load storage usage:', err);
-        document.getElementById('storage-usage').textContent = 'Storage info unavailable';
+        target.textContent = 'Storage usage unavailable';
     }
 }
 
-async function loadSessions() {
-    const container = document.getElementById('sessions-list');
+// -- Sessions --
+
+async function loadSessions({ more = false } = {}) {
+    const offset = more ? sessions.length : 0;
+    const limit = more ? PAGE_SIZE : Math.max(PAGE_SIZE, sessions.length);
+    let data;
     try {
-        const resp = await fetch('/api/sessions');
-        const sessions = await resp.json();
-
-        if (sessions.length === 0) {
-            container.innerHTML = emptyState('No sessions yet.');
-            return;
-        }
-
-        const list = document.createElement('ul');
-        list.className = 'list bg-base-100 rounded-box';
-
-        sessions.forEach(session => {
-            const row = document.createElement('li');
-            row.className = 'list-row items-center cursor-pointer hover:bg-base-200 transition-colors';
-            row.dataset.sessionId = session.id;
-
-            const started = new Date(session.started_at).toLocaleString();
-            const label = session.label ? `<div class="font-medium text-sm">${escapeHtml(session.label)}</div>` : '';
-
-            row.innerHTML = `
-                <div class="list-col-grow min-w-0">
-                    ${label}
-                    <div class="text-xs opacity-60">${started}</div>
-                    <div class="text-xs opacity-50 mt-0.5">${session.shot_count} shot${session.shot_count !== 1 ? 's' : ''}</div>
-                </div>
-                <button class="btn btn-xs btn-ghost text-error delete-session-btn" data-session-id="${session.id}" title="Delete session" aria-label="Delete session">
-                    <i data-lucide="trash-2" class="icon-sm"></i>
-                </button>
-            `;
-
-            list.appendChild(row);
-        });
-
-        container.innerHTML = '';
-        container.appendChild(list);
-
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-
-        // re-select the previously selected session if it still exists
-        if (selectedSessionId !== null) {
-            if (container.querySelector(`[data-session-id="${selectedSessionId}"]`)) {
-                highlightSession(selectedSessionId);
-            } else {
-                selectedSessionId = null;
-                clearShots();
-            }
-        }
+        data = await api(`/api/sessions?limit=${limit}&offset=${offset}`);
     } catch (err) {
-        console.error('Failed to load sessions:', err);
-        container.innerHTML = emptyState('Failed to load sessions.', true);
+        toast(`Could not load sessions: ${err.message}`, 'error');
+        return;
     }
+    sessions = more ? sessions.concat(data.sessions) : data.sessions;
+    hasMore = data.has_more;
+    renderSessions();
+    if (!sessions.some(s => s.id === selectedId)) await selectSession(sessions.length ? sessions[0].id : null);
 }
 
-function clearShots() {
-    document.getElementById('shots-heading').textContent = 'Shots';
-    document.getElementById('shots-list').innerHTML = emptyState('Select a session to view shots.');
-    clearDetail();
-}
+function renderSessions() {
+    byId('history-empty').classList.toggle('hidden', sessions.length > 0);
+    byId('history-main').classList.toggle('hidden', sessions.length === 0);
 
-function clearDetail() {
-    document.getElementById('shot-detail').innerHTML = emptyState('Select a shot to view details.');
-}
+    const list = byId('sessions-list');
+    list.replaceChildren(...sessions.map(s => {
+        const row = el('div', 'session-row flex items-center gap-1 rounded-box hover:bg-base-300');
+        row.dataset.sessionId = s.id;
+        const pick = el('button', 'session-pick flex-1 min-w-0 text-left px-3 py-2');
+        pick.append(el('div', 'text-sm font-medium truncate', sessionLabel(s.started_at)),
+            el('div', 'text-xs opacity-60', shotCount(s.shot_count)));
+        const del = el('button', 'session-delete btn btn-ghost btn-sm btn-square text-error');
+        del.setAttribute('aria-label', `Delete session from ${sessionLabel(s.started_at)}`);
+        del.title = 'Delete session';
+        del.innerHTML = '<i data-lucide="trash-2" class="icon-sm"></i>';
+        row.append(pick, del);
+        return row;
+    }));
+    byId('sessions-more-wrap').classList.toggle('hidden', !hasMore);
 
-async function loadShots(sessionId) {
-    const container = document.getElementById('shots-list');
-    container.innerHTML = loadingState();
-
-    try {
-        const resp = await fetch(`/api/sessions/${sessionId}/shots`);
-        if (!resp.ok) {
-            container.innerHTML = emptyState('Session not found.', true);
-            return;
-        }
-
-        const shots = await resp.json();
-        document.getElementById('shots-heading').textContent = `Shots (${shots.length})`;
-
-        if (shots.length === 0) {
-            container.innerHTML = emptyState('No shots in this session.');
-            return;
-        }
-
-        const table = document.createElement('table');
-        table.className = 'table table-xs w-full';
-        table.innerHTML = `
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Type</th>
-                    <th>Speed</th>
-                    <th>Carry</th>
-                    <th>Launch°</th>
-                    <th>Side°</th>
-                </tr>
-            </thead>
-            <tbody id="shots-tbody"></tbody>
-        `;
-
-        container.innerHTML = '';
-        container.appendChild(table);
-
-        const tbody = document.getElementById('shots-tbody');
-        shots.forEach(shot => {
-            const tr = document.createElement('tr');
-            tr.className = 'cursor-pointer hover:bg-base-300';
-            tr.dataset.shotId = shot.id;
-
-            const t = new Date(shot.created_at).toLocaleTimeString();
-            const speed = shot.speed != null ? shot.speed.toFixed(1) : '--';
-            const carry = shot.carry != null ? shot.carry.toFixed(0) : '--';
-            const launch = shot.launch_angle != null ? shot.launch_angle.toFixed(1) : '--';
-            const side = shot.side_angle != null ? shot.side_angle.toFixed(1) : '--';
-
-            tr.innerHTML = `
-                <td class="text-xs">${t}</td>
-                <td class="text-xs"><span class="badge badge-sm badge-ghost">${escapeHtml(shot.result_type || '--')}</span></td>
-                <td class="text-xs">${speed}</td>
-                <td class="text-xs">${carry}</td>
-                <td class="text-xs">${launch}</td>
-                <td class="text-xs">${side}</td>
-            `;
-
-            tbody.appendChild(tr);
-        });
-
-    } catch (err) {
-        console.error('Failed to load shots:', err);
-        container.innerHTML = emptyState('Failed to load shots.', true);
+    const select = byId('sessions-select');
+    select.replaceChildren(...sessions.map(s => {
+        const opt = el('option', '', `${sessionLabel(s.started_at)} (${shotCount(s.shot_count)})`);
+        opt.value = s.id;
+        return opt;
+    }));
+    if (hasMore) {
+        const more = el('option', '', 'Load more sessions...');
+        more.value = 'more';
+        select.append(more);
     }
+    highlightSession();
+    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [list] });
 }
 
-async function loadShotDetail(shotId) {
-    const container = document.getElementById('shot-detail');
-    container.innerHTML = loadingState();
-
-    try {
-        const resp = await fetch(`/api/shots/${shotId}`);
-        if (!resp.ok) {
-            container.innerHTML = emptyState('Shot not found.', true);
-            return;
-        }
-
-        const shot = await resp.json();
-        const ts = new Date(shot.created_at).toLocaleString();
-
-        const metrics = [
-            ['Time', ts],
-            ['Type', shot.result_type || '--'],
-            ['Speed', shot.speed != null ? shot.speed.toFixed(1) + ' mph' : '--'],
-            ['Carry', shot.carry != null ? shot.carry.toFixed(0) + ' yd' : '--'],
-            ['Launch Angle', shot.launch_angle != null ? shot.launch_angle.toFixed(1) + '°' : '--'],
-            ['Side Angle', shot.side_angle != null ? shot.side_angle.toFixed(1) + '°' : '--'],
-            ['Back Spin', shot.back_spin != null ? shot.back_spin.toFixed(0) + ' rpm' : '--'],
-            ['Side Spin', shot.side_spin != null ? shot.side_spin.toFixed(0) + ' rpm' : '--'],
-        ];
-
-        if (shot.message) {
-            metrics.push(['Message', shot.message]);
-        }
-
-        let html = '<div class="flex flex-col gap-1">';
-        metrics.forEach(([label, value]) => {
-            html += `
-                <div class="flex justify-between items-center py-1.5 border-b border-base-300 last:border-0">
-                    <span class="text-xs opacity-60">${escapeHtml(label)}</span>
-                    <span class="text-xs font-medium">${escapeHtml(String(value))}</span>
-                </div>
-            `;
-        });
-        html += '</div>';
-
-        if (shot.images && shot.images.length > 0) {
-            html += '<div class="mt-3"><div class="text-xs opacity-60 mb-2 uppercase tracking-wide">Images</div>';
-            html += '<div id="shot-images" class="flex flex-col gap-2">';
-            shot.images.forEach((img, idx) => {
-                html += `<div class="shot-img-wrapper" data-idx="${idx}" data-path="${escapeHtml(img.file_path)}">
-                    <img class="rounded border border-base-300 w-full" src="/images/${escapeHtml(img.file_path)}" alt="${escapeHtml(img.kind || 'image')}">
-                    <div class="text-xs opacity-40 mt-0.5">${escapeHtml(img.kind || img.file_path)}</div>
-                </div>`;
-            });
-            html += '</div></div>';
-        }
-
-        container.innerHTML = html;
-
-        // wire onerror for images via JS — no inline handlers
-        container.querySelectorAll('img').forEach(img => {
-            img.addEventListener('error', () => {
-                const wrapper = img.closest('.shot-img-wrapper');
-                if (wrapper) {
-                    wrapper.innerHTML = '<div class="text-xs opacity-40 italic py-2">Image expired or not available</div>';
-                }
-            });
-        });
-
-    } catch (err) {
-        console.error('Failed to load shot detail:', err);
-        container.innerHTML = emptyState('Failed to load shot.', true);
-    }
-}
-
-async function deleteSession(sessionId) {
-    if (!confirm('Delete this session and all its shots? This cannot be undone.')) return;
-
-    try {
-        const resp = await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
-        if (!resp.ok) {
-            alert('Failed to delete session.');
-            return;
-        }
-        if (selectedSessionId === sessionId) {
-            selectedSessionId = null;
-            clearShots();
-        }
-        await loadSessions();
-        await loadStorageUsage();
-    } catch (err) {
-        console.error('Failed to delete session:', err);
-        alert('Failed to delete session.');
-    }
-}
-
-function escapeHtml(str) {
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}
-
-function highlightSession(sessionId) {
-    document.querySelectorAll('#sessions-list [data-session-id]').forEach(el => {
-        el.classList.toggle('bg-primary/10', parseInt(el.dataset.sessionId, 10) === sessionId);
+function highlightSession() {
+    document.querySelectorAll('.session-row').forEach(row => {
+        const on = Number(row.dataset.sessionId) === selectedId;
+        row.classList.toggle('bg-primary/10', on);
+        row.querySelector('.session-pick').setAttribute('aria-current', on ? 'true' : 'false');
     });
+    if (selectedId !== null) byId('sessions-select').value = String(selectedId);
 }
 
-function highlightShot(shotId) {
-    document.querySelectorAll('#shots-tbody tr').forEach(tr => {
-        tr.classList.toggle('bg-primary/10', parseInt(tr.dataset.shotId, 10) === shotId);
+async function selectSession(id) {
+    if (id !== selectedId) {
+        expandedId = null;
+        shots = [];
+    }
+    selectedId = id;
+    highlightSession();
+    if (id === null) return;
+    renderSessionHeader();
+    await loadShots();
+}
+
+async function deleteSession(id) {
+    const session = sessions.find(s => s.id === id);
+    if (!session) return;
+    const ok = await confirmDialog({
+        title: 'Delete this session?',
+        body: `This removes the session from ${sessionLabel(session.started_at)}, its ${shotCount(session.shot_count)} and their images. It can't be undone.`,
+        confirmLabel: 'Delete',
+        danger: true,
     });
-}
-
-document.addEventListener('DOMContentLoaded', () => {
+    if (!ok) return;
+    try {
+        await api(`/api/sessions/${id}`, { method: 'DELETE' });
+    } catch (err) {
+        toast(`Could not delete the session: ${err.message}`, 'error');
+        return;
+    }
+    sessions = sessions.filter(s => s.id !== id);
+    renderSessions();
+    if (selectedId === id) await selectSession(sessions.length ? sessions[0].id : null);
     loadStorageUsage();
-    loadSessions();
+}
 
-    // session clicks via delegation
-    document.getElementById('sessions-list').addEventListener('click', async e => {
-        const deleteBtn = e.target.closest('.delete-session-btn');
-        if (deleteBtn) {
-            e.stopPropagation();
-            const sid = parseInt(deleteBtn.dataset.sessionId, 10);
-            await deleteSession(sid);
+// -- Shots --
+
+function renderSessionHeader() {
+    const session = sessions.find(s => s.id === selectedId);
+    if (!session) return;
+    byId('session-title').textContent = sessionLabel(session.started_at);
+    const speeds = shots.map(s => s.speed).filter(v => v != null);
+    const parts = [shotCount(shots.length || session.shot_count)];
+    if (speeds.length) parts.push(`Average ball speed ${formatNumber(speeds.reduce((a, b) => a + b, 0) / speeds.length, 1)} mph`);
+    byId('session-summary').textContent = parts.join(' · ');
+}
+
+async function loadShots() {
+    const request = ++shotsRequest;
+    const id = selectedId;
+    const wrap = byId('shots-wrap');
+    wrap.classList.add('opacity-50');
+    let rows;
+    try {
+        rows = await api(`/api/sessions/${id}/shots`);
+    } catch (err) {
+        if (request === shotsRequest) {
+            wrap.classList.remove('opacity-50');
+            toast(`Could not load shots: ${err.message}`, 'error');
+        }
+        return;
+    }
+    if (request !== shotsRequest) return;
+    wrap.classList.remove('opacity-50');
+    shots = rows;
+    renderSessionHeader();
+    renderShots();
+}
+
+function renderShots() {
+    const wrap = byId('shots-wrap');
+    if (!shots.length) {
+        wrap.replaceChildren(el('p', 'p-6 text-center text-sm opacity-60', 'No shots in this session.'));
+        return;
+    }
+    const table = el('table', 'table table-sm tabular-nums');
+    const head = el('tr');
+    head.append(el('th', '', 'Time'), ...COLUMNS.map(([label]) => el('th', 'text-right whitespace-nowrap', label)));
+    const thead = el('thead');
+    thead.append(head);
+    table.append(thead);
+    const body = el('tbody');
+    shots.forEach(shot => {
+        const tr = el('tr', 'shot-row cursor-pointer hover:bg-base-300');
+        tr.tabIndex = 0;
+        tr.dataset.shotId = shot.id;
+        tr.setAttribute('aria-expanded', 'false');
+        const time = new Date(shot.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+        tr.append(el('td', 'whitespace-nowrap', time), ...COLUMNS.map(([, fmt]) => el('td', 'text-right whitespace-nowrap', fmt(shot))));
+        body.append(tr);
+    });
+    table.append(body);
+    wrap.replaceChildren(table);
+    if (expandedId !== null && shots.some(s => s.id === expandedId)) expandShot(expandedId);
+    else expandedId = null;
+}
+
+function collapseShot() {
+    const open = byId('shots-wrap').querySelector('.shot-detail');
+    if (open) open.remove();
+    byId('shots-wrap').querySelectorAll('.shot-row[aria-expanded="true"]').forEach(tr => {
+        tr.setAttribute('aria-expanded', 'false');
+        tr.classList.remove('bg-base-300');
+    });
+}
+
+function fitDetail() {
+    const inner = byId('shots-wrap').querySelector('.shot-detail-inner');
+    if (inner) inner.style.width = `${byId('shots-wrap').clientWidth}px`;
+}
+
+async function expandShot(id) {
+    collapseShot();
+    expandedId = id;
+    const tr = byId('shots-wrap').querySelector(`.shot-row[data-shot-id="${id}"]`);
+    if (!tr) return;
+    tr.setAttribute('aria-expanded', 'true');
+    tr.classList.add('bg-base-300');
+
+    const detail = el('tr', 'shot-detail');
+    const td = el('td', 'p-0 bg-base-100');
+    td.colSpan = COLUMNS.length + 1;
+    const inner = el('div', 'shot-detail-inner sticky left-0 p-4 flex flex-col gap-3');
+    const spinner = el('div', 'flex justify-center py-4');
+    spinner.append(el('span', 'loading loading-spinner loading-sm text-primary'));
+    inner.append(spinner);
+    td.append(inner);
+    detail.append(td);
+    tr.after(detail);
+    fitDetail();
+
+    let shot = shotDetails.get(id);
+    if (!shot) {
+        try {
+            shot = await api(`/api/shots/${id}`);
+            shotDetails.set(id, shot);
+        } catch (err) {
+            if (expandedId === id) inner.replaceChildren(el('p', 'text-sm text-error', `Could not load this shot: ${err.message}`));
             return;
         }
+    }
+    if (expandedId !== id || !inner.isConnected) return;
+    renderDetail(inner, shot);
+}
 
-        const card = e.target.closest('[data-session-id]');
-        if (!card) return;
-
-        const sid = parseInt(card.dataset.sessionId, 10);
-        selectedSessionId = sid;
-        clearDetail();
-        highlightSession(sid);
-        await loadShots(sid);
+function renderDetail(inner, shot) {
+    const captured = new Date(shot.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'medium' });
+    inner.replaceChildren(el('p', 'text-sm opacity-60', `Captured ${captured}`));
+    const images = shot.images || [];
+    if (!images.length) {
+        inner.append(el('p', 'text-sm opacity-60', 'Images expired or not available'));
+        return;
+    }
+    const grid = el('div', 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3');
+    images.forEach(image => {
+        const src = `/images/${encodeURI(image.file_path)}`;
+        const label = IMAGE_LABELS[image.kind] || image.kind || image.file_path;
+        const fig = el('figure', 'm-0 flex flex-col items-stretch gap-1 min-w-0');
+        const link = el('a', 'block rounded-box border border-base-300 bg-base-300 overflow-hidden aspect-[4/3]');
+        link.href = src;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.setAttribute('aria-label', `Open ${label} full size`);
+        const img = el('img', 'w-full h-full object-contain');
+        img.src = src;
+        img.alt = label;
+        img.loading = 'lazy';
+        img.addEventListener('error', () => link.replaceChildren(
+            el('span', 'flex h-full items-center justify-center p-2 text-xs opacity-60 text-center', 'Image expired or not available')));
+        link.append(img);
+        fig.append(link, el('figcaption', 'text-xs opacity-70 truncate', label));
+        grid.append(fig);
     });
+    inner.append(grid);
+}
 
-    // shot row clicks via delegation
-    document.getElementById('shots-list').addEventListener('click', async e => {
-        const tr = e.target.closest('tr[data-shot-id]');
-        if (!tr) return;
+function toggleShot(tr) {
+    const id = Number(tr.dataset.shotId);
+    if (expandedId === id) {
+        collapseShot();
+        expandedId = null;
+    } else {
+        expandShot(id);
+    }
+}
 
-        const sid = parseInt(tr.dataset.shotId, 10);
-        highlightShot(sid);
-        await loadShotDetail(sid);
-    });
+// -- Init --
+
+byId('sessions-list').addEventListener('click', (e) => {
+    const row = e.target.closest('.session-row');
+    if (!row) return;
+    const id = Number(row.dataset.sessionId);
+    if (e.target.closest('.session-delete')) deleteSession(id);
+    else if (e.target.closest('.session-pick')) selectSession(id);
 });
+
+byId('sessions-more').addEventListener('click', () => loadSessions({ more: true }));
+
+byId('sessions-select').addEventListener('change', (e) => {
+    if (e.target.value === 'more') {
+        e.target.value = String(selectedId);
+        loadSessions({ more: true });
+    } else {
+        selectSession(Number(e.target.value));
+    }
+});
+
+byId('session-delete-phone').addEventListener('click', () => {
+    if (selectedId !== null) deleteSession(selectedId);
+});
+
+byId('shots-wrap').addEventListener('click', (e) => {
+    const tr = e.target.closest('.shot-row');
+    if (tr) toggleShot(tr);
+});
+
+byId('shots-wrap').addEventListener('keydown', (e) => {
+    const tr = e.target.closest('.shot-row');
+    if (tr && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        toggleShot(tr);
+    }
+});
+
+window.addEventListener('resize', fitDetail);
+
+openSocket('/ws', (msg) => {
+    if (msg.result_type !== 'Hit' || msg.type) return;
+    const before = selectedId;
+    loadSessions().then(() => {
+        if (before !== null && selectedId === before) loadShots();
+    });
+    loadStorageUsage();
+});
+
+loadStorageUsage();
+loadSessions();

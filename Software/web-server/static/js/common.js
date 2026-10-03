@@ -1,5 +1,5 @@
 // Common functionality for all PiTrac pages
-/* exported setTheme, controlPiTrac, requireStrobeSafe, escapeHtml, toast, confirmDialog, api, openSocket, onPiTracStatus, formatNumber,
+/* exported setTheme, controlPiTrac, requireStrobeSafe, escapeHtml, toast, confirmDialog, api, openSocket, onPiTracStatus, formatNumber, formatSided,
    setupStatusRequest, setSetupStatus, setupHidden, setSetupHidden, showSetupChecklist */
 
 if (typeof lucide !== 'undefined') {
@@ -17,6 +17,14 @@ function escapeHtml(value) {
 function formatNumber(value, decimals) {
     const n = Number(value);
     return value == null || Number.isNaN(n) ? '--' : n.toFixed(decimals);
+}
+
+// Negative is left, the sign the C++ sends and the sims pass straight through to GSPro HLA and SideSpin
+function formatSided(value, decimals) {
+    const text = formatNumber(value, decimals);
+    if (text === '--') return text;
+    const n = Number(text) || 0;
+    return Math.abs(n).toFixed(decimals) + (n < 0 ? ' L' : n > 0 ? ' R' : '');
 }
 
 async function api(path, { method = 'GET', body } = {}) {

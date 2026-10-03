@@ -1,5 +1,5 @@
 // Dashboard: status strip, shot metrics, shot image, setup readiness
-/* global openSocket, onPiTracStatus, formatNumber, api, controlPiTrac,
+/* global openSocket, onPiTracStatus, formatNumber, formatSided, api, controlPiTrac,
    setupStatusRequest, setupHidden, setSetupHidden, setupChecklist, renderSetupChecklist, setupSummaryHtml, loadCameraLabels */
 
 // Keys are the exact result_type strings from parsers.py; anything else leaves the strip as it is
@@ -87,15 +87,9 @@ function setMetric(id, text, dir = '') {
     setTimeout(() => el.classList.remove('updated'), 500);
 }
 
-// Negative is left, the sign the C++ sends and the sims pass straight through to GSPro HLA and SideSpin
 function setSidedMetric(id, value, decimals) {
-    const text = formatNumber(value, decimals);
-    if (text === '--') {
-        setMetric(id, text);
-        return;
-    }
-    const n = Number(text) || 0;
-    setMetric(id, Math.abs(n).toFixed(decimals), n < 0 ? 'L' : n > 0 ? 'R' : '');
+    const [text, dir = ''] = formatSided(value, decimals).split(' ');
+    setMetric(id, text, dir);
 }
 
 function renderMetrics(data) {

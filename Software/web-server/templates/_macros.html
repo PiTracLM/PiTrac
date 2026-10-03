@@ -25,13 +25,13 @@
 <li{% if li_class %} class="{{ li_class }}"{% endif %}><a href="{{ href }}" class="gap-2{% if active %} bg-base-300 text-primary font-semibold{% endif %}"{% if active %} aria-current="page"{% endif %}><i data-lucide="{{ icon }}" class="icon-menu"></i> {{ label }}</a></li>
 {% endmacro %}
 
-{% macro page_header(icon, title, subtitle="") %}
+{% macro page_header(icon, title, subtitle="", subtitle_id="") %}
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
     <div class="flex items-center gap-3 min-w-0">
         <i data-lucide="{{ icon }}" class="icon-md text-primary shrink-0"></i>
         <div class="min-w-0">
             <h1 class="text-xl sm:text-2xl font-bold leading-tight">{{ title }}</h1>
-            {% if subtitle %}<p class="text-sm opacity-60">{{ subtitle }}</p>{% endif %}
+            {% if subtitle %}<p class="text-sm opacity-60"{% if subtitle_id %} id="{{ subtitle_id }}"{% endif %}>{{ subtitle }}</p>{% endif %}
         </div>
     </div>
     {% if caller is defined %}<div class="flex flex-wrap items-center gap-2">{{ caller() }}</div>{% endif %}

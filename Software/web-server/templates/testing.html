@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import page_header %}
 
 {% block title %}Testing Tools - PiTrac{% endblock %}
 
@@ -9,87 +10,56 @@
 {% block content %}
 <div class="flex flex-col gap-4">
 
-    <!-- Image Upload Section -->
-    <div class="card bg-base-200 border border-base-300 shadow-sm tool-category">
-        <div class="card-body p-6">
-            <h2 class="text-xl font-semibold text-primary mb-4 category-title">Image Pipeline Testing</h2>
-            <div class="flex flex-col gap-4 items-center image-upload-container">
-                <div class="upload-area flex flex-col items-center justify-center gap-4 w-full max-w-[600px] min-h-[200px]
-                            border-2 border-dashed border-base-300 rounded-xl p-8 cursor-pointer
-                            transition-all duration-300 bg-base-100/50
-                            hover:border-primary hover:bg-base-300/30"
-                     id="uploadArea">
-                    <i data-lucide="cloud-upload" class="icon-lg opacity-40"></i>
-                    <p class="m-0 font-medium">Drag and drop strobed ball image here</p>
-                    <p class="m-0 text-sm opacity-60 upload-hint">Flight camera image with strobe (or click to browse)</p>
-                    <input type="file" id="imageUpload" accept="image/*" style="display: none;">
-                </div>
-                <div id="imagePreview" class="flex flex-col items-center gap-4 w-full max-w-[600px]" style="display: none;">
-                    <img id="previewImg" alt="Preview" class="w-full h-auto rounded-lg shadow-md">
-                    <div class="image-info flex justify-between items-center w-full p-3 bg-base-100 rounded-lg border border-base-300">
-                        <span id="imageName" class="font-medium text-sm"></span>
-                        <button class="btn btn-error btn-sm" onclick="clearImage()">Remove</button>
+    {{ page_header("flask-conical", "Testing tools") }}
+
+    <div id="pitrac-running-note" class="alert alert-warning hidden -mt-2" role="status">
+        <span>PiTrac is running. Stop it to run a test.</span>
+    </div>
+
+    <div class="card bg-base-200 border border-base-300 shadow-sm">
+        <div class="card-body p-4 sm:p-6">
+            <h2 class="text-xl font-semibold text-primary mb-4">Image pipeline</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                <div class="flex flex-col gap-4">
+                    <div class="upload-area flex flex-col items-center justify-center gap-4 w-full min-h-[200px]
+                                border-2 border-dashed border-base-300 rounded-xl p-8 cursor-pointer
+                                transition-all duration-300 bg-base-100/50
+                                hover:border-primary hover:bg-base-300/30"
+                         id="uploadArea" role="button" tabindex="0">
+                        <i data-lucide="cloud-upload" class="icon-lg opacity-40"></i>
+                        <p class="m-0 font-medium text-center">Drag and drop a strobed ball image here</p>
+                        <p class="m-0 text-sm opacity-60 text-center">Flight camera image with strobe, or click to browse</p>
+                        <input type="file" id="imageUpload" accept="image/*" hidden>
+                    </div>
+                    <div id="imagePreview" class="flex flex-col items-center gap-4 w-full hidden">
+                        <img id="previewImg" alt="Uploaded image" class="w-full h-auto rounded-lg shadow-md">
+                        <div class="flex justify-between items-center gap-2 w-full p-3 bg-base-100 rounded-lg border border-base-300">
+                            <span id="imageName" class="font-medium text-sm truncate"></span>
+                            <button class="btn btn-ghost btn-sm" id="clearImageBtn">Remove</button>
+                        </div>
                     </div>
                 </div>
-                <button id="runPipelineBtn" class="btn btn-primary btn-lg" style="display: none;" onclick="runImageTest()">
-                    Run Full Pipeline Test
-                </button>
+                <div id="upload-tools"></div>
             </div>
         </div>
     </div>
 
-    <!-- Tool Categories -->
-    <div class="flex flex-col gap-4 tool-categories">
-        <div class="card bg-base-200 border border-base-300 shadow-sm tool-category">
-            <div class="card-body p-6">
-                <h2 class="text-xl font-semibold text-primary mb-4 category-title">Hardware Tests</h2>
-                <div class="tool-grid grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4" id="hardware-tools"></div>
-            </div>
-        </div>
-
-        <div class="card bg-base-200 border border-base-300 shadow-sm tool-category">
-            <div class="card-body p-6">
-                <h2 class="text-xl font-semibold text-primary mb-4 category-title">Camera Tests</h2>
-                <div class="tool-grid grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4" id="camera-tools"></div>
-            </div>
-        </div>
-
-        <div class="card bg-base-200 border border-base-300 shadow-sm tool-category">
-            <div class="card-body p-6">
-                <h2 class="text-xl font-semibold text-primary mb-4 category-title">Calibration Tests</h2>
-                <div class="tool-grid grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4" id="calibration-tools"></div>
-            </div>
-        </div>
-
-        <div class="card bg-base-200 border border-base-300 shadow-sm tool-category">
-            <div class="card-body p-6">
-                <h2 class="text-xl font-semibold text-primary mb-4 category-title">Testing Suite</h2>
-                <div class="tool-grid grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4" id="testing-tools"></div>
-            </div>
+    {% for id, title in [("hardware", "Hardware tests"), ("camera", "Camera tests"), ("calibration", "Calibration tests"), ("testing", "Testing suite")] %}
+    <div class="card bg-base-200 border border-base-300 shadow-sm">
+        <div class="card-body p-4 sm:p-6">
+            <h2 class="text-xl font-semibold text-primary mb-4">{{ title }}</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4" id="{{ id }}-tools"></div>
         </div>
     </div>
-
-    <!-- Output Panel -->
-    <div class="card bg-base-200 border border-base-300 shadow-sm output-panel">
-        <div class="card-body p-6 flex flex-col max-h-[600px]">
-            <div class="flex justify-between items-center mb-4 pb-4 border-b border-base-300 output-header">
-                <h3 class="text-lg font-semibold text-primary mb-0">Test Output</h3>
-                <button class="btn btn-sm btn-ghost" onclick="clearOutput()">Clear</button>
-            </div>
-            <div class="output-content flex-1 min-h-[300px] overflow-y-auto" id="testOutput">
-                <div class="output-placeholder text-center py-8 opacity-60">Select a test tool to see output here</div>
-            </div>
-        </div>
-    </div>
+    {% endfor %}
 
 </div>
 
-<!-- Test Result Modal (native <dialog>, opened with .showModal()) -->
 <dialog id="testModal" class="modal">
     <div class="modal-box max-w-3xl">
-        <form method="dialog"><button class="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">&#x2715;</button></form>
-        <h3 class="text-lg font-bold" id="modalTitle">Test Result</h3>
-        <div class="py-4" id="modalBody"></div>
+        <form method="dialog"><button class="btn btn-sm btn-circle btn-ghost absolute right-4 top-4" aria-label="Close">&#x2715;</button></form>
+        <h3 class="text-lg font-bold pr-8" id="modalTitle">Test output</h3>
+        <div class="py-4 flex flex-col gap-3" id="modalBody"></div>
     </div>
     <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
