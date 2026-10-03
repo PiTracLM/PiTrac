@@ -107,9 +107,8 @@ class TestShotRepository:
         s = sessions.ensure_open("2026-06-01T10:00:00", timeout_minutes=30)
         shots.add(1717236000123, s, hit(), [("spin1", "shots/1717236000123/spin1.png")])
         shots.add(1717236000123, s, hit(), [("spin1", "shots/1717236000123/spin1.png")])
-        rows = shots.list_for_session(s)
-        assert len(rows) == 1
-        assert len(rows[0]["images"]) == 1
+        assert len(shots.list_for_session(s)) == 1
+        assert len(shots.get(1717236000123)["images"]) == 1
 
     def test_get_returns_shot_with_images(self, sessions, shots):
         s = sessions.ensure_open("2026-06-01T10:00:00", timeout_minutes=30)

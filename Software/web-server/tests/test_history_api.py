@@ -45,20 +45,20 @@ class TestSessionsEndpoint:
 
         resp = history_client.get("/api/sessions")
         assert resp.status_code == 200
-        sessions = resp.json()
+        sessions = resp.json()["sessions"]
         assert len(sessions) == 1
         assert sessions[0]["shot_count"] == 2
 
     def test_list_sessions_empty(self, history_client):
         resp = history_client.get("/api/sessions")
         assert resp.status_code == 200
-        assert resp.json() == []
+        assert resp.json() == {"sessions": [], "has_more": False}
 
     def test_list_sessions_limit_offset(self, history_client, history_server):
         history_client.post("/api/internal/shot-result", json=make_hit_payload(333))
         resp = history_client.get("/api/sessions?limit=5&offset=0")
         assert resp.status_code == 200
-        assert isinstance(resp.json(), list)
+        assert isinstance(resp.json()["sessions"], list)
 
     def test_list_sessions_newest_first(self, history_client, history_server):
         # Force two separate sessions by closing the first one
@@ -66,15 +66,28 @@ class TestSessionsEndpoint:
         history_server.session_repo.close_open("2020-01-01T00:00:00")
         history_client.post("/api/internal/shot-result", json=make_hit_payload(555))
 
-        sessions = history_client.get("/api/sessions").json()
+        sessions = history_client.get("/api/sessions").json()["sessions"]
         assert len(sessions) == 2
         assert sessions[0]["id"] > sessions[1]["id"]
+
+
+    def test_sessions_paging(self, history_client, history_server):
+        for shot_id in (601, 602, 603):
+            history_client.post("/api/internal/shot-result", json=make_hit_payload(shot_id))
+            history_server.session_repo.close_open("2020-01-01T00:00:00")
+
+        first = history_client.get("/api/sessions?limit=2").json()
+        assert [len(first["sessions"]), first["has_more"]] == [2, True]
+        rest = history_client.get("/api/sessions?limit=2&offset=2").json()
+        assert [len(rest["sessions"]), rest["has_more"]] == [1, False]
+        ids = [s["id"] for s in first["sessions"] + rest["sessions"]]
+        assert ids == sorted(ids, reverse=True) and len(set(ids)) == 3
 
 
 @pytest.mark.unit
 class TestShotsForSessionEndpoint:
 
-    def test_shots_for_session_returns_list_with_images(self, history_client, history_server):
+    def test_shots_for_session_returns_list(self, history_client, history_server):
         history_client.post("/api/internal/shot-result", json=make_hit_payload(1001))
         session_id = history_server.session_repo.list()[0]["id"]
 
@@ -83,8 +96,13 @@ class TestShotsForSessionEndpoint:
         shots = resp.json()
         assert len(shots) == 1
         assert shots[0]["result_type"] == "Hit"
-        assert len(shots[0]["images"]) == 2
-        assert shots[0]["images"][0]["file_path"].startswith("shots/")
+
+    def test_session_shots_omit_images(self, history_client, history_server):
+        history_client.post("/api/internal/shot-result", json=make_hit_payload(1002))
+        session_id = history_server.session_repo.list()[0]["id"]
+
+        shots = history_client.get(f"/api/sessions/{session_id}/shots").json()
+        assert "images" not in shots[0]
 
     def test_shots_for_session_unknown_id_returns_404(self, history_client):
         resp = history_client.get("/api/sessions/99999/shots")
@@ -111,7 +129,8 @@ class TestGetShotEndpoint:
         shot = resp.json()
         assert shot["id"] == 3001
         assert shot["result_type"] == "Hit"
-        assert "images" in shot
+        assert len(shot["images"]) == 2
+        assert shot["images"][0]["file_path"].startswith("shots/")
 
     def test_get_shot_unknown_id_returns_404(self, history_client):
         resp = history_client.get("/api/shots/99999")

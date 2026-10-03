@@ -232,7 +232,7 @@ namespace golf_sim {
         float side = result_ball.angles_ball_perspective_[0];
         int back_spin = static_cast<int>(result_ball.rotation_speeds_RPM_[2]);
         int side_spin = static_cast<int>(result_ball.rotation_speeds_RPM_[0]);
-        int carry = 100 + rand() % 150;
+        int carry = 0;
 
         std::vector<std::string> images;
         long shot_id;

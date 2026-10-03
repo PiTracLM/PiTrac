@@ -24,7 +24,9 @@ class TestingToolsManager:
         self.config_manager = config_manager
         self.pitrac_binary = "/usr/lib/pitrac/pitrac_lm"
         self.running_processes = {}
-        self.completed_results = {}
+        self.started_at: Dict[str, float] = {}
+        self.stopping: set = set()
+        self.last_results: Dict[str, Dict[str, Any]] = {}
 
         # Create TestImages directory if it doesn't exist
         self.test_images_dir = Path.home() / "LM_Shares/TestImages"
@@ -34,6 +36,8 @@ class TestingToolsManager:
             "test_uploaded_image": {
                 "name": "Test Uploaded Image",
                 "description": "Run full pipeline on uploaded flight camera image",
+                "before": "Upload a strobed flight camera image above.",
+                "success": "Shows the detection log and timing in the output.",
                 "category": "testing",
                 "args": ["--system_mode", "test"],
                 "requires_sudo": False,
@@ -43,6 +47,8 @@ class TestingToolsManager:
             "pulse_test": {
                 "name": "Strobe Pulse Test",
                 "description": "Test IR strobe pulse functionality",
+                "before": "Runs for 60 seconds.",
+                "success": "The strobe pulses until the test ends.",
                 "category": "hardware",
                 "args": ["--pulse_test", "--system_mode", "camera1"],
                 "requires_sudo": False,
@@ -52,22 +58,30 @@ class TestingToolsManager:
             "camera1_still": {
                 "name": "Camera 1 Still Image",
                 "description": "Capture a still image from Camera 1",
+                "before": "Takes up to 10 seconds.",
+                "success": "Shows a picture from Camera 1.",
                 "category": "camera",
                 "args": ["--system_mode", "camera1", "--cam_still_mode", "--output_filename=cam1_still_picture.png"],
+                "output_image": "cam1_still_picture.png",
                 "requires_sudo": False,
                 "timeout": 10,
             },
             "camera2_still": {
                 "name": "Camera 2 Still Image",
                 "description": "Capture a still image from Camera 2",
+                "before": "Takes up to 10 seconds.",
+                "success": "Shows a picture from Camera 2.",
                 "category": "camera",
                 "args": ["--system_mode", "camera2", "--cam_still_mode", "--output_filename=cam2_still_picture.png"],
+                "output_image": "cam2_still_picture.png",
                 "requires_sudo": False,
                 "timeout": 10,
             },
             "camera1_ball_location": {
                 "name": "Camera 1 Ball Location",
                 "description": "Check ball location for Camera 1",
+                "before": "Place a ball on the tee and stop PiTrac.",
+                "success": "Prints the ball position in the output.",
                 "category": "calibration",
                 "args": ["--system_mode", "camera1_ball_location"],
                 "requires_sudo": False,
@@ -76,6 +90,8 @@ class TestingToolsManager:
             "camera2_ball_location": {
                 "name": "Camera 2 Ball Location",
                 "description": "Check ball location for Camera 2",
+                "before": "Place a ball on the tee and stop PiTrac.",
+                "success": "Prints the ball position in the output.",
                 "category": "calibration",
                 "args": ["--system_mode", "camera2_ball_location"],
                 "requires_sudo": False,
@@ -84,6 +100,8 @@ class TestingToolsManager:
             "test_images": {
                 "name": "Test with Sample Images",
                 "description": "Run detection on test images",
+                "before": "Uses the sample images installed with PiTrac.",
+                "success": "Shows the detection log and timing in the output.",
                 "category": "testing",
                 "args": ["--system_mode", "test"],
                 "requires_sudo": True,
@@ -92,6 +110,8 @@ class TestingToolsManager:
             "automated_testing": {
                 "name": "Automated Test Suite",
                 "description": "Run full automated testing suite",
+                "before": "Uses the sample test suite installed with PiTrac. Takes up to 2 minutes.",
+                "success": "Prints how each sample shot compares with the expected results.",
                 "category": "testing",
                 "args": ["--system_mode", "automated_testing"],
                 "requires_sudo": False,
@@ -111,6 +131,8 @@ class TestingToolsManager:
                     "id": tool_id,
                     "name": tool_info["name"],
                     "description": tool_info["description"],
+                    "before": tool_info["before"],
+                    "success": tool_info["success"],
                     "requires_sudo": tool_info["requires_sudo"],
                 }
             )
@@ -134,6 +156,7 @@ class TestingToolsManager:
             return {"status": "error", "message": f"Tool {running} is already running"}
         # Reserved with no await since the check, so a run arriving during the spawn sees it
         self.running_processes[tool_id] = None
+        self.started_at[tool_id] = time.time()
 
         tool_info = self.tools[tool_id]
 
@@ -143,7 +166,7 @@ class TestingToolsManager:
             if tool_info.get("uses_uploaded_image"):
                 test_images = list(self.test_images_dir.glob("*"))
                 if not test_images:
-                    return {"status": "error", "message": "No test images found. Please upload an image first."}
+                    return {"status": "error", "message": "No test images found. Upload an image first."}
 
                 latest_image = max(test_images, key=lambda p: p.stat().st_mtime)
                 logger.info(f"Using test image: {latest_image}")
@@ -221,19 +244,16 @@ class TestingToolsManager:
                     output += log_content
 
                 result = {
-                    "status": "success" if process.returncode == 0 else "failed",
+                    "status": "stopped" if tool_id in self.stopping
+                    else "success" if process.returncode == 0 else "failed",
                     "output": output,
                     "error": error,
                     "return_code": process.returncode,
                     "timestamp": datetime.now().isoformat(),
                 }
 
-                if "still" in tool_id:
-                    if "cam1" in tool_id:
-                        image_path = Path.home() / "LM_Shares/Images/cam1_still_picture.png"
-                    else:
-                        image_path = Path.home() / "LM_Shares/Images/cam2_still_picture.png"
-
+                if image_name := tool_info.get("output_image"):
+                    image_path = Path.home() / "LM_Shares/Images" / image_name
                     if image_path.exists():
                         result["image_path"] = str(image_path)
                         result["image_url"] = f"/api/images/{image_path.name}"
@@ -263,7 +283,7 @@ class TestingToolsManager:
                 else:
                     return {
                         "status": "timeout",
-                        "message": f"Tool {tool_id} timed out after {tool_info['timeout']} seconds",
+                        "message": f"{tool_info['name']} timed out after {tool_info['timeout']} seconds",
                     }
 
         except Exception as e:
@@ -271,6 +291,8 @@ class TestingToolsManager:
             return {"status": "error", "message": str(e)}
         finally:
             self.running_processes.pop(tool_id, None)
+            self.started_at.pop(tool_id, None)
+            self.stopping.discard(tool_id)
             self.config_manager.transient_overrides = {}
 
     async def stop_tool(self, tool_id: str) -> Dict[str, Any]:
@@ -289,6 +311,7 @@ class TestingToolsManager:
             return {"status": "error", "message": f"Tool {tool_id} is still starting"}
 
         try:
+            self.stopping.add(tool_id)
             process.terminate()
 
             try:

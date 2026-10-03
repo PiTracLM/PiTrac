@@ -362,10 +362,10 @@ class PiTracServer:
             """Receives shot results from the C++ pitrac_lm process via HTTP POST."""
             body = await request.json()
 
-            result_type_int = int(body.get("result_type", 0))
+            result_type_int = int(body.get("result_type") or 0)
             result_type_str = self.parser._get_result_type_string(result_type_int)
-            speed_mps = float(body.get("speed_mps", 0))
-            message = str(body.get("message", ""))
+            speed_mps = float(body.get("speed_mps") or 0.0)
+            message = str(body.get("message") or "")
 
             # Club changes the C++ already applied; not for the dashboard, history or sims
             if result_type_str == "Control Message":
@@ -382,21 +382,21 @@ class PiTracServer:
                 )
             else:
                 speed_mph = speed_mps * MPS_TO_MPH
-                launch_angle = float(body.get("launch_angle", 0))
-                side_angle = float(body.get("side_angle", 0))
+                launch_angle = float(body.get("launch_angle") or 0.0)
+                side_angle = float(body.get("side_angle") or 0.0)
                 shot_data = ShotData(
                     speed=round(speed_mph, 1),
-                    carry=float(body.get("carry", 0)),
+                    carry=float(body.get("carry") or 0.0),
                     launch_angle=round(launch_angle, 1),
                     side_angle=round(side_angle, 1),
-                    back_spin=int(body.get("back_spin", 0)),
-                    side_spin=int(body.get("side_spin", 0)),
+                    back_spin=int(body.get("back_spin") or 0),
+                    side_spin=int(body.get("side_spin") or 0),
                     result_type=result_type_str,
                     message=message,
                     timestamp=datetime.now().isoformat(),
                 )
                 shot_data.shot_id = body.get("shot_id")
-                shot_data.images = list(body.get("images", []))
+                shot_data.images = list(body.get("images") or [])
                 # The sims round for their own protocol, so they get the values before display rounding
                 sim_shot = replace(shot_data, speed=speed_mph, launch_angle=launch_angle, side_angle=side_angle)
                 self._run_in_background(self.sim_manager.on_shot(sim_shot))
@@ -1103,9 +1103,10 @@ class PiTracServer:
             if self.pitrac_manager.is_running():
                 return {
                     "status": "error",
-                    "message": "Cannot run testing tools while PiTrac is running. Please stop PiTrac first.",
+                    "message": "Cannot run testing tools while PiTrac is running. Stop PiTrac first.",
                 }
 
+            self.testing_manager.last_results.pop(tool_id, None)
             task = asyncio.create_task(self._run_tool_async(tool_id))
             self.background_tasks.add(task)
             task.add_done_callback(self.background_tasks.discard)
@@ -1119,15 +1120,12 @@ class PiTracServer:
 
         @self.app.get("/api/testing/status")
         async def get_testing_status() -> Dict[str, Any]:
-            """Get status of running testing tools"""
-            running = self.testing_manager.get_running_tools()
-
-            results = {}
-            if hasattr(self.testing_manager, "completed_results"):
-                results = self.testing_manager.completed_results
-                self.testing_manager.completed_results = {}
-
-            return {"running": running, "results": results}
+            """Get running testing tools and the last result of each tool"""
+            return {
+                "running": self.testing_manager.get_running_tools(),
+                "elapsed": {t: int(time.time() - s) for t, s in self.testing_manager.started_at.items()},
+                "results": self.testing_manager.last_results,
+            }
 
         @self.app.post("/api/testing/upload-image")
         async def upload_test_image(file: UploadFile = File(...)) -> Dict[str, Any]:
@@ -1271,8 +1269,9 @@ class PiTracServer:
 
         # Shot history API
         @self.app.get("/api/sessions")
-        async def list_sessions(limit: int = 50, offset: int = 0) -> list:
-            return await asyncio.to_thread(self.session_repo.list, limit, offset)
+        async def list_sessions(limit: int = 50, offset: int = 0) -> Dict[str, Any]:
+            rows = await asyncio.to_thread(self.session_repo.list, limit + 1, offset)
+            return {"sessions": rows[:limit], "has_more": len(rows) > limit}
 
         @self.app.get("/api/sessions/{session_id}/shots")
         async def list_shots_for_session(session_id: int) -> list:
@@ -1671,17 +1670,11 @@ class PiTracServer:
         """Helper method to run a testing tool asynchronously"""
         try:
             result = await self.testing_manager.run_tool(tool_id)
-
-            if not hasattr(self.testing_manager, "completed_results"):
-                self.testing_manager.completed_results = {}
-            self.testing_manager.completed_results[tool_id] = result
-
             logger.info(f"Testing tool {tool_id} completed with status: {result.get('status')}")
         except Exception as e:
             logger.error(f"Error running testing tool {tool_id}: {e}")
-            if not hasattr(self.testing_manager, "completed_results"):
-                self.testing_manager.completed_results = {}
-            self.testing_manager.completed_results[tool_id] = {"status": "error", "message": str(e)}
+            result = {"status": "error", "message": str(e)}
+        self.testing_manager.last_results[tool_id] = result
 
     def _persist_shot(self, shot_id, shot_data, images):
         session_id = self.session_repo.ensure_open(shot_data.timestamp, self.session_timeout_minutes)

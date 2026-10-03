@@ -37,9 +37,9 @@ class TestTestingToolsManagerInit:
         """Test that manager initializes correctly"""
         assert testing_manager.pitrac_binary == "/usr/lib/pitrac/pitrac_lm"
         assert isinstance(testing_manager.running_processes, dict)
-        assert isinstance(testing_manager.completed_results, dict)
+        assert isinstance(testing_manager.last_results, dict)
         assert len(testing_manager.running_processes) == 0
-        assert len(testing_manager.completed_results) == 0
+        assert len(testing_manager.last_results) == 0
 
     def test_test_images_directory_created(self, testing_manager, tmp_path):
         """Test that test images directory is created"""
@@ -342,6 +342,32 @@ class TestStopTool:
         assert testing_manager.running_processes["pulse_test"] is mock_process
 
     @pytest.mark.asyncio
+    async def test_stopped_run_reports_stopped(self, testing_manager):
+        exited = asyncio.Event()
+        process = Mock(returncode=-15)
+        process.terminate = Mock(side_effect=exited.set)
+
+        async def communicate():
+            await exited.wait()
+            return b"partial", b""
+
+        async def wait():
+            await exited.wait()
+
+        process.communicate = communicate
+        process.wait = wait
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            run = asyncio.create_task(testing_manager.run_tool("pulse_test"))
+            while testing_manager.running_processes.get("pulse_test") is not process:
+                await asyncio.sleep(0)
+            await testing_manager.stop_tool("pulse_test")
+            result = await run
+
+        assert result["status"] == "stopped"
+        assert result["output"] == "partial"
+
+    @pytest.mark.asyncio
     async def test_run_refused_until_stopped_run_cleans_up(self, testing_manager, mock_config_manager):
         exited = asyncio.Event()
         log_read = asyncio.Event()
@@ -603,3 +629,22 @@ class TestGetRunningTools:
         assert len(result) == 2
         assert "pulse_test" in result
         assert "camera1_still" in result
+
+
+@pytest.mark.unit
+class TestStillImages:
+    @pytest.mark.asyncio
+    async def test_camera1_still_uses_cam1_image(self, testing_manager, tmp_path):
+        images = tmp_path / "LM_Shares/Images"
+        images.mkdir(parents=True)
+        (images / "cam1_still_picture.png").write_bytes(b"1")
+        (images / "cam2_still_picture.png").write_bytes(b"2")
+        mock_process = AsyncMock()
+        mock_process.returncode = 0
+        mock_process.communicate.return_value = (b"", b"")
+
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process), \
+                patch("testing_tools_manager.Path.home", return_value=tmp_path):
+            result = await testing_manager.run_tool("camera1_still")
+
+        assert result["image_url"] == "/api/images/cam1_still_picture.png"

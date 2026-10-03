@@ -96,7 +96,7 @@ class ShotRepository:
         rows = self.db.query(
             "SELECT * FROM shots WHERE session_id = ? ORDER BY id DESC", (session_id,)
         )
-        return [self._attach_images(dict(r)) for r in rows]
+        return [dict(r) for r in rows]
 
     def delete_images_for_session(self, session_id: int) -> None:
         self.db.execute(

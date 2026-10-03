@@ -159,7 +159,7 @@ class TestTestingToolsAPI:
     def test_get_testing_status(self, client, server_instance):
         """Test getting testing status"""
         server_instance.testing_manager.running_processes = {"pulse_test": MagicMock(pid=12345)}
-        server_instance.testing_manager.completed_results = {
+        server_instance.testing_manager.last_results = {
             "camera1_still": {
                 "success": True,
                 "output": "Camera test completed successfully",
@@ -181,7 +181,7 @@ class TestTestingToolsAPI:
     def test_get_testing_status_empty(self, client, server_instance):
         """Test getting testing status when no tools are running or completed"""
         server_instance.testing_manager.running_processes = {}
-        server_instance.testing_manager.completed_results = {}
+        server_instance.testing_manager.last_results = {}
 
         response = client.get("/api/testing/status")
         assert response.status_code == 200
@@ -284,3 +284,18 @@ class TestTestingToolsAPI:
 
         assert "testing" in content.lower()
         assert "tools" in content.lower()
+
+
+@pytest.mark.unit
+class TestTestingStatusResults:
+    def test_testing_status_keeps_last_result(self, client, server_instance):
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        result = {"status": "failed", "output": "stdout", "error": "boom", "return_code": 1}
+        server_instance.testing_manager.run_tool = AsyncMock(return_value=result)
+        asyncio.run(server_instance._run_tool_async("camera1_still"))
+
+        for _ in range(2):
+            data = client.get("/api/testing/status").json()
+            assert data["results"]["camera1_still"] == result

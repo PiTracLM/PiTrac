@@ -65,3 +65,8 @@ class TestShotPersistence:
         client.post("/api/pitrac/stop")
 
         assert server_instance.session_repo.list()[0]["ended_at"] is not None
+
+    def test_shot_result_accepts_nulls(self, client):
+        r = client.post("/api/internal/shot-result", json={"result_type": 7, "speed": 100.0, "back_spin": None,
+                                                           "side_spin": None, "launch_angle": None})
+        assert r.status_code == 200
