@@ -1,7 +1,7 @@
 import json
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from db.database import Database
 from models import ShotData
@@ -135,23 +135,25 @@ class KeyValueRepository:
         rows = self.db.query(f"SELECT key, value FROM {self.table}")
         return {r["key"]: json.loads(r["value"]) for r in rows}
 
-    def replace_all(self, flat: Dict[str, Any]) -> None:
+    def replace_all(self, flat: Dict[str, Any], touched: Iterable[str] = ()) -> None:
         with self.db.transaction() as conn:
-            self.replace_all_in(conn, flat)
+            self.replace_all_in(conn, flat, touched)
 
     def updated_at(self, key: str) -> Optional[str]:
         rows = self.db.query(f"SELECT updated_at FROM {self.table} WHERE key = ?", (key,))
         return rows[0]["updated_at"] if rows else None
 
-    def replace_all_in(self, conn, flat: Dict[str, Any]) -> None:
-        # A row keeps its updated_at while its value is unchanged, so the timestamp says when that key last changed
+    def replace_all_in(self, conn, flat: Dict[str, Any], touched: Iterable[str] = ()) -> None:
+        # A row keeps its updated_at while its value is unchanged unless it is in touched (a calibration that
+        # ran again), so the timestamp says when that key was last changed or recalibrated
         now = datetime.now().isoformat()
+        touched = set(touched)
         old = {r["key"]: (r["value"], r["updated_at"]) for r in conn.execute(f"SELECT key, value, updated_at FROM {self.table}")}
         rows = []
         for key, value in flat.items():
             encoded = json.dumps(value)
             prev_value, prev_updated = old.get(key, (None, None))
-            rows.append((key, encoded, prev_updated if prev_value == encoded else now))
+            rows.append((key, encoded, prev_updated if prev_value == encoded and key not in touched else now))
         conn.execute(f"DELETE FROM {self.table}")
         conn.executemany(f"INSERT INTO {self.table} (key, value, updated_at) VALUES (?, ?, ?)", rows)
 

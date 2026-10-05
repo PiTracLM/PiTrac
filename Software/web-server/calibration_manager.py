@@ -947,13 +947,13 @@ class CalibrationManager:
         def friendly_rejection(reasons: str) -> str:
             r = reasons.lower()
             if "blurry" in r:
-                return "Too blurry -- hold the board steadier or improve lighting"
+                return "Too blurry. Hold the board steadier or add more light."
             if "too small" in r or "coverage" in r:
-                return "Board is too far away -- move it closer to the camera"
+                return "The board is too far away. Move it closer to the camera."
             if "edge" in r or "margin" in r:
-                return "Board is partially out of frame -- move it inward"
+                return "Part of the board is out of frame. Move it inward."
             if "corners" in r or "insufficient" in r:
-                return "Board not fully visible -- make sure the full pattern is in frame and well-lit"
+                return "The board is not fully visible. Keep the whole pattern in frame and well lit."
             return reasons
 
         self.distortion_status[camera] = {
@@ -1052,7 +1052,7 @@ class CalibrationManager:
 
                 if good_count >= target_images and not (coverage_ok and tilt_ok and size_ok):
                     self.distortion_status[camera]["message"] = (
-                        f"All {target_images} images captured -- collecting a few more for better accuracy."
+                        f"All {target_images} images captured. Collecting a few more for better accuracy."
                     )
                 else:
                     self.distortion_status[camera]["message"] = (
@@ -1098,7 +1098,7 @@ class CalibrationManager:
                     rejected_count += 1
                     log_msg(f"Attempt {attempt + 1}: Too similar to existing sample")
                     self.distortion_status[camera]["message"] = (
-                        "Skipped: board position too similar -- move it to a new area"
+                        "Skipped: the board is in a spot already covered. Move it to a new area."
                     )
                     self.distortion_status[camera]["images_rejected"] = rejected_count
                     await asyncio.sleep(DISTORTION_CAPTURE_INTERVAL)
@@ -1133,11 +1133,10 @@ class CalibrationManager:
                     f"pixel coverage: {coverage_data['pixel_coverage']:.0%})"
                 )
 
-                # Positive feedback with coaching hint
                 if good_count < target_images and coverage_tracker:
-                    suggested = coverage_tracker.get_suggested_region()
+                    suggested = coverage_tracker.get_suggested_region().replace("-", " ")
                     self.distortion_status[camera]["message"] = (
-                        f"Got it! ({good_count}/{target_images}) -- Try the {suggested} area next."
+                        f"Captured {good_count} of {target_images}. Try the {suggested} area next."
                     )
 
                 await asyncio.sleep(DISTORTION_CAPTURE_INTERVAL)
@@ -1218,7 +1217,7 @@ class CalibrationManager:
             )
             self.distortion_status[camera]["status"] = "completed"
             self.distortion_status[camera]["message"] = (
-                f"Calibration complete -- accuracy: {quality_label} (error: {rms:.2f}px)"
+                f"Calibration complete. Accuracy: {quality_label} (error {rms:.2f}px)."
             )
             self.distortion_status[camera]["progress"] = 100
 

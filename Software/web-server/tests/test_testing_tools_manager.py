@@ -178,11 +178,11 @@ class TestRunTool:
     async def test_run_tool_timeout(self, testing_manager, mock_config_manager):
         """Test tool timeout handling"""
         mock_process = AsyncMock()
-        mock_process.communicate.side_effect = asyncio.TimeoutError()
+        mock_process.communicate.return_value = (b"", b"")
         mock_process.terminate = Mock()
-        mock_process.wait = AsyncMock()
 
-        with patch("asyncio.create_subprocess_exec", return_value=mock_process):
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process), \
+                patch("asyncio.wait_for", side_effect=asyncio.TimeoutError()):
             result = await testing_manager.run_tool("camera1_still")
 
         assert result["status"] == "timeout"
@@ -193,16 +193,37 @@ class TestRunTool:
     async def test_run_continuous_test_timeout(self, testing_manager, mock_config_manager):
         """Test continuous test timeout behavior"""
         mock_process = AsyncMock()
-        mock_process.communicate.side_effect = asyncio.TimeoutError()
+        mock_process.communicate.return_value = (b"", b"")
         mock_process.terminate = Mock()
-        mock_process.wait = AsyncMock()
 
-        with patch("asyncio.create_subprocess_exec", return_value=mock_process):
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process), \
+                patch("asyncio.wait_for", side_effect=asyncio.TimeoutError()):
             with patch.object(testing_manager, "_find_and_read_test_log", return_value="Test log content"):
                 result = await testing_manager.run_tool("pulse_test")
 
         assert result["status"] == "success"
         assert "Test log content" in result["output"]
+
+    @pytest.mark.asyncio
+    async def test_timed_out_tool_returns_partial_output(self, testing_manager):
+        testing_manager.tools["camera1_ball_location"]["timeout"] = 0.01
+        process = Mock(returncode=-15)
+        exited = asyncio.Event()
+        process.terminate = Mock(side_effect=exited.set)
+
+        async def communicate():
+            await exited.wait()
+            return b"Ball found at (512, 300)", b"camera warning"
+
+        process.communicate = communicate
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            result = await testing_manager.run_tool("camera1_ball_location")
+
+        assert result["status"] == "timeout"
+        assert result["output"] == "Ball found at (512, 300)"
+        assert result["error"] == "camera warning"
+        process.terminate.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_run_tool_with_sudo(self, testing_manager, mock_config_manager, tmp_path):

@@ -111,6 +111,7 @@
         if (NUMERIC.includes(m.type)) {
             const n = Number(value);
             if (value === '' || value === null || !Number.isFinite(n)) return 'Must be a number';
+            if (m.type === 'integer' && !Number.isInteger(n)) return 'Must be a whole number';
             if (m.min !== undefined && n < m.min) return `Must be at least ${m.min}`;
             if (m.max !== undefined && n > m.max) return `Must be at most ${m.max}`;
         }
@@ -604,15 +605,23 @@
         });
         if (!ok) return;
         selfEcho.set('config_import', Date.now());
+        let result;
         try {
-            await api('/api/config/import', { method: 'POST', body: data });
+            result = await api('/api/config/import', { method: 'POST', body: data });
         } catch (err) {
             selfEcho.delete('config_import');
             toast(`Import failed: ${err.message}`, 'error');
             return;
         }
         await refreshSaved();
-        toast('Settings imported', 'success');
+        const skipped = Object.entries(result?.skipped || {});
+        if (skipped.length) {
+            const list = skipped.map(([key, reason]) => `${key.split('.').pop()} (${reason})`).join(', ');
+            const count = skipped.length === 1 ? 'one setting' : `${skipped.length} settings`;
+            toast(`Settings imported, except ${count} this PiTrac cannot use: ${list}.`, 'warning', { sticky: true });
+        } else {
+            toast('Settings imported', 'success');
+        }
     }
 
     async function resetAll() {

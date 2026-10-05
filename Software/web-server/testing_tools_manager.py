@@ -81,7 +81,7 @@ class TestingToolsManager:
                 "name": "Camera 1 Ball Location",
                 "description": "Check ball location for Camera 1",
                 "before": "Place a ball on the tee and stop PiTrac.",
-                "success": "Prints the ball position in the output.",
+                "success": "Shows what the camera found before the test stops after 10 seconds.",
                 "category": "calibration",
                 "args": ["--system_mode", "camera1_ball_location"],
                 "requires_sudo": False,
@@ -91,7 +91,7 @@ class TestingToolsManager:
                 "name": "Camera 2 Ball Location",
                 "description": "Check ball location for Camera 2",
                 "before": "Place a ball on the tee and stop PiTrac.",
-                "success": "Prints the ball position in the output.",
+                "success": "Shows what the camera found before the test stops after 10 seconds.",
                 "category": "calibration",
                 "args": ["--system_mode", "camera2_ball_location"],
                 "requires_sudo": False,
@@ -231,60 +231,57 @@ class TestingToolsManager:
 
             start_time = time.time()
 
+            # Shielded so a timeout still collects what the binary printed before it was stopped
+            communicate = asyncio.ensure_future(process.communicate())
+            timed_out = False
             try:
-                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=tool_info["timeout"])
+                stdout, stderr = await asyncio.wait_for(asyncio.shield(communicate), timeout=tool_info["timeout"])
+            except asyncio.TimeoutError:
+                timed_out = True
+                process.terminate()
+                stdout, stderr = await communicate
 
-                output = stdout.decode() if stdout else ""
-                error = stderr.decode() if stderr else ""
+            output = stdout.decode() if stdout else ""
+            error = stderr.decode() if stderr else ""
 
-                log_content = await self._find_and_read_test_log(start_time)
-                if log_content:
-                    if output:
-                        output += "\n\n=== Test Log ===\n"
-                    output += log_content
+            log_content = await self._find_and_read_test_log(start_time)
+            if log_content:
+                if output:
+                    output += "\n\n=== Test Log ===\n"
+                output += log_content
 
-                result = {
-                    "status": "stopped" if tool_id in self.stopping
-                    else "success" if process.returncode == 0 else "failed",
+            if timed_out and tool_info.get("continuous_test", False):
+                return {
+                    "status": "success",
+                    "output": log_content or "Test completed but no log file found",
+                    "message": f"Test ran for {tool_info['timeout']} seconds",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            if timed_out:
+                return {
+                    "status": "timeout",
+                    "message": f"{tool_info['name']} timed out after {tool_info['timeout']} seconds",
                     "output": output,
                     "error": error,
-                    "return_code": process.returncode,
                     "timestamp": datetime.now().isoformat(),
                 }
 
-                if image_name := tool_info.get("output_image"):
-                    image_path = Path.home() / "LM_Shares/Images" / image_name
-                    if image_path.exists():
-                        result["image_path"] = str(image_path)
-                        result["image_url"] = f"/api/images/{image_path.name}"
+            result = {
+                "status": "stopped" if tool_id in self.stopping
+                else "success" if process.returncode == 0 else "failed",
+                "output": output,
+                "error": error,
+                "return_code": process.returncode,
+                "timestamp": datetime.now().isoformat(),
+            }
 
-                return result
+            if image_name := tool_info.get("output_image"):
+                image_path = Path.home() / "LM_Shares/Images" / image_name
+                if image_path.exists():
+                    result["image_path"] = str(image_path)
+                    result["image_url"] = f"/api/images/{image_path.name}"
 
-            except asyncio.TimeoutError:
-                process.terminate()
-                await process.wait()
-
-                if tool_info.get("continuous_test", False):
-                    log_content = await self._find_and_read_test_log(start_time)
-                    if log_content:
-                        return {
-                            "status": "success",
-                            "output": log_content,
-                            "message": f"Test ran for {tool_info['timeout']} seconds",
-                            "timestamp": datetime.now().isoformat(),
-                        }
-                    else:
-                        return {
-                            "status": "success",
-                            "output": "Test completed but no log file found",
-                            "message": f"Test ran for {tool_info['timeout']} seconds",
-                            "timestamp": datetime.now().isoformat(),
-                        }
-                else:
-                    return {
-                        "status": "timeout",
-                        "message": f"{tool_info['name']} timed out after {tool_info['timeout']} seconds",
-                    }
+            return result
 
         except Exception as e:
             logger.error(f"Error running tool {tool_id}: {e}")

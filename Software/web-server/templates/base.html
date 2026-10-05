@@ -7,7 +7,7 @@
     ("/calibration", "crosshair", "Calibration", false),
     ("/logs", "file-text", "Logs", false),
     ("/testing", "flask-conical", "Testing", false),
-    ("/update", "refresh-cw", "Update", false),
+    ("/update", "refresh-cw", "System update", false),
 ] %}
 <!DOCTYPE html>
 <html lang="en">
@@ -103,9 +103,9 @@
 
     <div id="toast-region" class="toast toast-bottom toast-end z-50" role="status" aria-live="polite"></div>
 
-    <dialog id="confirm-dialog" class="modal">
+    <dialog id="confirm-dialog" class="modal" aria-labelledby="confirm-dialog-title">
         <div class="modal-box">
-            <h3 id="confirm-dialog-title" class="text-lg font-bold"></h3>
+            <h3 id="confirm-dialog-title" class="text-lg font-semibold"></h3>
             <p id="confirm-dialog-body" class="py-4"></p>
             <form method="dialog" class="modal-action">
                 <button value="cancel" class="btn btn-ghost">Cancel</button>
@@ -117,7 +117,7 @@
 
     <dialog id="sim-editor" class="modal" aria-labelledby="sim-editor-title">
         <div class="modal-box max-w-lg">
-            <h3 id="sim-editor-title" class="text-lg font-bold">Add simulator</h3>
+            <h3 id="sim-editor-title" class="text-lg font-semibold">Add simulator</h3>
             <div id="sim-editor-types" class="py-4">
                 <p class="text-sm opacity-70 mb-3">Pick the simulator PiTrac should send shots to.</p>
                 <div id="sim-editor-type-list" class="grid grid-cols-1 sm:grid-cols-3 gap-2"></div>
@@ -138,12 +138,12 @@
         <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
 
-    <dialog id="strobe-safety-modal" class="modal">
+    <dialog id="strobe-safety-modal" class="modal" aria-labelledby="strobe-safety-title">
         <div class="modal-box">
             <div class="text-center mb-4 text-error">
                 <i data-lucide="triangle-alert" class="icon-lg"></i>
             </div>
-            <h3 class="text-lg font-bold text-center">Strobe calibration required</h3>
+            <h3 id="strobe-safety-title" class="text-lg font-semibold text-center">Strobe calibration required</h3>
             <p class="py-4 text-center opacity-60" id="strobe-safety-msg">
                 V3 board requires strobe calibration before use.
             </p>

@@ -296,13 +296,13 @@ class TestConfigManager:
         seen = []
         config_manager.register_callback("gs_config.cameras", lambda k, v: seen.append((k, v)))
 
-        ok, _ = config_manager.import_config({"user_settings": {"gs_config": {"cameras": {"kHLAOffset": 1.5}}}})
+        ok, *_ = config_manager.import_config({"user_settings": {"gs_config": {"cameras": {"kHLAOffset": 1.5}}}})
 
         assert ok
         assert seen == [("gs_config.cameras.kHLAOffset", 1.5)]
 
     def test_import_config_drops_old_simulator_keys(self, config_manager, db):
-        ok, _ = config_manager.import_config({"user_settings": {
+        ok, *_ = config_manager.import_config({"user_settings": {
             "simulators": {"gspro": {"host": "10.0.0.5", "enabled": True}},
             "cameras": {"slot1": {"type": "4"}},
         }})
@@ -318,7 +318,7 @@ class TestConfigManager:
             raise RuntimeError("disk full")
 
         config_manager._calibration.replace_all_in = fail
-        ok, _ = config_manager.import_config({
+        ok, *_ = config_manager.import_config({
             "user_settings": {"gs_config": {"cameras": {"kCamera1Gain": "9.0"}}},
             "calibration_data": {"gs_config": {"cameras": {"kCamera1FocalLength": 6.1}}},
         })
@@ -825,6 +825,36 @@ class TestSetCalibrationBatch:
         })
         assert any(k == "gs_config.cameras.kCamera1CalibrationMatrix" for k, _ in seen)
 
+    def test_redo_with_identical_values_bumps_timestamp(self, config_manager, db):
+        key = "gs_config.cameras.kCamera1CalibrationMatrix"
+        config_manager.set_calibration_batch({key: [[1.0]]})
+        db.execute("UPDATE calibration SET updated_at = '2026-01-01T00:00:00'")
+        config_manager.set_calibration_batch({key: [[1.0]]})
+        assert config_manager.calibration_updated_at(key) > "2026-01-01T00:00:00"
+
+
+class TestCalibrationTimestamps:
+    def test_calibration_set_config_with_identical_value_bumps_timestamp(self, config_manager, db):
+        key = "gs_config.cameras.kCamera1FocalLength"
+        config_manager.set_config(key, 6.1)
+        db.execute("UPDATE calibration SET updated_at = '2026-01-01T00:00:00'")
+        config_manager.set_config(key, 6.1)
+        assert config_manager.calibration_updated_at(key) > "2026-01-01T00:00:00"
+
+    def test_untouched_calibration_keys_keep_their_timestamp(self, config_manager, db):
+        config_manager.set_calibration_batch({"gs_config.cameras.kCamera1FocalLength": 6.1})
+        db.execute("UPDATE calibration SET updated_at = '2026-01-01T00:00:00'")
+        config_manager.set_calibration_batch({"gs_config.cameras.kCamera2FocalLength": 6.2})
+        assert config_manager.calibration_updated_at("gs_config.cameras.kCamera1FocalLength") == "2026-01-01T00:00:00"
+
+    def test_settings_write_with_identical_value_keeps_timestamp(self, config_manager, db):
+        key = "gs_config.cameras.kCamera1Gain"
+        config_manager.set_config(key, "3.5")
+        db.execute("UPDATE settings SET updated_at = '2026-01-01T00:00:00'")
+        config_manager.set_config(key, "3.5")
+        rows = db.query("SELECT updated_at FROM settings WHERE key = ?", (key,))
+        assert rows[0]["updated_at"] == "2026-01-01T00:00:00"
+
 
 class TestBuildGeneratedConfig:
     """Tests for the extracted config dict builder."""
@@ -845,7 +875,8 @@ class TestBuildGeneratedConfig:
         assert cfg["gs_config"]["testing"]["kBaseTestImageDir"] == "./Images/"
 
     def test_build_generated_config_truncates_integer_settings(self, config_manager):
-        config_manager.set_config("gs_config.strobing.kPrimingPulseFPS", "35.5")
+        config_manager._settings.replace_all({"gs_config.strobing.kPrimingPulseFPS": 35.5})
+        config_manager.reload()
         config_manager.set_config("gs_config.ipc_interface.kMaxCam2ImageReceivedTimeMs", 30000.0)
         cfg = config_manager.build_generated_config()
         assert cfg["gs_config"]["strobing"]["kPrimingPulseFPS"] == "35"
@@ -870,6 +901,7 @@ class TestConfigTypes:
         ("gs_config.cameras.kHLAOffset", "1.5", 1.5),
         ("gs_config.cameras.kHLAOffset", 2, 2.0),
         ("gs_config.cameras.kCamera1SearchCenterX", "921", 921),
+        ("gs_config.cameras.kCamera1SearchCenterX", "921.0", 921),
         ("gs_config.cameras.kCamera1Gain", "2.5", 2.5),
     ])
     def test_coerce_value(self, config_manager, key, value, expected):
@@ -885,6 +917,12 @@ class TestConfigTypes:
     def test_coerce_value_rejects_garbage(self, config_manager, key, value):
         with pytest.raises(ValueError):
             config_manager.coerce_value(key, value)
+
+    def test_integer_setting_rejects_fractions(self, config_manager):
+        ok, message, _ = config_manager.set_config("gs_config.cameras.kCamera1SearchCenterX", 1.9)
+        assert not ok
+        assert message == "Must be a whole number"
+        assert config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX") == 850
 
     def test_float_range_enforced(self, config_manager):
         ok, _, _ = config_manager.set_config("gs_config.cameras.kHLAOffset", 999)
@@ -933,19 +971,23 @@ class TestConfigTypes:
         config_manager.set_calibration_batch({"gs_config.cameras.kCamera1FocalLength": 6.1})
         assert config_manager.get_calibrated_keys() == ["gs_config.cameras.kCamera1FocalLength"]
 
-    def test_import_rejects_bad_types(self, config_manager):
-        ok, message = config_manager.import_config(
-            {"user_settings": {"gs_config": {"cameras": {"kHLAOffset": 999}}}}
-        )
-        assert not ok
-        assert "kHLAOffset" in message
-        assert config_manager.get_user_settings() == {}
+    def test_import_skips_bad_keys_and_imports_the_rest(self, config_manager):
+        ok, _, skipped = config_manager.import_config({
+            "user_settings": {"gs_config": {"cameras": {"kHLAOffset": 999}, "modes": {"kStartInPuttingMode": "1"}}},
+            "calibration_data": {"gs_config": {"cameras": {"kCamera1FocalLength": "wide", "kCamera1Angles": [2.0, -26.0]}}},
+        })
+        assert ok
+        assert set(skipped) == {"gs_config.cameras.kHLAOffset", "gs_config.cameras.kCamera1FocalLength"}
+        assert all(skipped.values())
+        assert config_manager.get_user_settings() == {"gs_config": {"modes": {"kStartInPuttingMode": True}}}
+        assert config_manager.get_calibrated_keys() == ["gs_config.cameras.kCamera1Angles"]
 
     def test_import_coerces_values(self, config_manager):
-        ok, _ = config_manager.import_config(
+        ok, _, skipped = config_manager.import_config(
             {"user_settings": {"gs_config": {"modes": {"kStartInPuttingMode": "1"}}, "cameras": {"slot1": {"type": 4}}}}
         )
         assert ok
+        assert skipped == {}
         user = config_manager.get_user_settings()
         assert user["gs_config"]["modes"]["kStartInPuttingMode"] is True
         assert user["cameras"]["slot1"]["type"] == "4"

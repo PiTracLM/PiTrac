@@ -1333,6 +1333,39 @@ class TestCalibrationStateAndJobIsolation:
         assert manager.distortion_status["camera1"]["status"] == "stopped"
         assert manager.get_status()["distortion"]["camera1"]["status"] == "stopped"
 
+    def test_accepted_image_message_is_plain(self, manager):
+        import numpy as np
+
+        captures, messages = [], []
+
+        async def capture(camera_index, output_path, gain):
+            captures.append(camera_index)
+            if len(captures) > 1:
+                await manager.stop_calibration(camera="camera1", kind="distortion")
+            return np.zeros((90, 120), dtype=np.uint8)
+
+        async def sleep(_):
+            messages.append(manager.distortion_status["camera1"]["message"])
+
+        detector = Mock()
+        corners = np.array([[[10.0, 10.0]], [[20.0, 10.0]], [[20.0, 20.0]], [[10.0, 20.0]]], dtype=np.float32)
+        detector.detect_charuco_corners.return_value = (corners, np.arange(4).reshape(-1, 1), None, None)
+        detector.assess_image_quality.return_value = {
+            "is_good": True, "reasons": [], "tilt_score": 0.0, "coverage": 0.12, "blur_score": 100.0,
+        }
+        detector.compute_image_params.return_value = [0.1, 0.1, 0.1, 0.0]
+        detector.is_good_sample.return_value = True
+
+        manager._capture_image = capture
+        with patch("charuco_detector.CompatibleCharucoDetector", return_value=detector), \
+                patch("calibration_manager.asyncio.sleep", new=sleep):
+            asyncio.run(manager.run_distortion_calibration("camera1", target_images=5))
+
+        accepted = [m for m in messages if m.startswith("Captured 1 of 5.")]
+        assert accepted, messages
+        assert accepted[0].endswith(" area next.")
+        assert not any("!" in m or "--" in m for m in messages)
+
     def test_failed_spawn_does_not_leave_camera_busy(self, manager):
         with patch("calibration_manager.asyncio.create_subprocess_exec", side_effect=FileNotFoundError("sudo")):
             result = asyncio.run(manager.run_auto_calibration("camera1"))

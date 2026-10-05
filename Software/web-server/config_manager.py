@@ -139,13 +139,13 @@ def coerce(setting_type: str, value: Any) -> Any:
             number = float(value)
             if not math.isfinite(number):
                 raise ValueError
-            if setting_type == "integer":
-                return int(number)
-            if setting_type == "number" and number.is_integer():
-                return int(number)
-            return number
         except (TypeError, ValueError, OverflowError):
             raise ValueError("Must be a number") from None
+        if setting_type == "integer" and not number.is_integer():
+            raise ValueError("Must be a whole number")
+        if setting_type == "integer" or (setting_type == "number" and number.is_integer()):
+            return int(number)
+        return number
 
     if setting_type == "array" and isinstance(value, str):
         try:
@@ -537,7 +537,7 @@ class ConfigurationManager:
             elif is_calibration:
                 calibration_copy = copy.deepcopy(self.calibration_data)
                 if _set_in_dict(calibration_copy, key, value):
-                    self._calibration.replace_all(_flatten(calibration_copy))
+                    self._calibration.replace_all(_flatten(calibration_copy), touched=[key])
                     self.calibration_data = calibration_copy
                     self._rebuild_merged_config()
                     notify_key = key
@@ -578,7 +578,7 @@ class ConfigurationManager:
                 if not _set_in_dict(calibration_copy, key, value):
                     return False, f"Failed to set {key}"
 
-            self._calibration.replace_all(_flatten(calibration_copy))
+            self._calibration.replace_all(_flatten(calibration_copy), touched=updates)
             self.calibration_data = calibration_copy
             self._rebuild_merged_config()
 
@@ -949,8 +949,8 @@ class ConfigurationManager:
             }
             return export_data
 
-    def _coerce_imported(self, nested: Dict[str, Any]) -> Dict[str, Any]:
-        """Coerce and validate every known key of an imported tree; raises ValueError naming the key."""
+    def _coerce_imported(self, nested: Dict[str, Any], skipped: Dict[str, str]) -> Dict[str, Any]:
+        """Coerce every valid key of an imported tree; invalid keys are left out and recorded in skipped."""
         flat = {}
         for key, value in _flatten(nested).items():
             # Simulators live in their own table; an old export's keys would migrate into a duplicate instance
@@ -959,32 +959,35 @@ class ConfigurationManager:
                 continue
             is_valid, error = self.validate_config(key, value)
             if not is_valid:
-                raise ValueError(f"{key}: {error}")
+                logger.warning(f"Not importing {key}: {error}")
+                skipped[key] = error
+                continue
             flat[key] = self.coerce_value(key, value)
         return _unflatten(flat)
 
-    def import_config(self, import_data: Dict[str, Any]) -> Tuple[bool, str]:
+    def import_config(self, import_data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, str]]:
         """Import configuration from exported data
 
         Args:
             import_data: Dictionary with user_settings and optional calibration_data
 
         Returns:
-            Tuple of (success, message)
+            Tuple of (success, message, skipped keys with the reason each was not imported)
         """
+        skipped: Dict[str, str] = {}
         with self._lock:
             try:
                 if not isinstance(import_data, dict):
-                    return False, "Import data must be a dictionary"
+                    return False, "Import data must be a dictionary", skipped
 
                 new_user = None
                 new_cal = None
 
                 if isinstance(import_data.get("user_settings"), dict):
-                    new_user = self._coerce_imported(import_data["user_settings"])
+                    new_user = self._coerce_imported(import_data["user_settings"], skipped)
 
                 if isinstance(import_data.get("calibration_data"), dict):
-                    new_cal = self._coerce_imported(import_data["calibration_data"])
+                    new_cal = self._coerce_imported(import_data["calibration_data"], skipped)
 
                 with self._db.transaction() as conn:
                     if new_user is not None:
@@ -1001,11 +1004,9 @@ class ConfigurationManager:
                 self._rebuild_merged_config()
                 after = self.merged_config
 
-            except ValueError as e:
-                return False, str(e)
             except Exception as e:
                 logger.error(f"Error importing configuration: {e}")
-                return False, f"Import failed: {e}"
+                return False, f"Import failed: {e}", skipped
 
         self._notify_changed(before, after)
-        return True, "Configuration imported successfully"
+        return True, "Configuration imported successfully", skipped

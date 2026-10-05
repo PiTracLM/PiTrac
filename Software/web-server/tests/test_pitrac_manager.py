@@ -22,8 +22,6 @@ class TestPiTracProcessManager:
             "logging.level": "info",
             "storage.image_dir": "/var/pitrac/images",
             "storage.web_share_dir": "/var/pitrac/web",
-            "simulators.e6.host": "192.168.1.100",
-            "simulators.gspro.host": "192.168.1.101",
             "gs_config.cameras.kCamera1Gain": 1.0,
             "gs_config.cameras.kCamera2Gain": 4.0,
         }
@@ -39,7 +37,6 @@ class TestPiTracProcessManager:
             "categoryList": [
                 "Basic",
                 "Cameras",
-                "Simulators",
                 "Ball Detection",
                 "AI Detection",
                 "Storage",

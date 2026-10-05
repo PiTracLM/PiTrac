@@ -592,11 +592,11 @@ class PiTracServer:
             """Import configuration from exported data"""
             try:
                 config_data = await request.json()
-                success, message = self.config_manager.import_config(config_data)
+                success, message, skipped = self.config_manager.import_config(config_data)
 
                 if success:
                     await self.connection_manager.broadcast({"type": "config_import"})
-                    return {"success": True, "message": message}
+                    return {"success": True, "message": message, "skipped": skipped}
 
                 return JSONResponse(status_code=400, content={"error": message})
             except Exception as e:
@@ -1065,7 +1065,10 @@ class PiTracServer:
                     "lens_calibrated": calibration[f"camera{n}"]["lens_calibrated"],
                     "position_calibrated": calibration[f"camera{n}"]["position_calibrated"],
                     "lens_updated_at": updated_at(f"gs_config.cameras.kCamera{n}CalibrationMatrix"),
-                    "position_updated_at": updated_at(f"gs_config.cameras.kCamera{n}FocalLength"),
+                    "position_updated_at": max(
+                        filter(None, (updated_at(f"gs_config.cameras.kCamera{n}{key}") for key in ("FocalLength", "Angles"))),
+                        default=None,
+                    ),
                 }
                 for n in (1, 2)
             }

@@ -383,6 +383,22 @@ def test_setup_status_reports_when_each_calibration_was_saved(client, server_ins
     assert s["cameras"]["camera2"]["lens_updated_at"] is None
 
 
+def test_position_updated_at_is_the_later_of_focal_length_and_angles(client, server_instance):
+    config = server_instance.config_manager
+    assert config.set_calibration_batch({
+        "gs_config.cameras.kCamera1FocalLength": 6.1,
+        "gs_config.cameras.kCamera1Angles": [2.0, -26.0],
+    })[0]
+    config._db.execute(
+        "UPDATE calibration SET updated_at = '2026-01-01T00:00:00' WHERE key = 'gs_config.cameras.kCamera1FocalLength'"
+    )
+    config._db.execute(
+        "UPDATE calibration SET updated_at = '2026-03-01T00:00:00' WHERE key = 'gs_config.cameras.kCamera1Angles'"
+    )
+    s = client.get("/api/setup/status").json()
+    assert s["cameras"]["camera1"]["position_updated_at"] == "2026-03-01T00:00:00"
+
+
 def test_calibration_status_keeps_ball_keys_and_adds_distortion(client):
     status = client.get("/api/calibration/status").json()
     assert status["camera1"]["status"] == "idle"

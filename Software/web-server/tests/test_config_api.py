@@ -28,7 +28,7 @@ class TestConfigurationAPI:
             "user_settings": {"cameras": {"camera1_gain": 2.0}},
             "timestamp": "2024-01-01T12:00:00",
         }
-        manager.import_config.return_value = (True, "Configuration imported")
+        manager.import_config.return_value = (True, "Configuration imported", {"gs_config.ball_identification.kModelPath": "File not found"})
         return manager
 
     def test_config_page(self, client):
@@ -193,12 +193,13 @@ class TestConfigurationAPI:
         data = response.json()
         assert data["success"] is True
         assert data["message"] == "Configuration imported"
+        assert data["skipped"] == {"gs_config.ball_identification.kModelPath": "File not found"}
 
         mock_config_manager.import_config.assert_called_once_with(import_data)
 
     def test_import_config_invalid(self, client, server_instance, mock_config_manager):
         """Test importing invalid configuration"""
-        mock_config_manager.import_config.return_value = (False, "Invalid configuration format")
+        mock_config_manager.import_config.return_value = (False, "Invalid configuration format", {})
         server_instance.config_manager = mock_config_manager
 
         response = client.post("/api/config/import", json={"invalid": "data"})
