@@ -752,6 +752,11 @@ SUDOEOF
     echo "To rebuild after code changes:"
     echo "  sudo ./build.sh dev         # Fast incremental build (only changed files)"
     echo "  sudo ./build.sh dev force   # Full clean rebuild"
+
+    if [[ -f /run/reboot-required ]]; then
+        echo ""
+        log_warn "REBOOT REQUIRED: run 'sudo reboot' before using PiTrac"
+    fi
 }
 
 # Main execution
