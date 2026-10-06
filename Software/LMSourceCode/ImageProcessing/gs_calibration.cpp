@@ -419,6 +419,7 @@ namespace golf_sim {
 		        else {
                 	GS_LOG_MSG(warning, "Could not DetermineFocalLengthForAutoCalibration -- trying again.");
                     i--;
+                    continue;
 		        }
             }
 
