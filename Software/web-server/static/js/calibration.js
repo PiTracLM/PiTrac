@@ -283,8 +283,7 @@ class CalibrationPage {
                 <div class="min-w-0">
                     <div class="font-semibold">${label} could not be calibrated</div>
                     ${partialLine}
-                    <div class="text-sm">Check that the ball is in place and the camera can see it, then try again.</div>
-                    ${message ? `<div class="text-sm opacity-70 mt-1">${escapeHtml(message)}</div>` : ''}
+                    <div class="text-sm">${escapeHtml(message || 'Check that the ball is in place and the camera can see it, then try again.')}</div>
                     <a href="/logs" class="link text-sm">Open logs</a>
                 </div>`;
         }

@@ -528,7 +528,7 @@ class TestErrorHandling:
                     result = await manager.run_auto_calibration("camera1")
 
         assert result["status"] == "failed"
-        assert "process" in result["message"]
+        assert "exit code 1" in result["message"]
         assert manager.calibration_status["camera1"]["status"] == "failed"
 
     @pytest.mark.asyncio
@@ -715,6 +715,46 @@ class TestRealCalibrationWorkflows:
         assert manager.calibration_status["camera1"]["status"] == "completed"
 
     @pytest.mark.asyncio
+    async def test_auto_calibration_failure_explains_why(self):
+        """A failed run reports what the user should check, not just that it failed"""
+        mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
+        mock_config_manager.get_config.return_value = {"calibration": {}}
+
+        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        log = (
+            "[2026-10-07 10:00:00.000000] (0x1) [warning] Could not DetermineFocalLengthForAutoCalibration -- "
+            "trying again.\n"
+            "[2026-10-07 10:00:01.000000] (0x1) [error] Could not DetermineFocalLengthForAutoCalibration -- Too many "
+            "failures - giving up.  Check the input pictures for more information.\n"
+            "[2026-10-07 10:00:01.000000] (0x1) [error] Failed to AutoCalibrateCamera.\n"
+        )
+
+        with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
+            mock_process = AsyncMock()
+            mock_process.returncode = 1
+            mock_process.pid = 12345
+            mock_subprocess.return_value = mock_process
+
+            with patch.object(manager, "wait_for_calibration_completion") as mock_wait:
+                mock_wait.return_value = {
+                    "completed": False,
+                    "method": "process",
+                    "api_success": False,
+                    "process_exit_code": 1,
+                    "focal_length_received": False,
+                    "angles_received": False,
+                }
+
+                with patch("builtins.open", mock_open(read_data=log)):
+                    result = await manager.run_auto_calibration("camera1")
+
+        assert result["status"] == "failed"
+        assert "could not find the calibration ball" in result["message"]
+        assert manager.calibration_status["camera1"]["message"] == result["message"]
+
+    @pytest.mark.asyncio
     async def test_manual_calibration_success_workflow(self):
         """Test complete manual calibration workflow"""
         mock_config_manager = Mock()
@@ -782,7 +822,7 @@ class TestRealCalibrationWorkflows:
                     result = await manager.run_auto_calibration("camera1")
 
         assert result["status"] == "failed"
-        assert "timeout" in result["message"]
+        assert "timed out" in result["message"]
         assert manager.calibration_status["camera1"]["status"] == "failed"
 
     @pytest.mark.asyncio

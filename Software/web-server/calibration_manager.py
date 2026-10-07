@@ -29,6 +29,49 @@ CAMERA1_CALIBRATION_TIMEOUT = 40.0  # Camera1 has faster hardware detection
 CAMERA2_CALIBRATION_TIMEOUT = 140.0  # Camera2 needs background process initialization
 CAMERA2_BACKGROUND_INIT_WAIT = 4.0  # Time to wait for background process to initialize
 
+_BALL_NOT_FOUND = (
+    "The camera could not find the calibration ball in enough pictures. Check that the ball is in place, "
+    "in view, well lit, and near the camera's Search Center setting."
+)
+_BAD_POSITION_SETTINGS = (
+    "The calibration ball position settings are missing or invalid. Check the Enclosure Version setting."
+)
+
+# Terminal pitrac_lm error lines (gs_calibration.cpp, lm_main.cpp) mapped to what the user should check.
+# Per-frame misses are left out on purpose: calibration retries those.
+AUTO_CALIBRATION_FAILURE_REASONS = [
+    ("Too many failures - giving up", _BALL_NOT_FOUND),
+    ("All focal length samples failed", _BALL_NOT_FOUND),
+    (
+        "FAILED to TakeStillPicture",
+        "The camera did not return a picture. Check the camera cable and that nothing else is using the camera.",
+    ),
+    (
+        "invalid focal length",
+        "The ball looked the wrong size for its expected distance. Check that the ball is at the calibration "
+        "position for your Enclosure Version and that the lens setting matches the camera.",
+    ),
+    (
+        "invalid camera angles",
+        "The ball gave impossible camera angles. Check that the ball is at the calibration position for your "
+        "Enclosure Version.",
+    ),
+    (
+        "Could not DetermineCameraAngles",
+        "The ball was found while measuring focal length but not while measuring the camera angles. Check that "
+        "the ball did not move and is well lit.",
+    ),
+    ("Could not RetrieveAutoCalibrationConstants", _BAD_POSITION_SETTINGS),
+    ("kFinalAutoCalibrationBallPositionFromCameraMeters", _BAD_POSITION_SETTINGS),
+    ("valid distance_direct_to_ball", _BAD_POSITION_SETTINGS),
+    ("invalid expected ball radius", _BAD_POSITION_SETTINGS),
+    ("invalid max_ball_radius", _BAD_POSITION_SETTINGS),
+    (
+        "Failed to PerformSystemStartupTasks",
+        "PiTrac could not start the cameras. Check that PiTrac is stopped and both cameras are detected.",
+    ),
+]
+
 DISTORTION_DEFAULT_TARGET_IMAGES = 40  # Hagemann 2021: 40+ images for sub-0.2% std_fx/fx
 DISTORTION_MAX_ATTEMPTS_MULTIPLIER = 5  # max_attempts = target * this
 DISTORTION_CAPTURE_INTERVAL = 2.0  # seconds between captures
@@ -560,11 +603,12 @@ class CalibrationManager:
                     "log_file": str(log_file),
                 }
             else:
+                message = self._auto_calibration_failure_message(completion_result, output, timeout)
                 self.calibration_status[camera]["status"] = "failed"
-                self.calibration_status[camera]["message"] = f"Calibration failed ({completion_result['method']})"
+                self.calibration_status[camera]["message"] = message
                 return {
                     "status": "failed",
-                    "message": f"Calibration failed via {completion_result['method']}",
+                    "message": message,
                     "completion_result": completion_result,
                     "output": output,
                     "log_file": str(log_file),
@@ -860,6 +904,21 @@ class CalibrationManager:
                 results["complete"] = True
 
         return results if results else None
+
+    def _auto_calibration_failure_message(self, completion_result: Dict[str, Any], output: str, timeout: float) -> str:
+        if completion_result["method"] == "timeout":
+            return f"Calibration timed out after {timeout:.0f} seconds."
+
+        for marker, reason in AUTO_CALIBRATION_FAILURE_REASONS:
+            if marker in output:
+                return reason
+
+        errors = [line.split("[error]", 1)[1].strip() for line in output.splitlines() if "[error]" in line]
+        if errors:
+            return f"Last error: {errors[-1]}"
+
+        exit_code = completion_result["process_exit_code"]
+        return f"Stopped with exit code {exit_code} and no logged reason. Open the logs for details."
 
     def _check_calibration_failed(self, output: str) -> bool:
         """Check if output contains calibration failure messages
