@@ -81,7 +81,7 @@ async def test_connect_sends_ready_then_shot():
 
     assert sim.status == "off"
     types = [m["type"] for m in fake.messages]
-    assert types[0] == "device" and fake.messages[0]["status"] == "ready"
+    assert types[0] == "device" and fake.messages[0]["status"] == "busy"
     assert "shot" in types
 
 
@@ -214,3 +214,61 @@ async def test_disconnect_does_not_wait_forever_for_the_socket_to_close():
 
     writer.transport.abort.assert_called_once()
     assert sim.status == "off"
+
+
+@pytest.mark.asyncio
+async def test_device_status_follows_the_ball():
+    fake = _FakeOGS()
+    await fake.start()
+    sim = OGSSim(host="127.0.0.1", port=fake.port, keepalive_sec=999)
+    await sim.connect()
+    await sim.on_ball_state(True)
+    await sim.on_ball_state(False)
+    await asyncio.sleep(0.05)
+    await sim.disconnect()
+    await fake.stop()
+
+    assert [m["status"] for m in fake.messages] == ["busy", "ready", "busy"]
+
+
+@pytest.mark.asyncio
+async def test_back_to_back_messages_arrive_in_separate_reads():
+    reads = []
+
+    async def handle(reader, writer):
+        while chunk := await reader.read(4096):
+            reads.append(chunk)
+        writer.close()
+
+    server = await asyncio.start_server(handle, "127.0.0.1", 0)
+    sim = OGSSim(host="127.0.0.1", port=server.sockets[0].getsockname()[1], keepalive_sec=999)
+    await sim.connect()
+    await sim.send_shot(ShotData(speed=99.0, launch_angle=12.0, side_angle=1.0, back_spin=2500, side_spin=200))
+    await sim.on_ball_state(False)
+    await asyncio.sleep(0.05)
+    await sim.disconnect()
+    server.close()
+    await server.wait_closed()
+
+    # OGS JSON.parses each read on its own
+    assert [json.loads(r)["type"] for r in reads] == ["device", "shot", "device"]
+
+
+@pytest.mark.asyncio
+async def test_player_updates_log_the_club(caplog):
+    async def handle(reader, writer):
+        writer.write(b'{"type": "player", "data": {"club": {"id": "PT", "name": "Putter"}}}\n')
+        await writer.drain()
+        await reader.read()
+        writer.close()
+
+    server = await asyncio.start_server(handle, "127.0.0.1", 0)
+    sim = OGSSim(host="127.0.0.1", port=server.sockets[0].getsockname()[1], keepalive_sec=999)
+    with caplog.at_level("INFO", logger="sims.ogs_sim"):
+        await sim.connect()
+        await asyncio.sleep(0.05)
+        await sim.disconnect()
+    server.close()
+    await server.wait_closed()
+
+    assert "OGS player update" in caplog.text and "PT" in caplog.text
