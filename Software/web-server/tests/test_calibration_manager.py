@@ -8,7 +8,7 @@ Focuses on testing real logic with minimal mocking to catch actual bugs.
 import asyncio
 import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch, AsyncMock, mock_open
 
 from calibration_manager import CalibrationManager
 
@@ -676,6 +676,43 @@ class TestRealCalibrationWorkflows:
         assert manager.calibration_status["camera1"]["status"] == "completed"
         assert manager.calibration_status["camera1"]["progress"] == 100
         mock_config_manager.reload.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_auto_calibration_recovered_retry_is_success(self):
+        """A tolerated retry in the log must not override a clean exit"""
+        mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
+        mock_config_manager.get_config.return_value = {"calibration": {}}
+        mock_config_manager.reload = Mock()
+
+        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        log = (
+            "Could not DetermineFocalLengthForAutoCalibration -- trying again.\n"
+            "====>  Average Focal Length = 6.120000.\n"
+        )
+
+        with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
+            mock_process = AsyncMock()
+            mock_process.returncode = 0
+            mock_process.pid = 12345
+            mock_subprocess.return_value = mock_process
+
+            with patch.object(manager, "wait_for_calibration_completion") as mock_wait:
+                mock_wait.return_value = {
+                    "completed": True,
+                    "method": "process",
+                    "api_success": False,
+                    "process_exit_code": 0,
+                    "focal_length_received": False,
+                    "angles_received": False,
+                }
+
+                with patch("builtins.open", mock_open(read_data=log)):
+                    result = await manager.run_auto_calibration("camera1")
+
+        assert result["status"] == "success"
+        assert manager.calibration_status["camera1"]["status"] == "completed"
 
     @pytest.mark.asyncio
     async def test_manual_calibration_success_workflow(self):

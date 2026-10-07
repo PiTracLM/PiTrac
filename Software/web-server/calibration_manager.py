@@ -535,13 +535,6 @@ class CalibrationManager:
             except OSError:
                 output = ""
 
-            if output and self._check_calibration_failed(output):
-                logger.warning(
-                    f"{camera}: Detected calibration failure in output despite exit code {process.returncode}"
-                )
-                completion_result["completed"] = False
-                completion_result["method"] = "output_parse"
-
             with open(log_file, "a") as f:
                 f.write(f"\n--- Completion ---\n")
                 f.write(f"Completion method: {completion_result['method']}\n")

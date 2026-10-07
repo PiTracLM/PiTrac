@@ -53,6 +53,9 @@ static constexpr std::string_view TEST_IMAGE_PREFIX = "TEST_RESULT_GetBall_";
 
 std::string kBaseTestDir = "Will be set from the .json configuration file";
 
+// The web server only learns that an auto calibration failed from the exit code.
+static int run_exit_code = 0;
+
 
 void test_image(std::string_view subdir, std::string_view filename) {
     BOOST_LOG_FUNCTION();
@@ -949,6 +952,7 @@ void run_main(int argc, char* argv[])
             // Initialize cameras and system components
             if (!PerformSystemStartupTasks()) {
                 GS_LOG_MSG(error, "Failed to PerformSystemStartupTasks.");
+                run_exit_code = 1;
                 return;
             }
 
@@ -959,7 +963,8 @@ void run_main(int argc, char* argv[])
 
             // We will want to send a calibration message to any monitor UIs
             if (!calibrator.AutoCalibrateCamera(camera_number)) {
-                GS_LOG_MSG(info, "Failed to AutoCalibrateCamera.");
+                GS_LOG_MSG(error, "Failed to AutoCalibrateCamera.");
+                run_exit_code = 1;
                 return;
             }
 
@@ -1131,7 +1136,8 @@ void run_main(int argc, char* argv[])
 
             // We will want to send a calibration message to any monitor UIs
             if (!GolfSimCalibration::AutoCalibrateCamera(camera_number)) {
-                GS_LOG_MSG(info, "Failed to AutoCalibrateCamera.");
+                GS_LOG_MSG(error, "Failed to AutoCalibrateCamera.");
+                run_exit_code = 1;
                 return;
             }
 
@@ -1372,5 +1378,5 @@ int main(int argc, char *argv[])
     // cv::waitKey(0);
 
     GS_LOG_TRACE_MSG(trace, "Tests Complete");
-    return 0;
+    return run_exit_code;
 }
