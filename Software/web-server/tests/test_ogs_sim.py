@@ -272,3 +272,35 @@ async def test_player_updates_log_the_club(caplog):
     await server.wait_closed()
 
     assert "OGS player update" in caplog.text and "PT" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_result_is_reported_once_for_the_last_shot():
+    results = []
+
+    async def handle(reader, writer):
+        await reader.readline()
+        await reader.readline()
+        result = {"type": "result", "data": {"result": {"carry": 196.07, "total": 202.55}, "club": {"id": "DR"}}}
+        for _ in range(2):
+            writer.write((json.dumps(result) + "\n").encode())
+            await writer.drain()
+            await asyncio.sleep(0.02)
+        await reader.read()
+        writer.close()
+
+    async def on_result(shot_id, data):
+        results.append((shot_id, data["result"]["carry"]))
+
+    server = await asyncio.start_server(handle, "127.0.0.1", 0)
+    sim = OGSSim(host="127.0.0.1", port=server.sockets[0].getsockname()[1], keepalive_sec=999, on_result=on_result)
+    await sim.connect()
+    shot = ShotData(speed=99.0, launch_angle=12.0, side_angle=1.0, back_spin=2500, side_spin=200)
+    shot.shot_id = 1717236000123
+    await sim.send_shot(shot)
+    await asyncio.sleep(0.1)
+    await sim.disconnect()
+    server.close()
+    await server.wait_closed()
+
+    assert results == [(1717236000123, 196.07)]

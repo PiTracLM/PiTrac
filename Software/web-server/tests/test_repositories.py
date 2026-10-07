@@ -118,6 +118,19 @@ class TestShotRepository:
         assert shot["images"] == [{"kind": "spin1", "file_path": "a.png"}]
         assert shots.get(999) is None
 
+    def test_sim_result_is_stored_with_the_shot(self, sessions, shots):
+        s = sessions.ensure_open("2026-06-01T10:00:00", timeout_minutes=30)
+        shots.add(1717236000123, s, hit(), [])
+        data = {"result": {"carry": 196.07, "height": 18.73, "roll": 6.48, "total": 202.55, "lateral": -0.08},
+                "club": {"id": "DR", "name": "Driver", "distance": 230}, "sessionId": 22}
+        shots.add_sim_result(1717236000123, "sim-1", data, "2026-06-01T10:00:05")
+        shots.add_sim_result(1717236000123, "sim-1", {"result": {"carry": 190.0}}, "2026-06-01T10:00:06")
+        shots.add_sim_result(1717236000123, "sim-2", data, "2026-06-01T10:00:07")
+        results = shots.get(1717236000123)["sim_results"]
+        assert [r["simulator_id"] for r in results] == ["sim-1", "sim-2"]
+        assert results[0]["carry"] == 190.0 and results[0]["club_id"] is None
+        assert results[1]["total"] == 202.55 and results[1]["club_name"] == "Driver"
+
     def test_delete_images_for_session_removes_only_that_session(self, sessions, shots, db):
         s1 = sessions.ensure_open("2026-06-01T09:00:00", timeout_minutes=30)
         shots.add(1, s1, hit(), [("spin1", "s1.png")])

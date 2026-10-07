@@ -26,6 +26,7 @@ _BALL_DETECTED_BY_STATUS = {
 }
 
 BroadcastFn = Callable[[Dict[str, object]], Awaitable[None]]
+ResultFn = Callable[[str, int, Dict[str, Any]], Awaitable[None]]
 
 
 class SimSettingsError(ValueError):
@@ -124,9 +125,15 @@ class SimManager:
     RELOAD_DEBOUNCE_SEC = 0.5
     TEST_TIMEOUT_SEC = 5
 
-    def __init__(self, repo: SimulatorRepository, broadcast: Optional[BroadcastFn] = None) -> None:
+    def __init__(
+        self,
+        repo: SimulatorRepository,
+        broadcast: Optional[BroadcastFn] = None,
+        on_result: Optional[ResultFn] = None,
+    ) -> None:
         self.repo = repo
         self._broadcast = broadcast
+        self._on_result = on_result
         self._sims: Dict[str, SimInterface] = {}
         self._build_errors: Dict[str, str] = {}
         self._running = False
@@ -217,6 +224,7 @@ class SimManager:
             settings = _valid_settings(cls, inst["settings"])
             hooks = {
                 "on_club": functools.partial(self.set_club, inst["id"]),
+                "on_result": functools.partial(self._record_result, inst["id"]),
                 "ball_state": lambda: bool(self._ball_detected),
             }
             accepted = inspect.signature(cls).parameters
@@ -318,6 +326,10 @@ class SimManager:
     @property
     def club(self) -> Optional[str]:
         return self._club
+
+    async def _record_result(self, sim_id: str, shot_id: int, data: Dict[str, Any]) -> None:
+        if self._on_result is not None:
+            await self._on_result(sim_id, shot_id, data)
 
     def set_club(self, sim_id: str, club: str) -> None:
         self._club = club

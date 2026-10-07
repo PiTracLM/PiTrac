@@ -23,6 +23,15 @@ class TestShotPersistence:
         assert shot["result_type"] == "Hit"
         assert len(shot["images"]) == 2
 
+    @pytest.mark.asyncio
+    async def test_sim_result_shows_on_the_shot(self, client, server_instance):
+        client.post("/api/internal/shot-result", json=make_hit_payload())
+        data = {"result": {"carry": 196.07, "total": 202.55}, "club": {"id": "DR", "name": "Driver"}}
+        await server_instance._store_sim_result("sim-1", 1717236000123, data)
+        await server_instance._store_sim_result("sim-1", 999, data)
+        results = client.get("/api/shots/1717236000123").json()["sim_results"]
+        assert len(results) == 1 and results[0]["total"] == 202.55
+
     def test_status_message_not_persisted(self, client, server_instance):
         client.post("/api/internal/shot-result", json={"result_type": 2, "message": "waiting"})
         assert server_instance.session_repo.list() == []

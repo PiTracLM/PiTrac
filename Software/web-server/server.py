@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import shutil
+import sqlite3
 import subprocess
 import time
 from contextlib import asynccontextmanager
@@ -218,7 +219,9 @@ class PiTracServer:
         sim_repo = SimulatorRepository(self.db)
         if import_legacy_settings(KeyValueRepository(self.db, "settings"), sim_repo):
             self.config_manager.reload()
-        self.sim_manager = SimManager(sim_repo, broadcast=self.sim_connection_manager.broadcast)
+        self.sim_manager = SimManager(
+            sim_repo, broadcast=self.sim_connection_manager.broadcast, on_result=self._store_sim_result
+        )
         self.shutdown_flag = False
         self.background_tasks: set[asyncio.Task] = set()
         self._active_cameras: Dict[int, str] = {}  # camera_index -> endpoint name
@@ -395,15 +398,15 @@ class PiTracServer:
                     message=message,
                     timestamp=datetime.now().isoformat(),
                 )
-                shot_data.shot_id = body.get("shot_id")
+                # Sims report results against this id, so it has to exist before they get the shot
+                shot_data.shot_id = body.get("shot_id") or int(datetime.now().timestamp() * 1000)
                 shot_data.images = list(body.get("images") or [])
                 # The sims round for their own protocol, so they get the values before display rounding
                 sim_shot = replace(shot_data, speed=speed_mph, launch_angle=launch_angle, side_angle=side_angle)
                 self._run_in_background(self.sim_manager.on_shot(sim_shot))
                 if result_type_str == "Hit":
-                    shot_id = shot_data.shot_id or int(datetime.now().timestamp() * 1000)
                     images = [(Path(p).stem, p) for p in shot_data.images]
-                    await asyncio.to_thread(self._persist_shot, shot_id, shot_data, images)
+                    await asyncio.to_thread(self._persist_shot, shot_data.shot_id, shot_data, images)
 
             self.shot_store.update(shot_data)
             await self.connection_manager.broadcast(shot_data.to_dict())
@@ -1685,6 +1688,14 @@ class PiTracServer:
     def _persist_shot(self, shot_id, shot_data, images):
         session_id = self.session_repo.ensure_open(shot_data.timestamp, self.session_timeout_minutes)
         self.shot_repo.add(shot_id, session_id, shot_data, images)
+
+    async def _store_sim_result(self, sim_id: str, shot_id: int, data: Dict[str, Any]) -> None:
+        try:
+            await asyncio.to_thread(
+                self.shot_repo.add_sim_result, shot_id, sim_id, data, datetime.now().isoformat()
+            )
+        except sqlite3.IntegrityError:
+            logger.warning(f"Simulator result for shot {shot_id} has no saved shot to attach to, dropped")
 
     def _run_in_background(self, coro) -> None:
         task = asyncio.create_task(coro)

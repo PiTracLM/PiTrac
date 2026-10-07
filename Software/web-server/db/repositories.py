@@ -80,6 +80,17 @@ class ShotRepository:
                 [(shot_id, kind, path) for kind, path in images],
             )
 
+    def add_sim_result(self, shot_id: int, simulator_id: str, data: Dict[str, Any], received_at: str) -> None:
+        result = data.get("result") or {}
+        club = data.get("club") or {}
+        self.db.execute(
+            """INSERT OR REPLACE INTO shot_sim_results
+               (shot_id, simulator_id, carry, total, roll, height, lateral, club_id, club_name, received_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (shot_id, simulator_id, result.get("carry"), result.get("total"), result.get("roll"),
+             result.get("height"), result.get("lateral"), club.get("id"), club.get("name"), received_at),
+        )
+
     def _attach_images(self, shot_row: Dict[str, Any]) -> Dict[str, Any]:
         imgs = self.db.query(
             "SELECT kind, file_path FROM shot_images WHERE shot_id = ? ORDER BY id",
@@ -90,7 +101,14 @@ class ShotRepository:
 
     def get(self, shot_id: int) -> Optional[Dict[str, Any]]:
         rows = self.db.query("SELECT * FROM shots WHERE id = ?", (shot_id,))
-        return self._attach_images(dict(rows[0])) if rows else None
+        if not rows:
+            return None
+        shot = self._attach_images(dict(rows[0]))
+        results = self.db.query(
+            "SELECT * FROM shot_sim_results WHERE shot_id = ? ORDER BY received_at", (shot_id,)
+        )
+        shot["sim_results"] = [{k: r[k] for k in r.keys() if k != "shot_id"} for r in results]
+        return shot
 
     def list_for_session(self, session_id: int) -> List[Dict[str, Any]]:
         rows = self.db.query(

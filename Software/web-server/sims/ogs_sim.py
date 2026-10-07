@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 import math
-from typing import Callable, Dict, Optional, Union
+from typing import Any, Awaitable, Callable, Dict, Optional, Union
 
 from models import ShotData
 from sims.tcp_sim import HOST_FIELD, TcpSim, clamp, port_field
@@ -54,10 +54,13 @@ class OGSSim(TcpSim):
         port: int = 3111,
         keepalive_sec: int = 5,
         ball_state: Callable[[], bool] = lambda: False,
+        on_result: Optional[Callable[[int, Dict[str, Any]], Awaitable[None]]] = None,
     ) -> None:
         super().__init__(host, port)
         self.keepalive_sec = max(1, int(keepalive_sec))
         self._ball_state = ball_state
+        self._on_result = on_result
+        self._awaiting_result: Optional[int] = None
         self._keepalive_task: Optional[asyncio.Task] = None
         self._send_lock = asyncio.Lock()
         self._last_send = 0.0
@@ -94,6 +97,7 @@ class OGSSim(TcpSim):
         if self._writer is None:
             raise ConnectionError("OGS not connected")
         await self._send_or_reconnect(build_shot_payload(shot))
+        self._awaiting_result = shot.shot_id
 
     async def _on_message(self, obj: object, raw: str = "") -> None:
         if not isinstance(obj, dict):
@@ -102,6 +106,14 @@ class OGSSim(TcpSim):
             # Club IDs are logged, not acted on, until we know what OGS sends for the putter
             data = obj.get("data") or {}
             logger.info(f"OGS player update: club {data.get('club')!r}")
+        elif obj.get("type") == "result":
+            # ponytail: pairs a result with the last shot sent and takes only the first one;
+            # match on the echoed data.shot if results ever start arriving after the next shot
+            shot_id, self._awaiting_result = self._awaiting_result, None
+            data = obj.get("data") or {}
+            logger.info(f"OGS result for shot {shot_id}: {data.get('result')!r}")
+            if shot_id is not None and self._on_result is not None:
+                await self._on_result(shot_id, data)
         elif obj.get("status") == 400:
             logger.warning(f"OGS rejected a message: {obj.get('error')!r}")
 
