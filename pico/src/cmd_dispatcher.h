@@ -34,6 +34,7 @@ typedef struct {
 
     /* Cam-XTR + cooldown timing */
     void    (*set_cam_xtr_setup)(uint32_t us);
+    void    (*set_cam2_xtr_active_high)(bool active_high);
     void    (*set_min_inter_shot)(uint32_t ms);
     void    (*set_pre_trigger_delay)(uint32_t ms);
 

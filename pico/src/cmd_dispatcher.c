@@ -56,6 +56,11 @@ void cmd_dispatcher_apply(const pitrac_cmd_t *c, const hw_driver_t *hw) {
         hw->emit_log("cam_xtr_setup updated");
         break;
 
+    case CMD_CFG_CAM2_XTR_ACTIVE_HIGH:
+        hw->set_cam2_xtr_active_high(c->u.armed);
+        hw->emit_log(c->u.armed ? "cam2_xtr_active_high=1" : "cam2_xtr_active_high=0");
+        break;
+
     case CMD_CFG_MIN_INTER_SHOT:
         hw->set_min_inter_shot(c->u.u32);
         hw->emit_log("min_inter_shot updated");

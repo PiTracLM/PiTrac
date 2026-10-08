@@ -5,7 +5,7 @@
  * Hardware: original Raspberry Pi Pico (RP2040), driving:
  *   - SPH0645 I2S MEMS mic (Adafruit 3421)
  *   - MCP1407 gate driver feeding a MOSFET → IR LED bank
- *   - Cam2 external trigger (IMX296 / Mira220), active low
+ *   - Cam2 external trigger (IMX296 active low, Mira220 active high)
  *
  * Pin numbers match README.md wiring; I2S pins are contiguous because RP2040
  * PIO can only address contiguous pin ranges for its sideset + OUT/IN groups.
@@ -31,9 +31,10 @@
  * Driven by ir_strobe.pio at cycle-accurate timing. */
 #define PIN_STROBE_OUT 13
 
-/* Cam2 external trigger. IMX296/Mira220 active low: LOW starts exposure, HIGH
- * ends it. Toggled from C — shutter latency dominates, so no cycle-accurate
- * timing vs the strobe needed. */
+/* Cam2 external trigger. IMX296 is active low: LOW starts exposure, HIGH ends
+ * it. The Mira220 REQ_EXP input is the opposite and 1.8 V only, so it needs
+ * `CFG CAM2_XTR_ACTIVE_HIGH=1` and a 3.3 V to 1.8 V divider. Toggled from C:
+ * shutter latency dominates, so no cycle-accurate timing vs the strobe needed. */
 #define PIN_CAM2_XTR   15
 
 /* M2 pins. Pi side: GPIO 26 -> GP9 (FIRE_IN), GP7 -> Pi GPIO 27 (IRQ_OUT),
@@ -195,7 +196,7 @@
 #define STROBE_MAX_HOLD_MS  200u
 
 /* Firmware version — surfaced on the boot LOG line. */
-#define PITRAC_PICO_FW_VERSION "0.8.5"
+#define PITRAC_PICO_FW_VERSION "0.8.6"
 
 /* EVENT RMS streaming rate ceiling (samples/sec). Caps the web UI mic
  * visualiser so USB CDC TX can't saturate and starve STATUS replies. */

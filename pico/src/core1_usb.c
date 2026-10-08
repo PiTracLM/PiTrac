@@ -53,6 +53,7 @@ void g_state_runtime_init(void) {
     g_state.interval_count       = STROBE_DEFAULT_INTERVAL_COUNT;
     g_state.arm_timeout_ms       = 10000;
     g_state.cam_xtr_setup_us     = CAM_XTR_DEFAULT_SETUP_US;
+    g_state.cam2_xtr_active_high = false;
     g_state.min_inter_shot_ms    = STROBE_DEFAULT_MIN_INTER_SHOT_MS;
     g_state.pre_trigger_delay_ms = STROBE_DEFAULT_PRE_TRIGGER_DELAY_MS;
     g_state.last_event_us        = 0;
@@ -110,12 +111,13 @@ static bool vbus_present(void) {
 int proto_format_status(const pitrac_state_t *st, char *buf, int buflen) {
     int n = snprintf(buf, buflen,
         "STATUS armed=%d threshold=%ld pulse_us=%.2f min_inter_shot_ms=%lu "
-        "pre_trigger_delay_ms=%lu strobe_hold=%d "
+        "pre_trigger_delay_ms=%lu strobe_hold=%d cam2_xtr_active_high=%d "
         "event_count=%lu dma_rearm=%lu vsys_mv=%lu vbus=%d fw=%s board=%s intervals=",
         (int)st->armed, (long)st->mic_threshold, (double)st->pulse_width_us,
         (unsigned long)st->min_inter_shot_ms,
         (unsigned long)st->pre_trigger_delay_ms,
         (int)strobe_is_held(),
+        (int)st->cam2_xtr_active_high,
         (unsigned long)st->event_count,
         (unsigned long)st->dma_rearm_count,
         (unsigned long)read_vsys_mv(),
@@ -236,6 +238,7 @@ static void fw_heartbeat(void) {
 
 static void fw_set_arm_timeout(uint32_t ms)        { g_state.arm_timeout_ms      = ms; }
 static void fw_set_cam_xtr_setup(uint32_t us)      { g_state.cam_xtr_setup_us    = us; }
+static void fw_set_cam2_xtr_active_high(bool high) { strobe_set_cam2_xtr_active_high(high); }
 static void fw_set_min_inter_shot(uint32_t ms)     { g_state.min_inter_shot_ms   = ms; }
 static void fw_set_pre_trigger_delay(uint32_t ms)  { g_state.pre_trigger_delay_ms = ms; }
 
@@ -324,10 +327,10 @@ static void fw_selftest(void) {
         led_set(true);  sleep_ms(50);
         led_set(false); sleep_ms(50);
     }
-    gpio_put(PIN_CAM2_XTR, 0);
+    strobe_cam2_xtr_put(true);
     gpio_put(PIN_CAM1_XTR, 0);
     sleep_ms(10);
-    gpio_put(PIN_CAM2_XTR, 1);
+    strobe_cam2_xtr_put(false);
     gpio_put(PIN_CAM1_XTR, 1);
     emit_log("selftest complete (strobe pin not pulsed by design)");
 }
@@ -340,6 +343,7 @@ static const hw_driver_t fw_driver = {
     .set_armed             = fw_set_armed,
     .set_arm_timeout       = fw_set_arm_timeout,
     .set_cam_xtr_setup     = fw_set_cam_xtr_setup,
+    .set_cam2_xtr_active_high = fw_set_cam2_xtr_active_high,
     .set_min_inter_shot    = fw_set_min_inter_shot,
     .set_pre_trigger_delay = fw_set_pre_trigger_delay,
     .hold_assert           = fw_hold_assert,

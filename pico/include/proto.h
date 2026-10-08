@@ -34,6 +34,7 @@ typedef enum {
     CMD_CFG_ARMED,            /* CFG ARMED=<0|1>                    */
     CMD_CFG_ARM_TIMEOUT,      /* CFG ARM_TIMEOUT_MS=<int>           */
     CMD_CFG_CAM_XTR_SETUP,    /* CFG CAM_XTR_SETUP_US=<int>         */
+    CMD_CFG_CAM2_XTR_ACTIVE_HIGH, /* CFG CAM2_XTR_ACTIVE_HIGH=<0|1>  */
     CMD_CFG_MIN_INTER_SHOT,   /* CFG MIN_INTER_SHOT_MS=<int>        */
     CMD_CFG_PRE_TRIGGER_DELAY,/* CFG PRE_TRIGGER_DELAY_MS=<int>     */
     CMD_CFG_STROBE_HOLD,      /* CFG STROBE_HOLD=<0|1> — sustain DIAG HIGH for calibration */
@@ -90,6 +91,10 @@ typedef struct {
 
     /* Delay between XTR LOW and strobe DMA start; tune up for slower sensors. */
     uint32_t cam_xtr_setup_us;
+
+    /* Cam2 XTR polarity. false: idle HIGH, LOW opens the shutter (IMX296).
+     * true: idle LOW, HIGH opens it (Mira220 REQ_EXP). */
+    bool     cam2_xtr_active_high;
 
     /* Cooldown between fires (boost recharge + LED thermal). Host can tighten
      * for calibration sweeps. */

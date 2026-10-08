@@ -164,6 +164,18 @@ static void test_cam_pulse_prefix_does_not_match_cam(void) {
     EXPECT(!ok, "CAM_PULSEX should not match");
 }
 
+static void test_cfg_cam2_xtr_active_high_parses(void) {
+    char high[] = "CFG CAM2_XTR_ACTIVE_HIGH=1";
+    char low[]  = "CFG CAM2_XTR_ACTIVE_HIGH=0";
+    pitrac_cmd_t cmd;
+    bool ok = proto_parse_line(high, &cmd);
+    EXPECT(ok, "parsed");
+    EXPECT(cmd.kind == CMD_CFG_CAM2_XTR_ACTIVE_HIGH, "kind");
+    EXPECT(cmd.u.armed, "active high");
+    ok = proto_parse_line(low, &cmd);
+    EXPECT(ok && !cmd.u.armed, "active low");
+}
+
 static void test_cfg_stream_rms_zero_stops(void) {
     pitrac_cmd_t cmd;
     char line[] = "CFG STREAM_RMS=0";
@@ -423,6 +435,7 @@ int main(void) {
     test_cam_pulse_zero_parses_for_clamp_at_strobe_layer();
     test_cam_pulse_huge_parses_for_clamp_at_strobe_layer();
     test_cam_pulse_prefix_does_not_match_cam();
+    test_cfg_cam2_xtr_active_high_parses();
     test_cfg_stream_rms_zero_stops();
     test_cfg_stream_rms_in_range();
     test_cfg_stream_rms_clamped_to_max();
@@ -444,6 +457,6 @@ int main(void) {
         printf("%d failure(s)\n", failures);
         return 1;
     }
-    printf("%d tests passed\n", 34);
+    printf("%d tests passed\n", 35);
     return 0;
 }

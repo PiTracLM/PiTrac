@@ -89,8 +89,15 @@ void strobe_adc_release(void);
  */
 bool strobe_fire_peak(uint16_t *peak_adc_out, uint32_t *samples_out);
 
-/* Drive PIN_CAM2_XTR LOW for `microseconds` then HIGH — no PIO/DMA/IR pulse.
- * Active-low like strobe_fire. Bounds 1..100000 us. No-op while hold asserted. */
+/* Drive PIN_CAM2_XTR to its shutter-open (true) or idle (false) level for the
+ * polarity in g_state.cam2_xtr_active_high. */
+void strobe_cam2_xtr_put(bool asserted);
+
+/* Set the cam2 XTR polarity and move the pin to the new idle level. */
+void strobe_set_cam2_xtr_active_high(bool active_high);
+
+/* Assert PIN_CAM2_XTR for `microseconds` then release, with no PIO/DMA/IR pulse.
+ * Same polarity as strobe_fire. Bounds 1..100000 us. No-op while hold asserted. */
 void strobe_cam_pulse(uint32_t microseconds);
 
 /* STATUS readback of configured values. */

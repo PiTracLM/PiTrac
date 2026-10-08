@@ -99,6 +99,15 @@ bool strobe_set_pulse_train(const float *intervals_ms,
     return true;
 }
 
+void strobe_cam2_xtr_put(bool asserted) {
+    gpio_put(PIN_CAM2_XTR, asserted == g_state.cam2_xtr_active_high);
+}
+
+void strobe_set_cam2_xtr_active_high(bool active_high) {
+    g_state.cam2_xtr_active_high = active_high;
+    strobe_cam2_xtr_put(false);
+}
+
 bool strobe_init(void) {
     /* Serialise ADC mux access between core 0's FIRE_PEAK sweep and core 1's
      * VSYS reads (see s_adc_spin notes above). */
@@ -107,7 +116,8 @@ bool strobe_init(void) {
         s_adc_spin = spin_lock_instance((uint)sl);
     }
 
-    /* Cam2 XTR — active low, idle HIGH. The InnoMaker J3 trigger input is opto-isolated
+    /* Cam2 XTR: active low, idle HIGH until the host sets CAM2_XTR_ACTIVE_HIGH.
+     * The InnoMaker J3 trigger input is opto-isolated
      * (~10mA load); the RP2040 4mA default sags, so drive 12mA to hold a clean edge. */
     gpio_init(PIN_CAM2_XTR);
     gpio_set_dir(PIN_CAM2_XTR, GPIO_OUT);
@@ -201,9 +211,9 @@ static void strobe_kick_dma(bool allow_pre_trigger_delay) {
         }
     }
 
-    /* Open shutter (active low) on both triggers in lockstep — single-camera
-     * installs ignore PIN_CAM1_XTR, stereo installs get synchronised exposure. */
-    gpio_put(PIN_CAM2_XTR, 0);
+    /* Open shutter on both triggers in lockstep: single-camera installs
+     * ignore PIN_CAM1_XTR, stereo installs get synchronised exposure. */
+    strobe_cam2_xtr_put(true);
     gpio_put(PIN_CAM1_XTR, 0);
 
     /* IMX296/Mira220 shutter response ~few hundred µs. Default 1 ms, host-tunable
@@ -216,9 +226,9 @@ static void strobe_kick_dma(bool allow_pre_trigger_delay) {
     dma_channel_set_trans_count(STROBE_DMA_CHAN, s_pattern_len, true /* start */);
 }
 
-/* Release both XTR pins high. Call once the train has drained. */
+/* Release both XTR pins. Call once the train has drained. */
 static void strobe_release_xtr(void) {
-    gpio_put(PIN_CAM2_XTR, 1);
+    strobe_cam2_xtr_put(false);
     gpio_put(PIN_CAM1_XTR, 1);
 }
 
@@ -345,9 +355,9 @@ void strobe_cam_pulse(uint32_t microseconds) {
     if (microseconds < 1u)      microseconds = 1u;
     if (microseconds > 100000u) microseconds = 100000u;
 
-    gpio_put(PIN_CAM2_XTR, 0);
+    strobe_cam2_xtr_put(true);
     busy_wait_us(microseconds);
-    gpio_put(PIN_CAM2_XTR, 1);
+    strobe_cam2_xtr_put(false);
 }
 
 bool strobe_is_idle(void) {

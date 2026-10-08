@@ -191,6 +191,13 @@ bool proto_parse_line(char *line, pitrac_cmd_t *out) {
             out->u.u32 = (uint32_t)v;
             return true;
         }
+        if (strcmp(key, "CAM2_XTR_ACTIVE_HIGH") == 0) {
+            long v;
+            if (!parse_int(val, &v)) return false;
+            out->kind = CMD_CFG_CAM2_XTR_ACTIVE_HIGH;
+            out->u.armed = (v != 0);  /* reuse bool union member */
+            return true;
+        }
         if (strcmp(key, "MIN_INTER_SHOT_MS") == 0) {
             /* Floored at STROBE_MIN_INTER_SHOT_MS_FLOOR so back-to-back fires
              * can't drain the boost cap before it recharges. */
