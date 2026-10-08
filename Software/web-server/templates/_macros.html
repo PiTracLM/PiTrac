@@ -1,17 +1,41 @@
-{# Reusable UI macros — import with {% from "_macros.html" import ... %} #}
+{# Reusable UI macros, import with {% from "_macros.html" import ... %} #}
 
-{% macro pitrac_btn(action, icon, label, suffix, extra_class="") %}
-<button id="pitrac-{{ action }}-btn-{{ suffix }}"
-        class="btn btn-sm gap-1 control-btn {{ action }}-btn {{ extra_class }}"
-        onclick="controlPiTrac('{{ action }}')"
-        title="{{ label }} PiTrac">
-    <i data-lucide="{{ icon }}" class="icon-sm"></i>
-    <span class="btn-text">{{ label }}</span>
-</button>
+{#
+  metric_card: renders a single metric display card. Font sizes live in dashboard.css.
+
+  Args:
+    label        : display label (e.g. "Ball Speed")
+    value_id     : id placed on the value block (JS updates it by id)
+    unit         : unit string, e.g. "mph", "rpm", "&deg;", rendered as raw HTML
+    card_classes : extra classes appended to the card shell
+    body_padding : padding class for the card body
+#}
+{% macro metric_card(label, value_id, unit, card_classes="", body_padding="p-4") %}
+<div class="card bg-base-200 border border-base-300 shadow-sm metric-card hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 {{ card_classes }}">
+    <div class="card-body {{ body_padding }}">
+        <div class="text-xs font-semibold uppercase tracking-widest text-base-content/40">{{ label }}</div>
+        <div class="metric-number text-base-content font-bold leading-tight tabular-nums" id="{{ value_id }}"><span
+             class="metric-value">--</span><span class="metric-unit text-base-content/40 font-normal ml-1">{{ unit | safe }}<span
+             class="metric-dir"></span></span></div>
+    </div>
+</div>
 {% endmacro %}
 
-{% macro nav_item(href, icon, label) %}
-<li><a href="{{ href }}" class="gap-3"><i data-lucide="{{ icon }}" class="icon-menu"></i> {{ label }}</a></li>
+{% macro nav_item(href, icon, label, active=false, li_class="") %}
+<li{% if li_class %} class="{{ li_class }}"{% endif %}><a href="{{ href }}" class="gap-2{% if active %} bg-base-300 text-primary font-semibold{% endif %}"{% if active %} aria-current="page"{% endif %}><i data-lucide="{{ icon }}" class="icon-menu"></i> {{ label }}</a></li>
+{% endmacro %}
+
+{% macro page_header(icon, title, subtitle="", subtitle_id="") %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div class="flex items-center gap-3 min-w-0">
+        <i data-lucide="{{ icon }}" class="icon-md text-primary shrink-0"></i>
+        <div class="min-w-0">
+            <h1 class="text-xl sm:text-2xl font-bold leading-tight">{{ title }}</h1>
+            {% if subtitle %}<p class="text-sm opacity-60"{% if subtitle_id %} id="{{ subtitle_id }}"{% endif %}>{{ subtitle }}</p>{% endif %}
+        </div>
+    </div>
+    {% if caller is defined %}<div class="flex flex-wrap items-center gap-2">{{ caller() }}</div>{% endif %}
+</div>
 {% endmacro %}
 
 {% macro status_row(label, id, value="--", extra_class="") %}
@@ -21,9 +45,3 @@
 </div>
 {% endmacro %}
 
-{% macro result_item(label, id, value="--") %}
-<div class="flex justify-between py-1.5 border-b border-base-300 last:border-0">
-    <span class="text-sm opacity-60">{{ label }}</span>
-    <span class="text-sm font-medium" id="{{ id }}">{{ value }}</span>
-</div>
-{% endmacro %}

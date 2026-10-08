@@ -29,7 +29,6 @@ namespace golf_sim {
 		static long kCam2SetupPeriodMilliseconds;
 		static int kNumberPrimingPulses;
 		static int kPrimingPulseFPS;
-		static long kPauseBeforeReadyForTriggerMicroSeconds;
 		static int kPauseToSetUpInnoMakerExternalTriggerMilliseconds;
 		static int kPauseBeforeReadyForFinalPrimingPulseMs;
 

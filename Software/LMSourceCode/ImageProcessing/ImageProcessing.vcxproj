@@ -131,9 +131,9 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;BOOST_BIND_GLOBAL_PLACEHOLDERS;BOOST_ALL_DYN_LINK;BOOST_USE_WINAPI_VERSION=0x0A00;YAML_CPP_STATIC_DEFINE;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;BOOST_BIND_GLOBAL_PLACEHOLDERS;BOOST_ALL_DYN_LINK;BOOST_USE_WINAPI_VERSION=0x0A00;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>E:\Dev_Libs\opencv\build\include;E:\Dev_Libs\yaml-cpp\include;E:\Dev_Libs\boost_1_90_0\boost;../packages/Microsoft.ML.OnnxRuntime.1.23.2/build/native/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Dev_Libs\opencv\build\include;E:\Dev_Libs\boost_1_90_0\boost;../packages/Microsoft.ML.OnnxRuntime.1.23.2/build/native/include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
     </ClCompile>
@@ -141,7 +141,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>E:\Dev_Libs\opencv\build\x64\vc16\lib;E:\Dev_Libs\boost_1_90_0\lib64-msvc-14.3</AdditionalLibraryDirectories>
-      <AdditionalDependencies>E:\Dev_Libs\opencv\build\x64\vc16\lib\opencv_world4120d.lib;E:\dev_libs\yaml-cpp\build\Debug\yaml-cppd.lib;../packages/Microsoft.ML.OnnxRuntime.1.23.2/runtimes/win-x64/native/onnxruntime.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>E:\Dev_Libs\opencv\build\x64\vc16\lib\opencv_world4120d.lib;../packages/Microsoft.ML.OnnxRuntime.1.23.2/runtimes/win-x64/native/onnxruntime.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
@@ -213,7 +213,6 @@
     <ClCompile Include="ball_watcher_image_buffer.cpp" />
     <ClCompile Include="camera_hardware.cpp" />
     <ClCompile Include="colorsys.cpp" />
-    <ClCompile Include="configuration_manager.cpp" />
     <ClCompile Include="core\dma_heaps.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
@@ -253,22 +252,12 @@
     <ClCompile Include="gs_camera.cpp" />
     <ClCompile Include="gs_clubs.cpp" />
     <ClCompile Include="gs_config.cpp" />
-    <ClCompile Include="gs_e6_interface.cpp" />
     <ClCompile Include="gs_e6_response.cpp" />
-    <ClCompile Include="gs_e6_results.cpp" />
     <ClCompile Include="gs_events.cpp" />
     <ClCompile Include="gs_fsm.cpp" />
-    <ClCompile Include="gs_gspro_interface.cpp" />
-    <ClCompile Include="gs_gspro_response.cpp" />
-    <ClCompile Include="gs_gspro_results.cpp" />
-    <ClCompile Include="gs_gspro_test_server.cpp" />
-    <ClCompile Include="gs_control_msg.cpp" />
     <ClCompile Include="gs_result_types.cpp" />
     <ClCompile Include="gs_results.cpp" />
     <ClCompile Include="gs_shot_parameters.cpp" />
-    <ClCompile Include="gs_sim_interface.cpp" />
-    <ClCompile Include="gs_sim_socket_interface.cpp" />
-    <ClCompile Include="gs_web_api.cpp" />
     <ClCompile Include="lm_main.cpp" />
     <ClCompile Include="gs_options.cpp" />
     <ClCompile Include="gs_ui_system.cpp" />
@@ -378,7 +367,6 @@
     <ClInclude Include="blocking_queue.h" />
     <ClInclude Include="camera_hardware.h" />
     <ClInclude Include="colorsys.h" />
-    <ClInclude Include="configuration_manager.h" />
     <ClInclude Include="core\buffer_sync.hpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClInclude>
@@ -415,23 +403,15 @@
     <ClInclude Include="gs_camera.h" />
     <ClInclude Include="gs_clubs.h" />
     <ClInclude Include="gs_config.h" />
-    <ClInclude Include="gs_e6_interface.h" />
     <ClInclude Include="gs_e6_response.h" />
-    <ClInclude Include="gs_e6_results.h" />
     <ClInclude Include="gs_format_lib.h" />
     <ClInclude Include="gs_fsm.h" />
     <ClInclude Include="gs_globals.h" />
-    <ClInclude Include="gs_gspro_interface.h" />
-    <ClInclude Include="gs_gspro_response.h" />
-    <ClInclude Include="gs_gspro_results.h" />
-    <ClInclude Include="gs_gspro_test_server.h" />
     <ClInclude Include="gs_control_msg.h" />
     <ClInclude Include="gs_result_types.h" />
     <ClInclude Include="gs_options.h" />
     <ClInclude Include="gs_results.h" />
     <ClInclude Include="gs_shot_parameters.h" />
-    <ClInclude Include="gs_sim_interface.h" />
-    <ClInclude Include="gs_sim_socket_interface.h" />
     <ClInclude Include="gs_ui_system.h" />
     <ClInclude Include="image\image.hpp" />
     <ClInclude Include="libcamera_interface.h" />
@@ -477,7 +457,6 @@
     <None Include="core\meson.build" />
     <None Include="core\version.cmake" />
     <None Include="core\version.cpp.in" />
-    <None Include="create_closed_source_objects.sh" />
     <None Include="encoder\meson.build" />
     <None Include="golf_sim_config.json" />
     <None Include="image\meson.build" />
@@ -503,8 +482,6 @@
     <None Include="RunScripts\runPiTracCommon.sh" />
     <None Include="RunScripts\runPulseTest.sh" />
     <None Include="RunScripts\runShutdown.sh" />
-    <None Include="RunScripts\runTestExternalSimMessage.sh" />
-    <None Include="RunScripts\runTestGsProServer.sh" />
     <None Include="RunScripts\runTestResults.sh" />
     <None Include="RunScripts\runTestSpin.sh" />
     <None Include="RunScripts\shutdown_gs.sh" />

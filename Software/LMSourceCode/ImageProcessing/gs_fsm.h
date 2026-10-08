@@ -86,10 +86,6 @@ namespace golf_sim {
     // This function is really the brains of the operation.
     bool RunGolfSimFsm(const GolfSimState& starting_state);
 
-    // Control messages are external messages coming to the system.  
-    // Currently driver/putter changes are the only such messages.
-    bool ProcessControlMessageEvent(GolfSimEvent::ControlMessage &event);
-
     bool PerformSystemStartupTasks();
     bool PerformSystemShutdownTasks();
 

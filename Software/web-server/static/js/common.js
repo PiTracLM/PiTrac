@@ -1,7 +1,124 @@
 // Common functionality for all PiTrac pages
+/* exported setTheme, controlPiTrac, requireStrobeSafe, escapeHtml, toast, confirmDialog, api, openSocket, onPiTracStatus, formatNumber, formatSided,
+   setupStatusRequest, setSetupStatus, setupHidden, setSetupHidden, showSetupChecklist */
 
 if (typeof lucide !== 'undefined') {
     lucide.createIcons();
+}
+
+// -- Helpers --
+
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => HTML_ESCAPES[c]);
+}
+
+function formatNumber(value, decimals) {
+    const n = Number(value);
+    return value == null || Number.isNaN(n) ? '--' : n.toFixed(decimals);
+}
+
+// Negative is left, the sign the C++ sends and the sims pass straight through to GSPro HLA and SideSpin
+function formatSided(value, decimals) {
+    const text = formatNumber(value, decimals);
+    if (text === '--') return text;
+    const n = Number(text) || 0;
+    return Math.abs(n).toFixed(decimals) + (n < 0 ? ' L' : n > 0 ? ' R' : '');
+}
+
+async function api(path, { method = 'GET', body } = {}) {
+    const res = await fetch(path, {
+        method,
+        headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+    if (!res.ok) {
+        const detail = data && typeof data.detail === 'string' && data.detail;
+        const err = new Error((data && (data.error || data.message)) || detail || `${res.status} ${res.statusText}`);
+        err.data = data;
+        throw err;
+    }
+    return data;
+}
+
+function openSocket(path, onMessage, { onOpen, onClose } = {}) {
+    let ws = null;
+    let timer = null;
+    let stopped = false;
+    const url = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}${path}`;
+    const connect = () => {
+        if (stopped || (ws && ws.readyState <= WebSocket.OPEN)) return;
+        clearTimeout(timer);
+        timer = null;
+        ws = new WebSocket(url);
+        ws.binaryType = 'arraybuffer';
+        ws.onopen = () => onOpen && onOpen();
+        ws.onmessage = (e) => onMessage(typeof e.data === 'string' ? JSON.parse(e.data) : e.data);
+        ws.onclose = () => {
+            if (onClose) onClose();
+            if (!stopped && !timer) timer = setTimeout(connect, 3000);
+        };
+        ws.onerror = () => ws.close();
+    };
+    const onVisible = () => { if (!document.hidden) connect(); };
+    document.addEventListener('visibilitychange', onVisible);
+    connect();
+    return {
+        send(msg) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); },
+        close() {
+            stopped = true;
+            clearTimeout(timer);
+            document.removeEventListener('visibilitychange', onVisible);
+            if (ws) ws.close();
+        },
+    };
+}
+
+function toast(message, type = 'info', { sticky = type === 'error', actionHref = null, actionLabel = null, onAction = null } = {}) {
+    const region = document.getElementById('toast-region');
+    if (!region) return;
+    const el = document.createElement('div');
+    el.className = `alert alert-${type} max-w-sm whitespace-normal`;
+    const text = document.createElement('span');
+    text.textContent = message;
+    el.append(text);
+    if (actionLabel && (actionHref || onAction)) {
+        const action = document.createElement(actionHref ? 'a' : 'button');
+        action.className = 'btn btn-sm whitespace-nowrap';
+        action.textContent = actionLabel;
+        if (actionHref) action.href = actionHref;
+        if (onAction) action.addEventListener('click', () => { el.remove(); onAction(); });
+        el.append(action);
+    }
+    if (sticky) {
+        const close = document.createElement('button');
+        close.className = 'btn btn-sm btn-ghost btn-square';
+        close.setAttribute('aria-label', 'Dismiss');
+        close.textContent = '✕';
+        close.addEventListener('click', () => el.remove());
+        el.append(close);
+    } else {
+        setTimeout(() => el.remove(), 4000);
+    }
+    region.append(el);
+}
+
+function confirmDialog({ title, body, confirmLabel = 'Confirm', danger = false }) {
+    const dialog = document.getElementById('confirm-dialog');
+    document.getElementById('confirm-dialog-title').textContent = title;
+    document.getElementById('confirm-dialog-body').textContent = body;
+    const ok = document.getElementById('confirm-dialog-ok');
+    ok.textContent = confirmLabel;
+    ok.className = `btn ${danger ? 'btn-error' : 'btn-primary'}`;
+    dialog.returnValue = '';
+    dialog.showModal();
+    return new Promise((resolve) => {
+        dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true });
+    });
 }
 
 // -- Theme --
@@ -13,18 +130,8 @@ function getSystemTheme() {
 }
 
 function applyTheme(theme) {
-    const root = document.documentElement;
-    document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
-
-    if (theme === 'system') {
-        root.setAttribute('data-theme', getSystemTheme());
-        const btn = document.querySelector('.theme-btn[data-theme="system"]');
-        if (btn) btn.classList.add('active');
-    } else {
-        root.setAttribute('data-theme', theme);
-        const btn = document.querySelector(`.theme-btn[data-theme="${theme}"]`);
-        if (btn) btn.classList.add('active');
-    }
+    document.documentElement.setAttribute('data-theme', theme === 'system' ? getSystemTheme() : theme);
+    document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === theme));
 }
 
 function setTheme(theme) {
@@ -34,7 +141,8 @@ function setTheme(theme) {
 }
 
 function initTheme() {
-    applyTheme(localStorage.getItem('pitrac-theme') || 'system');
+    currentTheme = localStorage.getItem('pitrac-theme') || 'system';
+    applyTheme(currentTheme);
 }
 
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
@@ -43,102 +151,134 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
 
 // -- PiTrac Controls --
 
-function getButtons(action) {
-    return ['desktop', 'mobile']
-        .map(s => document.getElementById(`pitrac-${action}-btn-${s}`))
-        .filter(Boolean);
-}
+// Every other status from /api/pitrac/{start,stop,restart} is a failure or a refusal
+const PITRAC_OK_STATUSES = ['started', 'already_running', 'stopped', 'not_running'];
+
+let pitracActionInFlight = false;
+let pitracPending = null;
+let pitracState = null;
+
+const PITRAC_PENDING_WORDS = { start: 'Starting...', stop: 'Stopping...', restart: 'Restarting...' };
 
 async function controlPiTrac(action) {
     if ((action === 'start' || action === 'restart') && !(await requireStrobeSafe())) {return;}
 
+    pitracActionInFlight = true;
+    pitracPending = action;
     document.querySelectorAll('.control-btn').forEach(b => { b.disabled = true; });
-    getButtons(action).forEach(b => b.classList.add('loading'));
+    renderPiTracButton();
 
     try {
-        const res = await fetch(`/api/pitrac/${action}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.error || `Failed to ${action} PiTrac`);
-        }
-        const data = await res.json();
-        if (typeof showStatusMessage === 'function') showStatusMessage(data.message, 'success');
-        setTimeout(() => { if (typeof checkSystemStatus === 'function') checkSystemStatus(); }, 2000);
+        const data = await api(`/api/pitrac/${action}`, { method: 'POST' });
+        if (!PITRAC_OK_STATUSES.includes(data.status)) throw new Error(data.message || `Failed to ${action} PiTrac`);
+        toast(data.message, 'success');
     } catch (err) {
-        console.error(`Error ${action}ing PiTrac:`, err);
-        if (typeof showStatusMessage === 'function') showStatusMessage(err.message, 'error');
+        toast(err.message, 'error', { actionHref: '/logs', actionLabel: 'Open logs' });
     } finally {
-        getButtons(action).forEach(b => b.classList.remove('loading'));
         setTimeout(() => {
-            if (typeof checkPiTracStatus === 'function') {
-                checkPiTracStatus();
-            } else {
-                document.querySelectorAll('.control-btn').forEach(b => { b.disabled = false; });
-            }
+            pitracActionInFlight = false;
+            checkPiTracStatus();
         }, 1000);
     }
 }
 
 function updatePiTracButtons(isRunning) {
-    const show = (btns) => btns.forEach(b => { b.style.display = ''; b.disabled = false; });
-    const hide = (btns) => btns.forEach(b => { b.style.display = 'none'; });
-
-    if (isRunning) {
-        hide(getButtons('start'));
-        show(getButtons('stop'));
-        show(getButtons('restart'));
-    } else {
-        show(getButtons('start'));
-        hide(getButtons('stop'));
-        hide(getButtons('restart'));
-    }
+    const restart = document.getElementById('pitrac-restart-item');
+    if (restart) restart.classList.toggle('hidden', !isRunning);
+    document.querySelectorAll('.control-btn').forEach(b => { b.disabled = false; });
 }
 
 // -- Status Polling --
 
-async function checkSystemStatus() {
-    try {
-        const res = await fetch('/health');
-        if (res.ok) return await res.json();
-    } catch (e) {
-        console.error('Error checking system status:', e);
+const piTracStatusSubscribers = [];
+
+function onPiTracStatus(fn) {
+    piTracStatusSubscribers.push(fn);
+}
+
+function renderPiTracButton() {
+    const btn = document.getElementById('pitrac-btn');
+    if (!btn || !pitracState) return;
+    const { is_running, pid, offline } = pitracState;
+    const state = offline ? 'offline' : is_running ? 'running' : 'stopped';
+    const stateWord = { running: 'Running', stopped: 'Stopped', offline: 'Offline' }[state];
+    const dot = { running: 'bg-success', stopped: 'bg-base-content/40', offline: 'bg-warning' }[state];
+    let action = null;
+    if (pitracPending) action = { word: PITRAC_PENDING_WORDS[pitracPending] };
+    else if (!offline) action = is_running
+        ? { word: 'Stop', icon: 'square', color: 'text-error', run: 'stop' }
+        : { word: 'Start', icon: 'play', color: 'text-success', run: 'start' };
+
+    const key = `${state}|${pitracPending}`;
+    btn.disabled = !action || !!pitracPending;
+    btn.dataset.action = action?.run || '';
+    btn.title = offline ? 'Cannot reach the PiTrac web server'
+        : is_running ? `PiTrac is running (PID ${pid})` : 'PiTrac is stopped';
+    btn.setAttribute('aria-label', offline ? 'PiTrac is offline.'
+        : pitracPending ? `PiTrac is ${stateWord.toLowerCase()}. ${PITRAC_PENDING_WORDS[pitracPending]}`
+        : `PiTrac is ${stateWord.toLowerCase()}. ${action.word} PiTrac.`);
+    const live = document.getElementById('pitrac-status-live');
+    if (live && live.textContent !== stateWord) live.textContent = stateWord;
+    if (btn.dataset.rendered === key) return;
+    btn.dataset.rendered = key;
+
+    const part = (cls, text) => {
+        const el = document.createElement('span');
+        el.className = cls;
+        el.textContent = text;
+        return el;
+    };
+    const dotEl = part(`w-2 h-2 rounded-full ${dot}`, '');
+    const stateEl = part('hidden sm:inline', stateWord);
+    const nodes = [dotEl, stateEl];
+    if (action) {
+        nodes.push(part('opacity-30 hidden sm:inline', '|'));
+        if (pitracPending) {
+            nodes.push(part('loading loading-spinner loading-xs', ''));
+        } else {
+            const icon = document.createElement('i');
+            icon.dataset.lucide = action.icon;
+            icon.className = `icon-sm ${action.color}`;
+            nodes.push(icon);
+        }
+        nodes.push(part(`hidden sm:inline ${action.color || ''}`, action.word));
     }
-    return null;
+    btn.replaceChildren(...nodes);
+    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [btn] });
 }
 
 async function checkPiTracStatus() {
+    let status;
     try {
-        const res = await fetch('/api/pitrac/status');
-        const status = await res.json();
-        updatePiTracButtons(status.is_running);
-
-        const dot = document.getElementById('pitrac-status-dot');
-        if (dot) {
-            dot.classList.toggle('connected', !!status.pid);
-            dot.classList.toggle('disconnected', !status.pid);
-            dot.title = status.pid ? `PiTrac Running (PID: ${status.pid})` : 'PiTrac Stopped';
-        }
-        return status.is_running;
-    } catch (e) {
-        console.error('Failed to check PiTrac status:', e);
-        return false;
+        const data = await api('/api/pitrac/status');
+        status = { is_running: !!data.is_running, pid: data.pid ?? null, offline: false };
+    } catch {
+        status = { is_running: false, pid: null, offline: true };
     }
+    pitracState = status;
+    if (!pitracActionInFlight) pitracPending = null;
+    renderPiTracButton();
+    if (!pitracActionInFlight && !status.offline) updatePiTracButtons(status.is_running);
+    piTracStatusSubscribers.forEach(fn => {
+        try {
+            fn(status);
+        } catch (err) {
+            console.error('PiTrac status subscriber failed:', err);
+        }
+    });
+    return status.is_running;
 }
 
 // -- Strobe Safety --
 
 async function requireStrobeSafe() {
     try {
-        const res = await fetch('/api/strobe-safety');
-        const data = await res.json();
+        const data = await api('/api/strobe-safety');
         if (data.safe) return true;
         showStrobeSafetyModal(data.reason || '');
         return false;
-    } catch (_) {
-        showStrobeSafetyModal('Could not verify strobe safety — check server connection.');
+    } catch {
+        showStrobeSafetyModal('Could not verify strobe safety. Check the connection to the PiTrac web server.');
         return false;
     }
 }
@@ -152,12 +292,51 @@ function showStrobeSafetyModal(reason) {
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
+// -- Setup checklist menu item --
+
+const SETUP_HIDDEN_KEY = 'pitrac-setup-hidden';
+let setupIncomplete = false;
+
+function setupHidden() {
+    try { return localStorage.getItem(SETUP_HIDDEN_KEY) === '1'; } catch { return false; }
+}
+
+function setSetupHidden(hidden) {
+    try {
+        if (hidden) localStorage.setItem(SETUP_HIDDEN_KEY, '1');
+        else localStorage.removeItem(SETUP_HIDDEN_KEY);
+    } catch { /* storage blocked: the card just stays visible */ }
+    const item = document.getElementById('setup-show-item');
+    if (item) item.classList.toggle('hidden', !(setupIncomplete && setupHidden()));
+}
+
+function setSetupStatus(setup) {
+    if (!setup) return;
+    setupIncomplete = !setup.complete;
+    setSetupHidden(setupIncomplete && setupHidden());
+}
+
+function showSetupChecklist() {
+    setSetupHidden(false);
+    if (location.pathname === '/') document.dispatchEvent(new Event('pitrac:setup-shown'));
+    else location.href = '/';
+}
+
+const setupStatusRequest = api('/api/setup/status').catch((err) => {
+    console.error('Could not load setup status:', err);
+    return null;
+});
+setupStatusRequest.then(setSetupStatus);
+
 // -- Init --
+
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('nav-dropdown');
+    if (menu && menu.open && (!menu.contains(e.target) || e.target.closest('ul a, ul button'))) menu.open = false;
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
-    checkSystemStatus();
     checkPiTracStatus();
-    setInterval(checkSystemStatus, 5000);
     setInterval(checkPiTracStatus, 5000);
 });

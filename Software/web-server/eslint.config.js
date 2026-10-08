@@ -1,6 +1,9 @@
+const js = require('@eslint/js');
 const prettierConfig = require('eslint-config-prettier');
 
 module.exports = [
+    { ignores: ['static/vendor/**', 'static/js/lucide.min.js'] },
+    js.configs.recommended,
     {
         files: ['**/*.js'],
         languageOptions: {
@@ -26,13 +29,26 @@ module.exports = [
                 Array: 'readonly',
                 Number: 'readonly',
                 String: 'readonly',
-                isNaN: 'readonly'
+                isNaN: 'readonly',
+                localStorage: 'readonly',
+                navigator: 'readonly',
+                requestAnimationFrame: 'readonly',
+                FormData: 'readonly',
+                lucide: 'readonly',
+                location: 'readonly',
+                HTMLElement: 'readonly',
+                Event: 'readonly',
+                CustomEvent: 'readonly',
+                getComputedStyle: 'readonly',
+                Node: 'readonly',
+                FileReader: 'readonly'
             }
         },
         rules: {
             'no-unused-vars': ['error', {
-                'argsIgnorePattern': '^_|^e$',
-                'varsIgnorePattern': '^(saveChanges|resetAll|reloadConfig|showDiff|exportConfig|importConfig|filterConfig|closeModal|setTheme|openImage|resetShot|controlPiTrac|startBtn|stopBtn|restartBtn|calibration)$'
+                'argsIgnorePattern': '^_',
+                'caughtErrors': 'none',
+                'varsIgnorePattern': '^(setTheme|openImage|resetShot|controlPiTrac|startBtn|stopBtn|restartBtn|calibration|showStatusMessage)$'
             }],
             'no-console': ['warn', { 'allow': ['warn', 'error'] }],
             'curly': ['error', 'multi-line'],

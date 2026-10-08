@@ -95,6 +95,7 @@ namespace golf_sim {
             GolfBall ball_; cv::Mat ball_hit_image_;
         };
 
+        // Only the closed-source E6 object builds these; pitrac_lm never queues one.
         class ControlMessage : public GolfSimEventBase
         {
         public:
@@ -189,7 +190,6 @@ namespace golf_sim {
                                         GolfSimEvent::CheckForBallStable, 
                                         GolfSimEvent::BallStabilized, 
                                         GolfSimEvent::BallHit,
-                                        GolfSimEvent::ControlMessage,
                                         GolfSimEvent::BeginWatchingForBallHit,
                                         GolfSimEvent::FoundMultipleBalls,
                                         GolfSimEvent::CheckForCam2ImageReceived,
@@ -231,8 +231,6 @@ namespace golf_sim {
         static PossibleEvent ConvertEventToPossibleEvent(GolfSimEventBase* event);
 
         static bool EventIsShutdownEvent(GolfSimEventBase* event);
-
-        static bool EventIsControlEvent(GolfSimEventBase* event);
 
         // Not thread safe
         static int GetQueueLength();

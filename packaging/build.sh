@@ -227,7 +227,7 @@ build_dev() {
     done
 
     # Boost libraries (dev packages pull in correct runtime versions automatically)
-    for pkg in libboost-dev libboost-all-dev libyaml-cpp-dev; do
+    for pkg in libboost-dev libboost-all-dev; do
         pkg_installed "$pkg" || missing_deps+=("$pkg")
     done
 
@@ -484,7 +484,7 @@ build_dev() {
     fi
 
     log_info "Building with Ninja..."
-    ninja -C build pitrac_lm
+    ninja -C build pitrac_lm libpitrac_e6.so
 
     # Check if build succeeded
     if [[ ! -f "build/pitrac_lm" ]]; then
@@ -495,6 +495,7 @@ build_dev() {
     # Install binary
     log_info "Installing PiTrac binary..."
     install -m 755 build/pitrac_lm /usr/lib/pitrac/pitrac_lm
+    install -s -m 644 build/libpitrac_e6.so /usr/lib/pitrac/libpitrac_e6.so
 
     # Remove any stale file capabilities — file capabilities trigger AT_SECURE
     # which breaks libcamera's secure_getenv() config file reading.
@@ -671,7 +672,7 @@ SUDOEOF
         update_web_server() {
             log_info "Syncing web server files..."
             mkdir -p /usr/lib/pitrac/web-server
-            rsync -a --checksum --delete \
+            rsync -a --checksum --delete --exclude .venv \
                 "$WEB_SERVER_DIR"/ /usr/lib/pitrac/web-server/
 
             install_python_dependencies "/usr/lib/pitrac/web-server"
@@ -751,6 +752,11 @@ SUDOEOF
     echo "To rebuild after code changes:"
     echo "  sudo ./build.sh dev         # Fast incremental build (only changed files)"
     echo "  sudo ./build.sh dev force   # Full clean rebuild"
+
+    if [[ -f /run/reboot-required ]]; then
+        echo ""
+        log_warn "REBOOT REQUIRED: run 'sudo reboot' before using PiTrac"
+    fi
 }
 
 # Main execution

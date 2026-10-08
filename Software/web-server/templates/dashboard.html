@@ -1,102 +1,67 @@
 {% extends "base.html" %}
-{% from "_macros.html" import result_item, status_row %}
+{% from "_macros.html" import metric_card %}
 
 {% block title %}PiTrac Launch Monitor{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="/static/css/dashboard.css">
+<link rel="stylesheet" href="/static/css/dashboard.css?v={{ asset_version }}">
 {% endblock %}
 
 {% block content %}
 <div class="grid grid-cols-1 lg:grid-cols-[minmax(320px,1fr)_minmax(400px,1.2fr)] gap-4">
 
-    <!-- Status Strip -->
-    <div class="status-strip col-span-full flex items-center gap-3 px-4 py-2.5 rounded-box bg-base-200 border border-base-300 shadow-sm"
+    <div class="status-strip initializing col-span-full flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 rounded-box bg-base-200 border border-base-300 shadow-sm"
          id="status-strip">
         <div class="shrink-0 flex items-center justify-center w-9 h-9">
             <div class="ball-icon w-full h-full"></div>
         </div>
-        <div class="flex-1 min-w-0 flex items-baseline gap-2 flex-wrap">
-            <span class="font-bold text-base whitespace-nowrap" id="status-strip-title">System Status</span>
-            <span class="status-strip-separator text-base-content/40 text-sm select-none">&mdash;</span>
-            <span class="status-strip-message" id="status-strip-message">Initializing...</span>
+        <div class="flex-1 min-w-48 flex items-baseline gap-x-2 flex-wrap" role="status">
+            <span class="font-bold text-base whitespace-nowrap" id="status-strip-title">Checking PiTrac</span>
+            <span class="status-strip-separator text-base-content/40 text-sm select-none" hidden>&middot;</span>
+            <span class="status-strip-message" id="status-strip-message"></span>
         </div>
-        <div class="shrink-0 flex items-center gap-2">
+        <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <button class="btn btn-success btn-sm control-btn" id="strip-start-btn" hidden>Start PiTrac</button>
+            <a class="btn btn-primary btn-sm" id="strip-setup-btn" href="/calibration#strobe" hidden>Calibrate strobe</a>
             <button class="btn btn-ghost btn-xs uppercase tracking-wide font-semibold border border-base-300"
-                    id="btn-reset" onclick="resetShot()" style="display: none;">Reset</button>
+                    id="btn-reset" hidden>Reset</button>
         </div>
     </div>
 
-    <!-- Left Column: Metrics -->
+    <div class="card bg-base-200 border border-base-300 shadow-sm col-span-full" id="setup-card" hidden>
+        <div class="card-body p-2 sm:p-4 gap-1">
+            <div class="flex items-start justify-between gap-2 px-2 pt-2 sm:p-0">
+                <div class="min-w-0">
+                    <h2 class="card-title text-base">Finish setting up PiTrac</h2>
+                    <p class="text-sm mt-1" id="setup-summary"></p>
+                </div>
+                <button class="btn btn-ghost btn-sm gap-1 shrink-0" id="setup-hide-btn">
+                    <i data-lucide="x" class="icon-sm"></i> Hide
+                </button>
+            </div>
+            <ul class="list" id="setup-rows"></ul>
+        </div>
+    </div>
+
     <div class="flex flex-col gap-3" id="metrics-panel">
-
-        <!-- Hero: Ball Speed -->
-        <div class="card bg-base-200 border border-base-300 shadow-sm
-                    metric-card hero hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-            <div class="card-body p-6">
-                <div class="stat p-0">
-                    <div class="stat-title text-sm uppercase tracking-widest opacity-60">Ball Speed</div>
-                    <div class="stat-value metric-number" id="speed"
-                         style="font-size: clamp(3.25rem, 7vw, 4.5rem);">{{ shot.speed }}<span class="metric-unit text-base-content/40 font-normal ml-1"
-                             style="font-size: clamp(1rem, 1.8vw, 1.25rem);">mph</span></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 2x2 Sub-Grid -->
+        {{ metric_card(label="Ball Speed", value_id="speed", unit="mph", card_classes="hero", body_padding="p-6") }}
         <div class="grid grid-cols-2 gap-3">
-            <div class="card bg-base-200 border border-base-300 shadow-sm                        metric-card hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-                <div class="card-body p-4">
-                    <div class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Launch Angle</div>
-                    <div class="metric-number text-base-content font-bold leading-tight tabular-nums"
-                         id="launch_angle"
-                         style="font-size: clamp(2.5rem, 5vw, 3.25rem);">{{ shot.launch_angle }}<span class="metric-unit text-base-content/40 font-normal ml-1"
-                             style="font-size: clamp(1rem, 1.8vw, 1.25rem);">&deg;</span></div>
-                </div>
-            </div>
-            <div class="card bg-base-200 border border-base-300 shadow-sm                        metric-card hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-                <div class="card-body p-4">
-                    <div class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Side Angle</div>
-                    <div class="metric-number text-base-content font-bold leading-tight tabular-nums"
-                         id="side_angle"
-                         style="font-size: clamp(2.5rem, 5vw, 3.25rem);">{{ shot.side_angle }}<span class="metric-unit text-base-content/40 font-normal ml-1"
-                             style="font-size: clamp(1rem, 1.8vw, 1.25rem);">&deg;</span></div>
-                </div>
-            </div>
-            <div class="card bg-base-200 border border-base-300 shadow-sm                        metric-card hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-                <div class="card-body p-4">
-                    <div class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Back Spin</div>
-                    <div class="metric-number text-base-content font-bold leading-tight tabular-nums"
-                         id="back_spin"
-                         style="font-size: clamp(2.5rem, 5vw, 3.25rem);">{{ shot.back_spin }}<span class="metric-unit text-base-content/40 font-normal ml-1"
-                             style="font-size: clamp(1rem, 1.8vw, 1.25rem);">rpm</span></div>
-                </div>
-            </div>
-            <div class="card bg-base-200 border border-base-300 shadow-sm                        metric-card hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-                <div class="card-body p-4">
-                    <div class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Side Spin</div>
-                    <div class="metric-number text-base-content font-bold leading-tight tabular-nums"
-                         id="side_spin"
-                         style="font-size: clamp(2.5rem, 5vw, 3.25rem);">{{ shot.side_spin }}<span class="metric-unit text-base-content/40 font-normal ml-1"
-                             style="font-size: clamp(1rem, 1.8vw, 1.25rem);">rpm</span></div>
-                </div>
-            </div>
+            {{ metric_card(label="Launch Angle", value_id="launch_angle", unit="&deg;") }}
+            {{ metric_card(label="Side Angle",   value_id="side_angle",   unit="&deg;") }}
+            {{ metric_card(label="Back Spin",    value_id="back_spin",    unit="rpm") }}
+            {{ metric_card(label="Side Spin",    value_id="side_spin",    unit="rpm") }}
         </div>
     </div>
 
-    <!-- Right Column: Image Panel -->
     <div class="card bg-base-200 border border-base-300 shadow-sm overflow-hidden">
-        <div class="image-panel-inner" id="image-panel-inner">
-            <div class="image-empty-state">
-                <div class="empty-icon"></div>
-                <div class="empty-text">Hit a shot to see the image here</div>
-            </div>
-        </div>
+        <div class="image-panel-inner" id="image-panel-inner"></div>
     </div>
 
 </div>
+<script type="application/json" id="initial-shot">{{ shot | tojson }}</script>
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="/static/js/dashboard.js"></script>
+<script src="/static/js/setup.js?v={{ asset_version }}"></script>
+<script src="/static/js/dashboard.js?v={{ asset_version }}"></script>
 {% endblock %}

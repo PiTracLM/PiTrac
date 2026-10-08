@@ -48,6 +48,8 @@ struct LoggingTools
 
 	static void InitLogging();
 
+	static void ApplyLogLevel();
+
 	// Lowest-level logging function to allow for additional filtering, sinking, etc.
 	static void InternalLog(boost::log::trivial::severity_level level, const std::string& msg);
 

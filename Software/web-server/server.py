@@ -3,27 +3,45 @@ import json
 import logging
 import os
 import shutil
+import sqlite3
 import subprocess
+import time
+from contextlib import asynccontextmanager
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from fastapi import FastAPI, File, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from calibration_manager import CalibrationManager
+from retention import ImageRetention, _dir_bytes
 from camera_detector import CameraDetector
 from config_manager import ConfigurationManager
 from constants import (
+    DB_PATH,
     IMAGES_DIR,
     MPS_TO_MPH,
 )
+from db.database import Database
+from log_files import (
+    follow,
+    latest_run_log,
+    list_run_logs,
+    prune_run_logs,
+    read_chunk_before,
+    tail_lines,
+    truncate_if_over,
+)
+from db.repositories import KeyValueRepository, SessionRepository, ShotRepository, SimulatorRepository
 from managers import ConnectionManager, ShotDataStore
 from models import ShotData
 from parsers import ShotDataParser
 from pitrac_manager import PiTracProcessManager
+from sim_manager import SimManager, SimSettingsError, import_legacy_settings
 from strobe_calibration_manager import StrobeCalibrationManager
 from testing_tools_manager import TestingToolsManager
 from update_manager import UpdateManager
@@ -34,6 +52,9 @@ CHARUCO_SQUARES_X = 8
 CHARUCO_SQUARES_Y = 11
 CHARUCO_SQUARE_LENGTH = 0.023
 CHARUCO_MARKER_LENGTH = 0.017
+
+LENS_CALIBRATION_FEED = "lens calibration feed"
+LENS_PREVIEW = "lens preview"
 
 # Locked to defeat AE/AWB/tuning drift across calibration frames (sub-pixel
 # corner bias). Tuning file matches production rcPi5GS.sh; shutter is shorter
@@ -174,18 +195,33 @@ class PiTracServer:
     _BASE_DIR = Path(__file__).resolve().parent
 
     def __init__(self):
-        self.app = FastAPI(title="PiTrac Dashboard")
+        self.app = FastAPI(title="PiTrac Dashboard", lifespan=self._lifespan)
         self.templates = Jinja2Templates(directory=str(self._BASE_DIR / "templates"))
+        self.templates.env.globals["asset_version"] = str(int(time.time()))
         self.connection_manager = ConnectionManager()
         self.shot_store = ShotDataStore()
         self.parser = ShotDataParser()
-        self.config_manager = ConfigurationManager()
+        self.db = Database(DB_PATH)
+        self.config_manager = ConfigurationManager(self.db)
         self.pitrac_manager = PiTracProcessManager(self.config_manager)
         self.calibration_manager = CalibrationManager(self.config_manager)
         self.testing_manager = TestingToolsManager(self.config_manager)
         self.strobe_calibration_manager = StrobeCalibrationManager(self.config_manager)
         self.update_manager = UpdateManager()
         self.update_manager.set_broadcast_callback(self.connection_manager.broadcast)
+        self.session_repo = SessionRepository(self.db)
+        self.shot_repo = ShotRepository(self.db)
+        metadata = self.config_manager.load_configurations_metadata()
+        self.session_timeout_minutes = metadata.get("storage", {}).get("sessionTimeoutMinutes", {}).get("default", 30)
+        self.image_cap_mb = metadata.get("storage", {}).get("imageStorageCapMB", {}).get("default", 5000)
+        self.retention = ImageRetention(self.session_repo, self.shot_repo, IMAGES_DIR, self.image_cap_mb)
+        self.sim_connection_manager = ConnectionManager()
+        sim_repo = SimulatorRepository(self.db)
+        if import_legacy_settings(KeyValueRepository(self.db, "settings"), sim_repo):
+            self.config_manager.reload()
+        self.sim_manager = SimManager(
+            sim_repo, broadcast=self.sim_connection_manager.broadcast, on_result=self._store_sim_result
+        )
         self.shutdown_flag = False
         self.background_tasks: set[asyncio.Task] = set()
         self._active_cameras: Dict[int, str] = {}  # camera_index -> endpoint name
@@ -196,12 +232,12 @@ class PiTracServer:
 
         self._setup_routes()
 
-        @self.app.on_event("startup")
-        async def _startup():
-            await self.startup_event()
-
-        @self.app.on_event("shutdown")
-        async def _shutdown():
+    @asynccontextmanager
+    async def _lifespan(self, app: FastAPI):
+        await self.startup_event()
+        try:
+            yield
+        finally:
             await self.shutdown_event()
 
     def _setup_routes(self) -> None:
@@ -238,9 +274,11 @@ class PiTracServer:
         async def get_shot_history(limit: int = 10) -> list:
             return [shot.to_dict() for shot in self.shot_store.get_history(limit)]
 
-        @self.app.get("/api/images/{filename}", response_model=None)
+        @self.app.get("/api/images/{filename:path}", response_model=None)
         async def get_image(filename: str):
-            image_path = IMAGES_DIR / filename
+            image_path = (IMAGES_DIR / filename).resolve()
+            if not image_path.is_relative_to(IMAGES_DIR.resolve()):
+                return {"error": "Image not found"}
             if image_path.exists() and image_path.is_file():
                 return FileResponse(image_path)
             return {"error": "Image not found"}
@@ -252,50 +290,129 @@ class PiTracServer:
             logger.info("Shot data reset via API")
             return {"status": "reset", "timestamp": shot_data.timestamp}
 
+        def sim_error(e: Exception) -> JSONResponse:
+            if isinstance(e, SimSettingsError):
+                return JSONResponse(status_code=400, content={"error": str(e), "fields": e.fields})
+            return JSONResponse(status_code=404, content={"error": "Unknown simulator"})
+
+        async def json_body(request: Request) -> Any:
+            try:
+                return await request.json()
+            except ValueError:
+                return None
+
+        @self.app.get("/api/sims/types")
+        async def get_sim_types() -> List[Dict[str, Any]]:
+            return self.sim_manager.types()
+
+        @self.app.get("/api/sims")
+        async def get_sims() -> List[Dict[str, Any]]:
+            return self.sim_manager.status()
+
+        @self.app.post("/api/sims")
+        async def create_sim(request: Request):
+            try:
+                return self.sim_manager.create(await json_body(request))
+            except SimSettingsError as e:
+                return sim_error(e)
+
+        @self.app.post("/api/sims/test")
+        async def test_sim(request: Request):
+            try:
+                return await self.sim_manager.test_connection(await json_body(request))
+            except SimSettingsError as e:
+                return sim_error(e)
+
+        @self.app.put("/api/sims/{sim_id}")
+        async def update_sim(sim_id: str, request: Request):
+            try:
+                return self.sim_manager.update(sim_id, await json_body(request))
+            except (SimSettingsError, KeyError) as e:
+                return sim_error(e)
+
+        @self.app.delete("/api/sims/{sim_id}")
+        async def delete_sim(sim_id: str):
+            try:
+                self.sim_manager.delete(sim_id)
+            except KeyError as e:
+                return sim_error(e)
+            return {"deleted": sim_id}
+
+        @self.app.post("/api/sims/{sim_id}/{action}")
+        async def sim_action(sim_id: str, action: str):
+            if action not in ("connect", "disconnect") or self.sim_manager.repo.get(sim_id) is None:
+                return JSONResponse(status_code=404, content={"error": "Unknown simulator"})
+            try:
+                await getattr(self.sim_manager, action)(sim_id)
+            except KeyError:
+                return JSONResponse(status_code=409, content={"error": "Turn this simulator on first"})
+            return self.sim_manager.status()
+
+        @self.app.websocket("/ws/sims")
+        async def websocket_sims(websocket: WebSocket) -> None:
+            await self.sim_connection_manager.connect(websocket)
+            try:
+                await websocket.send_json({"type": "sim_status", "sims": self.sim_manager.status()})
+                while True:
+                    await websocket.receive_text()
+            except WebSocketDisconnect:
+                self.sim_connection_manager.disconnect(websocket)
+            except Exception:
+                self.sim_connection_manager.disconnect(websocket)
+
         @self.app.post("/api/internal/shot-result")
-        async def receive_shot_result(request: Request) -> Dict[str, str]:
+        async def receive_shot_result(request: Request) -> Dict[str, Any]:
             """Receives shot results from the C++ pitrac_lm process via HTTP POST."""
             body = await request.json()
 
-            result_type_int = int(body.get("result_type", 0))
+            result_type_int = int(body.get("result_type") or 0)
             result_type_str = self.parser._get_result_type_string(result_type_int)
-            speed_mps = float(body.get("speed_mps", 0))
-            message = str(body.get("message", ""))
+            speed_mps = float(body.get("speed_mps") or 0.0)
+            message = str(body.get("message") or "")
+
+            # Club changes the C++ already applied; not for the dashboard, history or sims
+            if result_type_str == "Control Message":
+                return self._shot_result_reply()
 
             is_status = result_type_str in self.parser._get_status_message_strings()
-            is_fake_hit = result_type_int == 7 and message in [
-                "Club type was set", "Test message", "Configuration update",
-            ]
 
-            if is_status or is_fake_hit:
-                current = self.shot_store.get()
-                shot_data = ShotData(
-                    speed=current.speed,
-                    carry=current.carry,
-                    launch_angle=current.launch_angle,
-                    side_angle=current.side_angle,
-                    back_spin=current.back_spin,
-                    side_spin=current.side_spin,
+            if is_status:
+                shot_data = replace(
+                    self.shot_store.get(),
                     result_type=result_type_str,
                     message=message,
                     timestamp=datetime.now().isoformat(),
                 )
             else:
+                speed_mph = speed_mps * MPS_TO_MPH
+                launch_angle = float(body.get("launch_angle") or 0.0)
+                side_angle = float(body.get("side_angle") or 0.0)
                 shot_data = ShotData(
-                    speed=round(speed_mps * MPS_TO_MPH, 1),
-                    carry=float(body.get("carry", 0)),
-                    launch_angle=round(float(body.get("launch_angle", 0)), 1),
-                    side_angle=round(float(body.get("side_angle", 0)), 1),
-                    back_spin=int(body.get("back_spin", 0)),
-                    side_spin=int(body.get("side_spin", 0)),
+                    speed=round(speed_mph, 1),
+                    carry=float(body.get("carry") or 0.0),
+                    launch_angle=round(launch_angle, 1),
+                    side_angle=round(side_angle, 1),
+                    back_spin=int(body.get("back_spin") or 0),
+                    side_spin=int(body.get("side_spin") or 0),
                     result_type=result_type_str,
                     message=message,
                     timestamp=datetime.now().isoformat(),
                 )
+                # Sims report results against this id, so it has to exist before they get the shot
+                shot_data.shot_id = body.get("shot_id") or int(datetime.now().timestamp() * 1000)
+                shot_data.images = list(body.get("images") or [])
+                # The sims round for their own protocol, so they get the values before display rounding
+                sim_shot = replace(shot_data, speed=speed_mph, launch_angle=launch_angle, side_angle=side_angle)
+                self._run_in_background(self.sim_manager.on_shot(sim_shot))
+                if result_type_str == "Hit":
+                    images = [(Path(p).stem, p) for p in shot_data.images]
+                    await asyncio.to_thread(self._persist_shot, shot_data.shot_id, shot_data, images)
 
             self.shot_store.update(shot_data)
             await self.connection_manager.broadcast(shot_data.to_dict())
-            return {"status": "ok"}
+            if is_status:
+                self._run_in_background(self.sim_manager.on_status(result_type_str))
+            return self._shot_result_reply()
 
         @self.app.post("/api/internal/image-ready")
         async def receive_image_ready(request: Request) -> Dict[str, str]:
@@ -308,11 +425,17 @@ class PiTracServer:
                 })
             return {"status": "ok"}
 
+        @self.app.get("/api/internal/config")
+        async def internal_config() -> Dict[str, Any]:
+            """Merged config consumed by pitrac_lm at startup (replaces the generated JSON file)."""
+            return await asyncio.to_thread(self.config_manager.build_generated_config)
+
         @self.app.get("/health")
         async def health_check() -> Dict[str, Union[str, bool, int]]:
             pitrac_running = False
             try:
-                result = subprocess.run(
+                result = await asyncio.to_thread(
+                    subprocess.run,
                     ["pgrep", "-f", "pitrac_lm"],
                     capture_output=True,
                     text=True,
@@ -384,6 +507,11 @@ class PiTracServer:
             metadata = self.config_manager.load_configurations_metadata()
             return metadata.get("settings", {})
 
+        @self.app.get("/api/config/calibrated")
+        async def get_calibrated_keys() -> List[str]:
+            """Keys whose current value comes from the calibration layer"""
+            return self.config_manager.get_calibrated_keys()
+
         @self.app.get("/api/config/diff")
         async def get_config_diff() -> Dict[str, Any]:
             """Get differences between user settings and defaults"""
@@ -414,10 +542,6 @@ class PiTracServer:
                 success, message, requires_restart = self.config_manager.set_config(key, value)
 
                 if success:
-                    # Rebuild the generated config so the C++ process picks up changes
-                    generated_config_path = self.config_manager.generate_golf_sim_config()
-                    logger.info(f"Generated config file at: {generated_config_path}")
-
                     # Broadcast update to WebSocket clients
                     await self.connection_manager.broadcast(
                         {
@@ -446,9 +570,8 @@ class PiTracServer:
             success, message = self.config_manager.reset_all()
 
             if success:
-                self.config_manager.generate_golf_sim_config()
                 await self.connection_manager.broadcast({"type": "config_reset"})
-                return {"success": True, "message": message}
+                return {"success": True, "message": message, "calibration_kept": True}
 
             return JSONResponse(status_code=500, content={"error": message})
 
@@ -457,7 +580,6 @@ class PiTracServer:
             """Reload configuration from disk"""
             try:
                 self.config_manager.reload()
-                self.config_manager.generate_golf_sim_config()
                 return {"status": "Configuration reloaded"}
             except Exception as e:
                 logger.error(f"Failed to reload config: {e}")
@@ -473,12 +595,11 @@ class PiTracServer:
             """Import configuration from exported data"""
             try:
                 config_data = await request.json()
-                success, message = self.config_manager.import_config(config_data)
+                success, message, skipped = self.config_manager.import_config(config_data)
 
                 if success:
-                    self.config_manager.generate_golf_sim_config()
                     await self.connection_manager.broadcast({"type": "config_import"})
-                    return {"success": True, "message": message}
+                    return {"success": True, "message": message, "skipped": skipped}
 
                 return JSONResponse(status_code=400, content={"error": message})
             except Exception as e:
@@ -492,6 +613,8 @@ class PiTracServer:
             safety = self.strobe_calibration_manager.is_strobe_safe()
             if not safety["safe"]:
                 return {"status": "error", "message": safety["reason"]}
+            if refusal := self._testing_tool_refusal():
+                return refusal
             result = await self.pitrac_manager.start()
             logger.info(f"PiTrac start request: {result}")
             return result
@@ -501,6 +624,8 @@ class PiTracServer:
             """Stop the PiTrac launch monitor process"""
             result = await self.pitrac_manager.stop()
             logger.info(f"PiTrac stop request: {result}")
+            if result.get("status") == "stopped":
+                self.session_repo.close_open(datetime.now().isoformat())
             return result
 
         @self.app.post("/api/pitrac/restart")
@@ -509,6 +634,8 @@ class PiTracServer:
             safety = self.strobe_calibration_manager.is_strobe_safe()
             if not safety["safe"]:
                 return {"status": "error", "message": safety["reason"]}
+            if refusal := self._testing_tool_refusal():
+                return refusal
             result = await self.pitrac_manager.restart()
             logger.info(f"PiTrac restart request: {result}")
             return result
@@ -552,6 +679,10 @@ class PiTracServer:
                 return {"status": "error", "message": safety["reason"]}
             if self.calibration_manager.loop is None:
                 return {"status": "error", "message": "Server still starting up, please retry in a moment"}
+            if self.pitrac_manager.is_running():
+                return {"status": "error", "message": "Stop PiTrac before calibrating"}
+            if reason := self._camera_busy(camera):
+                return {"status": "error", "message": reason}
             return await self.calibration_manager.run_auto_calibration(camera)
 
         @self.app.post("/api/calibration/manual/{camera}")
@@ -661,7 +792,7 @@ class PiTracServer:
                     await websocket.close()
                     return
 
-                self._active_cameras[camera_index] = "distortion-feed"
+                self._active_cameras[camera_index] = LENS_CALIBRATION_FEED
 
                 # Read actual resolution after first frame (accurate for rpicam-vid)
                 ret, first_frame = await asyncio.to_thread(cap.read)
@@ -711,7 +842,7 @@ class PiTracServer:
                         })
 
                     # Draw coverage grid overlay (single blend pass)
-                    status = self.calibration_manager.calibration_status.get(camera, {})
+                    status = self.calibration_manager.distortion_status.get(camera, {})
                     cov = status.get("coverage")
                     if cov and cov.get("grid"):
                         dh, dw = display.shape[:2]
@@ -796,7 +927,7 @@ class PiTracServer:
                     await websocket.close()
                     return
 
-                self._active_cameras[camera_index] = "undistort-preview"
+                self._active_cameras[camera_index] = LENS_PREVIEW
 
                 # Read actual resolution and precompute undistort maps
                 ret, first_frame = await asyncio.to_thread(cap.read)
@@ -888,6 +1019,11 @@ class PiTracServer:
                 return {"status": "error", "message": "Server still starting up, please retry in a moment"}
             if self.pitrac_manager.is_running():
                 return {"status": "error", "message": "Stop PiTrac before running distortion calibration"}
+            reason = self._camera_busy(camera, own_feed=LENS_CALIBRATION_FEED) or (
+                self.calibration_manager.distortion_precheck(camera)
+            )
+            if reason:
+                return {"status": "error", "message": reason}
 
             target_images = 40
             try:
@@ -905,9 +1041,54 @@ class PiTracServer:
             return {"status": "started", "message": f"Distortion calibration started for {camera}"}
 
         @self.app.post("/api/calibration/stop")
-        async def stop_calibration() -> Dict[str, Any]:
-            """Stop any running calibration process"""
-            return await self.calibration_manager.stop_calibration()
+        async def stop_calibration(request: Request) -> Dict[str, Any]:
+            """Stop running calibration jobs. Optional body {camera, kind} narrows which ones."""
+            try:
+                body = await request.json()
+            except ValueError:
+                body = None
+            if not isinstance(body, dict):
+                body = {}
+            camera, kind = body.get("camera"), body.get("kind")
+            if camera not in (None, "camera1", "camera2") or kind not in (None, "ball", "distortion"):
+                return {"status": "error", "message": "Invalid camera or kind"}
+            return await self.calibration_manager.stop_calibration(camera, kind)
+
+        @self.app.get("/api/setup/status")
+        async def setup_status() -> Dict[str, Any]:
+            """What a new build still needs: strobe calibration and camera calibrations. Simulators are optional."""
+            board_version = self.config_manager.get_config("gs_config.strobing.kConnectionBoardVersion")
+            board_version = int(board_version) if board_version is not None else None
+            safety = self.strobe_calibration_manager.is_strobe_safe()
+            calibration = self.calibration_manager.get_calibration_data()
+            updated_at = self.config_manager.calibration_updated_at
+            cameras = {
+                f"camera{n}": {
+                    "type": self.config_manager.get_config(f"cameras.slot{n}.type"),
+                    "lens_calibrated": calibration[f"camera{n}"]["lens_calibrated"],
+                    "position_calibrated": calibration[f"camera{n}"]["position_calibrated"],
+                    "lens_updated_at": updated_at(f"gs_config.cameras.kCamera{n}CalibrationMatrix"),
+                    "position_updated_at": max(
+                        filter(None, (updated_at(f"gs_config.cameras.kCamera{n}{key}") for key in ("FocalLength", "Angles"))),
+                        default=None,
+                    ),
+                }
+                for n in (1, 2)
+            }
+            sims = [{key: sim[key] for key in ("id", "name", "type", "on", "status")} for sim in self.sim_manager.status()]
+            return {
+                "board_version": board_version,
+                "strobe": {
+                    "required": board_version == 3,
+                    "safe": safety["safe"],
+                    "reason": safety.get("reason", ""),
+                    "updated_at": updated_at(self.strobe_calibration_manager.DAC_CONFIG_KEY),
+                },
+                "cameras": cameras,
+                "simulator": {"instances": sims, "connected": [sim["name"] for sim in sims if sim["status"] == "connected"]},
+                "complete": safety["safe"]
+                and all(c["lens_calibrated"] and c["position_calibrated"] for c in cameras.values()),
+            }
 
         @self.app.get("/testing", response_class=HTMLResponse)
         async def testing_page(request: Request) -> Response:
@@ -922,15 +1103,18 @@ class PiTracServer:
         @self.app.post("/api/testing/run/{tool_id}")
         async def run_testing_tool(tool_id: str) -> Dict[str, Any]:
             """Run a specific testing tool"""
+            if tool_id not in self.testing_manager.tools:
+                return {"status": "error", "message": f"Unknown tool: {tool_id}"}
             safety = self.strobe_calibration_manager.is_strobe_safe()
             if not safety["safe"]:
                 return {"status": "error", "message": safety["reason"]}
             if self.pitrac_manager.is_running():
                 return {
                     "status": "error",
-                    "message": "Cannot run testing tools while PiTrac is running. Please stop PiTrac first.",
+                    "message": "Cannot run testing tools while PiTrac is running. Stop PiTrac first.",
                 }
 
+            self.testing_manager.last_results.pop(tool_id, None)
             task = asyncio.create_task(self._run_tool_async(tool_id))
             self.background_tasks.add(task)
             task.add_done_callback(self.background_tasks.discard)
@@ -944,15 +1128,12 @@ class PiTracServer:
 
         @self.app.get("/api/testing/status")
         async def get_testing_status() -> Dict[str, Any]:
-            """Get status of running testing tools"""
-            running = self.testing_manager.get_running_tools()
-
-            results = {}
-            if hasattr(self.testing_manager, "completed_results"):
-                results = self.testing_manager.completed_results
-                self.testing_manager.completed_results = {}
-
-            return {"running": running, "results": results}
+            """Get running testing tools and the last result of each tool"""
+            return {
+                "running": self.testing_manager.get_running_tools(),
+                "elapsed": {t: int(time.time() - s) for t, s in self.testing_manager.started_at.items()},
+                "results": self.testing_manager.last_results,
+            }
 
         @self.app.post("/api/testing/upload-image")
         async def upload_test_image(file: UploadFile = File(...)) -> Dict[str, Any]:
@@ -1094,6 +1275,43 @@ class PiTracServer:
                     },
                 }
 
+        # Shot history API
+        @self.app.get("/api/sessions")
+        async def list_sessions(limit: int = 50, offset: int = 0) -> Dict[str, Any]:
+            rows = await asyncio.to_thread(self.session_repo.list, limit + 1, offset)
+            return {"sessions": rows[:limit], "has_more": len(rows) > limit}
+
+        @self.app.get("/api/sessions/{session_id}/shots")
+        async def list_shots_for_session(session_id: int) -> list:
+            session = await asyncio.to_thread(self.session_repo.get, session_id)
+            if session is None:
+                raise HTTPException(status_code=404, detail="Session not found")
+            return await asyncio.to_thread(self.shot_repo.list_for_session, session_id)
+
+        @self.app.get("/api/shots/{shot_id}")
+        async def get_shot(shot_id: int) -> Dict[str, Any]:
+            shot = await asyncio.to_thread(self.shot_repo.get, shot_id)
+            if shot is None:
+                raise HTTPException(status_code=404, detail="Shot not found")
+            return shot
+
+        @self.app.delete("/api/sessions/{session_id}")
+        async def delete_session(session_id: int) -> Dict[str, Any]:
+            session = await asyncio.to_thread(self.session_repo.get, session_id)
+            if session is None:
+                raise HTTPException(status_code=404, detail="Session not found")
+            shot_ids = await asyncio.to_thread(self.shot_repo.shot_ids_for_session, session_id)
+            await asyncio.to_thread(self.session_repo.delete, session_id)
+            for shot_id in shot_ids:
+                await asyncio.to_thread(self.retention.remove_shot_dir, shot_id)
+            return {"status": "deleted", "session_id": session_id}
+
+        @self.app.get("/api/storage/usage")
+        async def storage_usage() -> Dict[str, Any]:
+            shots_dir = IMAGES_DIR / "shots"
+            used_bytes = await asyncio.to_thread(_dir_bytes, shots_dir)
+            return {"used_mb": used_bytes // (1024 * 1024), "cap_mb": self.image_cap_mb}
+
         @self.app.get("/api/cameras/types")
         async def get_camera_types() -> Dict[str, Any]:
             """Get available camera types and their descriptions"""
@@ -1112,8 +1330,8 @@ class PiTracServer:
             return await self.update_manager.get_branches()
 
         @self.app.get("/api/update/check")
-        async def check_for_updates() -> Dict[str, Any]:
-            return await self.update_manager.check_for_updates()
+        async def check_for_updates(branch: Optional[str] = None) -> Dict[str, Any]:
+            return await self.update_manager.check_for_updates(branch=branch)
 
         @self.app.post("/api/update/start")
         async def start_update(request: Request) -> Dict[str, Any]:
@@ -1139,6 +1357,11 @@ class PiTracServer:
         @self.app.get("/api/update/status")
         async def update_status() -> Dict[str, Any]:
             return self.update_manager.get_status()
+
+        @self.app.get("/history", response_class=HTMLResponse)
+        async def history_page(request: Request) -> Response:
+            """Serve shot history page"""
+            return self.templates.TemplateResponse(request, "history.html")
 
         @self.app.get("/logs", response_class=HTMLResponse)
         async def logs_page(request: Request) -> Response:
@@ -1174,7 +1397,7 @@ class PiTracServer:
             services.append(
                 {
                     "id": "pitrac",
-                    "name": "PiTrac Camera 1",
+                    "name": "Launch monitor",
                     "status": "running" if pitrac_status["is_running"] else "stopped",
                     "pid": pitrac_status.get("pid"),
                 }
@@ -1191,12 +1414,60 @@ class PiTracServer:
 
             return {"services": services}
 
+        @self.app.get("/api/logs/history")
+        async def logs_history(
+            service: str = "pitrac",
+            file: Optional[str] = None,
+            before: Optional[int] = None,
+            lines: int = 200,
+        ) -> Dict[str, Any]:
+            """Scrollback for the per-run logs: page backwards across run files via a cursor."""
+            lines = max(1, min(lines, 1000))
+
+            # journald scrollback is out of scope; only the file-backed pitrac log pages.
+            if service != "pitrac":
+                return {"lines": [], "next": None}
+
+            log_dir = self.pitrac_manager.log_dir
+            run_logs = await asyncio.to_thread(list_run_logs, log_dir)  # oldest → newest
+            if not run_logs:
+                return {"lines": [], "next": None}
+
+            by_name = {p.name: p for p in run_logs}
+            if file is not None:
+                path = by_name.get(file)
+                if path is None:  # unknown name → don't serve (also blocks traversal)
+                    return {"lines": [], "next": None}
+            else:
+                path = run_logs[-1]
+
+            def _prev_cursor() -> Optional[Dict[str, Any]]:
+                idx = run_logs.index(path)
+                if idx == 0:
+                    return None  # reached the very beginning
+                prev = run_logs[idx - 1]
+                return {"file": prev.name, "offset": prev.stat().st_size}
+
+            if before is None:
+                result_lines, offset = await asyncio.to_thread(tail_lines, path, lines)
+                next_cursor = {"file": path.name, "offset": offset} if offset > 0 else _prev_cursor()
+                return {"lines": result_lines, "next": next_cursor}
+
+            # Stale cursor: the truncate backstop shrank the file under us; tell the client
+            # to re-anchor from the tail rather than serving lines past the new end.
+            size = await asyncio.to_thread(lambda: path.stat().st_size)
+            if before > size:
+                return {"lines": [], "next": {"file": path.name, "offset": size}, "reset": True}
+
+            result_lines, new_offset = await asyncio.to_thread(read_chunk_before, path, before, lines)
+            next_cursor = {"file": path.name, "offset": new_offset} if new_offset > 0 else _prev_cursor()
+            return {"lines": result_lines, "next": next_cursor}
+
     async def _stream_service_logs(self, websocket: WebSocket, service: str) -> None:
         """Stream logs for a specific service via WebSocket"""
         try:
             if service == "pitrac":
-                log_file = self.pitrac_manager.log_file
-                await self._stream_file_logs(websocket, log_file)
+                await self._stream_file_logs(websocket)
             elif service == "pitrac-web":
                 await self._stream_systemd_logs(websocket, "pitrac-web")
             else:
@@ -1276,42 +1547,70 @@ class PiTracServer:
         except Exception as e:
             logger.error(f"Error streaming systemd logs: {e}")
 
-    async def _stream_file_logs(self, websocket: WebSocket, log_file: Path) -> None:
-        """Stream logs from a file"""
+    async def _stream_file_logs(self, websocket: WebSocket) -> None:
+        """Stream the active per-run log: anchor + historical tail, then follow new lines.
+
+        Tracks the latest run file rather than a fixed path — a pitrac restart rolls a new
+        per-run log, so when latest_run_log changes mid-view we re-anchor on the new file.
+        """
+        log_dir = self.pitrac_manager.log_dir
         try:
-            if not log_file.exists():
-                await websocket.send_json({"message": f"Log file not found: {log_file}", "level": "warning"})
+            current = await asyncio.to_thread(latest_run_log, log_dir)
+            if current is None:
+                current = self.pitrac_manager.log_file
+            if not current.exists():
+                await websocket.send_json({"message": f"Log file not found: {current}", "level": "warning"})
                 return
 
-            with open(log_file, "r") as f:
-                lines = f.readlines()
-                recent = lines[-100:] if len(lines) > 100 else lines
-                for line in recent:
-                    await websocket.send_json({"message": line.rstrip(), "historical": True})
+            # Outer loop: each pass anchors on `current`, then follows it until the
+            # latest run file changes (restart) — then breaks out to re-resolve.
+            poll = 0.5
+            while True:
+                lines, offset = await asyncio.to_thread(tail_lines, current, 100)
+                await websocket.send_json({"type": "anchor", "file": current.name, "offset": offset})
+                for line in lines:
+                    await websocket.send_json({"message": line, "historical": True})
 
-            follow_proc = await asyncio.create_subprocess_exec(
-                "tail",
-                "-f",
-                str(log_file),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-            )
-
-            if follow_proc.stdout:
-                async for line in follow_proc.stdout:
+                follower = follow(current, poll_interval=poll)
+                switched = False
+                while not switched:
                     try:
-                        await websocket.send_json(
-                            {
-                                "message": line.decode("utf-8", errors="replace").rstrip(),
-                                "historical": False,
-                            }
-                        )
-                    except WebSocketDisconnect:
-                        follow_proc.terminate()
-                        return
+                        # Bound the wait so an idle old file still lets us notice a restart.
+                        line = await asyncio.wait_for(follower.__anext__(), timeout=poll + 0.25)
+                        await websocket.send_json({"message": line, "historical": False})
+                    except asyncio.TimeoutError:
+                        pass
+                    latest = await asyncio.to_thread(latest_run_log, log_dir)
+                    if latest is not None and latest != current:
+                        current = latest
+                        switched = True
+                await follower.aclose()
 
+        except WebSocketDisconnect:
+            return
         except Exception as e:
             logger.error(f"Error streaming file logs: {e}")
+
+    async def _maintenance_loop(self) -> None:
+        while not self.shutdown_flag:
+            await asyncio.sleep(300)
+            # Each backstop runs independently; one failing must not skip the others.
+            try:
+                await asyncio.to_thread(self.retention.prune)
+            except Exception:
+                logger.exception("retention prune failed; will retry next cycle")
+            try:
+                await asyncio.to_thread(
+                    prune_run_logs, self.pitrac_manager.log_dir, self.pitrac_manager.log_dir_cap_bytes
+                )
+            except Exception:
+                logger.exception("run-log dir prune failed; will retry next cycle")
+            try:
+                await asyncio.to_thread(
+                    truncate_if_over, self.pitrac_manager.log_file, self.pitrac_manager.run_log_cap_bytes
+                )
+            except Exception:
+                logger.exception("run-log truncate failed; will retry next cycle")
 
     async def startup_event(self) -> None:
         logger.info("Starting PiTrac Web Server...")
@@ -1326,35 +1625,104 @@ class PiTracServer:
                 "V3 DAC not initialized — strobe calibration required before PiTrac can run"
             )
 
+        task = asyncio.create_task(self._maintenance_loop())
+        self.background_tasks.add(task)
+        task.add_done_callback(self.background_tasks.discard)
+
+        task = asyncio.create_task(self._detect_cameras_if_unset())
+        self.background_tasks.add(task)
+        task.add_done_callback(self.background_tasks.discard)
+
+        await self.sim_manager.start()
+
         logger.info("PiTrac Web Server ready — receiving results via HTTP POST")
+
+    async def _detect_cameras_if_unset(self) -> None:
+        if not self.db.created or self.config_manager.found_legacy_json:
+            return
+        try:
+            result = await asyncio.to_thread(lambda: CameraDetector().detect())
+        except Exception:
+            logger.exception("Camera detection failed; using default camera settings")
+            return
+        cameras = result.get("cameras", [])
+        if not cameras:
+            logger.info("No cameras detected; using default camera settings")
+            return
+        for slot in range(1, min(len(cameras), 2) + 1):
+            detected = result["configuration"][f"slot{slot}"]
+            for field in ("type", "lens"):
+                key, value = f"cameras.slot{slot}.{field}", str(detected[field])
+                valid, _ = self.config_manager.validate_config(key, value)
+                if valid:
+                    self.config_manager.set_config(key, value)
+                else:
+                    logger.warning(f"Detected {key} = {value} is not a supported option; keeping the default")
+        logger.info(f"Saved detected settings for {len(cameras)} camera(s)")
+
+    def _camera_busy(self, camera: str, own_feed: Optional[str] = None) -> Optional[str]:
+        if reason := self.calibration_manager.busy_reason(camera):
+            return reason
+        feed = self._active_cameras.get(0 if camera == "camera1" else 1)
+        if feed and feed != own_feed:
+            return f"{camera.replace('camera', 'Camera ')} is in use by the {feed}. Close it first."
+        return None
+
+    def _testing_tool_refusal(self) -> Optional[Dict[str, Any]]:
+        running = self.testing_manager.get_running_tools()
+        if not running:
+            return None
+        name = self.testing_manager.tools[running[0]]["name"]
+        return {"status": "error", "message": f"{name} is running. Stop it before starting PiTrac."}
 
     async def _run_tool_async(self, tool_id: str) -> None:
         """Helper method to run a testing tool asynchronously"""
         try:
             result = await self.testing_manager.run_tool(tool_id)
-
-            if not hasattr(self.testing_manager, "completed_results"):
-                self.testing_manager.completed_results = {}
-            self.testing_manager.completed_results[tool_id] = result
-
             logger.info(f"Testing tool {tool_id} completed with status: {result.get('status')}")
         except Exception as e:
             logger.error(f"Error running testing tool {tool_id}: {e}")
-            if not hasattr(self.testing_manager, "completed_results"):
-                self.testing_manager.completed_results = {}
-            self.testing_manager.completed_results[tool_id] = {"status": "error", "message": str(e)}
+            result = {"status": "error", "message": str(e)}
+        self.testing_manager.last_results[tool_id] = result
+
+    def _persist_shot(self, shot_id, shot_data, images):
+        session_id = self.session_repo.ensure_open(shot_data.timestamp, self.session_timeout_minutes)
+        self.shot_repo.add(shot_id, session_id, shot_data, images)
+
+    async def _store_sim_result(self, sim_id: str, shot_id: int, data: Dict[str, Any]) -> None:
+        try:
+            await asyncio.to_thread(
+                self.shot_repo.add_sim_result, shot_id, sim_id, data, datetime.now().isoformat()
+            )
+        except sqlite3.IntegrityError:
+            logger.warning(f"Simulator result for shot {shot_id} has no saved shot to attach to, dropped")
+
+    def _run_in_background(self, coro) -> None:
+        task = asyncio.create_task(coro)
+        self.background_tasks.add(task)
+        task.add_done_callback(self.background_tasks.discard)
+
+    def _shot_result_reply(self) -> Dict[str, Any]:
+        reply: Dict[str, Any] = {"status": "ok", "armed": self.sim_manager.armed}
+        if self.sim_manager.club:
+            reply["club"] = self.sim_manager.club
+        return reply
 
     async def shutdown_event(self) -> None:
         logger.info("Shutting down PiTrac Web Server...")
 
         self.shutdown_flag = True
 
-        for task in self.background_tasks:
+        await self.sim_manager.stop()
+
+        loop = asyncio.get_event_loop()
+        current_tasks = {t for t in self.background_tasks if t.get_loop() is loop}
+        for task in current_tasks:
             if not task.done():
                 task.cancel()
 
-        if self.background_tasks:
-            await asyncio.gather(*self.background_tasks, return_exceptions=True)
+        if current_tasks:
+            await asyncio.gather(*current_tasks, return_exceptions=True)
 
         for ws in self.connection_manager.connections:
             try:

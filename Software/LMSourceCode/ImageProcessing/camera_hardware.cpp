@@ -91,7 +91,7 @@ namespace golf_sim {
             { "100", CameraModel::kCameraUnknown },
         };
         if (camera_table.count(model_enum_value_string) == 0)
-            throw std::runtime_error("Invalid camera model_enum_value_string: " + model_enum_value_string + ".  Expected an integer. Check environment variables.");
+            throw std::runtime_error("Invalid camera model_enum_value_string: " + model_enum_value_string + ".  Expected an integer. Check the cameras.slotN.type setting.");
         
         CameraHardware::CameraModel camera_model = (CameraHardware::CameraModel)camera_table[model_enum_value_string];
 
@@ -107,7 +107,7 @@ namespace golf_sim {
             { "100", LensType::kLensUnknown },
         };
         if (lens_table.count(lens_enum_value_string) == 0)
-            throw std::runtime_error("Invalid camera lens_enum_value_string: " + lens_enum_value_string + ".  Expected an integer. Check environment variables.");
+            throw std::runtime_error("Invalid camera lens_enum_value_string: " + lens_enum_value_string + ".  Expected an integer. Check the cameras.slotN.lens setting.");
 
         CameraHardware::LensType lens_type = (CameraHardware::LensType)lens_table[lens_enum_value_string];
 
@@ -123,7 +123,7 @@ namespace golf_sim {
             { "100", CameraOrientation::kCameraOrientationUnknown },
         };
         if (orientation_table.count(lens_enum_value_string) == 0)
-            throw std::runtime_error("Invalid camera lens_enum_value_string: " + lens_enum_value_string + ".  Expected an integer. Check environment variables.");
+            throw std::runtime_error("Invalid camera lens_enum_value_string: " + lens_enum_value_string + ".  Expected an integer. Check the cameras.slotN.orientation setting.");
 
         CameraHardware::CameraOrientation orientation_type = (CameraHardware::CameraOrientation)orientation_table[lens_enum_value_string];
 
@@ -265,11 +265,11 @@ namespace golf_sim {
             GS_LOG_TRACE_MSG(trace, "Video resolution (x,y) is: " + std::to_string(video_resolution_x_) + "/" + std::to_string(video_resolution_y_) + ".");
 
             // Attempt to get the expected ball radius from the .json file
-            std::string ball_radius_pixels_at_40cm_name = "kExpectedBallRadiusPixelsAt40cmCamera" + std::string(camera_number == GsCameraNumber::kGsCamera1 ? "1" : "2");
+            std::string ball_radius_pixels_at_40cm_name = camera_number == GsCameraNumber::kGsCamera1 ? "gs_config.cameras.kExpectedBallRadiusPixelsAt40cmCamera1" : "gs_config.cameras.kExpectedBallRadiusPixelsAt40cmCamera2";
 
             int expected_ball_radius_pixels_at_40cm_from_config_file = -1;
 
-            GolfSimConfiguration::SetConstant("gs_config.cameras." + ball_radius_pixels_at_40cm_name, expected_ball_radius_pixels_at_40cm_from_config_file);
+            GolfSimConfiguration::SetConstant(ball_radius_pixels_at_40cm_name, expected_ball_radius_pixels_at_40cm_from_config_file);
 
             // The default will be used unless the .json file has a value, in which case that value will be used.
 
@@ -290,12 +290,13 @@ namespace golf_sim {
                 camera_distortion_values.cols,
                 camera_distortion_values.type());
 
-            std::string calibration_element_name = "kCamera" + std::to_string((int)camera_number_) + "CalibrationMatrix";
-            std::string distortion_element_name = "kCamera" + std::to_string((int)camera_number_) + "DistortionVector";
+            const bool is_camera1 = camera_number_ == GsCameraNumber::kGsCamera1;
+            std::string calibration_element_name = is_camera1 ? "gs_config.cameras.kCamera1CalibrationMatrix" : "gs_config.cameras.kCamera2CalibrationMatrix";
+            std::string distortion_element_name = is_camera1 ? "gs_config.cameras.kCamera1DistortionVector" : "gs_config.cameras.kCamera2DistortionVector";
 
-            if (GolfSimConfiguration::PropertyExists("gs_config.cameras." + calibration_element_name) ) {
-                GolfSimConfiguration::SetConstant("gs_config.cameras." + calibration_element_name, camera_calibration_matrix_values);
-                GolfSimConfiguration::SetConstant("gs_config.cameras." + distortion_element_name, camera_distortion_values);
+            if (GolfSimConfiguration::PropertyExists(calibration_element_name) ) {
+                GolfSimConfiguration::SetConstant(calibration_element_name, camera_calibration_matrix_values);
+                GolfSimConfiguration::SetConstant(distortion_element_name, camera_distortion_values);
             }
             
             bool calibration_information_is_valid = (camera_calibration_matrix_values.at<double>(0,0) != 0.0) &&
@@ -478,24 +479,18 @@ namespace golf_sim {
 
             // Only if we are using a custom focal length, then use that length
             if (lens_type == Lens_Custom) {
-                tag = "gs_config.cameras.kSlot" + std::to_string(camera_number_) + "CustomLensFocalLength";
-                if (GolfSimConfiguration::PropertyExists(tag)) {
-                    GolfSimConfiguration::SetConstant(tag, focal_length_);
-                    GS_LOG_TRACE_MSG(trace, "Setting custom focal length (from JSON file) = " + std::to_string(focal_length_));
-                }
+                tag = camera_number_ == GsCameraNumber::kGsCamera1 ? "cameras.kSlot1CustomLensFocalLength" : "cameras.kSlot2CustomLensFocalLength";
             }
             else {
 				// Otherwise, for non-custom lenses, just use the standard focal length parameter
-                tag = "gs_config.cameras.kCamera" + std::to_string(camera_number_) + "FocalLength";
-                if (GolfSimConfiguration::PropertyExists(tag)) {
-                    GolfSimConfiguration::SetConstant(tag, focal_length_);
-                    GS_LOG_TRACE_MSG(trace, "Setting focal length (from JSON file) = " + std::to_string(focal_length_));
-                }
+                tag = camera_number_ == GsCameraNumber::kGsCamera1 ? "gs_config.cameras.kCamera1FocalLength" : "gs_config.cameras.kCamera2FocalLength";
             }
+            GolfSimConfiguration::SetConstant(tag, focal_length_);
+            GS_LOG_TRACE_MSG(trace, "Focal length = " + std::to_string(focal_length_));
         }
 
 
-        tag = "gs_config.cameras.kCamera" + std::to_string(camera_number_) + "Angles";
+        tag = camera_number_ == GsCameraNumber::kGsCamera1 ? "gs_config.cameras.kCamera1Angles" : "gs_config.cameras.kCamera2Angles";
         GolfSimConfiguration::SetConstant(tag, camera_angles_);
 
         cameraInitialized = true;

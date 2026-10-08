@@ -6,13 +6,20 @@
 
 #ifdef __unix__  // Ignore in Windows environment
 
+#include <algorithm>
+#include <chrono>
+#include <filesystem>
+#include <mutex>
+#include <sstream>
+
+#include <boost/property_tree/json_parser.hpp>
+
 #include "logging_tools.h"
 
 #include "gs_result_types.h"
 #include "gs_options.h"
 #include "gs_clubs.h"
 #include "gs_ui_system.h"
-#include "gs_sim_interface.h"
 #include "gs_camera.h"
 #include "gs_http_client.h"
 #include "cv_utils.h"
@@ -26,6 +33,28 @@ namespace golf_sim {
     std::string GsUISystem::kWebServerResultBallRotatedByBestAngles;
     std::string GsUISystem::kWebServerErrorExposuresImage;
     std::string GsUISystem::kWebServerBallSearchAreaImage;
+
+    long GsUISystem::current_shot_id_ = 0;
+    std::vector<std::string> GsUISystem::current_shot_image_paths_;
+    std::mutex GsUISystem::shot_images_mutex_;
+    std::atomic<bool> GsUISystem::sim_armed_{ true };
+    std::atomic<GolfSimClubs::GsClubType> GsUISystem::sim_club_{ GolfSimClubs::kNotSelected };
+    long GsUISystem::shot_counter_ = 0;
+
+    std::string GsUISystem::CurrentShotRelativePath(const std::string& file_name) {
+        std::lock_guard<std::mutex> lock(shot_images_mutex_);
+        if (current_shot_id_ == 0) {
+            current_shot_id_ = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+        }
+        return "shots/" + std::to_string(current_shot_id_) + "/" + file_name;
+    }
+
+    void GsUISystem::ResetCurrentShot() {
+        std::lock_guard<std::mutex> lock(shot_images_mutex_);
+        current_shot_id_ = 0;
+        current_shot_image_paths_.clear();
+    }
 
     static std::string EscapeJson(const std::string& s) {
         std::string out;
@@ -47,7 +76,8 @@ namespace golf_sim {
                                        float speed_mps = 0, float launch_deg = 0,
                                        float side_deg = 0, int back_spin = 0,
                                        int side_spin = 0, int carry_m = 0,
-                                       const std::vector<std::string>& images = {}) {
+                                       const std::vector<std::string>& images = {},
+                                       long shot_id = 0) {
         std::string json = "{";
         json += "\"result_type\":" + std::to_string(result_type);
         json += ",\"speed_mps\":" + std::to_string(speed_mps);
@@ -62,8 +92,59 @@ namespace golf_sim {
             if (i > 0) json += ",";
             json += "\"" + EscapeJson(images[i]) + "\"";
         }
-        json += "]}";
+        json += "]";
+        if (shot_id != 0) {
+            json += ",\"shot_id\":" + std::to_string(shot_id);
+        }
+        json += "}";
         return json;
+    }
+
+    bool GsUISystem::SimArmed() {
+        return sim_armed_;
+    }
+
+    GolfSimClubs::GsClubType GsUISystem::SimClub() {
+        return sim_club_;
+    }
+
+    void GsUISystem::IncrementShotCounter() {
+        shot_counter_++;
+    }
+
+    long GsUISystem::GetShotCounter() {
+        return shot_counter_;
+    }
+
+    void GsUISystem::PostResult(const std::string& json) {
+        std::string reply = GsHttpClient::PostResult(json);
+
+        // A missing field, an unreadable reply or a server that is down all leave the FSM armed.
+        bool armed = true;
+        std::string club;
+        if (!reply.empty()) {
+            try {
+                boost::property_tree::ptree pt;
+                std::istringstream reply_stream(reply);
+                boost::property_tree::read_json(reply_stream, pt);
+                armed = pt.get<std::string>("armed", "true") != "false";
+                club = pt.get<std::string>("club", "");
+            }
+            catch (const std::exception& e) {
+                GS_LOG_MSG(warning, "Could not read the web server reply: " + std::string(e.what()));
+            }
+        }
+        sim_armed_ = armed;
+
+        if (club == "putter") {
+            sim_club_ = GolfSimClubs::GsClubType::kPutter;
+        }
+        else if (club == "driver") {
+            sim_club_ = GolfSimClubs::GsClubType::kDriver;
+        }
+        else {
+            sim_club_ = GolfSimClubs::GsClubType::kNotSelected;
+        }
     }
 
 
@@ -76,9 +157,22 @@ namespace golf_sim {
             msg = error_message;
         }
 
+        // Flush whatever images this failed attempt accumulated so they attach to this
+        // shot's result and don't bleed into the next shot.
+        std::vector<std::string> images;
+        long shot_id;
+        {
+            std::lock_guard<std::mutex> lock(shot_images_mutex_);
+            images = current_shot_image_paths_;
+            shot_id = current_shot_id_;
+            current_shot_image_paths_.clear();
+            current_shot_id_ = 0;
+        }
+
         GS_LOG_TRACE_MSG(trace, "Sending error result: " + msg);
-        GsHttpClient::PostResult(BuildResultJson(
-            static_cast<int>(GsIPCResultType::kError), msg));
+        PostResult(BuildResultJson(
+            static_cast<int>(GsIPCResultType::kError), msg,
+            0, 0, 0, 0, 0, 0, images, shot_id));
     }
 
 
@@ -92,7 +186,7 @@ namespace golf_sim {
         case GsIPCResultType::kWaitingForBallToAppear:
             if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1Calibrate ||
                 GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2Calibrate) {
-                msg = "Waiting for ball to be teed up at " + std::to_string(GolfSimCamera::kCamera1CalibrationDistanceToBall) + "cm in order to perform calibration.";
+                msg = "Waiting for ball to be teed up in order to perform calibration.";
             } else {
                 msg = "Waiting for ball to be teed up.";
             }
@@ -115,6 +209,9 @@ namespace golf_sim {
         case GsIPCResultType::kCalibrationResults:
             msg = "Returning Camera Calibration Results - see message.";
             break;
+        case GsIPCResultType::kControlMessage:
+            msg = "Control message.";
+            break;
         default:
             GS_LOG_TRACE_MSG(trace, "SendIPCStatusMessage received unknown GsIPCResultType : " + std::to_string((int)message_type));
             return false;
@@ -125,7 +222,7 @@ namespace golf_sim {
         }
 
         GS_LOG_TRACE_MSG(trace, "Sending status result: " + msg);
-        GsHttpClient::PostResult(BuildResultJson(static_cast<int>(message_type), msg));
+        PostResult(BuildResultJson(static_cast<int>(message_type), msg));
         return true;
     }
 
@@ -135,13 +232,21 @@ namespace golf_sim {
         float side = result_ball.angles_ball_perspective_[0];
         int back_spin = static_cast<int>(result_ball.rotation_speeds_RPM_[2]);
         int side_spin = static_cast<int>(result_ball.rotation_speeds_RPM_[0]);
-        int carry = 100 + rand() % 150;
+        int carry = 0;
 
         std::vector<std::string> images;
+        long shot_id;
+        {
+            std::lock_guard<std::mutex> lock(shot_images_mutex_);
+            images = current_shot_image_paths_;
+            shot_id = current_shot_id_;
+            current_shot_image_paths_.clear();
+            current_shot_id_ = 0;
+        }
 
         std::string msg = "Ball Hit - Results returned." + secondary_message;
 
-        GS_LOG_MSG(info, "BALL_HIT_CSV, " + std::to_string(GsSimInterface::GetShotCounter())
+        GS_LOG_MSG(info, "BALL_HIT_CSV, " + std::to_string(GetShotCounter())
             + ", (carry - NA), (Total - NA), (Side Dest - NA), (Smash Factor - NA), (Club Speed - NA), "
             + std::to_string(CvUtils::MetersPerSecondToMPH(speed)) + ", "
             + std::to_string(back_spin) + ", "
@@ -150,9 +255,9 @@ namespace golf_sim {
             + std::to_string(side)
             + ", (Descent Angle-NA), (Apex-NA), (Flight Time-NA), (Type-NA)");
 
-        GsHttpClient::PostResult(BuildResultJson(
+        PostResult(BuildResultJson(
             static_cast<int>(GsIPCResultType::kHit), msg,
-            speed, launch, side, back_spin, side_spin, carry, images));
+            speed, launch, side, back_spin, side_spin, carry, images, shot_id));
     }
 
 
@@ -170,7 +275,7 @@ namespace golf_sim {
         std::string file_name(input_file_name);
 
         if (GolfSimCamera::kLogDiagnosticImagesToUniqueFiles  && !suppress_diagnostic_saving) {
-            LoggingTools::LogImage(file_name + "_", img, std::vector < cv::Point >{}, false, "", "_Shot_" + std::to_string(GsSimInterface::GetShotCounter()));
+            LoggingTools::LogImage(file_name + "_", img, std::vector < cv::Point >{}, false, "", "_Shot_" + std::to_string(GetShotCounter()));
         }
 
         if (!GolfSimCamera::kLogWebserverImagesToFile) {
@@ -181,11 +286,25 @@ namespace golf_sim {
             file_name += ".png";
         }
 
-        std::string fname = kWebServerShareDirectory + file_name;
+        // Route every shot image into its own per-shot directory so shot history survives.
+        // NOTE: CurrentShotRelativePath takes shot_images_mutex_, so call it before taking
+        // the lock below to record the path (otherwise we'd deadlock).
+        std::string relative = CurrentShotRelativePath(file_name);
+        std::string fname = kWebServerShareDirectory + relative;
+        std::filesystem::create_directories(std::filesystem::path(fname).parent_path());
 
         try {
             if (cv::imwrite(fname, img)) {
                 GS_LOG_TRACE_MSG(trace, "Logged image to file: " + fname);
+
+                // Record the relative path once per shot.  Some images (e.g. the ball
+                // search-area image) are re-saved every wait-loop cycle; overwriting the
+                // file on disk is fine, but we must not flood the POST/DB with dupes.
+                std::lock_guard<std::mutex> lock(shot_images_mutex_);
+                if (std::find(current_shot_image_paths_.begin(), current_shot_image_paths_.end(), relative)
+                        == current_shot_image_paths_.end()) {
+                    current_shot_image_paths_.push_back(relative);
+                }
             }
             else {
                 GS_LOG_MSG(warning, "GsUISystem::SaveWebserverImage - could not save to file name: " + fname);

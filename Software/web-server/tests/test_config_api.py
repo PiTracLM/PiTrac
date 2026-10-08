@@ -1,5 +1,7 @@
 """Tests for configuration API endpoints"""
 
+import json
+
 import pytest
 
 from utils.mock_factories import MockConfigManagerFactory
@@ -26,7 +28,7 @@ class TestConfigurationAPI:
             "user_settings": {"cameras": {"camera1_gain": 2.0}},
             "timestamp": "2024-01-01T12:00:00",
         }
-        manager.import_config.return_value = (True, "Configuration imported")
+        manager.import_config.return_value = (True, "Configuration imported", {"gs_config.ball_identification.kModelPath": "File not found"})
         return manager
 
     def test_config_page(self, client):
@@ -191,12 +193,13 @@ class TestConfigurationAPI:
         data = response.json()
         assert data["success"] is True
         assert data["message"] == "Configuration imported"
+        assert data["skipped"] == {"gs_config.ball_identification.kModelPath": "File not found"}
 
         mock_config_manager.import_config.assert_called_once_with(import_data)
 
     def test_import_config_invalid(self, client, server_instance, mock_config_manager):
         """Test importing invalid configuration"""
-        mock_config_manager.import_config.return_value = (False, "Invalid configuration format")
+        mock_config_manager.import_config.return_value = (False, "Invalid configuration format", {})
         server_instance.config_manager = mock_config_manager
 
         response = client.post("/api/config/import", json={"invalid": "data"})
@@ -228,3 +231,22 @@ class TestConfigurationAPI:
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, dict)
+
+
+@pytest.mark.unit
+class TestConfigRealManager:
+    def test_internal_keys_not_in_categories(self, client):
+        cats = client.get("/api/config/categories").json()
+        assert "kDAC_setting" not in json.dumps(cats)
+
+    def test_metadata_carries_setup_flag(self, client):
+        meta = client.get("/api/config/metadata").json()
+        assert meta["cameras.slot1.type"]["setup"] is True
+
+    def test_select_round_trip_is_not_a_diff(self, client):
+        assert client.put("/api/config/cameras.slot1.type", json={"value": 5}).status_code == 200
+        assert "cameras.slot1.type" not in client.get("/api/config/diff").json()["data"]
+
+    def test_calibrated_and_reset_all(self, client):
+        assert client.get("/api/config/calibrated").json() == []
+        assert client.post("/api/config/reset").json()["calibration_kept"] is True

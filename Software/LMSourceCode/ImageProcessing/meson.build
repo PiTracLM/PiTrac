@@ -31,7 +31,7 @@ add_global_arguments('-DHAS_NCNN', language : 'cpp')
 fs = import('fs')
 
 # TBD FIX - The following may be redundant of the above options
-cpp_arguments = ['-pedantic', '-Wno-unused-parameter', '-faligned-new', '-DBOOST_LOG_DYN_LINK', '-Wno-error', '-Wno-deprecated-enum-enum-conversion', '-Wno-decprecated-declarations']
+cpp_arguments = ['-pedantic', '-Wno-unused-parameter', '-faligned-new', '-DBOOST_LOG_DYN_LINK', '-Wno-error']
 
 # Needed for file sizes > 32-bits.
 cpp_arguments += '-D_FILE_OFFSET_BITS=64'
@@ -74,7 +74,6 @@ fmt_dep = dependency('fmt', required : true)
 
 boost_dep = dependency('boost', method: 'pkg-config', version : '>=1.74.0', modules : ['timer', 'log', 'thread', 'filesystem', 'regex'])
 
-yamlcpp_dep = dependency('yaml-cpp', required : true)
 ncnn_dep = dependency('ncnn', required : true)
 omp_dep = dependency('openmp', language : 'cpp', required : false)
 if not omp_dep.found()
@@ -95,7 +94,10 @@ conf_data = configuration_data()
 
 pitrac_lm_module_deps = [
 	libcamera_dep, thread_dep, opencv_dep, lgpio_dep, rpicam_app_dep,
-	fmt_dep, boost_dep, ssl_dep, yamlcpp_dep, ncnn_dep, omp_dep,]
+	fmt_dep, boost_dep, ssl_dep, ncnn_dep, omp_dep,]
+
+# Before subdir('core'), which rebinds boost_dep to program_options only
+e6_auth_deps = [ boost_dep, ssl_dep, thread_dep ]
 
 
 subdir('core')
@@ -139,37 +141,20 @@ endif
 
 closed_source_object_files = []
 pitrac_lm_sources = []
+e6_auth_sources = [ 'e6_auth_shim.cpp' ]
 
 if enable_recompile_closed_source 
     message('Recompiling closed source code')
     run_command('cp', '/home/USERNAME/Dev/ClosedSourceCode/gs_e6_response.cpp.FULL', 'gs_e6_response.cpp', check:true)
-    pitrac_lm_sources += ([ 'gs_e6_response.cpp' ])
-endif
-
-if enable_recompile_closed_source 
-    message('Recompiling closed source code')
     run_command('cp', '/home/USERNAME/Dev/ClosedSourceCode/obfuscate.h', 'obfuscate.h', check:true)
-    pitrac_lm_sources += ([ 'gs_e6_response.cpp' ])
+    e6_auth_sources += ([ 'gs_e6_response.cpp' ])
+    e6_auth_deps += ([ opencv_dep.partial_dependency(compile_args : true, includes : true) ])
 endif
-
-# Move the pre-compiled, closed-source object file(s) into place
-# This is a workaround to the fact that meson will not allow paths in the 
-# output and input parameters of a custom_target
-create_closed_source_objects = find_program('create_closed_source_objects.sh')
-closed_source_target = custom_target('copy_closed_source_object',
-    input : 'gs_e6_results.cpp',
-    output : 'gs_e6_response.cpp.o',
-    command : [ create_closed_source_objects, '@INPUT@', '@OUTPUT@'],
-)
 
 if not enable_recompile_closed_source 
     message('Using pre-compiled closed object_code')
-    pitrac_lm_sources += ([ closed_source_target, ])
-    closed_source_object_files += (['gs_e6_response.cpp.o'])
-endif
-
-if not enable_recompile_closed_source 
     r = run_command ( 'cp', '-f', './ClosedSourceObjectFiles/gs_e6_response.cpp.o', '.', check:true)
+    closed_source_object_files += (['gs_e6_response.cpp.o'])
 endif
 
 libav_dep_names = ['libavcodec', 'libavdevice', 'libavformat', 'libavutil', 'libswresample']
@@ -187,7 +172,6 @@ pitrac_lm_sources += ([
 			'libcamera_jpeg.cpp',
 			'ball_watcher.cpp',
 			'ball_watcher_image_buffer.cpp',
-			'libcamera_jpeg.cpp',
 			'ball_image_proc.cpp',
 			'ncnn_detector.cpp',
 			'spin_predictor.cpp',
@@ -200,27 +184,16 @@ pitrac_lm_sources += ([
 			'gs_automated_testing.cpp',
 			'gs_calibration.cpp',
 			'gs_camera.cpp',
-			'gs_web_api.cpp',
 			'gs_clubs.cpp',
 			'gs_club_data.cpp',
 			'gs_options.cpp',
 			'gs_config.cpp',
 			'gs_shot_parameters.cpp',
-			'configuration_manager.cpp',
-			'gs_sim_interface.cpp',
-			'gs_gspro_interface.cpp',
-			'gs_gspro_response.cpp',
-			'gs_gspro_test_server.cpp',
-			'gs_sim_socket_interface.cpp',
-                        'gs_e6_interface.cpp',
-                        'gs_e6_results.cpp',
 			'logging_tools.cpp',
 			'gs_events.cpp',
 			'worker_thread.cpp',
 			'camera_hardware.cpp',
-                        'gs_control_msg.cpp',
                         'gs_results.cpp',
-                        'gs_gspro_results.cpp',
                         'gs_ui_system.cpp',
                         'gs_result_types.cpp',
                         'gs_http_client.cpp',
@@ -246,28 +219,38 @@ exec = executable('pitrac_lm',
 	pitrac_lm_sources,
 	include_directories : pitrac_lm_include_dirs,
 	install : true,
-        objects : closed_source_object_files,
 	dependencies : pitrac_lm_module_deps,
+	cpp_args : cpp_arguments
+	)
+
+e6_auth_lib = shared_library('pitrac_e6',
+	e6_auth_sources,
+	install : true,
+	install_dir : '/usr/lib/pitrac',
+	objects : closed_source_object_files,
+	dependencies : e6_auth_deps,
 	cpp_args : cpp_arguments
 	)
 
 # Hacky two targets, because can't figure out how to execute more than one command
 # per  target.  TBD
-custom_target('post_build1',
-  depends: exec,  # Ensure the executable is built first
-  input: exec,
-  output: 'dummy_file1',  # NOTE - command will execute in the build directory
-  command: [ 'cp', '-f', './pitrac_lm.p/gs_e6_response.cpp.o', '../ClosedSourceObjectFiles'],
-  build_by_default : true
-)
+if enable_recompile_closed_source
+    custom_target('post_build1',
+      depends: e6_auth_lib,  # Ensure the library is built first
+      input: e6_auth_lib,
+      output: 'dummy_file1',  # NOTE - command will execute in the build directory
+      command: [ 'cp', '-f', './libpitrac_e6.so.p/gs_e6_response.cpp.o', '../ClosedSourceObjectFiles'],
+      build_by_default : true
+    )
 
-custom_target('post_build2',
-  depends: exec,  # Ensure the executable is built first
-  input: exec,
-  output: 'dummy_file2',  # NOTE - command will execute in the build directory
-  command: [ 'cp', '-f', './pitrac_lm.p/gs_e6_response.cpp.o', '..'],
-  build_by_default : true
-)
+    custom_target('post_build2',
+      depends: e6_auth_lib,  # Ensure the library is built first
+      input: e6_auth_lib,
+      output: 'dummy_file2',  # NOTE - command will execute in the build directory
+      command: [ 'cp', '-f', './libpitrac_e6.so.p/gs_e6_response.cpp.o', '..'],
+      build_by_default : true
+    )
+endif
 
 summary({
             'libav encoder' : enable_libav,

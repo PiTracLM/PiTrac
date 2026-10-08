@@ -28,6 +28,7 @@ class UpdateManager:
         self._update_log: List[str] = []
         self._update_status: str = "idle"  # idle, checking, updating, restarting, failed
         self._update_error: Optional[str] = None
+        self._last_result: Optional[str] = None  # success, failed, cancelled
         self._last_check: Optional[str] = None
         self._last_update: Optional[str] = None
         self._available_commits: List[Dict[str, str]] = []
@@ -68,10 +69,12 @@ class UpdateManager:
             if prev_status == "updating":
                 # If we're alive after a mid-build kill, the build succeeded
                 self._last_update = data.get("timestamp")
+                self._last_result = "success"
                 logger.info("Previous update completed successfully (service was restarted by build.sh)")
-            elif prev_status == "failed":
+            elif prev_status in ("failed", "cancelled"):
                 self._update_error = data.get("message")
                 self._last_update = data.get("timestamp")
+                self._last_result = prev_status
             status_path.unlink(missing_ok=True)
         except Exception as e:
             logger.warning(f"Could not read persisted update status: {e}")
@@ -169,7 +172,7 @@ class UpdateManager:
                 logger.error(f"Branch list failed: {e}")
                 return {"status": "error", "message": str(e)}
 
-    async def check_for_updates(self, remote: str = "origin") -> Dict[str, Any]:
+    async def check_for_updates(self, remote: str = "origin", branch: Optional[str] = None) -> Dict[str, Any]:
         if not self.is_configured:
             return {"status": "error", "message": "Update system not configured. Run 'sudo ./build.sh dev' first."}
 
@@ -192,7 +195,7 @@ class UpdateManager:
                     self._update_status = "idle"
                     return {"status": "error", "message": f"git fetch failed: {fetch.stderr.strip()}"}
 
-                tracking = f"{remote}/{current_branch}"
+                tracking = f"{remote}/{branch or current_branch}"
                 count_result = await self._run_git("rev-list", "--count", f"HEAD..{tracking}")
                 if count_result.returncode != 0:
                     self._update_status = "idle"
@@ -268,6 +271,7 @@ class UpdateManager:
 
         self._update_log = []
         self._update_error = None
+        self._last_result = None
 
         self._update_task = asyncio.create_task(self._run_update(force, branch))
 
@@ -290,9 +294,7 @@ class UpdateManager:
                         if checkout.returncode != 0:
                             error = f"git checkout failed: {checkout.stderr.strip()}"
                             await self._log_line(f"[ERROR] {error}")
-                            self._update_status = "failed"
-                            self._update_error = error
-                            self._persist_status("failed", error)
+                            self._fail(error)
                             return
 
                 await self._log_line("[UPDATE] Pulling latest changes...")
@@ -300,9 +302,7 @@ class UpdateManager:
                 if pull.returncode != 0:
                     error = f"git pull failed: {pull.stderr.strip()}"
                     await self._log_line(f"[ERROR] {error}")
-                    self._update_status = "failed"
-                    self._update_error = error
-                    self._persist_status("failed", error)
+                    self._fail(error)
                     return
 
                 for line in pull.stdout.strip().splitlines():
@@ -335,9 +335,7 @@ class UpdateManager:
                 except asyncio.TimeoutError:
                     await self._log_line(f"[ERROR] Build timed out after {BUILD_TIMEOUT_SECONDS}s")
                     await self._kill_build_process()
-                    self._update_status = "failed"
-                    self._update_error = "Build timed out"
-                    self._persist_status("failed", "Build timed out")
+                    self._fail("Build timed out")
                     return
 
                 returncode = await self._update_process.wait()
@@ -348,25 +346,30 @@ class UpdateManager:
                     # Unlikely to reach here — build.sh restarts this service
                     await self._log_line("[UPDATE] Build complete. Service restarting...")
                     self._update_status = "restarting"
+                    self._last_result = "success"
                 else:
                     error = f"Build failed with exit code {returncode}"
                     await self._log_line(f"[ERROR] {error}")
-                    self._update_status = "failed"
-                    self._update_error = error
-                    self._persist_status("failed", error)
+                    self._fail(error)
 
             except asyncio.CancelledError:
                 await self._log_line("[UPDATE] Update cancelled.")
                 await self._kill_build_process()
                 self._update_status = "idle"
-                self._persist_status("failed", "Cancelled by user")
+                self._last_result = "cancelled"
+                self._update_error = "Cancelled by user"
+                self._persist_status("cancelled", "Cancelled by user")
             except Exception as e:
                 error = f"Update failed: {e}"
                 logger.error(error)
                 await self._log_line(f"[ERROR] {error}")
-                self._update_status = "failed"
-                self._update_error = str(e)
-                self._persist_status("failed", str(e))
+                self._fail(str(e))
+
+    def _fail(self, error: str) -> None:
+        self._update_status = "failed"
+        self._update_error = error
+        self._last_result = "failed"
+        self._persist_status("failed", error)
 
     async def _stream_build_output(self) -> None:
         if self._update_process and self._update_process.stdout:
@@ -411,7 +414,8 @@ class UpdateManager:
             self._update_task = None
 
         self._update_status = "idle"
-        self._update_error = None
+        self._last_result = "cancelled"
+        self._update_error = "Cancelled by user"
         await self._log_line("[UPDATE] Update cancelled by user.")
         return {"status": "cancelled", "message": "Update cancelled."}
 
@@ -426,6 +430,7 @@ class UpdateManager:
             "build_user": self.build_user,
             "status": self._update_status,
             "error": self._update_error,
+            "last_result": self._last_result,
             "last_check": self._last_check,
             "last_build": self.last_build_time,
             "last_update": self._last_update,

@@ -3,37 +3,45 @@
 import json
 import os
 import pytest
-import tempfile
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from config_manager import ConfigurationManager as ConfigManager
+from config_manager import ConfigurationManager as ConfigManager, _is_valid_host
+from db.database import Database
+from db.repositories import KeyValueRepository, SimulatorRepository
+from sim_manager import import_legacy_settings
+
+
+@pytest.fixture
+def db(tmp_path):
+    d = Database(tmp_path / "t.db")
+    yield d
+    d.close()
+
+
+@pytest.fixture
+def legacy_dir(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    d = tmp_path / ".pitrac" / "config"
+    d.mkdir(parents=True)
+    return d
+
+
+@pytest.fixture
+def config_manager(db, tmp_path):
+    manager = ConfigManager(db)
+    manager.user_settings_path = tmp_path / "user_settings.json"
+    manager.calibration_data_path = tmp_path / "calibration_data.json"
+    return manager
 
 
 class TestConfigManager:
     """Test the configuration manager functionality"""
 
     @pytest.fixture
-    def temp_config_dir(self):
-        """Create a temporary directory for config files"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            yield Path(tmpdir)
-
-    @pytest.fixture
-    def config_manager(self, temp_config_dir):
-        """Create a ConfigManager instance with temp paths"""
-        manager = ConfigManager()
-        manager.user_settings_path = temp_config_dir / "user_settings.json"
-        return manager
-
-    @pytest.fixture
-    def setup_config_files(self, config_manager):
-        """Setup basic config files"""
-        user_settings = {"gs_config": {"cameras": {"kCamera1Gain": "2.0"}}}
-
-        with open(config_manager.user_settings_path, "w") as f:
-            json.dump(user_settings, f)
-
+    def setup_config_files(self, config_manager, db):
+        KeyValueRepository(db, "settings").replace_all({"gs_config.cameras.kCamera1Gain": "2.0"})
         config_manager.reload()
         return config_manager
 
@@ -72,21 +80,6 @@ class TestConfigManager:
         assert "maximum" in error.lower() or "at most" in error.lower()
 
         is_valid, _ = config_manager.validate_config("gs_config.cameras.kCamera1Gain", "8.0")
-        assert is_valid
-
-    def test_config_validation_port(self, config_manager):
-        """Test configuration validation for network ports"""
-        is_valid, _ = config_manager.validate_config("gs_config.golf_simulator_interfaces.GSPro.kGSProConnectPort", "0")
-        assert not is_valid
-
-        is_valid, _ = config_manager.validate_config(
-            "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectPort", "70000"
-        )
-        assert not is_valid
-
-        is_valid, _ = config_manager.validate_config(
-            "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectPort", "8080"
-        )
         assert is_valid
 
     def test_reset_all(self, setup_config_files):
@@ -131,13 +124,14 @@ class TestConfigManager:
         gain_value = config_manager.get_config("gs_config.cameras.kCamera1Gain")
         assert gain_value is not None
 
-    def test_invalid_json_handling(self, config_manager):
-        """Test handling of invalid JSON files"""
-        with open(config_manager.user_settings_path, "w") as f:
-            f.write("{ invalid json }")
+    def test_invalid_json_file_is_left_alone(self, db, legacy_dir):
+        (legacy_dir / "user_settings.json").write_text("{ invalid json }")
 
-        config_manager.reload()
-        assert config_manager.user_settings == {}
+        manager = ConfigManager(db)
+
+        assert (legacy_dir / "user_settings.json").exists()
+        assert KeyValueRepository(db, "settings").load() == {}
+        assert manager.user_settings == {}
 
     def test_missing_file_handling(self, config_manager):
         """Test handling of missing config files"""
@@ -149,53 +143,189 @@ class TestConfigManager:
         assert config_manager.calibration_data == {}
         assert isinstance(config_manager.merged_config, dict)
 
-    def test_cli_parameters(self, config_manager):
-        """Test getting CLI parameters from config"""
-        config_manager.system_config = {
-            "gs_config": {"cameras": {"kCamera1Gain": "2.0"}, "modes": {"kStartInPuttingMode": "1"}}
-        }
-
-        cli_params = config_manager.get_cli_parameters()
-        assert isinstance(cli_params, list)
-
-    def test_environment_parameters(self, config_manager):
-        """Test getting environment parameters from config"""
-        config_manager.system_config = {
-            "gs_config": {"ipc_interface": {"kWebServerShareDirectory": "~/LM_Shares/WebShare"}}
-        }
-        config_manager.reload()
-
-        env_params = config_manager.get_environment_parameters()
-        assert isinstance(env_params, list)
-
     def test_nested_config_access(self, config_manager):
         """Test accessing deeply nested configuration values"""
-        config_manager.user_settings = {
-            "gs_config": {
-                "golf_simulator_interfaces": {
-                    "GSPro": {"kGSProConnectAddress": "192.168.1.100", "kGSProConnectPort": 921}
-                }
-            }
-        }
+        config_manager.user_settings = {"simulators": {"gspro": {"host": "192.168.1.100", "port": 921}}}
         config_manager._rebuild_merged_config()
 
-        port = config_manager.get_config("gs_config.golf_simulator_interfaces.GSPro.kGSProConnectPort")
+        port = config_manager.get_config("simulators.gspro.port")
         assert port == 921
 
-        address = config_manager.get_config("gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress")
+        address = config_manager.get_config("simulators.gspro.host")
         assert address == "192.168.1.100"
 
-    def test_config_persistence(self, setup_config_files):
-        """Test that configuration methods work"""
+    def test_set_survives_reload(self, setup_config_files):
         config_manager = setup_config_files
 
-        result = config_manager.set_config("gs_config.cameras.kCamera1Gain", "3.5")
-        assert result is not None
+        config_manager.set_config("gs_config.cameras.kCamera1Gain", "3.5")
+        config_manager.reload()
+
+        assert config_manager.get_config("gs_config.cameras.kCamera1Gain") == 3.5
+
+    def test_reset_all_clears_settings_and_keeps_calibration(self, config_manager, db):
+        config_manager.set_config("gs_config.cameras.kCamera1Gain", "3.5")
+        config_manager.set_config("gs_config.cameras.kCamera1FocalLength", 6.1)
+
+        config_manager.reset_all()
+
+        assert KeyValueRepository(db, "settings").load() == {}
+        assert KeyValueRepository(db, "calibration").load() == {"gs_config.cameras.kCamera1FocalLength": 6.1}
+
+    def test_callback_fires_after_set_config(self, config_manager):
+        seen = []
+        config_manager.register_callback("gs_config.cameras", lambda k, v: seen.append((k, v)))
+
+        config_manager.set_config("gs_config.cameras.kCamera1Gain", "3.5")
+
+        assert seen == [("gs_config.cameras.kCamera1Gain", 3.5)]
+
+    def test_imports_json_files_once_at_startup(self, db, legacy_dir):
+        (legacy_dir / "user_settings.json").write_text(json.dumps({
+            "gs_config": {"golf_simulator_interfaces": {"GSPro": {"kGSProConnectAddress": "10.0.0.5"}}},
+            "cameras": {"slot1": {"type": "4"}},
+        }))
+        (legacy_dir / "calibration_data.json").write_text(json.dumps({
+            "gs_config": {"cameras": {"kCamera1FocalLength": 5.9, "kCamera1Angles": [2.14, -26.42]}},
+        }))
+
+        expected_settings = {
+            "simulators.gspro.host": "10.0.0.5",
+            "simulators.gspro.enabled": True,
+            "cameras.slot1.type": "4",
+        }
+        expected_calibration = {
+            "gs_config.cameras.kCamera1FocalLength": 5.9,
+            "gs_config.cameras.kCamera1Angles": [2.14, -26.42],
+        }
+        settings = KeyValueRepository(db, "settings")
+        calibration = KeyValueRepository(db, "calibration")
+
+        manager = ConfigManager(db)
+
+        assert settings.load() == expected_settings
+        assert calibration.load() == expected_calibration
+        assert manager.get_config("cameras.slot1.type") == "4"
+        assert manager.found_legacy_json
+        assert not (legacy_dir / "user_settings.json").exists()
+        assert not (legacy_dir / "calibration_data.json").exists()
+        assert (legacy_dir / "user_settings.json.imported").exists()
+        assert (legacy_dir / "calibration_data.json.imported").exists()
+
+    def test_reload_never_imports(self, config_manager, db):
+        config_manager.user_settings_path.write_text(json.dumps({"cameras": {"slot1": {"type": "5"}}}))
 
         config_manager.reload()
 
-        gain_value = config_manager.get_config("gs_config.cameras.kCamera1Gain")
-        assert gain_value is not None
+        assert KeyValueRepository(db, "settings").load() == {}
+        assert config_manager.user_settings_path.exists()
+
+    def test_legacy_file_next_to_rows_is_not_imported(self, db, legacy_dir):
+        settings = KeyValueRepository(db, "settings")
+        settings.replace_all({"cameras.slot1.type": "4"})
+        (legacy_dir / "user_settings.json").write_text(json.dumps({"cameras": {"slot1": {"type": "5"}}}))
+
+        manager = ConfigManager(db)
+
+        assert settings.load() == {"cameras.slot1.type": "4"}
+        assert manager.get_config("cameras.slot1.type") == "4"
+        assert (legacy_dir / "user_settings.json").exists()
+
+    def test_second_import_keeps_first_backup(self, db, legacy_dir):
+        first_backup = legacy_dir / "user_settings.json.imported"
+        first_backup.write_text('{"original": true}')
+        (legacy_dir / "user_settings.json").write_text("{}")
+
+        ConfigManager(db)
+
+        assert first_backup.read_text() == '{"original": true}'
+        assert len(list(legacy_dir.glob("user_settings.json.imported.*"))) == 1
+
+    def test_import_drops_dotted_top_level_keys(self, db, legacy_dir):
+        (legacy_dir / "user_settings.json").write_text(json.dumps({
+            "cameras": {"slot1": {"type": "5"}},
+            "cameras.slot1.type": "4",
+        }))
+
+        manager = ConfigManager(db)
+
+        assert KeyValueRepository(db, "settings").load() == {"cameras.slot1.type": "5"}
+        assert manager.get_config("cameras.slot1.type") == "5"
+
+    def test_backups_from_the_same_second_are_all_kept(self, db, legacy_dir):
+        stamp = "user_settings.json.imported.20260101-120000"
+        (legacy_dir / "user_settings.json.imported").write_text("first")
+        (legacy_dir / stamp).write_text("second")
+        (legacy_dir / "user_settings.json").write_text("{}")
+
+        with patch("config_manager.datetime") as clock:
+            clock.now.return_value = datetime(2026, 1, 1, 12, 0, 0)
+            ConfigManager(db)
+
+        assert (legacy_dir / "user_settings.json.imported").read_text() == "first"
+        assert (legacy_dir / stamp).read_text() == "second"
+        assert (legacy_dir / f"{stamp}.1").read_text() == "{}"
+
+    def test_failed_rename_keeps_imported_rows_and_starts(self, db, legacy_dir):
+        (legacy_dir / "user_settings.json").write_text(json.dumps({"cameras": {"slot1": {"type": "5"}}}))
+
+        with patch.object(Path, "rename", side_effect=OSError("read-only")):
+            manager = ConfigManager(db)
+
+        assert KeyValueRepository(db, "settings").load() == {"cameras.slot1.type": "5"}
+        assert manager.get_config("cameras.slot1.type") == "5"
+
+    def test_import_drops_nested_dotted_keys(self, db, legacy_dir):
+        (legacy_dir / "user_settings.json").write_text(json.dumps({
+            "gs_config": {"cameras": {"kCamera1Gain": "2.5"}, "a.b": 1},
+        }))
+
+        ConfigManager(db)
+
+        assert KeyValueRepository(db, "settings").load() == {"gs_config.cameras.kCamera1Gain": "2.5"}
+
+    def test_reset_all_notifies_changed_keys(self, config_manager):
+        config_manager.set_config("gs_config.cameras.kHLAOffset", 1.5)
+        seen = []
+        config_manager.register_callback("gs_config.cameras", lambda k, v: seen.append((k, v)))
+
+        config_manager.reset_all()
+
+        assert seen == [("gs_config.cameras.kHLAOffset", config_manager.get_default("gs_config.cameras.kHLAOffset"))]
+
+    def test_import_config_notifies_changed_keys(self, config_manager):
+        seen = []
+        config_manager.register_callback("gs_config.cameras", lambda k, v: seen.append((k, v)))
+
+        ok, *_ = config_manager.import_config({"user_settings": {"gs_config": {"cameras": {"kHLAOffset": 1.5}}}})
+
+        assert ok
+        assert seen == [("gs_config.cameras.kHLAOffset", 1.5)]
+
+    def test_import_config_drops_old_simulator_keys(self, config_manager, db):
+        ok, *_ = config_manager.import_config({"user_settings": {
+            "simulators": {"gspro": {"host": "10.0.0.5", "enabled": True}},
+            "cameras": {"slot1": {"type": "4"}},
+        }})
+
+        assert ok
+        assert config_manager.get_user_settings() == {"cameras": {"slot1": {"type": "4"}}}
+        assert KeyValueRepository(db, "settings").load() == {"cameras.slot1.type": "4"}
+
+    def test_import_config_failure_leaves_settings_untouched(self, config_manager, db):
+        config_manager.set_config("gs_config.cameras.kCamera1Gain", "3.5")
+
+        def fail(conn, flat):
+            raise RuntimeError("disk full")
+
+        config_manager._calibration.replace_all_in = fail
+        ok, *_ = config_manager.import_config({
+            "user_settings": {"gs_config": {"cameras": {"kCamera1Gain": "9.0"}}},
+            "calibration_data": {"gs_config": {"cameras": {"kCamera1FocalLength": 6.1}}},
+        })
+
+        assert not ok
+        assert KeyValueRepository(db, "settings").load() == {"gs_config.cameras.kCamera1Gain": 3.5}
+        assert config_manager.get_config("gs_config.cameras.kCamera1Gain") == 3.5
 
     @patch.dict(os.environ, {"HOME": "/test/home"})
     def test_default_paths(self):
@@ -230,22 +360,84 @@ class TestConfigManager:
         assert not is_valid
 
 
+OLD_SIM = "gs_config.golf_simulator_interfaces"
+
+
+class TestRenamedSimKeys:
+    """The oldest sim keys move to simulators.<type>.*, which the server then turns into instances"""
+
+    def _start(self, db, rows):
+        settings = KeyValueRepository(db, "settings")
+        settings.replace_all(rows)
+        ConfigManager(db)
+        sims = SimulatorRepository(db)
+        import_legacy_settings(settings, sims)
+        return settings.load(), {s["type"]: (s["on"], s["settings"]) for s in sims.list()}
+
+    def test_gspro_rows_become_an_instance_that_is_on(self, db):
+        rows, sims = self._start(db, {
+            f"{OLD_SIM}.GSPro.kGSProConnectAddress": "10.0.0.5",
+            f"{OLD_SIM}.GSPro.kGSProConnectPort": 9210,
+            f"{OLD_SIM}.kLaunchMonitorIdString": "My LM",
+            "cameras.slot1.type": "4",
+        })
+
+        assert rows == {"cameras.slot1.type": "4"}
+        assert sims == {"gspro": (True, {"host": "10.0.0.5", "port": 9210})}
+
+    def test_e6_rows_become_an_instance_that_is_on(self, db):
+        rows, sims = self._start(db, {
+            f"{OLD_SIM}.E6.kE6ConnectAddress": "10.0.0.6",
+            f"{OLD_SIM}.E6.kE6ConnectPort": "2484",
+            f"{OLD_SIM}.E6.kE6InterMessageDelayMs": 75,
+        })
+
+        assert rows == {}
+        assert sims == {"e6": (True, {"host": "10.0.0.6", "port": 2484, "inter_message_delay_ms": 75})}
+
+    def test_no_address_makes_no_instance(self, db):
+        for address in ("", None):
+            rows, sims = self._start(db, {
+                f"{OLD_SIM}.GSPro.kGSProConnectAddress": address,
+                f"{OLD_SIM}.GSPro.kGSProConnectPort": "921",
+                f"{OLD_SIM}.E6.kE6InterMessageDelayMs": 50,
+                "cameras.slot1.type": "4",
+            })
+
+            assert rows == {"cameras.slot1.type": "4"}
+            assert sims == {}
+
+    def test_values_that_do_not_validate_take_the_default(self, db):
+        rows, sims = self._start(db, {
+            f"{OLD_SIM}.E6.kE6ConnectAddress": "10.0.0.6",
+            f"{OLD_SIM}.E6.kE6ConnectPort": "inf",
+            f"{OLD_SIM}.E6.kE6InterMessageDelayMs": None,
+        })
+
+        assert sims == {"e6": (True, {"host": "10.0.0.6", "port": 2483, "inter_message_delay_ms": 50})}
+
+    def test_never_overwrites_a_new_key_already_set(self, db):
+        rows, sims = self._start(db, {
+            f"{OLD_SIM}.GSPro.kGSProConnectAddress": "10.0.0.5",
+            "simulators.gspro.host": "10.0.0.9",
+        })
+
+        assert sims == {"gspro": (False, {"host": "10.0.0.9", "port": 921})}
+
+    def test_second_start_changes_nothing(self, db):
+        self._start(db, {f"{OLD_SIM}.GSPro.kGSProConnectAddress": "10.0.0.5"})
+        settings = KeyValueRepository(db, "settings")
+        before = SimulatorRepository(db).list()
+
+        ConfigManager(db)
+        assert import_legacy_settings(settings, SimulatorRepository(db)) is False
+
+        assert settings.load() == {}
+        assert SimulatorRepository(db).list() == before
+
+
 class TestArrayHandling:
     """Test suite for array type configuration handling"""
-
-    @pytest.fixture
-    def temp_config_dir(self):
-        """Create a temporary directory for config files"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            yield Path(tmpdir)
-
-    @pytest.fixture
-    def config_manager(self, temp_config_dir):
-        """Create a ConfigManager instance with temp paths"""
-        manager = ConfigManager()
-        manager.user_settings_path = temp_config_dir / "user_settings.json"
-        manager.calibration_data_path = temp_config_dir / "calibration_data.json"
-        return manager
 
     def test_validate_array_with_list(self, config_manager):
         """Test validation of array type with a proper list"""
@@ -581,21 +773,6 @@ class TestArrayHandling:
 class TestSetCalibrationBatch:
     """Atomic multi-key calibration writes used by distortion calibration save."""
 
-    @pytest.fixture
-    def temp_config_dir(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            yield Path(tmpdir)
-
-    @pytest.fixture
-    def config_manager(self, temp_config_dir):
-        manager = ConfigManager()
-        manager.user_settings_path = temp_config_dir / "user_settings.json"
-        manager.calibration_data_path = temp_config_dir / "calibration_data.json"
-        manager.calibration_data = {}
-        manager.user_settings = {}
-        manager._rebuild_merged_config()
-        return manager
-
     def test_empty_updates_returns_success(self, config_manager):
         ok, msg = config_manager.set_calibration_batch({})
         assert ok
@@ -613,13 +790,12 @@ class TestSetCalibrationBatch:
         assert cams["kCamera1CalibrationMatrix"] == matrix
         assert cams["kCamera1DistortionVector"] == dist
 
-    def test_persists_to_calibration_data_file(self, config_manager):
+    def test_persists_to_calibration_table(self, config_manager, db):
         config_manager.set_calibration_batch({
             "gs_config.cameras.kCamera1CalibrationMatrix": [[1.0]],
         })
-        with open(config_manager.calibration_data_path) as f:
-            saved = json.load(f)
-        assert saved["gs_config"]["cameras"]["kCamera1CalibrationMatrix"] == [[1.0]]
+        saved = KeyValueRepository(db, "calibration").load()
+        assert saved["gs_config.cameras.kCamera1CalibrationMatrix"] == [[1.0]]
 
     def test_rejects_non_calibration_key(self, config_manager):
         ok, msg = config_manager.set_calibration_batch({
@@ -648,3 +824,197 @@ class TestSetCalibrationBatch:
             "gs_config.cameras.kCamera1DistortionVector": [0.0] * 5,
         })
         assert any(k == "gs_config.cameras.kCamera1CalibrationMatrix" for k, _ in seen)
+
+    def test_redo_with_identical_values_bumps_timestamp(self, config_manager, db):
+        key = "gs_config.cameras.kCamera1CalibrationMatrix"
+        config_manager.set_calibration_batch({key: [[1.0]]})
+        db.execute("UPDATE calibration SET updated_at = '2026-01-01T00:00:00'")
+        config_manager.set_calibration_batch({key: [[1.0]]})
+        assert config_manager.calibration_updated_at(key) > "2026-01-01T00:00:00"
+
+
+class TestCalibrationTimestamps:
+    def test_calibration_set_config_with_identical_value_bumps_timestamp(self, config_manager, db):
+        key = "gs_config.cameras.kCamera1FocalLength"
+        config_manager.set_config(key, 6.1)
+        db.execute("UPDATE calibration SET updated_at = '2026-01-01T00:00:00'")
+        config_manager.set_config(key, 6.1)
+        assert config_manager.calibration_updated_at(key) > "2026-01-01T00:00:00"
+
+    def test_untouched_calibration_keys_keep_their_timestamp(self, config_manager, db):
+        config_manager.set_calibration_batch({"gs_config.cameras.kCamera1FocalLength": 6.1})
+        db.execute("UPDATE calibration SET updated_at = '2026-01-01T00:00:00'")
+        config_manager.set_calibration_batch({"gs_config.cameras.kCamera2FocalLength": 6.2})
+        assert config_manager.calibration_updated_at("gs_config.cameras.kCamera1FocalLength") == "2026-01-01T00:00:00"
+
+    def test_settings_write_with_identical_value_keeps_timestamp(self, config_manager, db):
+        key = "gs_config.cameras.kCamera1Gain"
+        config_manager.set_config(key, "3.5")
+        db.execute("UPDATE settings SET updated_at = '2026-01-01T00:00:00'")
+        config_manager.set_config(key, "3.5")
+        rows = db.query("SELECT updated_at FROM settings WHERE key = ?", (key,))
+        assert rows[0]["updated_at"] == "2026-01-01T00:00:00"
+
+
+class TestBuildGeneratedConfig:
+    """Tests for the extracted config dict builder."""
+
+    def test_build_generated_config_returns_merged_dict(self, config_manager):
+        cfg = config_manager.build_generated_config()
+        assert isinstance(cfg, dict)
+        assert "gs_config" in cfg
+
+    def test_build_generated_config_merges_transient_overrides(self, config_manager):
+        config_manager.transient_overrides = {"gs_config": {"testing": {"kBaseTestImageDir": "/tmp/x/"}}}
+        cfg = config_manager.build_generated_config()
+        assert cfg["gs_config"]["testing"]["kBaseTestImageDir"] == "/tmp/x/"
+        assert "kGolferOrientation" in cfg["gs_config"]["player"]
+
+        config_manager.transient_overrides = {}
+        cfg = config_manager.build_generated_config()
+        assert cfg["gs_config"]["testing"]["kBaseTestImageDir"] == "./Images/"
+
+    def test_build_generated_config_truncates_integer_settings(self, config_manager):
+        config_manager._settings.replace_all({"gs_config.strobing.kPrimingPulseFPS": 35.5})
+        config_manager.reload()
+        config_manager.set_config("gs_config.ipc_interface.kMaxCam2ImageReceivedTimeMs", 30000.0)
+        cfg = config_manager.build_generated_config()
+        assert cfg["gs_config"]["strobing"]["kPrimingPulseFPS"] == "35"
+        assert cfg["gs_config"]["ipc_interface"]["kMaxCam2ImageReceivedTimeMs"] == "30000"
+
+    def test_build_generated_config_includes_former_cli_and_env(self, config_manager):
+        cfg = config_manager.build_generated_config()
+        # former CLI setting — gs_config.player.kGolferOrientation
+        assert "kGolferOrientation" in cfg.get("gs_config", {}).get("player", {})
+        # former environment setting — cameras.slot1.type
+        assert "type" in cfg.get("cameras", {}).get("slot1", {})
+
+
+class TestConfigTypes:
+    @pytest.mark.parametrize("key,value,expected", [
+        ("cameras.slot1.type", 5, "5"),
+        ("gs_config.modes.kStartInPuttingMode", "false", False),
+        ("gs_config.modes.kStartInPuttingMode", "true", True),
+        ("gs_config.modes.kStartInPuttingMode", 1, True),
+        ("gs_config.modes.kStartInPuttingMode", "1", True),
+        ("gs_config.modes.kStartInPuttingMode", "0", False),
+        ("gs_config.cameras.kHLAOffset", "1.5", 1.5),
+        ("gs_config.cameras.kHLAOffset", 2, 2.0),
+        ("gs_config.cameras.kCamera1SearchCenterX", "921", 921),
+        ("gs_config.cameras.kCamera1SearchCenterX", "921.0", 921),
+        ("gs_config.cameras.kCamera1Gain", "2.5", 2.5),
+    ])
+    def test_coerce_value(self, config_manager, key, value, expected):
+        result = config_manager.coerce_value(key, value)
+        assert result == expected
+        assert type(result) is type(expected)
+
+    @pytest.mark.parametrize("key,value", [
+        ("gs_config.modes.kStartInPuttingMode", "maybe"),
+        ("gs_config.cameras.kHLAOffset", "abc"),
+        ("gs_config.cameras.kCamera1SearchCenterX", None),
+    ])
+    def test_coerce_value_rejects_garbage(self, config_manager, key, value):
+        with pytest.raises(ValueError):
+            config_manager.coerce_value(key, value)
+
+    def test_integer_setting_rejects_fractions(self, config_manager):
+        ok, message, _ = config_manager.set_config("gs_config.cameras.kCamera1SearchCenterX", 1.9)
+        assert not ok
+        assert message == "Must be a whole number"
+        assert config_manager.get_config("gs_config.cameras.kCamera1SearchCenterX") == 850
+
+    def test_float_range_enforced(self, config_manager):
+        ok, _, _ = config_manager.set_config("gs_config.cameras.kHLAOffset", 999)
+        assert not ok
+        assert config_manager.get_config("gs_config.cameras.kHLAOffset") == 0.0
+
+    def test_set_config_stores_typed_value(self, config_manager):
+        config_manager.set_config("gs_config.modes.kStartInPuttingMode", "true")
+        assert config_manager.get_user_settings()["gs_config"]["modes"]["kStartInPuttingMode"] is True
+
+    def test_select_default_round_trip_is_not_custom(self, config_manager):
+        config_manager.set_config("cameras.slot1.type", 5)
+        assert "cameras.slot1.type" not in config_manager.get_diff()
+        assert "cameras" not in config_manager.get_user_settings()
+
+    @pytest.mark.parametrize("host,ok", [
+        ("192.168.1.10", True),
+        ("gaming-pc.local", True),
+        ("", True),
+        ("1.2.3.4:921", False),
+        ("999.1.1.1", False),
+        ("<b>x</b>", False),
+        ("-bad.example", False),
+        ("a\n.example", False),
+        ("gaming-pc\n", False),
+    ])
+    def test_host_rule(self, host, ok):
+        assert _is_valid_host(host) is ok
+
+    def test_internal_keys_not_in_categories(self, config_manager):
+        cats = config_manager.get_categories()
+        assert "gs_config.strobing.kDAC_setting" not in json.dumps(cats)
+        assert config_manager.get_default("gs_config.strobing.kDAC_setting") is None
+        assert config_manager.set_config("gs_config.strobing.kDAC_setting", 120)[0]
+        assert config_manager.get_config("gs_config.strobing.kDAC_setting") == 120
+
+    def test_setup_flag_in_metadata(self, config_manager):
+        settings = config_manager.load_configurations_metadata()["settings"]
+        setup = {k for k, v in settings.items() if v.get("setup")}
+        assert {"system.mode", "cameras.slot1.type", "cameras.slot1.lens"} <= setup
+        assert not any(key.startswith("simulators.") for key in settings)
+        assert "gs_config.cameras.kHLAOffset" not in setup
+
+    def test_calibrated_keys(self, config_manager):
+        assert config_manager.get_calibrated_keys() == []
+        config_manager.set_calibration_batch({"gs_config.cameras.kCamera1FocalLength": 6.1})
+        assert config_manager.get_calibrated_keys() == ["gs_config.cameras.kCamera1FocalLength"]
+
+    def test_import_skips_bad_keys_and_imports_the_rest(self, config_manager):
+        ok, _, skipped = config_manager.import_config({
+            "user_settings": {"gs_config": {"cameras": {"kHLAOffset": 999}, "modes": {"kStartInPuttingMode": "1"}}},
+            "calibration_data": {"gs_config": {"cameras": {"kCamera1FocalLength": "wide", "kCamera1Angles": [2.0, -26.0]}}},
+        })
+        assert ok
+        assert set(skipped) == {"gs_config.cameras.kHLAOffset", "gs_config.cameras.kCamera1FocalLength"}
+        assert all(skipped.values())
+        assert config_manager.get_user_settings() == {"gs_config": {"modes": {"kStartInPuttingMode": True}}}
+        assert config_manager.get_calibrated_keys() == ["gs_config.cameras.kCamera1Angles"]
+
+    def test_import_coerces_values(self, config_manager):
+        ok, _, skipped = config_manager.import_config(
+            {"user_settings": {"gs_config": {"modes": {"kStartInPuttingMode": "1"}}, "cameras": {"slot1": {"type": 4}}}}
+        )
+        assert ok
+        assert skipped == {}
+        user = config_manager.get_user_settings()
+        assert user["gs_config"]["modes"]["kStartInPuttingMode"] is True
+        assert user["cameras"]["slot1"]["type"] == "4"
+
+
+class TestModelLists:
+    @pytest.fixture
+    def models_dir(self, config_manager, tmp_path):
+        root = tmp_path / "models"
+        for name in ("spin-predictor", "yolo26-ball-detector"):
+            (root / name).mkdir(parents=True)
+            (root / name / "best.ncnn.param").touch()
+        config_manager._raw_metadata["systemPaths"]["modelSearchPaths"]["default"] = [str(root)]
+        config_manager._metadata_cache = None
+        return root
+
+    def test_spin_in_the_name_makes_a_spin_model(self, config_manager, models_dir):
+        spin = str((models_dir / "spin-predictor").resolve())
+        ball = str((models_dir / "yolo26-ball-detector").resolve())
+        assert config_manager.get_available_models("spin") == {"spin-predictor": spin}
+        assert config_manager.get_available_models("ball") == {"yolo26-ball-detector": ball}
+
+        settings = config_manager.load_configurations_metadata()["settings"]
+        assert settings["gs_config.spin_analysis.kSpinModelPath"]["options"] == {"spin-predictor": spin}
+        assert settings["gs_config.ball_identification.kModelPath"]["options"] == {"yolo26-ball-detector": ball}
+
+    def test_a_ball_model_is_not_a_valid_spin_model(self, config_manager, models_dir):
+        ball = str((models_dir / "yolo26-ball-detector").resolve())
+        assert config_manager.validate_config("gs_config.ball_identification.kModelPath", ball)[0]
+        assert not config_manager.validate_config("gs_config.spin_analysis.kSpinModelPath", ball)[0]

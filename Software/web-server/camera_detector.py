@@ -527,13 +527,13 @@ class CameraDetector:
             {
                 "value": 4,
                 "label": "Pi Global Shutter",
-                "description": "IMX296 Color (RECOMMENDED)",
+                "description": "IMX296 Color",
                 "status": "supported",
             },
             {
                 "value": 5,
                 "label": "InnoMaker IMX296",
-                "description": "IMX296 Mono",
+                "description": "IMX296 Mono (RECOMMENDED)",
                 "status": "supported",
             },
         ]
@@ -662,9 +662,9 @@ def main():
                     print(f"    Color Mode: {cam['cfa']}")
                 print()
 
-            print("Recommended Configuration:")
-            print(f"  export PITRAC_SLOT1_CAMERA_TYPE={result['configuration']['slot1']['type']}")
-            print(f"  export PITRAC_SLOT2_CAMERA_TYPE={result['configuration']['slot2']['type']}")
+            print("Recommended Configuration (web UI Config page, Cameras section, or its Detect button):")
+            print(f"  cameras.slot1.type = {result['configuration']['slot1']['type']}")
+            print(f"  cameras.slot2.type = {result['configuration']['slot2']['type']}")
         else:
             print("\nNo cameras detected!")
             print("\nTroubleshooting:")

@@ -5,8 +5,6 @@
 
 // Representation of the results of processing a golf shot
 
-#include <regex>
-#include "gs_format_lib.h"
 #include "math.h"
 #include "logging_tools.h"
 #include "cv_utils.h"
@@ -31,9 +29,6 @@ namespace golf_sim {
         // TBD - Not sure club type should be set here,
         // but this is a reasonable default for now
         club_type_ = GolfSimClubs::GetCurrentClubType();
-
-        // Real shot data implies a ball was definitely detected.
-        heartbeat_ball_detected_ = true;
 
         // TBD - Even though this is a constructor, it might be a reasonable
         // place to calculate the Carry yardarge.
@@ -61,56 +56,6 @@ namespace golf_sim {
         // TBD - Add internal carry value.
 
         return s;
-    }
-
-    std::string GsResults::FormatDoubleAsString(const double original_value) {
-
-        double value = std::round(original_value * 10.0) / 10.0;
-
-        auto s = GS_FORMATLIB_FORMAT("{: <1.1f}", value);
-
-        std::string result;
-
-        // If we don't quote 0.0, it ends up as 0, and some systems don't like that
-        if (s == "0.0") {
-            result = "0.0";
-        }
-        else {
-            result = s;
-        }
-
-        return result;
-    }
-
-    std::string GsResults::GenerateStringFromJsonTree(const boost::property_tree::ptree& root) {
-
-        // Write the property tree to a JSON string
-        std::stringstream ss;
-        boost::property_tree::write_json(ss, root);
-
-        // Get the JSON string
-        std::string json_string = ss.str();
-
-        // Remove any quotes around data values that should be numbers
-        // Apparently this is a deficiency in the boost library, see
-        // https://stackoverflow.com/questions/2855741/why-does-boost-property-tree-write-json-save-everything-as-string-is-it-possibl
-
-        std::regex reg("\\\"([+-]?[0-9]+\\.{0,1}[0-9]*)\\\"");
-        std::string result = std::regex_replace(json_string, reg, "$1");
-
-        std::string subStringToRemove = "\"true\"";
-        std::string subStringToReplace = "true";
-        boost::replace_all(result, subStringToRemove, subStringToReplace);
-
-        subStringToRemove = "\"false\"";
-        subStringToReplace = "false";
-        boost::replace_all(result, subStringToRemove, subStringToReplace);
-
-        subStringToRemove = "\"APIversion\": 1,";
-        subStringToReplace = "\"APIversion\": \"1\",";
-        boost::replace_all(result, subStringToRemove, subStringToReplace);
-
-        return result;
     }
 
 }

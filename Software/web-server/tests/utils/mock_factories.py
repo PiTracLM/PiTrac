@@ -18,7 +18,6 @@ class MockConfigManagerFactory:
 
         manager.get_config.return_value = {
             "cameras": {"camera1_gain": 2.0, "camera2_gain": 4.0},
-            "simulators": {"gspro_host": "192.168.1.100", "gspro_port": 921},
             "logging": {"level": "info"},
         }
 
@@ -27,7 +26,6 @@ class MockConfigManagerFactory:
         manager.get_categories.return_value = {
             "Basic": {"basic": [], "advanced": []},
             "Cameras": {"basic": ["cameras.camera1_gain"], "advanced": ["cameras.camera2_gain"]},
-            "Simulators": {"basic": ["simulators.gspro_host"], "advanced": ["simulators.gspro_port"]},
         }
 
         manager.set_config.return_value = (True, "Configuration updated", False)
@@ -46,16 +44,14 @@ class MockConfigManagerFactory:
             "logging.level": "info",
             "storage.image_dir": "/var/pitrac/images",
             "storage.web_share_dir": "/var/pitrac/web",
-            "gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress": "192.168.1.100",
-            "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress": "192.168.1.101",
             "gs_config.cameras.kCamera1Gain": 1.0,
             "gs_config.cameras.kCamera2Gain": 4.0,
         }
 
         manager.load_configurations_metadata.return_value = {
             "cameraDefinitions": {
-                "camera1": {"displayName": "Camera 1", "slot": "slot1", "defaultIndex": 0, "envPrefix": "PITRAC_SLOT1"},
-                "camera2": {"displayName": "Camera 2", "slot": "slot2", "defaultIndex": 1, "envPrefix": "PITRAC_SLOT2"},
+                "camera1": {"displayName": "Camera 1", "slot": "slot1", "defaultIndex": 0},
+                "camera2": {"displayName": "Camera 2", "slot": "slot2", "defaultIndex": 1},
             },
             "systemDefaults": {
                 "configStructure": {"systemKey": "system", "camerasKey": "cameras"},
@@ -63,7 +59,6 @@ class MockConfigManagerFactory:
             "categoryList": [
                 "Basic",
                 "Cameras",
-                "Simulators",
                 "Ball Detection",
                 "AI Detection",
                 "Storage",
@@ -101,9 +96,6 @@ class MockConfigManagerFactory:
             },
             "settings": {},
         }
-
-        manager.get_cli_parameters.return_value = []
-        manager.get_environment_parameters.return_value = []
 
         return manager
 

@@ -71,39 +71,39 @@ namespace golf_sim {
     static const double kEllipseColorMaskWideningAmount = 35;
     static const bool kSerializeOpsForDebug = false;
 
-    int BallImageProc::kCoarseXRotationDegreesIncrement = 6;
-    int BallImageProc::kCoarseXRotationDegreesStart = -42;
-    int BallImageProc::kCoarseXRotationDegreesEnd = 42;
+    int BallImageProc::kCoarseXRotationDegreesIncrement = 4;
+    int BallImageProc::kCoarseXRotationDegreesStart = -36;
+    int BallImageProc::kCoarseXRotationDegreesEnd = 36;
     int BallImageProc::kCoarseYRotationDegreesIncrement = 5;
-    int BallImageProc::kCoarseYRotationDegreesStart = -30;
-    int BallImageProc::kCoarseYRotationDegreesEnd = 30;
-    int BallImageProc::kCoarseZRotationDegreesIncrement = 6;
-    int BallImageProc::kCoarseZRotationDegreesStart = -50;
-    int BallImageProc::kCoarseZRotationDegreesEnd = 60;
+    int BallImageProc::kCoarseYRotationDegreesStart = -15;
+    int BallImageProc::kCoarseYRotationDegreesEnd = 15;
+    int BallImageProc::kCoarseZRotationDegreesIncrement = 4;
+    int BallImageProc::kCoarseZRotationDegreesStart = -10;
+    int BallImageProc::kCoarseZRotationDegreesEnd = 110;
     int BallImageProc::kCoarseSearchResolution = 90;
 
     double BallImageProc::kPlacedBallCannyLower;
     double BallImageProc::kPlacedBallCannyUpper;
-    double BallImageProc::kPlacedBallStartingParam2 = 40;
-    double BallImageProc::kPlacedBallMinParam2 = 30;
-    double BallImageProc::kPlacedBallMaxParam2 = 60;
-    double BallImageProc::kPlacedBallCurrentParam1 = 120.0;
-    double BallImageProc::kPlacedBallParam2Increment = 4;
+    double BallImageProc::kPlacedBallStartingParam2 = 0.9;
+    double BallImageProc::kPlacedBallMinParam2 = 0.8;
+    double BallImageProc::kPlacedBallMaxParam2 = 1.0;
+    double BallImageProc::kPlacedBallCurrentParam1 = 130.0;
+    double BallImageProc::kPlacedBallParam2Increment = 0.03;
 
     int BallImageProc::kPlacedMinHoughReturnCircles = 1;
     int BallImageProc::kPlacedMaxHoughReturnCircles = 4;
-    double BallImageProc::kStrobedBallsCannyLower = 50;
-    double BallImageProc::kStrobedBallsCannyUpper = 110;
+    double BallImageProc::kStrobedBallsCannyLower = 33;
+    double BallImageProc::kStrobedBallsCannyUpper = 90;
 
 
-    int BallImageProc::kStrobedBallsMaxHoughReturnCircles = 12;
-    int BallImageProc::kStrobedBallsMinHoughReturnCircles = 1;
+    int BallImageProc::kStrobedBallsMaxHoughReturnCircles = 20;
+    int BallImageProc::kStrobedBallsMinHoughReturnCircles = 6;
 
-    int BallImageProc::kStrobedBallsPreCannyBlurSize = 5;
+    int BallImageProc::kStrobedBallsPreCannyBlurSize = 3;
     int BallImageProc::kStrobedBallsPreHoughBlurSize = 13;
-    double BallImageProc::kStrobedBallsStartingParam2 = 40;
-    double BallImageProc::kStrobedBallsMinParam2 = 30;
-    double BallImageProc::kStrobedBallsMaxParam2 = 60;
+    double BallImageProc::kStrobedBallsStartingParam2 = 60;
+    double BallImageProc::kStrobedBallsMinParam2 = 18;
+    double BallImageProc::kStrobedBallsMaxParam2 = 140;
     double BallImageProc::kStrobedBallsCurrentParam1 = 120.0;
     double BallImageProc::kStrobedBallsHoughDpParam1 = 1.5;
     double BallImageProc::kStrobedBallsParam2Increment = 4;
@@ -111,26 +111,26 @@ namespace golf_sim {
     bool  BallImageProc::kStrobedBallsUseAltHoughAlgorithm = true;
     double BallImageProc::kStrobedBallsAltCannyLower = 35;
     double BallImageProc::kStrobedBallsAltCannyUpper = 70;
-    int BallImageProc::kStrobedBallsAltPreCannyBlurSize = 11;
-    int BallImageProc::kStrobedBallsAltPreHoughBlurSize = 16;
-    double BallImageProc::kStrobedBallsAltStartingParam2 = 0.95;
-    double BallImageProc::kStrobedBallsAltMinParam2 = 0.6;
+    int BallImageProc::kStrobedBallsAltPreCannyBlurSize = 9;
+    int BallImageProc::kStrobedBallsAltPreHoughBlurSize = 15;
+    double BallImageProc::kStrobedBallsAltStartingParam2 = 0.65;
+    double BallImageProc::kStrobedBallsAltMinParam2 = 0.5;
     double BallImageProc::kStrobedBallsAltMaxParam2 = 1.0;
     double BallImageProc::kStrobedBallsAltCurrentParam1 = 130.0;
-    double BallImageProc::kStrobedBallsAltHoughDpParam1 = 1.5;
+    double BallImageProc::kStrobedBallsAltHoughDpParam1 = 0.8;
     double BallImageProc::kStrobedBallsAltParam2Increment = 0.05;
 
     bool BallImageProc::kUseCLAHEProcessing;
     int BallImageProc::kCLAHEClipLimit;
     int BallImageProc::kCLAHETilesGridSize;
 
-    double BallImageProc::kPuttingBallStartingParam2 = 40;
-    double BallImageProc::kPuttingBallMinParam2 = 30;
-    double BallImageProc::kPuttingBallMaxParam2 = 60;
-    double BallImageProc::kPuttingBallCurrentParam1 = 120.0;
-    double BallImageProc::kPuttingBallParam2Increment = 4;
-    int BallImageProc::kPuttingMaxHoughReturnCircles = 12;
-    int BallImageProc::kPuttingMinHoughReturnCircles = 1;
+    double BallImageProc::kPuttingBallStartingParam2 = 0.9;
+    double BallImageProc::kPuttingBallMinParam2 = 0.8;
+    double BallImageProc::kPuttingBallMaxParam2 = 1.0;
+    double BallImageProc::kPuttingBallCurrentParam1 = 300.0;
+    double BallImageProc::kPuttingBallParam2Increment = 0.03;
+    int BallImageProc::kPuttingMaxHoughReturnCircles = 25;
+    int BallImageProc::kPuttingMinHoughReturnCircles = 6;
     double BallImageProc::kPuttingHoughDpParam1 = 1.5;
 
     double BallImageProc::kExternallyStrobedEnvCannyLower = 35;
@@ -148,27 +148,25 @@ namespace golf_sim {
     int BallImageProc::kExternallyStrobedEnvPreHoughBlurSize = 11;
     int BallImageProc::kExternallyStrobedEnvPreCannyBlurSize = 3;
     double BallImageProc::kExternallyStrobedEnvHoughDpParam1 = 1.0;
-    int BallImageProc::kExternallyStrobedEnvNarrowingPreCannyBlurSize = 3;
-    int BallImageProc::kExternallyStrobedEnvNarrowingPreHoughBlurSize = 9;
     int BallImageProc::kExternallyStrobedEnvMinimumSearchRadius = 60;
     int BallImageProc::kExternallyStrobedEnvMaximumSearchRadius = 80;
 
-    bool BallImageProc::kUseDynamicRadiiAdjustment = true;
-    int BallImageProc::kNumberRadiiToAverageForDynamicAdjustment = 3;
-    double BallImageProc::kStrobedNarrowingRadiiMinRatio = 0.8;
-    double BallImageProc::kStrobedNarrowingRadiiMaxRatio = 1.2;
-    double BallImageProc::kStrobedNarrowingRadiiDpParam = 1.8;
-    double BallImageProc::kStrobedNarrowingRadiiParam2 = 100.0;
+    bool BallImageProc::kUseDynamicRadiiAdjustment = false;
+    int BallImageProc::kNumberRadiiToAverageForDynamicAdjustment = 2;
+    double BallImageProc::kStrobedNarrowingRadiiMinRatio = 0.7;
+    double BallImageProc::kStrobedNarrowingRadiiMaxRatio = 1.6;
+    double BallImageProc::kStrobedNarrowingRadiiDpParam = 1.5;
+    double BallImageProc::kStrobedNarrowingRadiiParam2 = 0.8;
 
 
     double BallImageProc::kPlacedNarrowingRadiiMinRatio = 0.9;
     double BallImageProc::kPlacedNarrowingRadiiMaxRatio = 1.1;
-    double BallImageProc::kPlacedNarrowingStartingParam2 = 80.0;
-    double BallImageProc::kPlacedNarrowingRadiiDpParam = 2.0;
+    double BallImageProc::kPlacedNarrowingStartingParam2 = 0.9;
+    double BallImageProc::kPlacedNarrowingRadiiDpParam = 1.5;
     double BallImageProc::kPlacedNarrowingParam1 = 130.0;
 
-    int BallImageProc::kPlacedPreCannyBlurSize = 5;
-    int BallImageProc::kPlacedPreHoughBlurSize = 11;
+    int BallImageProc::kPlacedPreCannyBlurSize = 11;
+    int BallImageProc::kPlacedPreHoughBlurSize = 13;
     int BallImageProc::kPuttingPreHoughBlurSize = 9;
 
 
@@ -182,13 +180,10 @@ namespace golf_sim {
     double BallImageProc::kBestCircleCannyUpper = 110;
     int BallImageProc::kBestCirclePreCannyBlurSize = 5;
     int BallImageProc::kBestCirclePreHoughBlurSize = 13;
-    double BallImageProc::kBestCircleParam1 = 120.;
-    double BallImageProc::kBestCircleParam2 = 35.;
+    double BallImageProc::kBestCircleParam1 = 300.;
+    double BallImageProc::kBestCircleParam2 = 0.65;
     double BallImageProc::kBestCircleHoughDpParam1 = 1.5;
 
-    double BallImageProc::kExternallyStrobedBestCircleCannyLower = 55;
-    double BallImageProc::kExternallyStrobedBestCircleCannyUpper = 110;
-    int BallImageProc::kExternallyStrobedBestCirclePreCannyBlurSize = 5;
     int BallImageProc::kExternallyStrobedBestCirclePreHoughBlurSize = 13;
     double BallImageProc::kExternallyStrobedBestCircleParam1 = 120.;
     double BallImageProc::kExternallyStrobedBestCircleParam2 = 35.;
@@ -198,11 +193,11 @@ namespace golf_sim {
     int BallImageProc::kExternallyStrobedCLAHEClipLimit = 6;
     int BallImageProc::kExternallyStrobedCLAHETilesGridSize = 6;
 
-    double BallImageProc::kBestCircleIdentificationMinRadiusRatio = 0.85;
-    double BallImageProc::kBestCircleIdentificationMaxRadiusRatio = 1.10;
+    double BallImageProc::kBestCircleIdentificationMinRadiusRatio = 0.9;
+    double BallImageProc::kBestCircleIdentificationMaxRadiusRatio = 1.2;
 
-    int BallImageProc::kGaborMaxWhitePercent = 44; // Nominal 46;
-    int BallImageProc::kGaborMinWhitePercent = 38; // Nominal 40;
+    int BallImageProc::kGaborMaxWhitePercent = 45; // Nominal 46;
+    int BallImageProc::kGaborMinWhitePercent = 39; // Nominal 40;
     std::string BallImageProc::kSpinDetectionMethod = "ml";
 
     // Model Detection Configuration
@@ -211,7 +206,7 @@ namespace golf_sim {
     #ifdef _WIN32
     std::string BallImageProc::kModelPath = "../../Software/LMSourceCode/ml_assets/yolo26-ball-detector";
     #else
-    std::string BallImageProc::kModelPath = "../ml_assets/yolo26-ball-detector";
+    std::string BallImageProc::kModelPath = "/etc/pitrac/models/yolo26-ball-detector";
     #endif
     float BallImageProc::kModelConfidenceThreshold = 0.5f;
     float BallImageProc::kModelNMSThreshold = 0.4f;
@@ -243,145 +238,6 @@ namespace golf_sim {
     BallImageProc::BallImageProc() {
         min_ball_radius_ = -1;
         max_ball_radius_ = -1;
-
-        // The following constants are only used internal to the GolfSimCamera class, and so can be initialized in the constructor
-        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseXRotationDegreesIncrement", kCoarseXRotationDegreesIncrement);
-        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseXRotationDegreesStart", kCoarseXRotationDegreesStart);
-        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseXRotationDegreesEnd", kCoarseXRotationDegreesEnd);
-        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseYRotationDegreesIncrement", kCoarseYRotationDegreesIncrement);
-        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseYRotationDegreesStart", kCoarseYRotationDegreesStart);
-        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseYRotationDegreesEnd", kCoarseYRotationDegreesEnd);
-        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseZRotationDegreesIncrement", kCoarseZRotationDegreesIncrement);
-        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseZRotationDegreesStart", kCoarseZRotationDegreesStart);
-        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseZRotationDegreesEnd", kCoarseZRotationDegreesEnd);
-
-        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseSearchResolution", kCoarseSearchResolution);
-
-        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kGaborMinWhitePercent", kGaborMinWhitePercent);
-        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kGaborMaxWhitePercent", kGaborMaxWhitePercent);
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallCannyLower", kPlacedBallCannyLower);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallCannyUpper", kPlacedBallCannyUpper);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallStartingParam2", kPlacedBallStartingParam2);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallMinParam2", kPlacedBallMinParam2);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallMaxParam2", kPlacedBallMaxParam2);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallCurrentParam1", kPlacedBallCurrentParam1);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallParam2Increment", kPlacedBallParam2Increment);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedMinHoughReturnCircles", kPlacedMinHoughReturnCircles);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedMaxHoughReturnCircles", kPlacedMaxHoughReturnCircles);
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsCannyLower", kStrobedBallsCannyLower);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsCannyUpper", kStrobedBallsCannyUpper);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsPreCannyBlurSize", kStrobedBallsPreCannyBlurSize);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsPreHoughBlurSize", kStrobedBallsPreHoughBlurSize);
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsStartingParam2", kStrobedBallsStartingParam2);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsMinParam2", kStrobedBallsMinParam2);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsMaxParam2", kStrobedBallsMaxParam2);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsCurrentParam1", kStrobedBallsCurrentParam1);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsParam2Increment", kStrobedBallsParam2Increment);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsMinHoughReturnCircles", kStrobedBallsMinHoughReturnCircles);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsMaxHoughReturnCircles", kStrobedBallsMaxHoughReturnCircles);
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsUseAltHoughAlgorithm", kStrobedBallsUseAltHoughAlgorithm);
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltCannyLower", kStrobedBallsAltCannyLower);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltCannyUpper", kStrobedBallsAltCannyUpper);
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltPreCannyBlurSize", kStrobedBallsAltPreCannyBlurSize);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltPreHoughBlurSize", kStrobedBallsAltPreHoughBlurSize);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltStartingParam2", kStrobedBallsAltStartingParam2);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltMinParam2", kStrobedBallsAltMinParam2);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltMaxParam2", kStrobedBallsAltMaxParam2);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltCurrentParam1", kStrobedBallsAltCurrentParam1);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltHoughDpParam1", kStrobedBallsAltHoughDpParam1);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltParam2Increment", kStrobedBallsAltParam2Increment);
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kUseCLAHEProcessing", kUseCLAHEProcessing);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kCLAHEClipLimit", kCLAHEClipLimit);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kCLAHETilesGridSize", kCLAHETilesGridSize);
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingBallStartingParam2", kPuttingBallStartingParam2);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingBallMinParam2", kPuttingBallMinParam2);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingBallMaxParam2", kPuttingBallMaxParam2);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingBallCurrentParam1", kPuttingBallCurrentParam1);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingBallParam2Increment", kPuttingBallParam2Increment);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingMinHoughReturnCircles", kPuttingMinHoughReturnCircles);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingMaxHoughReturnCircles", kPuttingMaxHoughReturnCircles);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingHoughDpParam1", kPuttingHoughDpParam1);
-
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvCurrentParam1", kExternallyStrobedEnvCurrentParam1);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvMaxParam2", kExternallyStrobedEnvMaxParam2);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvStartingParam2", kExternallyStrobedEnvStartingParam2);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvNarrowingParam2", kExternallyStrobedEnvNarrowingParam2);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvNarrowingDpParam", kExternallyStrobedEnvNarrowingDpParam);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvNarrowingPreCannyBlurSize", kExternallyStrobedEnvNarrowingPreCannyBlurSize);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvNarrowingPreHoughBlurSize", kExternallyStrobedEnvNarrowingPreHoughBlurSize);
-
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvParam2Increment", kExternallyStrobedEnvParam2Increment);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvMinHoughReturnCircles", kExternallyStrobedEnvMinHoughReturnCircles);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvMaxHoughReturnCircles", kExternallyStrobedEnvMaxHoughReturnCircles);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvPreHoughBlurSize", kExternallyStrobedEnvPreHoughBlurSize);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvPreCannyBlurSize", kExternallyStrobedEnvPreCannyBlurSize);
-
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCircleCannyLower", kExternallyStrobedBestCircleCannyLower);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCircleCannyUpper", kExternallyStrobedBestCircleCannyUpper);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCirclePreCannyBlurSize", kExternallyStrobedBestCirclePreCannyBlurSize);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCirclePreHoughBlurSize", kExternallyStrobedBestCirclePreHoughBlurSize);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCircleParam1", kExternallyStrobedBestCircleParam1);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCircleParam2", kExternallyStrobedBestCircleParam2);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCircleHoughDpParam1", kExternallyStrobedBestCircleHoughDpParam1);
-
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedUseCLAHEProcessing", kExternallyStrobedUseCLAHEProcessing);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedCLAHEClipLimit", kExternallyStrobedCLAHEClipLimit);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedCLAHETilesGridSize", kExternallyStrobedCLAHETilesGridSize);
-
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvHoughDpParam1", kExternallyStrobedEnvHoughDpParam1);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvMaximumSearchRadius", kExternallyStrobedEnvMaximumSearchRadius);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvMinimumSearchRadius", kExternallyStrobedEnvMinimumSearchRadius);
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedPreHoughBlurSize", kPlacedPreHoughBlurSize);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedPreCannyBlurSize", kPlacedPreCannyBlurSize);
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsPreHoughBlurSize", kStrobedBallsPreHoughBlurSize);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingPreHoughBlurSize", kPuttingPreHoughBlurSize);
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallHoughDpParam1", kPlacedBallHoughDpParam1);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsHoughDpParam1", kStrobedBallsHoughDpParam1);
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kUseBestCircleRefinement", kUseBestCircleRefinement);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kUseBestCircleLargestCircle", kUseBestCircleLargestCircle);
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCircleCannyLower", kBestCircleCannyLower);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCircleCannyUpper", kBestCircleCannyUpper);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCirclePreCannyBlurSize", kBestCirclePreCannyBlurSize);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCirclePreHoughBlurSize", kBestCirclePreHoughBlurSize);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCircleParam1", kBestCircleParam1);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCircleParam2", kBestCircleParam2);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCircleHoughDpParam1", kBestCircleHoughDpParam1);
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCircleIdentificationMinRadiusRatio", kBestCircleIdentificationMinRadiusRatio);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCircleIdentificationMaxRadiusRatio", kBestCircleIdentificationMaxRadiusRatio);
-
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kUseDynamicRadiiAdjustment", kUseDynamicRadiiAdjustment);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kNumberRadiiToAverageForDynamicAdjustment", kNumberRadiiToAverageForDynamicAdjustment);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedNarrowingRadiiMinRatio", kStrobedNarrowingRadiiMinRatio);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedNarrowingRadiiMaxRatio", kStrobedNarrowingRadiiMaxRatio);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedNarrowingRadiiDpParam", kStrobedNarrowingRadiiDpParam);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedNarrowingRadiiParam2", kStrobedNarrowingRadiiParam2);
-
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingRadiiMinRatio", kPlacedNarrowingRadiiMinRatio);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingRadiiMaxRatio", kPlacedNarrowingRadiiMaxRatio);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingStartingParam2", kPlacedNarrowingStartingParam2);
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingRadiiDpParam", kPlacedNarrowingRadiiDpParam);
-
-        int kImageTypeToProcessWithYOLOAsInt;
-        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kImageTypeToProcessWithYOLO", kImageTypeToProcessWithYOLOAsInt);
-        kImageTypeToProcessWithYOLO= static_cast<YOLOImageTypeToUse>(kImageTypeToProcessWithYOLOAsInt);
-
-
-        GolfSimConfiguration::SetConstant("gs_config.logging.kLogIntermediateSpinImagesToFile", kLogIntermediateSpinImagesToFile);
 
         // Preload model at startup if using experimental detection for either ball placement or flight
         if (kStrobedBallDetectionMethod == "experimental" ||
@@ -1714,9 +1570,6 @@ namespace golf_sim {
             cv::GaussianBlur(cannyOutput_for_balls, finalChoiceSubImg, cv::Size(kBestCirclePreHoughBlurSize, kBestCirclePreHoughBlurSize), 0);   // Nominal is 7x7
         }
         else {
-            // cv::GaussianBlur(finalChoiceSubImg, finalChoiceSubImg, cv::Size(kExternallyStrobedBestCirclePreCannyBlurSize, kExternallyStrobedBestCirclePreCannyBlurSize), 0);
-
-            // cv::Canny(finalChoiceSubImg, cannyOutput_for_balls, kExternallyStrobedBestCircleCannyLower, kExternallyStrobedBestCircleCannyUpper);
             cannyOutput_for_balls = finalChoiceSubImg.clone();
 
             LoggingTools::DebugShowImage("Best Circle (externally-strobed)" + std::to_string(expandedRadiusForHough) + "  cannyOutput for best ball", cannyOutput_for_balls);
@@ -4393,6 +4246,136 @@ namespace golf_sim {
             GS_LOG_MSG(error, "Unrecognized kSpinDetectionMethod: '" + kSpinDetectionMethod + "' - defaulting to 'ml'");
             kSpinDetectionMethod = "ml";
         }
+
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseXRotationDegreesIncrement", kCoarseXRotationDegreesIncrement);
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseXRotationDegreesStart", kCoarseXRotationDegreesStart);
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseXRotationDegreesEnd", kCoarseXRotationDegreesEnd);
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseYRotationDegreesIncrement", kCoarseYRotationDegreesIncrement);
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseYRotationDegreesStart", kCoarseYRotationDegreesStart);
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseYRotationDegreesEnd", kCoarseYRotationDegreesEnd);
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseZRotationDegreesIncrement", kCoarseZRotationDegreesIncrement);
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseZRotationDegreesStart", kCoarseZRotationDegreesStart);
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseZRotationDegreesEnd", kCoarseZRotationDegreesEnd);
+
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kCoarseSearchResolution", kCoarseSearchResolution);
+
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kGaborMinWhitePercent", kGaborMinWhitePercent);
+        GolfSimConfiguration::SetConstant("gs_config.spin_analysis.kGaborMaxWhitePercent", kGaborMaxWhitePercent);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallCannyLower", kPlacedBallCannyLower);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallCannyUpper", kPlacedBallCannyUpper);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallStartingParam2", kPlacedBallStartingParam2);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallMinParam2", kPlacedBallMinParam2);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallMaxParam2", kPlacedBallMaxParam2);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallCurrentParam1", kPlacedBallCurrentParam1);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallParam2Increment", kPlacedBallParam2Increment);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedMinHoughReturnCircles", kPlacedMinHoughReturnCircles);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedMaxHoughReturnCircles", kPlacedMaxHoughReturnCircles);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsCannyLower", kStrobedBallsCannyLower);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsCannyUpper", kStrobedBallsCannyUpper);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsPreCannyBlurSize", kStrobedBallsPreCannyBlurSize);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsPreHoughBlurSize", kStrobedBallsPreHoughBlurSize);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsStartingParam2", kStrobedBallsStartingParam2);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsMinParam2", kStrobedBallsMinParam2);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsMaxParam2", kStrobedBallsMaxParam2);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsCurrentParam1", kStrobedBallsCurrentParam1);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsParam2Increment", kStrobedBallsParam2Increment);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsMinHoughReturnCircles", kStrobedBallsMinHoughReturnCircles);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsMaxHoughReturnCircles", kStrobedBallsMaxHoughReturnCircles);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsUseAltHoughAlgorithm", kStrobedBallsUseAltHoughAlgorithm);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltCannyLower", kStrobedBallsAltCannyLower);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltCannyUpper", kStrobedBallsAltCannyUpper);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltPreCannyBlurSize", kStrobedBallsAltPreCannyBlurSize);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltPreHoughBlurSize", kStrobedBallsAltPreHoughBlurSize);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltStartingParam2", kStrobedBallsAltStartingParam2);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltMinParam2", kStrobedBallsAltMinParam2);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltMaxParam2", kStrobedBallsAltMaxParam2);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltCurrentParam1", kStrobedBallsAltCurrentParam1);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltHoughDpParam1", kStrobedBallsAltHoughDpParam1);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsAltParam2Increment", kStrobedBallsAltParam2Increment);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kUseCLAHEProcessing", kUseCLAHEProcessing);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kCLAHEClipLimit", kCLAHEClipLimit);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kCLAHETilesGridSize", kCLAHETilesGridSize);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingBallStartingParam2", kPuttingBallStartingParam2);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingBallMinParam2", kPuttingBallMinParam2);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingBallMaxParam2", kPuttingBallMaxParam2);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingBallCurrentParam1", kPuttingBallCurrentParam1);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingBallParam2Increment", kPuttingBallParam2Increment);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingMinHoughReturnCircles", kPuttingMinHoughReturnCircles);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingMaxHoughReturnCircles", kPuttingMaxHoughReturnCircles);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingHoughDpParam1", kPuttingHoughDpParam1);
+
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvCurrentParam1", kExternallyStrobedEnvCurrentParam1);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvMaxParam2", kExternallyStrobedEnvMaxParam2);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvStartingParam2", kExternallyStrobedEnvStartingParam2);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvNarrowingParam2", kExternallyStrobedEnvNarrowingParam2);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvNarrowingDpParam", kExternallyStrobedEnvNarrowingDpParam);
+
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvParam2Increment", kExternallyStrobedEnvParam2Increment);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvMinHoughReturnCircles", kExternallyStrobedEnvMinHoughReturnCircles);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvMaxHoughReturnCircles", kExternallyStrobedEnvMaxHoughReturnCircles);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvPreHoughBlurSize", kExternallyStrobedEnvPreHoughBlurSize);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvPreCannyBlurSize", kExternallyStrobedEnvPreCannyBlurSize);
+
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCirclePreHoughBlurSize", kExternallyStrobedBestCirclePreHoughBlurSize);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCircleParam1", kExternallyStrobedBestCircleParam1);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCircleParam2", kExternallyStrobedBestCircleParam2);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedBestCircleHoughDpParam1", kExternallyStrobedBestCircleHoughDpParam1);
+
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedUseCLAHEProcessing", kExternallyStrobedUseCLAHEProcessing);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedCLAHEClipLimit", kExternallyStrobedCLAHEClipLimit);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedCLAHETilesGridSize", kExternallyStrobedCLAHETilesGridSize);
+
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvHoughDpParam1", kExternallyStrobedEnvHoughDpParam1);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvMaximumSearchRadius", kExternallyStrobedEnvMaximumSearchRadius);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvMinimumSearchRadius", kExternallyStrobedEnvMinimumSearchRadius);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedPreHoughBlurSize", kPlacedPreHoughBlurSize);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedPreCannyBlurSize", kPlacedPreCannyBlurSize);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPuttingPreHoughBlurSize", kPuttingPreHoughBlurSize);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallHoughDpParam1", kPlacedBallHoughDpParam1);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedBallsHoughDpParam1", kStrobedBallsHoughDpParam1);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kUseBestCircleRefinement", kUseBestCircleRefinement);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kUseBestCircleLargestCircle", kUseBestCircleLargestCircle);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCircleCannyLower", kBestCircleCannyLower);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCircleCannyUpper", kBestCircleCannyUpper);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCirclePreCannyBlurSize", kBestCirclePreCannyBlurSize);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCirclePreHoughBlurSize", kBestCirclePreHoughBlurSize);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCircleParam1", kBestCircleParam1);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCircleParam2", kBestCircleParam2);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCircleHoughDpParam1", kBestCircleHoughDpParam1);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCircleIdentificationMinRadiusRatio", kBestCircleIdentificationMinRadiusRatio);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kBestCircleIdentificationMaxRadiusRatio", kBestCircleIdentificationMaxRadiusRatio);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kUseDynamicRadiiAdjustment", kUseDynamicRadiiAdjustment);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kNumberRadiiToAverageForDynamicAdjustment", kNumberRadiiToAverageForDynamicAdjustment);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedNarrowingRadiiMinRatio", kStrobedNarrowingRadiiMinRatio);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedNarrowingRadiiMaxRatio", kStrobedNarrowingRadiiMaxRatio);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedNarrowingRadiiDpParam", kStrobedNarrowingRadiiDpParam);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kStrobedNarrowingRadiiParam2", kStrobedNarrowingRadiiParam2);
+
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingRadiiMinRatio", kPlacedNarrowingRadiiMinRatio);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingRadiiMaxRatio", kPlacedNarrowingRadiiMaxRatio);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingStartingParam2", kPlacedNarrowingStartingParam2);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedNarrowingRadiiDpParam", kPlacedNarrowingRadiiDpParam);
+
+        int kImageTypeToProcessWithYOLOAsInt = static_cast<int>(kImageTypeToProcessWithYOLO);
+        GolfSimConfiguration::SetConstant("gs_config.ball_identification.kImageTypeToProcessWithYOLO", kImageTypeToProcessWithYOLOAsInt);
+        kImageTypeToProcessWithYOLO = static_cast<YOLOImageTypeToUse>(kImageTypeToProcessWithYOLOAsInt);
+
+        GolfSimConfiguration::SetConstant("gs_config.logging.kLogIntermediateSpinImagesToFile", kLogIntermediateSpinImagesToFile);
 
         GS_LOG_MSG(info, "Model directory: " + kModelPath);
         GS_LOG_MSG(info, "Detection method: " + kStrobedBallDetectionMethod);

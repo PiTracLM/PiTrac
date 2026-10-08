@@ -25,16 +25,13 @@ namespace golf_sim {
 	// that we would want when just watching the ball to see when it moves,
 	// but the trade off is getting the club images.
 	// Must call Configure() before these will be set.
-	 uint GolfSimClubData::kClubImageWidthPixels = 200;
-	 uint GolfSimClubData::kClubImageHeightPixels = 150;
+	 uint GolfSimClubData::kClubImageWidthPixels = 340;
+	 uint GolfSimClubData::kClubImageHeightPixels = 200;
 
-	// The fully-qualified output directory
-	 std::string GolfSimClubData::kClubImageOutputDir;
+	 uint GolfSimClubData::kNumberFramesToSaveBeforeHit = 6;
+	 uint GolfSimClubData::kNumberFramesToSaveAfterHit = 8;
 
-	 uint GolfSimClubData::kNumberFramesToSaveBeforeHit = 4;
-	 uint GolfSimClubData::kNumberFramesToSaveAfterHit = 4;
-
-	 float GolfSimClubData::kClubImageCameraGain = 30.0F;
+	 float GolfSimClubData::kClubImageCameraGain = 40.0F;
 	 float GolfSimClubData::kClubImageShutterSpeedMultiplier = 0.4F;
 
 
@@ -44,7 +41,6 @@ namespace golf_sim {
 		GolfSimConfiguration::SetConstant("gs_config.club_data.kEnableClubImages", kGatherClubData);
 
 		if (kGatherClubData) {
-			GolfSimConfiguration::SetConstant("gs_config.club_data.kEnableClubImages", kClubImageOutputDir);
 			GolfSimConfiguration::SetConstant("gs_config.club_data.kNumberFramesToSaveBeforeHit", kNumberFramesToSaveBeforeHit);
 			GolfSimConfiguration::SetConstant("gs_config.club_data.kNumberFramesToSaveAfterHit", kNumberFramesToSaveAfterHit);
 			GolfSimConfiguration::SetConstant("gs_config.club_data.kClubImageWidthPixels", kClubImageWidthPixels);

@@ -18,7 +18,6 @@
 #include "libcamera_interface.h"
 
 #include "gs_camera.h"
-#include "gs_web_api.h"
 
 
 namespace golf_sim {
@@ -26,15 +25,15 @@ namespace golf_sim {
     // Constants used by this class
     bool GolfSimCamera::kLogIntermediateExposureImagesToFile = false;
     bool GolfSimCamera::kLogWebserverImagesToFile = true;
-    bool GolfSimCamera::kLogDiagnosticImagesToUniqueFiles = false;
+    bool GolfSimCamera::kLogDiagnosticImagesToUniqueFiles = true;
     
-    int GolfSimCamera::kMaximumOffTrajectoryDistance = 5;
+    int GolfSimCamera::kMaximumOffTrajectoryDistance = 8;
     unsigned int GolfSimCamera::kNumberHighQualityBallsToRetain = 2;
-    double GolfSimCamera::kMaxStrobedBallColorDifferenceRelaxed = 35000.;
-    double GolfSimCamera::kMaxPuttingBallColorDifferenceRelaxed = 35000.;
-    double GolfSimCamera::kMaxStrobedBallColorDifferenceStrict = 15000.;
-    double GolfSimCamera::kBallProximityMarginPercentRelaxed = 50.;
-    double GolfSimCamera::kBallProximityMarginPercentStrict = 5.;
+    double GolfSimCamera::kMaxStrobedBallColorDifferenceRelaxed = 70000.;
+    double GolfSimCamera::kMaxPuttingBallColorDifferenceRelaxed = 40000.;
+    double GolfSimCamera::kMaxStrobedBallColorDifferenceStrict = 30000.;
+    double GolfSimCamera::kBallProximityMarginPercentRelaxed = 65.;
+    double GolfSimCamera::kBallProximityMarginPercentStrict = 15.;
 
     // These constants may be used before this class's constructor is called.
     // For that reason, they are initialized in the GsConfiguration startup
@@ -42,60 +41,55 @@ namespace golf_sim {
     cv::Vec3d GolfSimCamera::kCamera2PositionsFromExpectedBallMeters;
     cv::Vec3d GolfSimCamera::kCamera2OffsetFromCamera1OriginMeters;
 
-    double GolfSimCamera::kColorDifferenceRgbPostMultiplierForDarker = 5.0;
-    double GolfSimCamera::kColorDifferenceRgbPostMultiplierForLighter = 10.0;
+    double GolfSimCamera::kColorDifferenceRgbPostMultiplierForDarker = 4.0;
+    double GolfSimCamera::kColorDifferenceRgbPostMultiplierForLighter = 1.0;
     double GolfSimCamera::kColorDifferenceStdPostMultiplierForDarker = 3.0;
-    double GolfSimCamera::kColorDifferenceStdPostMultiplierForLighter = 2.0;
+    double GolfSimCamera::kColorDifferenceStdPostMultiplierForLighter = 5.0;
 
-    double GolfSimCamera::kMaxDistanceFromTrajectory = 20.;
+    double GolfSimCamera::kMaxDistanceFromTrajectory = 30.;
 
     int GolfSimCamera::kClosestBallPairEdgeBackoffPixels = 200;
 
-    double GolfSimCamera::kMaxIntermediateBallRadiusChangePercent = 10.0;
-    double GolfSimCamera::kMaxPuttingIntermediateBallRadiusChangePercent = 10.0;
+    double GolfSimCamera::kMaxIntermediateBallRadiusChangePercent = 5.0;
+    double GolfSimCamera::kMaxPuttingIntermediateBallRadiusChangePercent = 8.0;
     double GolfSimCamera::kMaxOverlappedBallRadiusChangeRatio = 1.3;
-    double GolfSimCamera::kMaxRadiusDifferencePercentageFromBest = 20;
+    double GolfSimCamera::kMaxRadiusDifferencePercentageFromBest = 35;
 
     bool GolfSimCamera::kUsePreImageSubtraction = false;  // Ultimately, this concept was not as helpful as hoped for
-    double GolfSimCamera::kPreImageWeightingOverall = 1.0;
-    double GolfSimCamera::kPreImageWeightingBlue = 1.0;
-    double GolfSimCamera::kPreImageWeightingGreen = 1.0;
+    double GolfSimCamera::kPreImageWeightingOverall = 0.0;
+    double GolfSimCamera::kPreImageWeightingBlue = 1.05;
+    double GolfSimCamera::kPreImageWeightingGreen = 1.2;
     double GolfSimCamera::kPreImageWeightingRed = 1.0;
 
-    float GolfSimCamera::kTeedBallSearchAreaMaskRadiusRatio = 5.0f;
-    double GolfSimCamera::kCamera1CalibrationDistanceToBall = 0.5;
-    double GolfSimCamera::kCamera2CalibrationDistanceToBall = 0.5;
+    float GolfSimCamera::kTeedBallSearchAreaMaskRadiusRatio = 0.0f;
 
     double GolfSimCamera::kCamera1XOffsetForTilt = 0.0;
     double GolfSimCamera::kCamera1YOffsetForTilt = 0.0;
     double GolfSimCamera::kCamera2XOffsetForTilt = 0.0;
     double GolfSimCamera::kCamera2YOffsetForTilt = 0.0;
 
-    double GolfSimCamera::kExpectedBallPositionXcm = -50.0;
-    double GolfSimCamera::kExpectedBallPositionYcm = -28.0;
-    double GolfSimCamera::kExpectedBallPositionZcm = 50.0;
-    double GolfSimCamera::kExpectedBallRadiusPixelsAt40cm = 50;
-    float GolfSimCamera::kMaxMovedBallRadiusRatio = 1.40f;
-    float GolfSimCamera::kMinMovedBallRadiusRatio = 0.50f;
-    double GolfSimCamera::kMinRadiusRatio = 0.7;
-    double GolfSimCamera::kMaxRadiusRatio = 1.2;
+    double GolfSimCamera::kExpectedBallRadiusPixelsAt40cm = 87;
+    float GolfSimCamera::kMaxMovedBallRadiusRatio = 1.5f;
+    float GolfSimCamera::kMinMovedBallRadiusRatio = 0.6f;
+    double GolfSimCamera::kMinRadiusRatio = 0.8;
+    double GolfSimCamera::kMaxRadiusRatio = 1.7;
     // Fixed amount to subtract or add to an expected radius to produce a reasonable range
-    int GolfSimCamera::kMinRadiusOffset = 10;
-    int GolfSimCamera::kMaxRadiusOffset = 10;
+    int GolfSimCamera::kMinRadiusOffset = 20;
+    int GolfSimCamera::kMaxRadiusOffset = 20;
 
     double GolfSimCamera::kUnlikelyAngleMinimumDistancePixels = 40;
-    double GolfSimCamera::kMaxQualityExposureLaunchAngle = 45.0;
+    double GolfSimCamera::kMaxQualityExposureLaunchAngle = 35.0;
     double GolfSimCamera::kMinQualityExposureLaunchAngle = -5.0;
-    double GolfSimCamera::kMaxPuttingQualityExposureLaunchAngle = +10.0;
-    double GolfSimCamera::kMinPuttingQualityExposureLaunchAngle = -10.0;
-    int GolfSimCamera::kNumberAngleCheckExposures = 3;
+    double GolfSimCamera::kMaxPuttingQualityExposureLaunchAngle = +8.0;
+    double GolfSimCamera::kMinPuttingQualityExposureLaunchAngle = -5.0;
+    int GolfSimCamera::kNumberAngleCheckExposures = 4;
 
-    double GolfSimCamera::kStandardBallSpeedSlowdownPercentage = 0.5;
-    double GolfSimCamera::kPracticeBallSpeedSlowdownPercentage = 2.0;
-    double GolfSimCamera::kPuttingBallSpeedSlowdownPercentage = 5.0;
+    double GolfSimCamera::kStandardBallSpeedSlowdownPercentage = 0.1;
+    double GolfSimCamera::kPracticeBallSpeedSlowdownPercentage = 4.0;
+    double GolfSimCamera::kPuttingBallSpeedSlowdownPercentage = 5.2;
     bool GolfSimCamera::kCameraRequiresFlushPulse = false;
 
-    int GolfSimCamera::kMaxBallsToRetain = 18;
+    int GolfSimCamera::kMaxBallsToRetain = 30;
 
     bool GolfSimCamera::kExternallyStrobedEnvFilterImage = true;
     int GolfSimCamera::kExternallyStrobedEnvBottomIgnoreHeight = 70;
@@ -105,18 +99,16 @@ namespace golf_sim {
     int GolfSimCamera::kExternallyStrobedEnvFilterHsvUpperS = 255;
     int GolfSimCamera::kExternallyStrobedEnvFilterHsvLowerV = 114;
     int GolfSimCamera::kExternallyStrobedEnvFilterHsvUpperV = 255;
-    int GolfSimCamera::kExternallyStrobedEnvCannyLower = 156;
-    int GolfSimCamera::kExternallyStrobedEnvCannyUpper = 337;
-    int GolfSimCamera::kExternallyStrobedEnvPreHoughBlurSize = 13;  // 6 for External Strobe, 9 for normal
+    int GolfSimCamera::kExternallyStrobedEnvCleanupCannyLower = 156;
+    int GolfSimCamera::kExternallyStrobedEnvCleanupCannyUpper = 337;
+    int GolfSimCamera::kExternallyStrobedEnvCleanupPreHoughBlurSize = 13;  // 6 for External Strobe, 9 for normal
     int GolfSimCamera::kExternallyStrobedEnvPreCannyBlurSize = 3;
     
-    int GolfSimCamera::kExternallyStrobedEnvHoughLineIntersections = 235;
     int GolfSimCamera::kExternallyStrobedEnvLinesAngleLower = 140;
     int GolfSimCamera::kExternallyStrobedEnvLinesAngleUpper = 180;
-    int GolfSimCamera::kExternallyStrobedEnvMaximumHoughLineGap = 7;
     int GolfSimCamera::kExternallyStrobedEnvMinimumHoughLineLength = 23;
 
-    bool GolfSimCamera::kPlacedBallUseLargestBall = true;
+    bool GolfSimCamera::kPlacedBallUseLargestBall = false;
 
     CameraHardware::CameraModel GolfSimCamera::kSystemSlot1CameraType = CameraHardware::CameraModel::PiGS;
     CameraHardware::CameraModel GolfSimCamera::kSystemSlot2CameraType = CameraHardware::CameraModel::PiGS;
@@ -127,19 +119,12 @@ namespace golf_sim {
     CameraHardware::CameraOrientation GolfSimCamera::kSystemSlot1CameraOrientation = CameraHardware::CameraOrientation::kUpsideUp;
     CameraHardware::CameraOrientation GolfSimCamera::kSystemSlot2CameraOrientation = CameraHardware::CameraOrientation::kUpsideUp;
 
-    float GolfSimCamera::kHLAOffsetAngleDegrees = 0.0;
-    float GolfSimCamera::kVLAOffsetAngleDegrees = 0.0;
+    bool GolfSimCamera::kUseOnlyHighQualityBallImagesForHLA = false;
 
 
-    bool GolfSimCamera::kUseOnlyHighQualityBallImagesForHLA = true;
-
-
-    GolfSimCamera::GolfSimCamera() {
-
-        // TBD - Probably shouldn't be doing all of this in the constructor
-
+    void GolfSimCamera::LoadConfigurationValues() {
         GS_LOG_TRACE_MSG(trace, "GolfSimCamera reading constants from JSON file.");
-        // The following constants are only used internal to the GolfSimCamera class, and so can be initialized in the constructor
+
         GolfSimConfiguration::SetConstant("gs_config.logging.kLogIntermediateExposureImagesToFile", kLogIntermediateExposureImagesToFile);
         GolfSimConfiguration::SetConstant("gs_config.logging.kLogWebserverImagesToFile", kLogWebserverImagesToFile);
         GolfSimConfiguration::SetConstant("gs_config.logging.kLogDiagnosticImagesToUniqueFiles", kLogDiagnosticImagesToUniqueFiles);
@@ -172,9 +157,6 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.ball_exposure_selection.kMaxOverlappedBallRadiusChangeRatio", kMaxOverlappedBallRadiusChangeRatio);
         GolfSimConfiguration::SetConstant("gs_config.ball_exposure_selection.kMaxRadiusDifferencePercentageFromBest", kMaxRadiusDifferencePercentageFromBest);
         
-        GolfSimConfiguration::SetConstant("gs_config.calibration.kCamera1CalibrationDistanceToBall", kCamera1CalibrationDistanceToBall);
-        GolfSimConfiguration::SetConstant("gs_config.calibration.kCamera2CalibrationDistanceToBall", kCamera2CalibrationDistanceToBall);
-
         GolfSimConfiguration::SetConstant("gs_config.ball_position.kTeedBallSearchAreaMaskRadiusRatio", kTeedBallSearchAreaMaskRadiusRatio);
         
         GolfSimConfiguration::SetConstant("gs_config.cameras.kCamera1XOffsetForTilt", kCamera1XOffsetForTilt);
@@ -182,9 +164,6 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.cameras.kCamera2XOffsetForTilt", kCamera2XOffsetForTilt);
         GolfSimConfiguration::SetConstant("gs_config.cameras.kCamera2YOffsetForTilt", kCamera2YOffsetForTilt);
 
-        GolfSimConfiguration::SetConstant("gs_config.ball_position.kExpectedBallPositionXcm", kExpectedBallPositionXcm);
-        GolfSimConfiguration::SetConstant("gs_config.ball_position.kExpectedBallPositionYcm", kExpectedBallPositionYcm);
-        GolfSimConfiguration::SetConstant("gs_config.ball_position.kExpectedBallPositionZcm", kExpectedBallPositionZcm);
         GolfSimConfiguration::SetConstant("gs_config.ball_position.kExpectedBallRadiusPixelsAt40cm", kExpectedBallRadiusPixelsAt40cm);
         GolfSimConfiguration::SetConstant("gs_config.ball_position.kMaxMovedBallRadiusRatio", kMaxMovedBallRadiusRatio);
         GolfSimConfiguration::SetConstant("gs_config.ball_position.kMinMovedBallRadiusRatio", kMinMovedBallRadiusRatio);
@@ -212,20 +191,18 @@ namespace golf_sim {
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvFilterHsvUpperS", kExternallyStrobedEnvFilterHsvUpperS);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvFilterHsvLowerV", kExternallyStrobedEnvFilterHsvLowerV);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvFilterHsvUpperV", kExternallyStrobedEnvFilterHsvUpperV);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvCannyLower", kExternallyStrobedEnvCannyLower);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvCannyUpper", kExternallyStrobedEnvCannyUpper);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvPreHoughBlurSize", kExternallyStrobedEnvPreHoughBlurSize);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvCleanupCannyLower", kExternallyStrobedEnvCleanupCannyLower);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvCleanupCannyUpper", kExternallyStrobedEnvCleanupCannyUpper);
+        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvCleanupPreHoughBlurSize", kExternallyStrobedEnvCleanupPreHoughBlurSize);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvPreCannyBlurSize", kExternallyStrobedEnvPreCannyBlurSize);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvHoughLineIntersections", kExternallyStrobedEnvHoughLineIntersections);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvLinesAngleLower", kExternallyStrobedEnvLinesAngleLower);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvLinesAngleUpper", kExternallyStrobedEnvLinesAngleUpper);
-        GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvMaximumHoughLineGap", kExternallyStrobedEnvMaximumHoughLineGap);
         GolfSimConfiguration::SetConstant("gs_config.testing.kExternallyStrobedEnvMinimumHoughLineLength", kExternallyStrobedEnvMinimumHoughLineLength);
 
         GolfSimConfiguration::SetConstant("gs_config.ball_identification.kPlacedBallUseLargestBall", kPlacedBallUseLargestBall);
+    }
 
-        GolfSimConfiguration::SetConstant("gs_config.cameras.kHLAOffsetAngleDegrees", kHLAOffsetAngleDegrees);
-        GolfSimConfiguration::SetConstant("gs_config.cameras.kVLAOffsetAngleDegrees", kVLAOffsetAngleDegrees);
+    GolfSimCamera::GolfSimCamera() {
     }
 
     GolfSimCamera::~GolfSimCamera() {
@@ -445,25 +422,6 @@ namespace golf_sim {
             GS_LOG_TRACE_MSG(trace, "GetCalibratedBall called for camera2 (usually used for camera1 images).");
         }
 
-        // If we are calibrating the focal length, then override the distance to that specified in 
-        // the JSON file
-        if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1Calibrate ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2Calibrate ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1BallLocation ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2BallLocation ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1TestStandalone) {
-
-            if (kCamera1CalibrationDistanceToBall > 0.01) {
-                if (GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera1) {
-                    expected_distance = kCamera1CalibrationDistanceToBall;
-                }
-                else {
-                    expected_distance = kCamera2CalibrationDistanceToBall;
-                }
-                GS_LOG_TRACE_MSG(trace, "GetCalibratedBall overriding expected_distance.  Setting to: " + std::to_string(expected_distance));
-            }
-        }
-
         GS_LOG_TRACE_MSG(trace, "GetCalibratedBall using expected ball distance of: " + std::to_string(expected_distance));
 
         double expectedRadius = GetExpectedBallRadiusPixels(camera.camera_hardware_, rgbImg.cols, expected_distance);
@@ -577,12 +535,10 @@ namespace golf_sim {
         if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1Calibrate ||
             GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2Calibrate) {
 
-            if (GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera1) {
-                distance_direct_to_ball = kCamera1CalibrationDistanceToBall;
-            }
-            else {
-                distance_direct_to_ball = kCamera2CalibrationDistanceToBall;
-            }
+            distance_direct_to_ball = CvUtils::GetDistance(
+                GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera1
+                    ? kCamera1PositionsFromExpectedBallMeters
+                    : kCamera2PositionsFromExpectedBallMeters);
             
             b.distance_to_z_plane_from_lens_ = distance_direct_to_ball;
 
@@ -3594,16 +3550,16 @@ namespace golf_sim {
 
             // Get a good picture of the edges of the balls.  Will probably have way too many shaft lines
             cv::Mat cannyOutput_for_balls;
-            cv::Canny(image_gray, cannyOutput_for_balls, kExternallyStrobedEnvCannyLower, kExternallyStrobedEnvCannyUpper);
+            cv::Canny(image_gray, cannyOutput_for_balls, kExternallyStrobedEnvCleanupCannyLower, kExternallyStrobedEnvCleanupCannyUpper);
 
 
             LoggingTools::DebugShowImage("Initial cannyOutput", cannyOutput_for_balls);
 
-            if (kExternallyStrobedEnvPreHoughBlurSize > 0) {
-                if (kExternallyStrobedEnvPreHoughBlurSize % 2 != 1) {
-                    kExternallyStrobedEnvPreHoughBlurSize++;
+            if (kExternallyStrobedEnvCleanupPreHoughBlurSize > 0) {
+                if (kExternallyStrobedEnvCleanupPreHoughBlurSize % 2 != 1) {
+                    kExternallyStrobedEnvCleanupPreHoughBlurSize++;
                 }
-                cv::GaussianBlur(cannyOutput_for_balls, cannyOutput_for_balls, cv::Size(kExternallyStrobedEnvPreHoughBlurSize, kExternallyStrobedEnvPreHoughBlurSize), 0);
+                cv::GaussianBlur(cannyOutput_for_balls, cannyOutput_for_balls, cv::Size(kExternallyStrobedEnvCleanupPreHoughBlurSize, kExternallyStrobedEnvCleanupPreHoughBlurSize), 0);
             }
 
             LoggingTools::DebugShowImage("Post-Blur cannyOutput", cannyOutput_for_balls);

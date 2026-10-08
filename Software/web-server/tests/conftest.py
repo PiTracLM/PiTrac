@@ -12,6 +12,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 os.environ["TESTING"] = "true"
 
+import tempfile
+os.environ.setdefault("PITRAC_DB_PATH", str(Path(tempfile.mkdtemp()) / "import-time.db"))
+# server.py builds a server at import, which imports ~/.pitrac/config/*.json and renames them
+os.environ["HOME"] = tempfile.mkdtemp()
+# pitrac_manager tests patch Path.exists to True, so prune_run_logs stats the legacy log
+(Path(os.environ["HOME"]) / ".pitrac" / "logs").mkdir(parents=True)
+(Path(os.environ["HOME"]) / ".pitrac" / "logs" / "pitrac.log").touch()
+
 from models import ShotData
 from managers import ConnectionManager, ShotDataStore
 from parsers import ShotDataParser
@@ -24,8 +32,10 @@ from utils.test_helpers import ShotDataHelper
 
 
 @pytest.fixture
-def server_instance():
+def server_instance(monkeypatch, tmp_path):
     """Create PiTracServer instance with mocked dependencies"""
+    import server as server_module
+    monkeypatch.setattr(server_module, "DB_PATH", tmp_path / "test.db")
     server = PiTracServer()
     server.shutdown_flag = False
     return server
@@ -76,29 +86,6 @@ def shot_data_instance():
         message="Great shot!",
         timestamp="2024-01-01T12:00:00",
     )
-
-
-@pytest.fixture
-def mock_home_dir(tmp_path):
-    """Mock home directory for testing with simplified structure"""
-    from utils.test_helpers import ConfigTestHelper
-
-    home = ConfigTestHelper.create_temp_config_dir()
-
-    config = {
-        "network": {
-            "username": "test_user",
-            "password": "test_pass",
-        }
-    }
-
-    config_file = home / ".pitrac" / "config" / "pitrac.yaml"
-    import yaml
-
-    with open(config_file, "w") as f:
-        yaml.dump(config, f)
-
-    yield home
 
 
 @pytest.fixture

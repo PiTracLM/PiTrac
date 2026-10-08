@@ -289,3 +289,44 @@ class TestStatusFile:
         # Should not raise
         m = UpdateManager()
         assert m._update_error is None
+
+
+class TestBranchAndResult:
+    @pytest.fixture
+    def configured(self, isolated_paths):
+        env_file, _ = isolated_paths
+        env_file.write_text("PITRAC_REPO_ROOT=/srv/pitrac\nPITRAC_BUILD_SCRIPT=/srv/pitrac/build.sh\n")
+        return UpdateManager()
+
+    @pytest.mark.asyncio
+    async def test_check_for_updates_uses_requested_branch(self, configured):
+        calls = []
+
+        async def fake_git(*args, timeout=30):
+            calls.append(args)
+            out = "main\n" if args[0] == "rev-parse" and "--abbrev-ref" in args else "0\n"
+            return type("R", (), {"returncode": 0, "stdout": out, "stderr": ""})()
+
+        configured._run_git = fake_git
+        result = await configured.check_for_updates(branch="dev")
+        assert result["status"] == "ok"
+        assert ("rev-list", "--count", "HEAD..origin/dev") in calls
+
+    def test_status_reports_failed_last_update(self, isolated_paths):
+        _, status_file = isolated_paths
+        status_file.write_text(json.dumps({
+            "status": "failed", "message": "git pull conflict", "timestamp": "2026-04-13T07:30:00",
+        }))
+        s = UpdateManager().get_status()
+        assert s["last_result"] == "failed"
+        assert s["error"] == "git pull conflict"
+
+    def test_status_reports_cancelled_and_success(self, isolated_paths):
+        _, status_file = isolated_paths
+        status_file.write_text(json.dumps({"status": "cancelled", "message": "Cancelled by user", "timestamp": "t"}))
+        assert UpdateManager().get_status()["last_result"] == "cancelled"
+        status_file.write_text(json.dumps({"status": "updating", "message": "", "timestamp": "t"}))
+        assert UpdateManager().get_status()["last_result"] == "success"
+
+    def test_initial_last_result_is_none(self, isolated_paths):
+        assert UpdateManager().get_status()["last_result"] is None

@@ -26,7 +26,6 @@
 #include "ball_image_proc.h"
 #include "gs_http_client.h"
 #include "gs_ui_system.h"
-#include "gs_sim_interface.h"
 #include "pulse_strobe.h"
 #include "libcamera_interface.h"
 
@@ -38,6 +37,14 @@ namespace golf_sim {
 
     static Camera2Thread g_cam2_thread;
 
+    // Only the FSM applies the sims' club, and only where a change cannot land mid-shot
+    static void ApplySimClub() {
+        GolfSimClubs::GsClubType sim_club = GsUISystem::SimClub();
+        if (sim_club != GolfSimClubs::kNotSelected && sim_club != GolfSimClubs::GetCurrentClubType()) {
+            GolfSimClubs::SetCurrentClubType(sim_club);
+        }
+    }
+
     static int signal_received;
     static void default_signal_handler(int signal_number)
     {
@@ -47,7 +54,7 @@ namespace golf_sim {
         GolfSimGlobals::golf_sim_running_ = false;
     }
 
-    static long kMaxCam2ImageReceivedTimeMs = 2000;
+    static long kMaxCam2ImageReceivedTimeMs = 40000;
 
     const int kWaitForBallPauseMs = 500;
     const int kEventLoopPauseMs = 5000;
@@ -128,8 +135,12 @@ namespace golf_sim {
         // Let the monitor interface know what's happening
         GsUISystem::SendIPCStatusMessage(GsIPCResultType::kInitializing);
 
+        // A restart abandons any in-progress shot (cam2 timeout, trigger failure) without
+        // flushing a result POST, so drop its stale shot id/images before the next attempt.
+        GsUISystem::ResetCurrentShot();
+
         // If we're already armed, just start waiting for a ball to appear.
-        if (GsSimInterface::GetAllSystemsArmed()) {
+        if (GsUISystem::SimArmed()) {
             GolfSimEventElement beginWaitingForBallPlacedEvent{ new GolfSimEvent::BeginWaitingForBallPlaced{ } };
             GolfSimEventQueue::QueueEvent(beginWaitingForBallPlacedEvent);
 
@@ -167,7 +178,6 @@ namespace golf_sim {
         // TBD - see if we need to move this back to the initializating state
         if (!waitingForBallState.already_sent_waiting_ipc_message) {
             GsUISystem::SendIPCStatusMessage(GsIPCResultType::kWaitingForBallToAppear);
-            GsSimInterface::SendHeartbeat(false);
         }
 
         // This check will be called repeatedly by re-queuing events.
@@ -185,8 +195,6 @@ namespace golf_sim {
         }
 
         if (found) {
-            // Inform connected sims that the ball is on the tee.
-            GsSimInterface::SendHeartbeat(true);
             if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1Calibrate ||
                 GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2Calibrate) {
 
@@ -287,7 +295,11 @@ namespace golf_sim {
         GS_LOG_MSG(info, "=============== Ball Stabilized - Let's Play Golf!  (Waiting for hit)\n\n");
 
         // Whatever happens, this is a new shot with a new shot number
-        GsSimInterface::IncrementShotCounter();
+        GsUISystem::IncrementShotCounter();
+
+        // The last POST before arming was the stabilization status, so a club the sims picked
+        // since the previous shot applies here and then holds through the hit and its analysis.
+        ApplySimClub();
 
         // Arm Camera2 thread to start waiting for the external trigger
         g_cam2_thread.arm();
@@ -308,7 +320,7 @@ namespace golf_sim {
             if (GolfSimCamera::kLogDiagnosticImagesToUniqueFiles) {
                 // Save a unique version of the webserver image into a directory that will not get
                 // over-written.  A unique timestamp will be added to the file name
-                LoggingTools::LogImage(kWebServerLastTeedBallImage + "_", img, std::vector < cv::Point >{}, false, "", "_Shot_" + std::to_string(GsSimInterface::GetShotCounter()));
+                LoggingTools::LogImage(kWebServerLastTeedBallImage + "_", img, std::vector < cv::Point >{}, false, "", "_Shot_" + std::to_string(GsUISystem::GetShotCounter()));
 
             }
 
@@ -344,7 +356,7 @@ namespace golf_sim {
         // Wait a moment so that we're not spinning too much
         sleep(1);
 
-        if (GsSimInterface::GetAllSystemsArmed()) {
+        if (GsUISystem::SimArmed()) {
             GolfSimEventElement beginWaitingForBallPlacedEvent{ new GolfSimEvent::BeginWaitingForBallPlaced{ } };
             GolfSimEventQueue::QueueEvent(beginWaitingForBallPlacedEvent);
 
@@ -453,7 +465,7 @@ namespace golf_sim {
 
             GsUISystem::SendIPCErrorStatusMessage("GolfSim FSM could not ProcessReceivedCam2Image.");
 
-            GS_LOG_MSG(info, "BALL_HIT_CSV, " + std::to_string(GsSimInterface::GetShotCounter()) + ", (carry - Error), (Total - Error), (Side Dest - Error), (Smash Factor - Error), (Club Speed - Error), "
+            GS_LOG_MSG(info, "BALL_HIT_CSV, " + std::to_string(GsUISystem::GetShotCounter()) + ", (carry - Error), (Total - Error), (Side Dest - Error), (Smash Factor - Error), (Club Speed - Error), "
                 + std::to_string(0) + ", "
                 + std::to_string(0) + ", "
                 + std::to_string(0) + ", "
@@ -466,13 +478,6 @@ namespace golf_sim {
         else {
 
             GS_LOG_TRACE_MSG(trace, "Received and processed cam2ImageReceived.  Now sending Results to any connected Golf Simulator");
-            GsResults results(result_ball);
-
-
-            // Get the result to the golf simulator ASAP
-            if (!GsSimInterface::SendResultsToGolfSims(results)) {
-                GS_LOG_MSG(error, "GolfSim FSM could not SendResultsToGolfSim.");
-            }
 
             GS_LOG_TRACE_MSG(trace, "Received and processed cam2ImageReceived.  Now sending an IPC Results Message:");
 
@@ -482,16 +487,20 @@ namespace golf_sim {
             auto velocity_time_period_string = GS_FORMATLIB_FORMAT("{: <6.2f}", velocity_time_period);
             s = " Time between chosen images for velocity calculation: " + velocity_time_period_string + " ms.";
 
-            GsUISystem::SendIPCHitMessage(result_ball, s);
-
-#ifdef __unix__ 
+            // Save the exposure-candidates image and announce it BEFORE SendIPCHitMessage:
+            // that call flushes the accumulated image paths into the POST and resets the
+            // shot id, so any image saved after it would land under a fresh shot.
+#ifdef __unix__
             if (exposures_image.empty()) {
                 GS_LOG_MSG(warning, "Exposures_image from ProcessReceivedCamera2 was empty.");
             }
             GsUISystem::SaveWebserverImage(GsUISystem::kWebServerResultBallExposureCandidates,
                 exposures_image, exposure_balls);
-            GsHttpClient::PostImageReady(GsUISystem::kWebServerResultBallExposureCandidates + ".png");
+            GsHttpClient::PostImageReady(
+                GsUISystem::CurrentShotRelativePath(GsUISystem::kWebServerResultBallExposureCandidates + ".png"));
 #endif
+
+            GsUISystem::SendIPCHitMessage(result_ball, s);
 
         }
 
@@ -621,26 +630,6 @@ namespace golf_sim {
     }
 
 
-    bool ProcessControlMessageEvent(GolfSimEvent::ControlMessage &control_message) {
-
-        GsIPCControlMsgType message_type = control_message.message_type_;
-
-        GS_LOG_TRACE_MSG(trace, "Processing ControlMessage of type: " + GsIPCControlMsg::FormatControlMessageType(message_type));
-
-        if (message_type == GsIPCControlMsgType::kClubChangeToPutter) {
-            GolfSimClubs::SetCurrentClubType(GolfSimClubs::GsClubType::kPutter);
-        }
-        else if (message_type == GsIPCControlMsgType::kClubChangeToDriver) {
-            GolfSimClubs::SetCurrentClubType(GolfSimClubs::GsClubType::kDriver);
-        }
-        else {
-            GS_LOG_MSG(error, "Received ControlMessage event with unknown message type.");
-        }
-
-        return true;
-    }
-
-
     bool RunGolfSimFsm( const GolfSimState& starting_state ) {
         GS_LOG_TRACE_MSG(trace, "RunGolfSimFsm");
 
@@ -654,6 +643,9 @@ namespace golf_sim {
             GS_LOG_MSG(error, "Failed to PerformSystemStartupTasks.");
             return false;
         }
+
+        // A club the sims named in reply to the startup Initializing post replaces the configured default
+        ApplySimClub();
 
         GolfSimConfiguration::SetConstant("gs_config.ipc_interface.kMaxCam2ImageReceivedTimeMs", kMaxCam2ImageReceivedTimeMs);
 
@@ -703,21 +695,6 @@ namespace golf_sim {
                 if (GolfSimEventQueue::EventIsShutdownEvent(eventElement.e_)) {
                     GS_LOG_TRACE_MSG(trace, "----------- Shutting Down - Received Exit Event -------------");
                     GolfSimGlobals::golf_sim_running_ = false;
-                }
-                else if (GolfSimEventQueue::EventIsControlEvent(eventElement.e_)) {
-                    GS_LOG_TRACE_MSG(trace, "----------- Received Control Event -------------");
-
-                    GolfSimEvent::ControlMessage* control_message = dynamic_cast<GolfSimEvent::ControlMessage*>(eventElement.e_);
-                    
-                    if (control_message == nullptr) {
-                        GS_LOG_MSG(error, "Could not get ControlMessage event.");
-                        continue;
-                    }
-
-                    if (!ProcessControlMessageEvent(*control_message)) {
-                        GS_LOG_MSG(error, "Could not ProcessControlMessageEvent.");
-                        continue;
-                    }
                 }
                 else {
                     // Let the FSM handle the event
@@ -801,8 +778,6 @@ namespace golf_sim {
 
         std::this_thread::yield();
 
-        GsSimInterface::DeInitializeSims();
-
         GS_LOG_TRACE_MSG(trace, "System shutdown complete");
 
         PulseStrobe::DeinitGPIOSystem();
@@ -819,8 +794,6 @@ namespace golf_sim {
         // These modes use test images or simulate functionality without cameras
         bool skip_camera = (mode == SystemMode::kTest ||
                            mode == SystemMode::kTestSpin ||
-                           mode == SystemMode::kTestExternalSimMessage ||
-                           mode == SystemMode::kTestGSProServer ||
                            mode == SystemMode::kAutomatedTesting);
 
         if (!skip_camera) {
@@ -833,16 +806,11 @@ namespace golf_sim {
             GS_LOG_MSG(info, "Skipping camera initialization for test mode: " + std::to_string(mode));
         }
 
-        GsHttpClient::Init();
+        GsHttpClient::Init("localhost", GolfSimOptions::GetCommandLineOptions().web_server_port_);
         GsUISystem::SendIPCStatusMessage(GsIPCResultType::kInitializing);
 
         if (!PulseStrobe::InitGPIOSystem(default_signal_handler)) {
             GS_LOG_MSG(error, "Failed to InitGPIOSystem.");
-            return false;
-        }
-
-        if (!GsSimInterface::InitializeSims()) {
-            GS_LOG_MSG(error, "Failed to Initialize the Golf Simulator Interface.");
             return false;
         }
 

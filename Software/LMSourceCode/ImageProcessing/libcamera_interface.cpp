@@ -57,22 +57,19 @@ namespace golf_sim {
     double LibCameraInterface::kCamera1Saturation = 1.0;
     double LibCameraInterface::kCamera1HighFPSGain = 15.0;
     double LibCameraInterface::kCamera1Contrast = 1.0;
-    double LibCameraInterface::kCamera2Gain = 6.0;
+    double LibCameraInterface::kCamera2Gain = 3.0;
     double LibCameraInterface::kCamera2Saturation = 1.0;
     double LibCameraInterface::kCamera2ComparisonGain = 0.8;
-    double LibCameraInterface::kCamera2StrobedEnvironmentGain = 0.8;
-    double LibCameraInterface::kCamera2Contrast = 1.0;
+    double LibCameraInterface::kCamera2Contrast = 1.2;
     double LibCameraInterface::kCamera2CalibrateOrLocationGain = 1.0;
     double LibCameraInterface::kCamera2PuttingGain = 4.0;
-    double LibCameraInterface::kCamera2PuttingContrast = 1.0;
-    std::string LibCameraInterface::kCameraMotionDetectSettings = "./assets/motion_detect.json";
+    double LibCameraInterface::kCamera2PuttingContrast = 1.2;
 
-    long LibCameraInterface::kCamera1StillShutterTimeuS = 15000;
+    long LibCameraInterface::kCamera1StillShutterTimeuS = 40000;
     long LibCameraInterface::kCamera2StillShutterTimeuS = 15000;
 
-    // Default values are based on empirical measurements using a 6mm lens
-    int kCroppedImagePixelOffsetLeft = -5;
-    int kCroppedImagePixelOffsetUp = -13;
+    int kCroppedImagePixelOffsetLeft = 0;
+    int kCroppedImagePixelOffsetUp = -3;
 
     // The system will start in a full-screen watching mode, but ensure 
     // we set it up once just in case
@@ -665,13 +662,13 @@ bool SendCameraCroppingCommand(const GolfSimCamera& camera, cv::Vec2i& cropping_
 
 bool ConfigurePostProcessing(const cv::Vec2i& roi_size, const cv::Vec2i& roi_offset ) {
 
-    float kDifferenceM = 0.;
-    float kDifferenceC = 0.;
-    float kRegionThreshold = 0.;
-    float kMaxRegionThreshold = 0.;
+    float kDifferenceM = 0.6;
+    float kDifferenceC = 3.;
+    float kRegionThreshold = 0.05;
+    float kMaxRegionThreshold = 0.05;
     uint kFramePeriod = 0;
-    uint kHSkip = 0;
-    uint kVSkip = 0;
+    uint kHSkip = 2;
+    uint kVSkip = 2;
 
 
     GolfSimConfiguration::SetConstant("gs_config.motion_detect_stage.kDifferenceM", kDifferenceM);
@@ -795,7 +792,6 @@ bool ConfigureLibCameraOptions(const GolfSimCamera& camera, RPiCamEncoder& app, 
     // TBD - We are switching away from having the post_process_file trigger the
     // dynamic loading of the motion_detection module.  Instead, hop[efully for speed,
     // we will use a statically-bound motion_detection module.  See ball_watcher.cpp
-    // options->Set().post_process_file = LibCameraInterface::kCameraMotionDetectSettings;
 
     if (cropping_window_size[0] > 0 && cropping_window_size[1] > 0) {
         options->Set().width = cropping_window_size[0];

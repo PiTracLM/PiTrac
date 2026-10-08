@@ -44,20 +44,18 @@ namespace golf_sim {
 			kRPiUnknown
 		};
 
-		static bool Initialize(const std::string& configuration_filename = "gs_config.json");
+		static bool Initialize();
 
 		// Uses a safer version of getenv when in Windows environment.
 		static std::string safe_getenv(const std::string& varname);
 
 		static PiModel GetPiModel();
 
-		// Reads any values that need to be initialized early, such as static members of
-		// classes that won't otherwise have a good place to be otherwise initialized because,
-		// e.g., there's not constructor that will be called.
 		static bool ReadValues();
 
 		static bool PropertyExists(const std::string& value_tag);
 
+		// The served config always wins; a variable's initializer applies only when the server omits the key.
 		static void SetConstant(const std::string& value_tag, bool& constant_value);
 		static void SetConstant(const std::string& value_tag, int& constant_value);
 		static void SetConstant(const std::string& value_tag, long& constant_value);
@@ -73,19 +71,6 @@ namespace golf_sim {
 		static void SetConstant(const std::string& tag_name, cv::Mat& matrix);
 
 
-		static bool ReadShotInjectionData(std::vector<GsResults>& shots,
-								   int& kInterShotInjectionPauseSeconds);
-
-		// Set the specified value to the value.  The node will be created if necessary
-		static bool SetTreeValue(const std::string& tag_name, const cv::Vec2d& vec);
-		static bool SetTreeValue(const std::string& tag_name, const double value);
-
-		// Write the current json tree to the specified file
-		static bool WriteTreeToFile(const std::string& file_name);
-
-		// Remove the named node in the json tree if it exists.  
-		// Returns true if the node had previously existed, false if not
-		static bool RemoveTreeNode(const std::string& tag_name);
 
 		// Returns the valiue of the environment variable PITRAC_ROOT
 		static std::string GetPiTracRootPath();

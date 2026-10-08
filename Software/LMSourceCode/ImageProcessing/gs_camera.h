@@ -129,17 +129,11 @@ namespace golf_sim {
         static double kMaxOverlappedBallRadiusChangeRatio;
         static double kMaxRadiusDifferencePercentageFromBest;
 
-        static double kCamera1CalibrationDistanceToBall;
-        static double kCamera2CalibrationDistanceToBall;
-
         static double kCamera1XOffsetForTilt;
         static double kCamera1YOffsetForTilt;
         static double kCamera2XOffsetForTilt;
         static double kCamera2YOffsetForTilt;
 
-        static double kExpectedBallPositionXcm;
-        static double kExpectedBallPositionYcm;
-        static double kExpectedBallPositionZcm;
         static double kExpectedBallRadiusPixelsAt40cm;
         static double kMinRadiusRatio;
         static double kMaxRadiusRatio;
@@ -174,14 +168,12 @@ namespace golf_sim {
         static int kExternallyStrobedEnvFilterHsvUpperS;
         static int kExternallyStrobedEnvFilterHsvLowerV;
         static int kExternallyStrobedEnvFilterHsvUpperV;
-        static int kExternallyStrobedEnvCannyLower;
-        static int kExternallyStrobedEnvCannyUpper;
-        static int kExternallyStrobedEnvPreHoughBlurSize;
+        static int kExternallyStrobedEnvCleanupCannyLower;
+        static int kExternallyStrobedEnvCleanupCannyUpper;
+        static int kExternallyStrobedEnvCleanupPreHoughBlurSize;
         static int kExternallyStrobedEnvPreCannyBlurSize;
-        static int kExternallyStrobedEnvHoughLineIntersections;
         static int kExternallyStrobedEnvLinesAngleLower;
         static int kExternallyStrobedEnvLinesAngleUpper;
-        static int kExternallyStrobedEnvMaximumHoughLineGap;
         static int kExternallyStrobedEnvMinimumHoughLineLength;
 
 
@@ -199,12 +191,6 @@ namespace golf_sim {
         static CameraHardware::CameraOrientation kSystemSlot1CameraOrientation;
         static CameraHardware::CameraOrientation kSystemSlot2CameraOrientation;
 
-		// The following angles are used to adjust the final HLA and VLA to account for
-		// problems such as the auto-calibration rig being slightly off.
-		// See the HLA and VLA calculations in gs_camera.cpp for more details on the meaning of negative versus positive angles
-        static float kHLAOffsetAngleDegrees;
-        static float kVLAOffsetAngleDegrees;
-
         static bool kUseOnlyHighQualityBallImagesForHLA;
 
         // Refers to the camera_hardware device object associated with this higher-level camera object
@@ -213,6 +199,9 @@ namespace golf_sim {
         GolfSimCamera();
 
         ~GolfSimCamera();
+
+        // Call once, after GolfSimConfiguration::Initialize
+        static void LoadConfigurationValues();
 
         // One of the main workhorses of the system.  It determines a ball in and
         // image by using various circle-identification algorithms and other processing.

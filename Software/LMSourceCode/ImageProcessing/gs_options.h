@@ -24,8 +24,6 @@ namespace golf_sim {
 		kTestSpin = 7,
 		kCamera1BallLocation = 8,
 		kCamera2BallLocation = 9,
-		kTestExternalSimMessage = 10,
-		kTestGSProServer = 11,
 		kAutomatedTesting = 12,
 		kCamera1AutoCalibrate = 13,
 		kCamera2AutoCalibrate = 14,
@@ -70,42 +68,22 @@ namespace golf_sim {
 					"Print this help message")
 				("version", value<bool>(&version_)->default_value(false)->implicit_value(true),
 					"Displays the build version number")
-				("golfer_orientation", value<std::string>(&golfer_orientation_string_)->default_value("right_handed"),
-					"Set the golfer's handed-ness (right_handed, left_handed)")
 				("system_mode", value<std::string>(&system_mode_string_)->default_value("test"),
-					"Set the system's operating mode (camera1, camera1_test_standalone, camera1Calibrate, camera2Calibrate, test_spin, camera1_ball_location, camera2_ball_location, test_gspro_server, automated_testing, camera1AutoCalibrate, camera2AutoCalibrate, test)")
-				("logging_level", value<std::string>(&logging_level_string_)->default_value("warn"),
-					"Set the system's logging level (trace, debug, info, warn, error, none)")
-				("artifact_save_level", value<std::string>(&artifact_save_level_string_)->default_value("final_results_only"),
-					"Set the system's level of saving artifact images to files (none, final_results_only, all)")
+					"Set the system's operating mode (camera1, camera1_test_standalone, camera1Calibrate, camera2Calibrate, test_spin, camera1_ball_location, camera2_ball_location, automated_testing, camera1AutoCalibrate, camera2AutoCalibrate, test)")
 				("shutdown", value<bool>(&shutdown_)->default_value(false)->implicit_value(true),
 					"Request clean shutdown")
 				("cam_still_mode", value<bool>(&camera_still_mode_)->default_value(false)->implicit_value(true),
 					"Take a single camera2 still picture (using one strobe flash) and exit")
 				("lm_comparison_mode", value<bool>(&lm_comparison_mode_)->default_value(false)->implicit_value(true),
 					"Configure for operating in another infrared-based LM environment")
-				("send_test_results", value<bool>(&send_test_results_)->default_value(false)->implicit_value(true),
-					"Send test shot results to the web server and exit")
-				("skip_wait_armed", value<bool>(&skip_wait_armed_)->default_value(false)->implicit_value(true),
-					"Skip waiting for simulator armed state (for hardware-less testing)")
 				("output_filename", value<std::string>(&output_filename_)->default_value("out.png"),
 					"Write any still picture to the specified filename")
 				("pulse_test", value<bool>(&perform_pulse_test_)->default_value(false)->implicit_value(true),
 					"Continually sends strobe and shutter signals")
-				("practice_ball", value<bool>(&practice_ball_)->default_value(false)->implicit_value(true),
-					"Configure system to expect a lightweight, soft, practice ball")
-				("wait_keys", value<bool>(&wait_for_key_on_images_)->default_value(false)->implicit_value(true),
-					"0 = Don't wait for a key press after showing each debug image, 1 = Do wait")
 				("run_single_pi", value<bool>(&run_single_pi_)->default_value(true)->implicit_value(true),
 					"Deprecated — always single Pi. Accepted for backward compatibility.")
-				("show_images", value<bool>(&show_images_)->default_value(false)->implicit_value(true),
-					"0 = Don't show any debug/trace images in windows on the screen, 1 = Do")
 				("use_non_IR_camera", value<bool>(&use_non_IR_camera_)->default_value(false)->implicit_value(true),
 					"1 = The camera in use by this system is not an IR camera (and will likely need less gain)")
-				("search_center_x", value<unsigned int>(&search_center_x_)->default_value(0),
-					"Set the x coordinate of the center of the ball-search circle")
-				("search_center_y", value<unsigned int>(&search_center_y_)->default_value(0),
-					"Set the y coordinate of the center of the ball-search circle")
 				("simulate_found_ball", value<bool>(&simulate_found_ball_)->default_value(false)->implicit_value(true),
 					"Causes camera1 system to act as though a ball was found even if none is present.")
 				("camera_gain", value<double>(&camera_gain_)->default_value(0.0),
@@ -116,12 +94,8 @@ namespace golf_sim {
 					"Specify the full path (with an ending '/') where diagnostic images are to be written. Default is: <empty>")
 				("web_server_share_dir", value<std::string>(&web_server_share_dir_)->default_value(""),
 					"Specify the full path (with an ending '/') where diagnostic images are to be written. Default  is: <empty>")
-				("e6_host_address", value<std::string>(&e6_host_address_)->default_value(""),
-					"Specify the name or IP address of the host PC that is running the E6 simulator.  Default is: <empty string>, indicating no TruGolf sim is connected.")
-				("gspro_host_address", value<std::string>(&gspro_host_address_)->default_value(""),
-					"Specify the name or IP address of the host PC that is running the GSPro simulator.  Default is: <empty string>, indicating no GSPro sim is connected.")
-				("config_file", value<std::string>(&config_file_)->default_value("golf_sim_config.json"),
-					"Specify the filename with the JSON configuration.  Default is: golf_sim_config.json")
+				("web_server_port", value<int>(&web_server_port_)->default_value(8080),
+					"Port of the PiTrac web server (on localhost) to fetch configuration from and post results to.")
 				("cmd_file,cmd", value<std::string>(&command_line_file_)->implicit_value("config.txt"),
 					"Read the options from a file. If no filename is specified, default to config.txt. "
 					"In case of duplicate options, the ones provided on the command line will be used. "
@@ -143,37 +117,38 @@ namespace golf_sim {
 		bool shutdown_;
 		bool camera_still_mode_;
 		bool lm_comparison_mode_;
-		bool send_test_results_;
-		bool skip_wait_armed_;
-		bool practice_ball_;
+		bool practice_ball_ = false;
 		bool perform_pulse_test_;
 		bool use_non_IR_camera_;
 		bool simulate_found_ball_;
 		std::string output_filename_;
 		std::string system_mode_string_;
-		std::string artifact_save_level_string_;
-		std::string logging_level_string_;
+		std::string artifact_save_level_string_ = "final_results_only";
+		std::string logging_level_string_ = "warn";
 		std::string command_line_file_;
 		std::string msg_broker_address_;
 		std::string base_image_logging_dir_;
 		std::string web_server_share_dir_;
-		std::string e6_host_address_;
-		std::string gspro_host_address_;
-		std::string config_file_;
-		std::string golfer_orientation_string_;
+		std::string golfer_orientation_string_ = "right_handed";
 		SystemMode system_mode_ = kTest;
-		LoggingLevel logging_level_ = kInfo;
-		ArtifactSaveLevel artifact_save_level_ = kNoArtifacts;
+		LoggingLevel logging_level_ = kWarn;
+		ArtifactSaveLevel artifact_save_level_ = kFinalResultsOnly;
 		GolferOrientation golfer_orientation_ = kRightHanded;
-		bool wait_for_key_on_images_;
+		bool wait_for_key_on_images_ = false;
 		bool run_single_pi_ = true;  // Always true — dual-Pi support removed
-		bool show_images_;
+		bool show_images_ = false;
 		unsigned int search_center_x_ = 0;
 		unsigned int search_center_y_ = 0;
 		double camera_gain_ = 0.0;   // 1.0 might seem more appropriate, but we want to be able to see if this is set or not
+		int web_server_port_ = 8080;
 
 		virtual bool Parse(int argc, char* argv[]);
 		virtual void Print() const;
+
+		// Each returns false and leaves the option unchanged if the string is not a recognized value
+		bool SetArtifactSaveLevel(const std::string& level);
+		bool SetLoggingLevel(const std::string& level);
+		bool SetGolferOrientation(const std::string& orientation);
 
 	protected:
 		boost::program_options::options_description options_;

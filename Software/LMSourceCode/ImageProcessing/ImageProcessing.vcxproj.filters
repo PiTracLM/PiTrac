@@ -90,21 +90,6 @@
     <ClCompile Include="gs_ui_system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="gs_gspro_results.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="gs_sim_interface.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="gs_gspro_interface.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="gs_gspro_test_server.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="gs_gspro_response.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="ED.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -115,18 +100,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gs_clubs.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="gs_control_msg.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="gs_e6_interface.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="gs_e6_results.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="gs_sim_socket_interface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="core\dma_heaps.cpp">
@@ -249,16 +222,10 @@
     <ClCompile Include="gs_automated_testing.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="configuration_manager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="gs_calibration.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="onnx_runtime_detector.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="gs_web_api.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gs_shot_parameters.cpp">
@@ -335,21 +302,6 @@
     <ClInclude Include="gs_ui_system.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="gs_gspro_results.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gs_sim_interface.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gs_gspro_interface.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gs_gspro_test_server.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gs_gspro_response.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="post_processing_stages\post_processing_stage.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -366,15 +318,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gs_control_msg.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gs_e6_interface.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gs_e6_results.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gs_sim_socket_interface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gs_e6_response.h">
@@ -479,9 +422,6 @@
     <ClInclude Include="gs_format_lib.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="configuration_manager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="gs_calibration.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -559,12 +499,9 @@
     <None Include="RunScripts\runPiTracCommon.sh" />
     <None Include="RunScripts\runPulseTest.sh" />
     <None Include="RunScripts\runShutdown.sh" />
-    <None Include="RunScripts\runTestExternalSimMessage.sh" />
-    <None Include="RunScripts\runTestGsProServer.sh" />
     <None Include="RunScripts\runTestResults.sh" />
     <None Include="RunScripts\runTestSpin.sh" />
     <None Include="RunScripts\shutdown_gs.sh" />
-    <None Include="create_closed_source_objects.sh" />
     <None Include="..\..\web-server\calibration_manager.py">
       <Filter>Resource Files</Filter>
     </None>

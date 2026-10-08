@@ -8,7 +8,7 @@ Focuses on testing real logic with minimal mocking to catch actual bugs.
 import asyncio
 import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch, AsyncMock, mock_open
 
 from calibration_manager import CalibrationManager
 
@@ -86,7 +86,8 @@ class TestCalibrationManagerStatus:
         assert "camera1" in status
         assert "camera2" in status
 
-        for camera_status in status.values():
+        assert set(status["distortion"]) == {"camera1", "camera2"}
+        for camera_status in (status["camera1"], status["camera2"]):
             assert "status" in camera_status
             assert "message" in camera_status
             assert "progress" in camera_status
@@ -132,6 +133,7 @@ class TestCalibrationDataRetrieval:
             }
         }
 
+        mock_config_manager.calibration_data = {}
         manager = CalibrationManager(mock_config_manager)
         data = manager.get_calibration_data()
 
@@ -158,6 +160,7 @@ class TestCalibrationDataRetrieval:
             }
         }
 
+        mock_config_manager.calibration_data = {}
         manager = CalibrationManager(mock_config_manager)
         data = manager.get_calibration_data()
 
@@ -174,6 +177,7 @@ class TestCalibrationDataRetrieval:
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {}
 
+        mock_config_manager.calibration_data = {}
         manager = CalibrationManager(mock_config_manager)
         data = manager.get_calibration_data()
 
@@ -198,7 +202,6 @@ class TestCommandBuilding:
                 "camera2_search_center_y": 500,
             },
         }
-        mock.generated_config_path = "/tmp/test_config.yaml"
         mock.get_cli_parameters.return_value = []  # Return empty list for CLI params
         mock.register_callback = Mock()  # Mock callback registration
         return mock
@@ -225,7 +228,6 @@ class TestCommandBuilding:
                 "camera2_search_center_y": 450,
             },
         }
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -350,7 +352,6 @@ class TestStillImageCapture:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -375,7 +376,6 @@ class TestStillImageCapture:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -398,7 +398,6 @@ class TestStillImageCapture:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -436,7 +435,6 @@ class TestLogFileHandling:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"calibration": {}}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -481,14 +479,13 @@ class TestErrorHandling:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"calibration": {}}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
         with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
             mock_process.communicate.side_effect = asyncio.TimeoutError()
-            mock_process.terminate = AsyncMock()
+            mock_process.terminate = Mock()
             mock_process.wait = AsyncMock()
             mock_subprocess.return_value = mock_process
 
@@ -505,7 +502,6 @@ class TestErrorHandling:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"calibration": {}}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -532,7 +528,7 @@ class TestErrorHandling:
                     result = await manager.run_auto_calibration("camera1")
 
         assert result["status"] == "failed"
-        assert "process" in result["message"]
+        assert "exit code 1" in result["message"]
         assert manager.calibration_status["camera1"]["status"] == "failed"
 
     @pytest.mark.asyncio
@@ -572,7 +568,7 @@ class TestErrorHandling:
         manager = CalibrationManager(mock_config_manager)
 
         mock_process = AsyncMock()
-        mock_process.terminate = AsyncMock()
+        mock_process.terminate = Mock()
         mock_process.wait = AsyncMock()
         mock_process.returncode = None
         manager.current_processes["camera1"] = mock_process
@@ -593,7 +589,7 @@ class TestErrorHandling:
         manager = CalibrationManager(mock_config_manager)
 
         mock_process = AsyncMock()
-        mock_process.terminate.side_effect = Exception("Permission denied")
+        mock_process.terminate = Mock(side_effect=Exception("Permission denied"))
         mock_process.wait.side_effect = Exception("Wait failed")
         mock_process.returncode = None
         manager.current_processes["camera1"] = mock_process
@@ -649,7 +645,6 @@ class TestRealCalibrationWorkflows:
                 "camera1_search_center_y": 600,
             },
         }
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
         mock_config_manager.reload = Mock()
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
@@ -683,6 +678,83 @@ class TestRealCalibrationWorkflows:
         mock_config_manager.reload.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_auto_calibration_recovered_retry_is_success(self):
+        """A tolerated retry in the log must not override a clean exit"""
+        mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
+        mock_config_manager.get_config.return_value = {"calibration": {}}
+        mock_config_manager.reload = Mock()
+
+        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        log = (
+            "Could not DetermineFocalLengthForAutoCalibration -- trying again.\n"
+            "====>  Average Focal Length = 6.120000.\n"
+        )
+
+        with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
+            mock_process = AsyncMock()
+            mock_process.returncode = 0
+            mock_process.pid = 12345
+            mock_subprocess.return_value = mock_process
+
+            with patch.object(manager, "wait_for_calibration_completion") as mock_wait:
+                mock_wait.return_value = {
+                    "completed": True,
+                    "method": "process",
+                    "api_success": False,
+                    "process_exit_code": 0,
+                    "focal_length_received": False,
+                    "angles_received": False,
+                }
+
+                with patch("builtins.open", mock_open(read_data=log)):
+                    result = await manager.run_auto_calibration("camera1")
+
+        assert result["status"] == "success"
+        assert manager.calibration_status["camera1"]["status"] == "completed"
+
+    @pytest.mark.asyncio
+    async def test_auto_calibration_failure_explains_why(self):
+        """A failed run reports what the user should check, not just that it failed"""
+        mock_config_manager = Mock()
+        mock_config_manager.get_cli_parameters = Mock(return_value=[])
+        mock_config_manager.register_callback = Mock()
+        mock_config_manager.get_config.return_value = {"calibration": {}}
+
+        manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
+        log = (
+            "[2026-10-07 10:00:00.000000] (0x1) [warning] Could not DetermineFocalLengthForAutoCalibration -- "
+            "trying again.\n"
+            "[2026-10-07 10:00:01.000000] (0x1) [error] Could not DetermineFocalLengthForAutoCalibration -- Too many "
+            "failures - giving up.  Check the input pictures for more information.\n"
+            "[2026-10-07 10:00:01.000000] (0x1) [error] Failed to AutoCalibrateCamera.\n"
+        )
+
+        with patch("calibration_manager.asyncio.create_subprocess_exec") as mock_subprocess:
+            mock_process = AsyncMock()
+            mock_process.returncode = 1
+            mock_process.pid = 12345
+            mock_subprocess.return_value = mock_process
+
+            with patch.object(manager, "wait_for_calibration_completion") as mock_wait:
+                mock_wait.return_value = {
+                    "completed": False,
+                    "method": "process",
+                    "api_success": False,
+                    "process_exit_code": 1,
+                    "focal_length_received": False,
+                    "angles_received": False,
+                }
+
+                with patch("builtins.open", mock_open(read_data=log)):
+                    result = await manager.run_auto_calibration("camera1")
+
+        assert result["status"] == "failed"
+        assert "could not find the calibration ball" in result["message"]
+        assert manager.calibration_status["camera1"]["message"] == result["message"]
+
+    @pytest.mark.asyncio
     async def test_manual_calibration_success_workflow(self):
         """Test complete manual calibration workflow"""
         mock_config_manager = Mock()
@@ -694,7 +766,6 @@ class TestRealCalibrationWorkflows:
                 "camera2_search_center_y": 450,
             },
         }
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
         mock_config_manager.reload = Mock()
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
@@ -725,7 +796,6 @@ class TestRealCalibrationWorkflows:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"calibration": {}}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -752,7 +822,7 @@ class TestRealCalibrationWorkflows:
                     result = await manager.run_auto_calibration("camera1")
 
         assert result["status"] == "failed"
-        assert "timeout" in result["message"]
+        assert "timed out" in result["message"]
         assert manager.calibration_status["camera1"]["status"] == "failed"
 
     @pytest.mark.asyncio
@@ -767,7 +837,6 @@ class TestRealCalibrationWorkflows:
                 "camera1_search_center_y": 600,
             },
         }
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -792,7 +861,6 @@ class TestRealCalibrationWorkflows:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -825,7 +893,6 @@ class TestIntegrationScenarios:
                 "camera1_search_center_y": 600,
             },
         }
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
         mock_config_manager.reload = Mock()
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
@@ -873,7 +940,6 @@ class TestIntegrationScenarios:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"calibration": {}}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
 
         manager = CalibrationManager(mock_config_manager, "/test/pitrac_lm")
 
@@ -983,7 +1049,6 @@ class TestConfigurationHandling:
         mock_config_manager.get_cli_parameters = Mock(return_value=[])
         mock_config_manager.register_callback = Mock()
         mock_config_manager.get_config.return_value = {"calibration": {}}
-        mock_config_manager.generated_config_path = "/tmp/test_config.yaml"
         mock_config_manager.reload = Mock()
 
         manager = CalibrationManager(mock_config_manager)
@@ -1119,26 +1184,26 @@ class TestStopDistortionCalibrationFlag:
         return CalibrationManager(cfg)
 
     def test_stop_signals_distortion_camera(self, manager):
-        manager.calibration_status["camera1"]["status"] = "distortion_calibrating"
+        manager.distortion_status["camera1"]["status"] = "distortion_calibrating"
 
         async def go():
             return await manager.stop_calibration(camera="camera1")
 
         result = asyncio.run(go())
-        assert manager.calibration_status["camera1"]["status"] == "stopping"
+        assert manager.distortion_status["camera1"]["status"] == "stopping"
         assert result["status"] == "stopping"
         assert "camera1" in result["cameras"]
 
     def test_stop_all_signals_both_distortion_cameras(self, manager):
-        manager.calibration_status["camera1"]["status"] = "distortion_calibrating"
-        manager.calibration_status["camera2"]["status"] = "distortion_calibrating"
+        manager.distortion_status["camera1"]["status"] = "distortion_calibrating"
+        manager.distortion_status["camera2"]["status"] = "distortion_calibrating"
 
         async def go():
             return await manager.stop_calibration()
 
         result = asyncio.run(go())
-        assert manager.calibration_status["camera1"]["status"] == "stopping"
-        assert manager.calibration_status["camera2"]["status"] == "stopping"
+        assert manager.distortion_status["camera1"]["status"] == "stopping"
+        assert manager.distortion_status["camera2"]["status"] == "stopping"
         assert result["status"] == "stopping"
         assert set(result["cameras"]) == {"camera1", "camera2"}
 
@@ -1258,3 +1323,132 @@ class TestTriggerModeSwitching:
         asyncio.run(go())
         mock_set.assert_called_once_with(1)
         assert manager._free_running_refs == 0
+
+
+class TestCalibrationStateAndJobIsolation:
+    @pytest.fixture
+    def manager(self):
+        cfg = Mock()
+        cfg.register_callback = Mock()
+        cfg.get_config.return_value = {}
+        cfg.calibration_data = {}
+        return CalibrationManager(cfg)
+
+    @staticmethod
+    def _process():
+        process = AsyncMock()
+        process.terminate = Mock()
+        process.returncode = None
+        return process
+
+    def test_calibrated_flags_come_from_saved_calibration(self, manager):
+        manager.config_manager.calibration_data = {
+            "gs_config": {
+                "cameras": {
+                    "kCamera1CalibrationMatrix": [[1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0]],
+                    "kCamera1FocalLength": 6.1,
+                    "kCamera1Angles": [1.5, -2.5],
+                    "kCamera2FocalLength": 6.0,
+                }
+            }
+        }
+
+        data = manager.get_calibration_data()
+
+        assert data["camera1"]["lens_calibrated"] is True
+        assert data["camera1"]["position_calibrated"] is True
+        assert data["camera2"]["lens_calibrated"] is False
+        assert data["camera2"]["position_calibrated"] is False
+
+    def test_stop_with_camera_only_stops_that_camera(self, manager):
+        cam1, cam2 = self._process(), self._process()
+        manager.current_processes.update({"camera1": cam1, "camera2": cam2})
+        manager.distortion_status["camera2"]["status"] = "distortion_calibrating"
+
+        result = asyncio.run(manager.stop_calibration(camera="camera1"))
+
+        assert result == {"status": "stopped", "cameras": ["camera1"]}
+        cam1.terminate.assert_called_once()
+        cam2.terminate.assert_not_called()
+        assert list(manager.current_processes) == ["camera2"]
+        assert manager.distortion_status["camera2"]["status"] == "distortion_calibrating"
+
+    def test_stop_kind_limits_the_job_type(self, manager):
+        cam1 = self._process()
+        manager.current_processes["camera1"] = cam1
+        manager.distortion_status["camera1"]["status"] = "distortion_calibrating"
+
+        result = asyncio.run(manager.stop_calibration(kind="distortion"))
+
+        assert result == {"status": "stopping", "cameras": ["camera1"]}
+        assert manager.distortion_status["camera1"]["status"] == "stopping"
+        cam1.terminate.assert_not_called()
+
+        result = asyncio.run(manager.stop_calibration(kind="ball"))
+
+        assert result == {"status": "stopped", "cameras": ["camera1"]}
+        cam1.terminate.assert_called_once()
+
+    def test_distortion_and_ball_status_are_separate(self, manager):
+        captures = []
+
+        async def capture(camera_index, output_path, gain):
+            captures.append(camera_index)
+            if len(captures) == 1:
+                manager.calibration_status["camera1"]["status"] = "completed"
+            else:
+                await manager.stop_calibration(camera="camera1", kind="distortion")
+            return None
+
+        manager._capture_image = capture
+        with patch("calibration_manager.asyncio.sleep", new=AsyncMock()):
+            result = asyncio.run(manager.run_distortion_calibration("camera1", target_images=5))
+
+        assert result["status"] == "stopped"
+        assert len(captures) == 2
+        assert manager.calibration_status["camera1"]["status"] == "completed"
+        assert manager.distortion_status["camera1"]["status"] == "stopped"
+        assert manager.get_status()["distortion"]["camera1"]["status"] == "stopped"
+
+    def test_accepted_image_message_is_plain(self, manager):
+        import numpy as np
+
+        captures, messages = [], []
+
+        async def capture(camera_index, output_path, gain):
+            captures.append(camera_index)
+            if len(captures) > 1:
+                await manager.stop_calibration(camera="camera1", kind="distortion")
+            return np.zeros((90, 120), dtype=np.uint8)
+
+        async def sleep(_):
+            messages.append(manager.distortion_status["camera1"]["message"])
+
+        detector = Mock()
+        corners = np.array([[[10.0, 10.0]], [[20.0, 10.0]], [[20.0, 20.0]], [[10.0, 20.0]]], dtype=np.float32)
+        detector.detect_charuco_corners.return_value = (corners, np.arange(4).reshape(-1, 1), None, None)
+        detector.assess_image_quality.return_value = {
+            "is_good": True, "reasons": [], "tilt_score": 0.0, "coverage": 0.12, "blur_score": 100.0,
+        }
+        detector.compute_image_params.return_value = [0.1, 0.1, 0.1, 0.0]
+        detector.is_good_sample.return_value = True
+
+        manager._capture_image = capture
+        with patch("charuco_detector.CompatibleCharucoDetector", return_value=detector), \
+                patch("calibration_manager.asyncio.sleep", new=sleep):
+            asyncio.run(manager.run_distortion_calibration("camera1", target_images=5))
+
+        accepted = [m for m in messages if m.startswith("Captured 1 of 5.")]
+        assert accepted, messages
+        assert accepted[0].endswith(" area next.")
+        assert not any("!" in m or "--" in m for m in messages)
+
+    def test_failed_spawn_does_not_leave_camera_busy(self, manager):
+        with patch("calibration_manager.asyncio.create_subprocess_exec", side_effect=FileNotFoundError("sudo")):
+            result = asyncio.run(manager.run_auto_calibration("camera1"))
+
+        assert result["status"] == "error"
+        assert manager.calibration_status["camera1"]["status"] == "failed"
+        assert manager.calibration_status["camera1"]["message"].startswith("Could not start calibration")
+        assert manager.busy_reason("camera1") is None
+        assert manager._active_calibrations == {}

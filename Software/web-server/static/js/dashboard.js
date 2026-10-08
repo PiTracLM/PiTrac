@@ -1,230 +1,202 @@
-// Dashboard-specific functionality (theme and dropdown handled by common.js)
-let ws = null;
-let piTracRunning = false;
+// Dashboard: status strip, shot metrics, shot image, setup readiness
+/* global openSocket, onPiTracStatus, formatNumber, formatSided, api, controlPiTrac,
+   setupStatusRequest, setupHidden, setSetupHidden, setupChecklist, renderSetupChecklist, setupSummaryHtml, loadCameraLabels */
 
-function connectWebSocket() {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+// Keys are the exact result_type strings from parsers.py; anything else leaves the strip as it is
+const STRIP_STATES = {
+    'Initializing':                       ['initializing', 'Starting up', 'PiTrac is starting.'],
+    'Waiting For Ball':                   ['waiting', 'Place a ball', 'Put a ball on the tee.'],
+    'Waiting For Simulator':              ['waiting', 'Waiting for simulator', 'Connect a simulator to continue.'],
+    'Waiting For Placement To Stabilize': ['stabilizing', 'Ball detected', 'Let the ball settle.'],
+    'Ball Placed':                        ['ready', 'Ready. Hit it.', ''],
+    'Hit':                                ['hit', 'Shot recorded', ''],
+    'Multiple Balls Present':             ['error', 'More than one ball', 'Remove the extra balls.'],
+    'Error':                              ['error', 'Error', ''],
+};
+const STRIP_CLASSES = ['initializing', 'waiting', 'stabilizing', 'ready', 'hit', 'error'];
 
-    ws.onopen = () => {
-        document.getElementById('ws-status-dot').classList.remove('disconnected');
-    };
+let running = null;
+let offline = false;
+let shotState = null;
+let setup = null;
+let cameraLabels = {};
+let freshSocket = true;
+let hitTime = '';
+let shownImage = null;
 
-    ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (!piTracRunning) {
-            piTracRunning = true;
-            const metricsPanel = document.getElementById('metrics-panel');
-            if (metricsPanel) metricsPanel.style.opacity = '1';
-        }
-        if (data.type === 'image_ready') {
-            handleImageReady(data.filename);
-        } else {
-            updateDisplay(data);
-        }
-    };
+const byId = (id) => document.getElementById(id);
 
-    ws.onclose = () => {
-        document.getElementById('ws-status-dot').classList.add('disconnected');
-        setTimeout(connectWebSocket, 3000);
-    };
-
-    ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-    };
-}
-
-function updateDisplay(data) {
-    const updateMetric = (id, value) => {
-        const element = document.getElementById(id);
-        if (!element) return;
-        const unitSpan = element.querySelector('.metric-unit');
-        const currentText = element.firstChild && element.firstChild.nodeType === Node.TEXT_NODE
-            ? element.firstChild.textContent.trim()
-            : '';
-        const newValue = String(value);
-
-        if (currentText !== newValue) {
-            if (element.firstChild && element.firstChild.nodeType === Node.TEXT_NODE) {
-                element.firstChild.textContent = newValue;
-            } else {
-                element.insertBefore(document.createTextNode(newValue), unitSpan);
-            }
-            element.classList.add('updated');
-            setTimeout(() => {
-                element.classList.remove('updated');
-            }, 500);
-        }
-    };
-
-    updateMetric('speed', data.speed || '0.0');
-    updateMetric('launch_angle', data.launch_angle || '0.0');
-    updateMetric('side_angle', data.side_angle || '0.0');
-    updateMetric('back_spin', data.back_spin || '0');
-    updateMetric('side_spin', data.side_spin || '0');
-
-    // Update ball status strip
-    updateBallStatus(data.result_type, data.message, data.pitrac_running);
-
-    if (data.timestamp) {
-        const date = new Date(data.timestamp);
-        document.getElementById('timestamp').textContent = date.toLocaleTimeString();
+function stripState() {
+    if (running === null) return ['initializing', 'Checking PiTrac', ''];
+    if (offline) return ['initializing', 'PiTrac is offline', "Can't reach the PiTrac web server."];
+    if (!running) {
+        const message = strobeBlocked() ? setup.strobe.reason || 'Finish setup before starting.' : 'Start it to begin.';
+        return ['initializing', 'PiTrac is stopped', message];
     }
+    return shotState || ['initializing', 'PiTrac is running', ''];
+}
 
-    const resultType = (data.result_type || '').toLowerCase();
-    if (resultType.includes('stabilization') || resultType.includes('pausing')) {
-        const imageInner = document.getElementById('image-panel-inner');
-        imageInner.className = 'image-panel-inner';
-        imageInner.innerHTML =
-            '<div class="image-empty-state">' +
-                '<div class="empty-icon"></div>' +
-                '<div class="empty-text">Waiting for shot...</div>' +
-            '</div>';
+function strobeBlocked() {
+    return !!setup && !setup.strobe.safe;
+}
+
+function setText(el, text) {
+    if (el.textContent !== text) el.textContent = text;
+}
+
+function renderStrip() {
+    const [state, title, message] = stripState();
+    const stopped = running === false && !offline;
+    const strip = byId('status-strip');
+    if (!strip.classList.contains(state)) {
+        strip.classList.remove(...STRIP_CLASSES);
+        strip.classList.add(state);
     }
+    setText(byId('status-strip-title'), title);
+    setText(byId('status-strip-message'), message);
+    document.querySelector('.status-strip-separator').hidden = !message;
+    byId('strip-start-btn').hidden = !stopped || strobeBlocked();
+    byId('strip-setup-btn').hidden = !stopped || !strobeBlocked();
+    byId('btn-reset').hidden = !running || state !== 'hit';
 }
 
-function handleImageReady(filename) {
-    const imageInner = document.getElementById('image-panel-inner');
-    const ts = Date.now();
-    imageInner.className = 'image-panel-inner';
-    imageInner.innerHTML =
-        `<img src="/images/${filename}?t=${ts}" alt="Shot image" class="shot-image" onclick="openImage('${filename}')">`;
+function shotStateFor(data) {
+    const def = STRIP_STATES[data.result_type];
+    if (!def) return null;
+    const [state, title, message] = def;
+    if (state === 'hit') {
+        hitTime = data.timestamp ? new Date(data.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+        return [state, title, hitTime ? `Shot at ${hitTime}` : ''];
+    }
+    // The C++ sends Waiting For Ball right after every Hit; keep the shot up until the next ball shows
+    if (data.result_type === 'Waiting For Ball' && shotState && shotState[0] === 'hit') {
+        return ['hit', shotState[1], hitTime ? `Shot at ${hitTime}. Place the next ball.` : 'Place the next ball.'];
+    }
+    return [state, title, message || (state === 'error' ? data.message || '' : '')];
 }
 
-function updateBallStatus(resultType, message, isPiTracRunning) {
-    const strip = document.getElementById('status-strip');
-    const title = document.getElementById('status-strip-title');
-    const msg = document.getElementById('status-strip-message');
-    const resetBtn = document.getElementById('btn-reset');
+// -- Metrics --
 
-    strip.classList.remove('initializing', 'waiting', 'stabilizing', 'ready', 'hit', 'error');
+function setMetric(id, text, dir = '') {
+    const el = byId(id);
+    const value = el.querySelector('.metric-value');
+    el.querySelector('.metric-dir').textContent = dir ? ` ${dir}` : '';
+    if (value.textContent === text) return;
+    value.textContent = text;
+    el.classList.add('updated');
+    setTimeout(() => el.classList.remove('updated'), 500);
+}
 
-    resetBtn.style.display = 'none';
+function setSidedMetric(id, value, decimals) {
+    const [text, dir = ''] = formatSided(value, decimals).split(' ');
+    setMetric(id, text, dir);
+}
 
-    if (isPiTracRunning === false) {
-        strip.classList.add('error');
-        title.textContent = 'System Stopped';
-        msg.textContent = 'PiTrac is not running \u2014 click Start to begin';
+function renderMetrics(data) {
+    setMetric('speed', formatNumber(data.speed, 1));
+    setMetric('launch_angle', formatNumber(data.launch_angle, 1));
+    setSidedMetric('side_angle', data.side_angle, 1);
+    setMetric('back_spin', formatNumber(data.back_spin, 0));
+    setSidedMetric('side_spin', data.side_spin, 0);
+}
+
+// -- Image panel --
+
+function renderEmptyImage(text) {
+    const inner = byId('image-panel-inner');
+    inner.innerHTML = '<div class="image-empty-state"><div class="empty-icon"></div><div class="empty-text"></div></div>';
+    inner.querySelector('.empty-text').textContent = text;
+}
+
+function renderImage(path) {
+    const img = document.createElement('img');
+    img.src = `/images/${encodeURI(path)}?t=${Date.now()}`;
+    img.alt = 'Shot image';
+    img.className = 'shot-image';
+    img.addEventListener('click', () => window.open(`/images/${encodeURI(path)}`, '_blank'));
+    byId('image-panel-inner').replaceChildren(img);
+    shownImage = path;
+}
+
+const shotDir = (path) => path.slice(0, path.lastIndexOf('/'));
+
+function renderStoredShot(shot) {
+    renderMetrics(shot);
+    if (shot.images && shot.images.length) renderImage(shot.images[0]);
+    else renderEmptyImage('Hit a shot to see the image here');
+}
+
+// -- Socket --
+
+function onMessage(data) {
+    if (data.type === 'image_ready') {
+        renderImage(data.filename);
         return;
     }
-
-    if (resultType) {
-        const normalizedType = resultType.toLowerCase();
-
-        if (normalizedType.includes('initializing')) {
-            strip.classList.add('initializing');
-            title.textContent = 'System Initializing';
-            msg.textContent = message || 'Starting up PiTrac system...';
-        } else if (normalizedType.includes('waiting for ball')) {
-            strip.classList.add('waiting');
-            title.textContent = 'Waiting for Ball';
-            msg.textContent = message || 'Please place ball on tee';
-        } else if (normalizedType.includes('waiting for simulator')) {
-            strip.classList.add('waiting');
-            title.textContent = 'Waiting for Simulator';
-            msg.textContent = message || 'Waiting for simulator to be ready';
-        } else if (normalizedType.includes('pausing') || normalizedType.includes('stabilization')) {
-            strip.classList.add('stabilizing');
-            title.textContent = 'Ball Detected';
-            msg.textContent = message || 'Waiting for ball to stabilize...';
-        } else if (normalizedType.includes('ball ready') || normalizedType.includes('ready')) {
-            strip.classList.add('ready');
-            title.textContent = 'Ready to Hit!';
-            msg.textContent = message || 'Ball is ready, take your shot';
-        } else if (normalizedType.includes('hit')) {
-            strip.classList.add('hit');
-            title.textContent = 'Ball Hit!';
-            msg.textContent = message || 'Processing shot data...';
-            resetBtn.style.display = '';
-        } else if (normalizedType.includes('error')) {
-            strip.classList.add('error');
-            title.textContent = 'Error';
-            msg.textContent = message || 'An error occurred';
-        } else if (normalizedType.includes('multiple balls')) {
-            strip.classList.add('error');
-            title.textContent = 'Multiple Balls Detected';
-            msg.textContent = message || 'Please remove extra balls';
-        } else {
-            title.textContent = 'System Status';
-            msg.textContent = message || resultType;
-        }
+    if (!('result_type' in data) || data.type) return;
+    renderMetrics(data);
+    if (freshSocket) {
+        freshSocket = false;
+        const stored = data.images && data.images[0];
+        if (stored && !(shownImage && shotDir(shownImage) === shotDir(stored))) renderImage(stored);
     }
-}
-
-function openImage(imgPath) {
-    window.open(`/images/${imgPath}`, '_blank');
+    const next = shotStateFor(data);
+    if (next) {
+        shotState = next;
+        renderStrip();
+    }
 }
 
 async function resetShot() {
     try {
-        const response = await fetch('/api/reset', { method: 'POST' });
-        if (response.ok) {
-            // Clear the image panel on explicit reset
-            const imageInner = document.getElementById('image-panel-inner');
-            imageInner.className = 'image-panel-inner';
-            imageInner.innerHTML =
-                '<div class="image-empty-state">' +
-                    '<div class="empty-icon"></div>' +
-                    '<div class="empty-text">Waiting for shot...</div>' +
-                '</div>';
-        }
-    } catch (error) {
-        console.error('Error resetting shot:', error);
+        await api('/api/reset', { method: 'POST' });
+        renderEmptyImage('Waiting for shot...');
+        shotState = null;
+        renderStrip();
+    } catch (err) {
+        console.error('Error resetting shot:', err);
     }
 }
 
-let originalCheckPiTracStatus;
-const dashboardCheckPiTracStatus = async function() {
-    if (!originalCheckPiTracStatus) {
-        originalCheckPiTracStatus = window.checkPiTracStatus;
-    }
-    const isRunning = await originalCheckPiTracStatus();
-    piTracRunning = isRunning;
+// -- Setup readiness --
 
-    const metricsPanel = document.getElementById('metrics-panel');
-    if (metricsPanel) {
-        metricsPanel.style.opacity = isRunning ? '1' : '0.3';
-    }
-
-    if (!isRunning) {
-        updateBallStatus(null, null, false);
-    }
-
-    return isRunning;
-};
-
-function showStatusMessage(message, type = 'info') {
-    const statusMessage = document.getElementById('status-strip-message');
-    if (statusMessage) {
-        const originalMessage = statusMessage.textContent;
-        statusMessage.textContent = message;
-        statusMessage.className = `status-strip-message ${type}`;
-
-        setTimeout(() => {
-            statusMessage.textContent = originalMessage;
-            statusMessage.className = 'status-strip-message';
-        }, 3000);
-    }
+function renderSetup() {
+    const card = byId('setup-card');
+    card.hidden = !setup || setup.complete || setupHidden();
+    if (card.hidden) return;
+    byId('setup-summary').innerHTML = setupSummaryHtml(setup, cameraLabels);
+    renderSetupChecklist(byId('setup-rows'), setupChecklist(setup), { base: '/calibration' });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    connectWebSocket();
+async function loadSetup() {
+    setup = await setupStatusRequest;
+    if (!setup) return;
+    renderStrip();
+    if (setup.complete) return;
+    cameraLabels = await loadCameraLabels();
+    renderSetup();
+}
 
-    updateBallStatus(null, null, false);
+// -- Init --
 
-    // Check if a shot image already exists on disk (e.g. page refresh after a shot)
-    const img = new Image();
-    img.onload = () => handleImageReady('ball_exposure_candidates.png');
-    img.src = '/images/ball_exposure_candidates.png?t=' + Date.now();
-
-    if (window.checkPiTracStatus) {
-        originalCheckPiTracStatus = window.checkPiTracStatus;
-        window.checkPiTracStatus = dashboardCheckPiTracStatus;
-    }
-
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) {
-            connectWebSocket();
-        }
-    });
+onPiTracStatus((s) => {
+    const now = s.is_running && !s.offline;
+    if (running && !now) shotState = null;
+    running = now;
+    offline = s.offline;
+    renderStrip();
 });
+
+renderStoredShot(JSON.parse(byId('initial-shot').textContent));
+renderStrip();
+
+byId('strip-start-btn').addEventListener('click', () => controlPiTrac('start'));
+byId('btn-reset').addEventListener('click', resetShot);
+byId('setup-hide-btn').addEventListener('click', () => {
+    setSetupHidden(true);
+    renderSetup();
+});
+document.addEventListener('pitrac:setup-shown', renderSetup);
+
+openSocket('/ws', onMessage, { onOpen: () => { freshSocket = true; } });
+loadSetup();

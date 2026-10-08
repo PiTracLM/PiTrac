@@ -1,356 +1,290 @@
-/* globals setTheme, closeModal */
+/* global requireStrobeSafe, escapeHtml, toast, api, onPiTracStatus */
 
-const runningTools = new Set();
-let outputBuffer = [];
-const MAX_OUTPUT_LINES = 1000;
-let uploadedImageFilename = null;
+const STATES = {
+    idle: ['bg-base-content/20', 'Not run'],
+    running: ['bg-warning animate-pulse', 'Running'],
+    success: ['bg-success', 'Passed'],
+    failed: ['bg-error', 'Failed'],
+    timeout: ['bg-warning', 'Timed out'],
+    stopped: ['bg-base-content/40', 'Stopped'],
+    error: ['bg-error', 'Could not run'],
+};
 
-document.addEventListener('DOMContentLoaded', () => {
-    loadAvailableTools();
-    startOutputPolling();
-    setupImageUpload();
-});
+const tools = {};
+const results = {};
+const running = new Map();
+let pitracRunning = false;
+let pollTimer = null;
 
-async function loadAvailableTools() {
+const byId = (id) => document.getElementById(id);
+const stateOf = (status) => STATES[status] || STATES.error;
+
+function textEl(tag, text, className = '') {
+    const el = document.createElement(tag);
+    el.className = className;
+    el.textContent = text;
+    return el;
+}
+
+async function loadTools() {
     try {
-        const response = await fetch('/api/testing/tools');
-        const data = await response.json();
-
-        Object.entries(data).forEach(([category, tools]) => {
-            const container = document.getElementById(`${category}-tools`);
-            if (container) {
-                container.innerHTML = '';
-                tools.forEach(tool => {
-                    container.appendChild(createToolCard(tool));
-                });
-            }
+        const data = await api('/api/testing/tools');
+        Object.entries(data).forEach(([category, list]) => {
+            list.forEach(tool => {
+                tools[tool.id] = tool;
+                const container = byId(tool.id === 'test_uploaded_image' ? 'upload-tools' : `${category}-tools`);
+                if (container) container.appendChild(createToolCard(tool));
+            });
         });
-    } catch (error) {
-        console.error('Failed to load testing tools:', error);
-        showError('Failed to load testing tools');
+    } catch (err) {
+        toast(`Could not load the testing tools: ${err.message}`, 'error');
+        return;
     }
+    await pollStatus(false);
 }
 
 function createToolCard(tool) {
     const card = document.createElement('div');
-    card.className = 'tool-card';
+    card.className = 'tool-card flex flex-col gap-2';
     card.dataset.toolId = tool.id;
-
-    const isRunning = runningTools.has(tool.id);
-
     card.innerHTML = `
-        <div class="tool-header">
-            <h3 class="tool-name">${tool.name}</h3>
-            ${tool.requires_sudo ? '<span class="sudo-badge">sudo</span>' : ''}
+        <div class="flex items-start justify-between gap-2">
+            <h3 class="tool-name">${escapeHtml(tool.name)}</h3>
+            <span class="tool-state flex items-center gap-1.5 text-xs whitespace-nowrap pt-0.5"></span>
         </div>
-        <p class="tool-description">${tool.description}</p>
-        <div class="tool-actions">
-            <button class="btn btn-primary run-btn" 
-                    onclick="runTool('${tool.id}')"
-                    ${isRunning ? 'disabled' : ''}>
-                ${isRunning ? 'Running...' : 'Run Test'}
-            </button>
-            ${isRunning ? `<button class="btn btn-danger" onclick="stopTool('${tool.id}')">Stop</button>` : ''}
-        </div>
-    `;
-
-    if (isRunning) {
-        card.classList.add('running');
-    }
-
+        <p class="tool-description grow-0">${escapeHtml(tool.description)}</p>
+        <dl class="text-xs grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
+            <dt class="opacity-60">Before</dt><dd>${escapeHtml(tool.before)}</dd>
+            <dt class="opacity-60">Expect</dt><dd>${escapeHtml(tool.success)}</dd>
+        </dl>
+        <p class="tool-message grow-0 text-xs text-error hidden"></p>
+        <div class="tool-actions mt-auto pt-2">
+            <button class="btn btn-primary btn-sm run-btn">Run</button>
+            <button class="btn btn-error btn-sm stop-btn hidden">Stop</button>
+            <button class="btn btn-ghost btn-sm view-btn hidden">View output</button>
+        </div>`;
+    card.querySelector('.run-btn').addEventListener('click', () => runTool(tool.id));
+    card.querySelector('.stop-btn').addEventListener('click', () => stopTool(tool.id));
+    card.querySelector('.view-btn').addEventListener('click', () => showOutput(tool.id));
     return card;
+}
+
+function renderCard(card) {
+    const id = card.dataset.toolId;
+    const isRunning = running.has(id);
+    const result = results[id];
+    const status = isRunning ? 'running' : result ? result.status : 'idle';
+    const [dot, word] = stateOf(status);
+    const label = isRunning ? `${word} ${Math.max(0, Math.round((Date.now() - running.get(id)) / 1000))}s` : word;
+    const stateEl = card.querySelector('.tool-state');
+    if (stateEl.textContent !== label) {
+        stateEl.replaceChildren(textEl('span', '', `w-2 h-2 rounded-full ${dot}`), textEl('span', label));
+    }
+    card.classList.toggle('running', isRunning);
+
+    const message = card.querySelector('.tool-message');
+    const showMessage = !isRunning && result && ['error', 'timeout'].includes(result.status) && result.message;
+    message.textContent = showMessage ? result.message : '';
+    message.classList.toggle('hidden', !showMessage);
+
+    const runBtn = card.querySelector('.run-btn');
+    runBtn.classList.toggle('hidden', isRunning);
+    runBtn.disabled = pitracRunning || running.size > 0;
+    runBtn.title = pitracRunning ? 'Stop PiTrac to run a test' : running.size > 0 ? 'Another test is running' : '';
+    card.querySelector('.stop-btn').classList.toggle('hidden', !isRunning);
+    card.querySelector('.view-btn').classList.toggle('hidden', isRunning || !result);
+}
+
+function renderAll() {
+    document.querySelectorAll('.tool-card').forEach(renderCard);
+    byId('pitrac-running-note').classList.toggle('hidden', !pitracRunning);
 }
 
 async function runTool(toolId) {
     if (!(await requireStrobeSafe())) return;
 
-    const card = document.querySelector(`[data-tool-id="${toolId}"]`);
-    const runBtn = card.querySelector('.run-btn');
+    running.set(toolId, Date.now());
+    delete results[toolId];
+    renderAll();
 
-    runBtn.disabled = true;
-    runBtn.textContent = 'Starting...';
-
+    let response;
     try {
-        const response = await fetch(`/api/testing/run/${toolId}`, {
-            method: 'POST'
-        });
-
-        const result = await response.json();
-
-        if (result.status === 'started') {
-            runningTools.add(toolId);
-            card.classList.add('running');
-            runBtn.textContent = 'Running...';
-
-            const actionsDiv = card.querySelector('.tool-actions');
-            if (!actionsDiv.querySelector('.btn-danger')) {
-                const stopBtn = document.createElement('button');
-                stopBtn.className = 'btn btn-danger';
-                stopBtn.textContent = 'Stop';
-                stopBtn.onclick = () => stopTool(toolId);
-                actionsDiv.appendChild(stopBtn);
-            }
-
-            appendOutput(`[${new Date().toLocaleTimeString()}] Started ${toolId}`, 'info');
-        } else {
-            handleToolResult(toolId, result);
-        }
-    } catch (error) {
-        console.error(`Failed to run tool ${toolId}:`, error);
-        showError(`Failed to run tool: ${error.message}`);
-        runBtn.disabled = false;
-        runBtn.textContent = 'Run Test';
+        response = await api(`/api/testing/run/${toolId}`, { method: 'POST' });
+    } catch (err) {
+        response = { status: 'error', message: err.message };
     }
+    if (response.status === 'started') startPolling();
+    else finishTool(toolId, response, true);
 }
 
 async function stopTool(toolId) {
     try {
-        const response = await fetch(`/api/testing/stop/${toolId}`, {
-            method: 'POST'
-        });
-
-        const result = await response.json();
-
-        if (result.status === 'success') {
-            runningTools.delete(toolId);
-            updateToolCard(toolId);
-            appendOutput(`[${new Date().toLocaleTimeString()}] Stopped ${toolId}`, 'warning');
-        }
-    } catch (error) {
-        console.error(`Failed to stop tool ${toolId}:`, error);
-        showError(`Failed to stop tool: ${error.message}`);
+        const response = await api(`/api/testing/stop/${toolId}`, { method: 'POST' });
+        if (response.status !== 'success') toast(response.message, 'error');
+    } catch (err) {
+        toast(`Could not stop the test: ${err.message}`, 'error');
     }
+    await pollStatus();
 }
 
-function handleToolResult(toolId, result) {
-    runningTools.delete(toolId);
-    updateToolCard(toolId);
+function finishTool(toolId, result, live) {
+    running.delete(toolId);
+    results[toolId] = result;
+    renderAll();
+    if (!live) return;
 
-    const timestamp = new Date().toLocaleTimeString();
-
+    const name = tools[toolId]?.name || toolId;
     if (result.status === 'success') {
-        appendOutput(`[${timestamp}] ${toolId} completed successfully`, 'success');
-
-        if (result.output) {
-            appendOutput('--- Output ---', 'info');
-            appendOutput(result.output);
-        }
-
-        if (result.image_path) {
-            showImageResult(toolId, result.image_url);
-        }
-    } else if (result.status === 'failed') {
-        appendOutput(`[${timestamp}] ${toolId} failed`, 'error');
-
-        if (result.error) {
-            appendOutput('--- Error ---', 'error');
-            appendOutput(result.error);
-        }
-    } else if (result.status === 'timeout') {
-        appendOutput(`[${timestamp}] ${toolId} timed out`, 'warning');
+        if (result.image_url) showOutput(toolId);
+        else toast(`${name} passed`, 'success', result.output ? { actionLabel: 'View output', onAction: () => showOutput(toolId) } : {});
+    } else if (result.status === 'error') {
+        toast(result.message || `${name} could not run`, 'error');
+    } else if (result.status !== 'stopped') {
+        toast(`${name}: ${stateOf(result.status)[1].toLowerCase()}`, 'error', {
+            actionLabel: 'View output',
+            onAction: () => showOutput(toolId),
+        });
     }
 }
 
-function updateToolCard(toolId) {
-    const card = document.querySelector(`[data-tool-id="${toolId}"]`);
-    if (!card) return;
-
-    const runBtn = card.querySelector('.run-btn');
-    const stopBtn = card.querySelector('.btn-danger');
-
-    card.classList.remove('running');
-    runBtn.disabled = false;
-    runBtn.textContent = 'Run Test';
-
-    if (stopBtn) {
-        stopBtn.remove();
+async function pollStatus(live = true) {
+    let data;
+    try {
+        data = await api('/api/testing/status');
+    } catch (err) {
+        console.error('Failed to poll testing status:', err);
+        return;
     }
-}
+    const serverRunning = new Set(data.running || []);
+    const serverResults = data.results || {};
 
-async function startOutputPolling() {
-    setInterval(async () => {
-        if (runningTools.size === 0) return;
-
-        try {
-            const response = await fetch('/api/testing/status');
-            const data = await response.json();
-
-            for (const toolId of runningTools) {
-                if (data.results && data.results[toolId]) {
-                    handleToolResult(toolId, data.results[toolId]);
-                }
-            }
-
-            if (data.running) {
-                const currentlyRunning = new Set(data.running);
-                for (const toolId of runningTools) {
-                    if (!currentlyRunning.has(toolId)) {
-                        runningTools.delete(toolId);
-                        updateToolCard(toolId);
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Failed to poll status:', error);
-        }
-    }, 2000); // Poll every 2 seconds
-}
-
-function appendOutput(text, className = '') {
-    const outputDiv = document.getElementById('testOutput');
-
-    const placeholder = outputDiv.querySelector('.output-placeholder');
-    if (placeholder) {
-        placeholder.remove();
-    }
-
-    const lines = text.split('\n');
-
-    lines.forEach(line => {
-        if (!line.trim()) return;
-
-        const lineDiv = document.createElement('div');
-        lineDiv.className = `output-line ${className}`;
-        lineDiv.textContent = line;
-
-        outputBuffer.push(lineDiv);
-        outputDiv.appendChild(lineDiv);
+    if (!live) Object.assign(results, serverResults);
+    serverRunning.forEach(id => {
+        if (!running.has(id)) running.set(id, Date.now() - ((data.elapsed || {})[id] || 0) * 1000);
     });
-
-    while (outputBuffer.length > MAX_OUTPUT_LINES) {
-        const oldLine = outputBuffer.shift();
-        oldLine.remove();
+    for (const id of [...running.keys()]) {
+        if (serverRunning.has(id)) continue;
+        if (serverResults[id]) finishTool(id, serverResults[id], live);
+        else running.delete(id);
     }
-
-    outputDiv.scrollTop = outputDiv.scrollHeight;
+    renderAll();
+    if (running.size) startPolling();
+    else stopPolling();
 }
 
-// eslint-disable-next-line no-unused-vars
-function clearOutput() {
-    const outputDiv = document.getElementById('testOutput');
-    outputDiv.innerHTML = '<div class="output-placeholder">Select a test tool to see output here</div>';
-    outputBuffer = [];
+function startPolling() {
+    if (pollTimer) return;
+    let tick = 0;
+    pollTimer = setInterval(() => {
+        renderAll();
+        if (++tick % 2 === 0) pollStatus();
+    }, 1000);
 }
 
-function showImageResult(toolId, imageUrl) {
-    const modal = document.getElementById('testModal');
-    const modalTitle = document.getElementById('modalTitle');
-    const modalBody = document.getElementById('modalBody');
-
-    modalTitle.textContent = `Image Result: ${toolId}`;
-    modalBody.innerHTML = `
-        <div class="image-result">
-            <img src="${imageUrl}" alt="${toolId} result" style="max-width: 100%; height: auto;">
-            <div class="image-actions">
-                <a href="${imageUrl}" download class="btn btn-primary">Download</a>
-            </div>
-        </div>
-    `;
-
-    modal.style.display = 'block';
+function stopPolling() {
+    clearInterval(pollTimer);
+    pollTimer = null;
 }
 
-function showError(message) {
-    appendOutput(`[ERROR] ${message}`, 'error');
+function showOutput(toolId) {
+    const result = results[toolId];
+    if (!result) return;
+    const name = tools[toolId]?.name || toolId;
+    byId('modalTitle').textContent = `${name}: ${stateOf(result.status)[1].toLowerCase()}`;
+
+    const body = byId('modalBody');
+    body.replaceChildren();
+    if (result.message) body.append(textEl('p', result.message, 'text-sm'));
+    if (result.image_url) {
+        const src = `${result.image_url}?t=${encodeURIComponent(result.timestamp || Date.now())}`;
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = `${name} picture`;
+        img.className = 'w-full h-auto rounded-lg';
+        const download = textEl('a', 'Download', 'btn btn-sm btn-primary self-center');
+        download.href = src;
+        download.download = '';
+        body.append(img, download);
+    }
+    const section = (label, text) => body.append(
+        textEl('div', label, 'text-xs font-semibold uppercase tracking-wide opacity-60'),
+        textEl('pre', text, 'terminal max-h-[50vh] m-0'),
+    );
+    if (result.error) section('Error output', result.error);
+    if (result.output) section('Output', result.output);
+    if (!body.childElementCount) body.append(textEl('p', 'No output.', 'text-sm opacity-60'));
+    byId('testModal').showModal();
 }
 
-// Image Upload Functions
+// -- Image upload --
+
 function setupImageUpload() {
-    const uploadArea = document.getElementById('uploadArea');
-    const fileInput = document.getElementById('imageUpload');
+    const uploadArea = byId('uploadArea');
+    const fileInput = byId('imageUpload');
 
-    // Click to upload
     uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            fileInput.click();
+        }
+    });
+    fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
+    byId('clearImageBtn').addEventListener('click', clearImage);
 
-    // File input change
-    fileInput.addEventListener('change', handleFileSelect);
-
-    // Drag and drop
     uploadArea.addEventListener('dragover', (e) => {
         e.preventDefault();
         uploadArea.classList.add('drag-over');
     });
-
-    uploadArea.addEventListener('dragleave', () => {
-        uploadArea.classList.remove('drag-over');
-    });
-
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
     uploadArea.addEventListener('drop', (e) => {
         e.preventDefault();
         uploadArea.classList.remove('drag-over');
-
-        if (e.dataTransfer.files.length > 0) {
-            handleFileSelect({ target: { files: e.dataTransfer.files } });
-        }
+        handleFile(e.dataTransfer.files[0]);
     });
 }
 
-async function handleFileSelect(event) {
-    const file = event.target.files[0];
+async function handleFile(file) {
     if (!file) return;
-
-    // Validate file type
     if (!file.type.startsWith('image/')) {
-        showError('Please select an image file');
+        toast('Choose an image file.', 'error');
         return;
     }
 
-    // Show preview
     const reader = new FileReader();
     reader.onload = (e) => {
-        document.getElementById('previewImg').src = e.target.result;
-        document.getElementById('imageName').textContent = file.name;
-        document.getElementById('uploadArea').style.display = 'none';
-        document.getElementById('imagePreview').style.display = 'block';
-        document.getElementById('runPipelineBtn').style.display = 'block';
+        byId('previewImg').src = e.target.result;
+        byId('imageName').textContent = file.name;
+        byId('uploadArea').classList.add('hidden');
+        byId('imagePreview').classList.remove('hidden');
     };
     reader.readAsDataURL(file);
 
-    // Upload to server
     const formData = new FormData();
     formData.append('file', file);
-
     try {
-        appendOutput('[INFO] Uploading image...', 'info');
-
-        const response = await fetch('/api/testing/upload-image', {
-            method: 'POST',
-            body: formData
-        });
-
+        const response = await fetch('/api/testing/upload-image', { method: 'POST', body: formData });
         const result = await response.json();
-
-        if (result.status === 'success') {
-            uploadedImageFilename = result.filename;
-            appendOutput(`[SUCCESS] Image uploaded: ${result.filename}`, 'success');
-        } else {
-            showError(result.message);
-            clearImage();
-        }
-    } catch (error) {
-        showError(`Upload failed: ${error.message}`);
+        if (result.status !== 'success') throw new Error(result.message);
+        toast(`Uploaded ${result.filename}`, 'success');
+    } catch (err) {
+        toast(`Upload failed: ${err.message}`, 'error');
         clearImage();
     }
 }
 
 function clearImage() {
-    document.getElementById('uploadArea').style.display = 'flex';
-    document.getElementById('imagePreview').style.display = 'none';
-    document.getElementById('runPipelineBtn').style.display = 'none';
-    document.getElementById('imageUpload').value = '';
-    uploadedImageFilename = null;
+    byId('uploadArea').classList.remove('hidden');
+    byId('imagePreview').classList.add('hidden');
+    byId('imageUpload').value = '';
 }
 
-// eslint-disable-next-line no-unused-vars
-async function runImageTest() {
-    if (!uploadedImageFilename) {
-        showError('No image uploaded');
-        return;
-    }
+onPiTracStatus((s) => {
+    const now = s.is_running && !s.offline;
+    if (now === pitracRunning) return;
+    pitracRunning = now;
+    renderAll();
+});
 
-    appendOutput('[INFO] Starting full pipeline test...', 'info');
-    appendOutput('[INFO] Processing strobed ball image through: Ball Detection → Spin Analysis → Shot Calculation', 'info');
-
-    // Run the test_uploaded_image tool
-    await runTool('test_uploaded_image');
-}
+setupImageUpload();
+loadTools();

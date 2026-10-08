@@ -17,7 +17,7 @@
 
 #include "gs_camera.h"
 #include "gs_calibration.h"
-#include "gs_web_api.h"
+#include "gs_http_client.h"
 
 
 namespace golf_sim {
@@ -55,9 +55,9 @@ namespace golf_sim {
     // Number of pictures to average when determining focal length.  Because the focal length can tend
     // to bounce around a bit due to small variations in ball detection, averaging multiple pictures can help.
 
-    int GolfSimCalibration::kNumberPicturesForFocalLengthAverage = 5;
+    int GolfSimCalibration::kNumberPicturesForFocalLengthAverage = 6;
 
-    int GolfSimCalibration::kNumberOfCalibrationFailuresToTolerate = 2;
+    int GolfSimCalibration::kNumberOfCalibrationFailuresToTolerate = 4;
 
 
     GolfSimCalibration::GolfSimCalibration() {
@@ -151,7 +151,7 @@ namespace golf_sim {
         bool result = ip->GetBall(color_image, ball, return_balls, nullROI, search_mode);
 
         if (!result || return_balls.empty()) {
-            GS_LOG_MSG(error, "GetBall() failed to get a ball.  Consider setting  --show_images=1  in order to determine why no ball was found.");
+            GS_LOG_MSG(error, "GetBall() failed to get a ball.  Consider enabling Show Debug Images (gs_config.debug.kShowDebugImages) to determine why no ball was found.");
             return -1.0;
         }
 
@@ -419,6 +419,7 @@ namespace golf_sim {
 		        else {
                 	GS_LOG_MSG(warning, "Could not DetermineFocalLengthForAutoCalibration -- trying again.");
                     i--;
+                    continue;
 		        }
             }
 
@@ -442,7 +443,7 @@ namespace golf_sim {
         }
 
         average_focal_length /= number_samples;
-        GS_LOG_MSG(info, "====>  Average Focal Length = " + std::to_string(average_focal_length) + ". Will set this value into the gs_config.json file.");
+        GS_LOG_MSG(info, "====>  Average Focal Length = " + std::to_string(average_focal_length) + ".");
 
         const double kMinFocalLength = 2.0;
         const double kMaxFocalLength = 50.0;
@@ -479,54 +480,17 @@ namespace golf_sim {
             return false;
         }
 
-        // Now save the values out to a .json file
+        const bool is_camera1 = camera_number == GsCameraNumber::kGsCamera1;
+        std::string focal_length_tag_name = is_camera1 ? "gs_config.cameras.kCamera1FocalLength" : "gs_config.cameras.kCamera2FocalLength";
+        std::string camera_angles_tag_name = is_camera1 ? "gs_config.cameras.kCamera1Angles" : "gs_config.cameras.kCamera2Angles";
 
-        std::string camera_number_string = std::to_string(camera_number);
-            
-        std::string focal_length_tag_name = "gs_config.cameras.kCamera" + camera_number_string + "FocalLength";
-        std::string camera_angles_tag_name = "gs_config.cameras.kCamera" + camera_number_string + "Angles";
-
-        GolfSimConfiguration::SetTreeValue(focal_length_tag_name, average_focal_length);
-        GolfSimConfiguration::SetTreeValue(camera_angles_tag_name, camera_angles);
-            
-        WebApi::UpdateCalibration(focal_length_tag_name, average_focal_length);
-            
+#ifdef __unix__
         std::vector<double> angles_vector = {camera_angles[0], camera_angles[1]};
-        WebApi::UpdateCalibration(camera_angles_tag_name, angles_vector);
-
-        std::string config_file_name = "golf_sim_config.json";
-
-        if (!GolfSimOptions::GetCommandLineOptions().config_file_.empty()) {
-
-            config_file_name = GolfSimOptions::GetCommandLineOptions().config_file_;
-        }
-
-        // Add only to the tail of the file name to ensure that any prefixed path will remain valid
-        std::string backup_json_file_name = config_file_name + "_BACKUP_" + LoggingTools::GetUniqueLogName() + ".json";
-
-        GS_LOG_TRACE_MSG(info, "Saving current golf_sim_config.json file to filename = " + backup_json_file_name);
-
-#ifdef __unix__  
-        std::string cp_command = "cp " + config_file_name + " " + backup_json_file_name;
+        return GsHttpClient::UpdateCalibration(focal_length_tag_name, average_focal_length) &&
+               GsHttpClient::UpdateCalibration(camera_angles_tag_name, angles_vector);
 #else
-        std::string cp_command = "copy " + config_file_name + " " + backup_json_file_name;
+        return false;
 #endif
-        int command_result = system(cp_command.c_str());
-
-        if (command_result != 0) {
-            GS_LOG_TRACE_MSG(trace, "system(cp_command) failed. Could not backup existing golf_sim_config.json file.  Exiting");
-            return false;
-        }
-
-        // NOTE - we will overwrite the original config file
-        std::string results_tree_file_name = config_file_name;
-
-        if (!GolfSimConfiguration::WriteTreeToFile(results_tree_file_name)) {
-            GS_LOG_MSG(error, "Could not WriteTreeToFile(" + results_tree_file_name + ").");
-            return false;
-        }
-
-        return true;
     }
 
 }

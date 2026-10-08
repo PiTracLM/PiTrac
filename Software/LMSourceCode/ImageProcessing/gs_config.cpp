@@ -11,11 +11,11 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include "gs_http_client.h"
 #include "logging_tools.h"
 #include "gs_camera.h"
 #include "gs_ui_system.h"
 #include "gs_config.h"
-#include "configuration_manager.h"
 #include "gs_options.h"
 
 // Having to set the constants in this way creates more entanglement than we'd like.  TBD - Re-architect
@@ -30,10 +30,47 @@ namespace golf_sim {
 	GolfSimConfiguration::EnclosureType GolfSimConfiguration::kEnclosureVersion = GolfSimConfiguration::EnclosureType::kEnclosureVersion_Unknown;
 
 
-	bool GolfSimConfiguration::Initialize(const std::string& configuration_filename) {
+static std::string GetConfigString(const std::string& tag_name) {
+	std::string value;
+	GolfSimConfiguration::SetConstant(tag_name, value);
+	return value;
+}
+
+static void PopulateOptionsFromConfig() {
+	GolfSimOptions& options = GolfSimOptions::GetCommandLineOptions();
+
+	auto apply_enum = [&options](const std::string& tag_name, bool (GolfSimOptions::*setter)(const std::string&)) {
+		std::string value = GetConfigString(tag_name);
+		if (!value.empty() && !(options.*setter)(value)) {
+			GS_LOG_MSG(warning, "Ignoring unrecognized value for " + tag_name + ": " + value);
+		}
+	};
+	apply_enum("gs_config.player.kGolferOrientation", &GolfSimOptions::SetGolferOrientation);
+	apply_enum("logging.level", &GolfSimOptions::SetLoggingLevel);
+	apply_enum("gs_config.logging.kArtifactSaveLevel", &GolfSimOptions::SetArtifactSaveLevel);
+
+	GolfSimConfiguration::SetConstant("gs_config.debug.kShowDebugImages", options.show_images_);
+	GolfSimConfiguration::SetConstant("gs_config.debug.kWaitForKeyOnImages", options.wait_for_key_on_images_);
+	GolfSimConfiguration::SetConstant("gs_config.player.kUsePracticeBalls", options.practice_ball_);
+	GolfSimConfiguration::SetConstant("gs_config.cameras.kCamera1SearchCenterX", options.search_center_x_);
+	GolfSimConfiguration::SetConstant("gs_config.cameras.kCamera1SearchCenterY", options.search_center_y_);
+}
+
+	bool GolfSimConfiguration::Initialize() {
+
+		std::string config_body;
+#ifdef __unix__
+		config_body = GsHttpClient::FetchConfig();
+#endif
+
+		if (config_body.empty()) {
+			GS_LOG_MSG(error, "GolfSimConfiguration::Initialize failed: no config. The web server must be running to serve /api/internal/config.");
+			return false;
+		}
 
 		try {
-			boost::property_tree::read_json(configuration_filename, configuration_root_);
+			std::istringstream config_stream(config_body);
+			boost::property_tree::read_json(config_stream, configuration_root_);
 		}
 		catch (std::exception const& e)
 		{
@@ -41,18 +78,12 @@ namespace golf_sim {
 			return false;
 		}
 
-		// Initialize new ConfigurationManager for override support
-		ConfigurationManager& config_mgr = ConfigurationManager::GetInstance();
-		if (!config_mgr.Initialize(configuration_filename)) {
-			GS_LOG_MSG(warning, "ConfigurationManager initialization failed, using JSON only");
-		} else {
-			GS_LOG_MSG(info, "ConfigurationManager initialized with override support");
-		}
-
 		// Read any values that we want to set early, here at initialization
 		if (!ReadValues()) {
 			return false;
 		}
+
+		PopulateOptionsFromConfig();
 
 		return true;
 	}
@@ -81,39 +112,6 @@ namespace golf_sim {
 		return std::string();
 	}
 
-
-	bool GolfSimConfiguration::ReadShotInjectionData(std::vector<GsResults>& shots,
-													 int & kInterShotInjectionPauseSeconds) {
-		try {
-			SetConstant("gs_config.testing.kInterShotInjectionPauseSeconds", kInterShotInjectionPauseSeconds);
-
-			// Retrirve as many shots as are defined in the json file
-			boost::property_tree::ptree shots_json = configuration_root_.get_child("gs_config.testing.test_shots_to_inject");
-
-			int shot_number = 1;
-			for (boost::property_tree::ptree::iterator iter = shots_json.begin(); iter != shots_json.end(); iter++) {
-			// for (boost::property_tree::ptree& shot_section : shots_json) {
-				GsResults result;
-				result.shot_number_ = shot_number;
-				shot_number++;
-
-				result.speed_mph_ = iter->second.get<float>("Speed", 0);
-				result.hla_deg_ = iter->second.get<float>("HLA", 0);
-				result.vla_deg_ = iter->second.get<float>("VLA", 0);
-				result.back_spin_rpm_ = iter->second.get<int>("BackSpin", 0);
-				result.side_spin_rpm_ = iter->second.get<int>("SideSpin", 0);
-				result.club_type_ = GolfSimClubs::GsClubType::kNotSelected;
-
-				shots.push_back(result);
-			}
-		}
-		catch (std::exception const& e)
-		{
-			GS_LOG_MSG(error, "GolfSimConfiguration::ReadShotInjectionData failed. ERROR: *** " + std::string(e.what()) + " ***");
-			return false;
-		}
-		return true;
-	}
 
 	// Returns the valiue of the environment variable PITRAC_ROOT
 	std::string GolfSimConfiguration::GetPiTracRootPath() {
@@ -165,7 +163,7 @@ bool GolfSimConfiguration::ReadValues() {
 	SetConstant("gs_config.cameras.kCamera2OffsetFromCamera1OriginMeters", GolfSimCamera::kCamera2OffsetFromCamera1OriginMeters);
 
 
-	int enclosure_type = 0;
+	int enclosure_type = 2;
 	GolfSimConfiguration::SetConstant("gs_config.system.kEnclosureVersion", enclosure_type);
 	kEnclosureVersion = (GolfSimConfiguration::EnclosureType)enclosure_type;
 
@@ -197,13 +195,11 @@ bool GolfSimConfiguration::ReadValues() {
 
 	SetConstant("gs_config.cameras.kCamera2CalibrateOrLocationGain", LibCameraInterface::kCamera2CalibrateOrLocationGain);	
 	SetConstant("gs_config.cameras.kCamera2ComparisonGain", LibCameraInterface::kCamera2ComparisonGain);
-	SetConstant("gs_config.testing.kCamera2StrobedEnvironmentGain", LibCameraInterface::kCamera2StrobedEnvironmentGain);
 	SetConstant("gs_config.cameras.kCamera2Contrast", LibCameraInterface::kCamera2Contrast);
 	SetConstant("gs_config.cameras.kCamera2PuttingGain", LibCameraInterface::kCamera2PuttingGain);
 	SetConstant("gs_config.cameras.kCamera2PuttingContrast", LibCameraInterface::kCamera2PuttingContrast);
 	SetConstant("gs_config.cameras.kCamera1StillShutterTimeuS", LibCameraInterface::kCamera1StillShutterTimeuS);
 	SetConstant("gs_config.cameras.kCamera2StillShutterTimeuS", LibCameraInterface::kCamera2StillShutterTimeuS);
-	SetConstant("gs_config.cameras.kCameraMotionDetectSettings", LibCameraInterface::kCameraMotionDetectSettings);
 
 	// The web server share directory isn't really a value we want to use from the .json configuration
 	// file anymore, but for now, let's allow it as a fall-back to the command line
@@ -212,7 +208,7 @@ bool GolfSimConfiguration::ReadValues() {
 	}
 	else {
 		// Attempt to get the image logging directory from the .json config file
-		SetConstant("gs_config.user_interface.kWebServerShareDirectory", GsUISystem::kWebServerShareDirectory);
+		SetConstant("gs_config.ipc_interface.kWebServerShareDirectory", GsUISystem::kWebServerShareDirectory);
 	}
 
 	// If the configuration file forgot to add a "/" at the end of the logging directory, we should add it here ourselves
@@ -222,87 +218,41 @@ bool GolfSimConfiguration::ReadValues() {
 
 #endif
 
-    // Read any environment variables that we may need
-
-    std::string slot1_env = safe_getenv("PITRAC_SLOT1_CAMERA_TYPE");
-    GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT1_CAMERA_TYPE environment variable was: " + slot1_env );
-    if (slot1_env.empty()) {
-        GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT1_CAMERA_TYPE environment variable was not set.  Assuming default of: " + std::to_string(GolfSimCamera::kSystemSlot1CameraType));
-    } else {
-#ifndef __unix__  // Ignore in Windows environment
-		// Ensure we don't have any trailing spaces.  Visual Studio seems to add them?
-		slot1_env = slot1_env.substr(0,1);
-#endif
-        GolfSimCamera::kSystemSlot1CameraType = CameraHardware::string_to_camera_model(slot1_env);
-    }
-
-    std::string slot2_env = safe_getenv("PITRAC_SLOT2_CAMERA_TYPE");
-    GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT2_CAMERA_TYPE environment variable was: " + slot2_env );
-    if (slot2_env.empty()) {
-        GS_LOG_TRACE_MSG(error, "PITRAC_SLOT2_CAMERA_TYPE must be set. Exiting.");
-        return false;
-    } else {
-#ifndef __unix__  // Ignore in Windows environment
-        // Ensure we don't have any trailing spaces.  Visual Studio seems to add them?
-        slot2_env = slot2_env.substr(0, 1);
-#endif
-        GolfSimCamera::kSystemSlot2CameraType = CameraHardware::string_to_camera_model(slot2_env);
-    }
-
-	std::string slot1_lens_env = safe_getenv("PITRAC_SLOT1_LENS_TYPE");
-	GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT1_LENS_TYPE environment variable was: " + slot1_lens_env);
-	if (slot1_lens_env.empty()) {
-		GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT1_LENS_TYPE environment variable was not set.  Assuming default of: " + std::to_string(GolfSimCamera::kSystemSlot1LensType));
-	}
-	else {
-#ifndef __unix__  // Ignore in Windows environment
-		// Ensure we don't have any trailing spaces.  Visual Studio seems to add them?
-		slot1_lens_env = slot1_lens_env.substr(0, 1);
-#endif
-		GolfSimCamera::kSystemSlot1LensType = CameraHardware::string_to_lens_type(slot1_lens_env);
+	std::string slot1_type = GetConfigString("cameras.slot1.type");
+	if (!slot1_type.empty()) {
+		GolfSimCamera::kSystemSlot1CameraType = CameraHardware::string_to_camera_model(slot1_type);
 	}
 
-	std::string slot2_lens_env = safe_getenv("PITRAC_SLOT2_LENS_TYPE");
-	GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT2_LENS_TYPE environment variable was: " + slot2_lens_env);
-	if (slot2_lens_env.empty()) {
-		GS_LOG_TRACE_MSG(error, "PITRAC_SLOT2_LENS_TYPE must be set. Exiting.");
+	std::string slot2_type = GetConfigString("cameras.slot2.type");
+	if (slot2_type.empty()) {
+		GS_LOG_MSG(error, "cameras.slot2.type must be set. Exiting.");
 		return false;
 	}
-	else {
-#ifndef __unix__  // Ignore in Windows environment
-		// Ensure we don't have any trailing spaces
-		slot2_lens_env = slot2_lens_env.substr(0, 1);
-#endif
-		GolfSimCamera::kSystemSlot2LensType = CameraHardware::string_to_lens_type(slot2_lens_env);
+	GolfSimCamera::kSystemSlot2CameraType = CameraHardware::string_to_camera_model(slot2_type);
+
+	std::string slot1_lens = GetConfigString("cameras.slot1.lens");
+	if (!slot1_lens.empty()) {
+		GolfSimCamera::kSystemSlot1LensType = CameraHardware::string_to_lens_type(slot1_lens);
 	}
 
-
-	std::string slot1_camera_orientation_env = safe_getenv("PITRAC_SLOT1_CAMERA_ORIENTATION");
-	GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT1_CAMERA_ORIENTATION environment variable was: " + slot1_camera_orientation_env);
-	if (slot1_camera_orientation_env.empty()) {
-		GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT1_CAMERA_ORIENTATION environment variable was not set.  Assuming default of: " + std::to_string(GolfSimCamera::kSystemSlot1CameraOrientation));
-	}
-	else {
-#ifndef __unix__  // Ignore in Windows environment
-		// Ensure we don't have any trailing spaces.  Visual Studio seems to add them?
-		slot1_camera_orientation_env = slot1_camera_orientation_env.substr(0, 1);
-#endif
-		GolfSimCamera::kSystemSlot1CameraOrientation = CameraHardware::string_to_camera_orientation(slot1_camera_orientation_env);
-	}
-
-	std::string slot2_camera_orientation_env = safe_getenv("PITRAC_SLOT2_CAMERA_ORIENTATION");
-	GS_LOG_TRACE_MSG(info, "GolfSimConfiguration - PITRAC_SLOT2_CAMERA_ORIENTATION environment variable was: " + slot2_camera_orientation_env);
-	if (slot2_camera_orientation_env.empty()) {
-		GS_LOG_TRACE_MSG(error, "PITRAC_SLOT2_CAMERA_ORIENTATION must be set. Exiting.");
+	std::string slot2_lens = GetConfigString("cameras.slot2.lens");
+	if (slot2_lens.empty()) {
+		GS_LOG_MSG(error, "cameras.slot2.lens must be set. Exiting.");
 		return false;
 	}
-	else {
-#ifndef __unix__  // Ignore in Windows environment
-		// Ensure we don't have any trailing spaces
-		slot2_camera_orientation_env = slot2_camera_orientation_env.substr(0, 1);
-#endif
-		GolfSimCamera::kSystemSlot2CameraOrientation = CameraHardware::string_to_camera_orientation(slot2_camera_orientation_env);
+	GolfSimCamera::kSystemSlot2LensType = CameraHardware::string_to_lens_type(slot2_lens);
+
+	std::string slot1_orientation = GetConfigString("cameras.slot1.orientation");
+	if (!slot1_orientation.empty()) {
+		GolfSimCamera::kSystemSlot1CameraOrientation = CameraHardware::string_to_camera_orientation(slot1_orientation);
 	}
+
+	std::string slot2_orientation = GetConfigString("cameras.slot2.orientation");
+	if (slot2_orientation.empty()) {
+		GS_LOG_MSG(error, "cameras.slot2.orientation must be set. Exiting.");
+		return false;
+	}
+	GolfSimCamera::kSystemSlot2CameraOrientation = CameraHardware::string_to_camera_orientation(slot2_orientation);
 
 
 	return true;
@@ -316,136 +266,22 @@ bool GolfSimConfiguration::ReadValues() {
 	}
 
 
-	void GolfSimConfiguration::SetConstant(const std::string& tag_name, bool& constant_value) {
-		// Try ConfigurationManager first for override support
-		ConfigurationManager& config_mgr = ConfigurationManager::GetInstance();
-		if (config_mgr.HasKey(tag_name)) {
-			bool val = config_mgr.GetBool(tag_name, constant_value);
-			if (val != constant_value) {
-				GS_LOG_TRACE_MSG(trace, "Override from ConfigurationManager: " + tag_name + " = " + (val ? "true" : "false"));
-				constant_value = val;
-				return;
-			}
-		}
-
-		// Fall back to original JSON behavior
-		try {
-			constant_value = configuration_root_.get<bool>(tag_name, false);
-		}
-		catch (std::exception const& e)
-		{
-			GS_LOG_MSG(error, "GolfSimConfiguration::SetConstant failed. ERROR: *** " + std::string(e.what()) + " ***");
-			constant_value = false;
+	template <typename T>
+	static void ReadScalar(const boost::property_tree::ptree& root, const std::string& tag_name, T& constant_value) {
+		if (auto v = root.get_optional<T>(tag_name)) {
+			constant_value = *v;
+		} else {
+			GS_LOG_MSG(warning, "No config value for " + tag_name + ", keeping default");
 		}
 	}
 
-	void GolfSimConfiguration::SetConstant(const std::string& tag_name, int& constant_value) {
-		// Try ConfigurationManager first for override support
-		ConfigurationManager& config_mgr = ConfigurationManager::GetInstance();
-		if (config_mgr.HasKey(tag_name)) {
-			int val = config_mgr.GetInt(tag_name, constant_value);
-			if (val != constant_value) {
-				GS_LOG_TRACE_MSG(trace, "Override from ConfigurationManager: " + tag_name + " = " + std::to_string(val));
-				constant_value = val;
-				return;
-			}
-		}
-
-		// Fall back to original JSON behavior
-		try {
-			constant_value = configuration_root_.get<int>(tag_name, 0);
-		}
-		catch (std::exception const& e)
-		{
-			GS_LOG_MSG(error, "GolfSimConfiguration::SetConstant failed. ERROR: *** " + std::string(e.what()) + " ***");
-			constant_value = false;
-		}
-	}
-
-	void GolfSimConfiguration::SetConstant(const std::string& tag_name, long& constant_value) {
-		try {
-			constant_value = configuration_root_.get<long>(tag_name, 0);
-		}
-		catch (std::exception const& e)
-		{
-			GS_LOG_MSG(error, "GolfSimConfiguration::SetConstant failed. ERROR: *** " + std::string(e.what()) + " ***");
-			constant_value = false;
-		}
-	}
-
-	void GolfSimConfiguration::SetConstant(const std::string& tag_name, unsigned int& constant_value) {
-		try {
-			constant_value = configuration_root_.get<uint>(tag_name, 0);
-		}
-		catch (std::exception const& e)
-		{
-			GS_LOG_MSG(error, "GolfSimConfiguration::SetConstant failed. ERROR: *** " + std::string(e.what()) + " ***");
-			constant_value = false;
-		}
-	}
-
-	 void GolfSimConfiguration::SetConstant(const std::string& tag_name, float& constant_value) {
-		// Try ConfigurationManager first for override support
-		ConfigurationManager& config_mgr = ConfigurationManager::GetInstance();
-		if (config_mgr.HasKey(tag_name)) {
-			float val = config_mgr.GetFloat(tag_name, constant_value);
-			if (val != constant_value) {
-				GS_LOG_TRACE_MSG(trace, "Override from ConfigurationManager: " + tag_name + " = " + std::to_string(val));
-				constant_value = val;
-				return;
-			}
-		}
-
-		// Fall back to original JSON behavior
-		try {
-			constant_value = configuration_root_.get<float>(tag_name, 0.0);
-		}
-		catch (std::exception const& e)
-		{
-			GS_LOG_MSG(error, "GolfSimConfiguration::SetConstant failed. ERROR: *** " + std::string(e.what()) + " ***");
-			constant_value = false;
-		}
-	}
-
-	 void GolfSimConfiguration::SetConstant(const std::string& tag_name, double& constant_value) {
-		try {
-			constant_value = configuration_root_.get<double>(tag_name, 0.0);
-		}
-		catch (std::exception const& e)
-		{
-			GS_LOG_MSG(error, "GolfSimConfiguration::SetConstant failed. ERROR: *** " + std::string(e.what()) + " ***");
-			constant_value = false;
-		}
-	}
-
-	 void GolfSimConfiguration::SetConstant(const std::string& tag_name, std::string& constant_value) {
-		// Try ConfigurationManager first for override support
-		ConfigurationManager& config_mgr = ConfigurationManager::GetInstance();
-		
-		// First check if there's a mapped YAML key
-		std::string yaml_key = tag_name;
-		// Convert JSON path to potential YAML key (simplified mapping)
-		// e.g., "gs_config.cameras.kCamera1Gain" -> "cameras.camera1_gain"
-		
-		if (config_mgr.HasKey(yaml_key)) {
-			std::string val = config_mgr.GetString(yaml_key, constant_value);
-			if (val != constant_value) {
-				GS_LOG_TRACE_MSG(trace, "Override from ConfigurationManager: " + tag_name + " = " + val);
-				constant_value = val;
-				return;
-			}
-		}
-
-		// Fall back to original JSON behavior
-		 try {
-			 constant_value = configuration_root_.get<std::string>(tag_name, constant_value);
-		 }
-		 catch (std::exception const& e)
-		 {
-			 GS_LOG_MSG(error, "GolfSimConfiguration::SetConstant failed. ERROR: *** " + std::string(e.what()) + " ***");
-			 constant_value = "";
-		 }
-	 }
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, bool& constant_value) { ReadScalar(configuration_root_, tag_name, constant_value); }
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, int& constant_value) { ReadScalar(configuration_root_, tag_name, constant_value); }
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, long& constant_value) { ReadScalar(configuration_root_, tag_name, constant_value); }
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, unsigned int& constant_value) { ReadScalar(configuration_root_, tag_name, constant_value); }
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, float& constant_value) { ReadScalar(configuration_root_, tag_name, constant_value); }
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, double& constant_value) { ReadScalar(configuration_root_, tag_name, constant_value); }
+	void GolfSimConfiguration::SetConstant(const std::string& tag_name, std::string& constant_value) { ReadScalar(configuration_root_, tag_name, constant_value); }
 
 	 void GolfSimConfiguration::SetConstant(const std::string& tag_name, cv::Vec3d& vec) {
 		 try {
@@ -555,100 +391,6 @@ bool GolfSimConfiguration::ReadValues() {
 		 {
 			 GS_LOG_MSG(error, "GolfSimConfiguration::SetConstant failed. ERROR: *** " + std::string(e.what()) + " ***");
 		 }
-	 }
-
-	 bool GolfSimConfiguration::RemoveTreeNode(const std::string& tag_name) {
-
-		 try {
-			 std::string end_node_name = "kCamera1FocalLength";
-
-			 if (PropertyExists(tag_name)) {
-				 configuration_root_.erase(tag_name);
-				 return true;
-			 }
-		 }
-		 catch (std::exception const& e)
-		 {
-			 GS_LOG_MSG(error, "GolfSimConfiguration::RemoveTreeNode failed. ERROR: *** " + std::string(e.what()) + " ***");
-			 return false;
-		 }
-
-		 return false;
-	 }
-
-	 bool GolfSimConfiguration::SetTreeValue(const std::string& tag_name, const cv::Vec2d& vec) {
-
-		 boost::property_tree::ptree values_node;
-
-		 try {
-			 // RemoveTreeNode(tag_name);
-
-			 bool node_exists = PropertyExists(tag_name);
-
-			 if (node_exists) {
-				 int i = 0;
-				 for (boost::property_tree::ptree::value_type& element : configuration_root_.get_child(tag_name)) {
-					 element.second.put("", vec[i++]);
-				 }
-			 }
-			 else {
-				 boost::property_tree::ptree new_node;
-				 boost::property_tree::ptree element;
-
-				 element.put("", vec[0]);
-				 new_node.push_back(std::make_pair("", element));
-
-				 element.clear();
-				 element.put("", vec[1]);
-				 new_node.push_back(std::make_pair("", element));
-
-				 configuration_root_.add_child(tag_name, new_node);
-			 }
-		 }
-		 catch (std::exception const& e)
-		 {
-			 GS_LOG_MSG(error, "GolfSimConfiguration::SetTreeValue failed. ERROR: *** " + std::string(e.what()) + " ***");
-			 return false;
-		 }
-
-		 // TBD - Set the values
-
-		 return true;
-	 }
-
-	 bool GolfSimConfiguration::SetTreeValue(const std::string& tag_name, const double value) {
-
-		 // RemoveTreeNode(tag_name);
-
-		 try {
-			 configuration_root_.put(tag_name, value);
-		 }
-		 catch (std::exception const& e)
-		 {
-			 GS_LOG_MSG(error, "GolfSimConfiguration::SetTreeValue failed. ERROR: *** " + std::string(e.what()) + " ***");
-			 return false;
-		 }
-
-		 // TBD - Set the values
-
-		 return true;
-	 }
-
-	 bool GolfSimConfiguration::WriteTreeToFile(const std::string& file_name) {
-
-		 GS_LOG_MSG(trace, "GolfSimConfiguration::WriteTreeToFile called for file_name = " + file_name);
-			 
-		 std::ofstream file(file_name);
-		 if (file.is_open()) {
-			 boost::property_tree::write_json(file, configuration_root_);
-			 file.close();
-		 }
-		 else {
-			 GS_LOG_MSG(error, "GolfSimConfiguration::WriteTreeToFile failed. Could not open file for writing.");
-			 return false;
-		 }
-
-		 return true;
 	 }
 
 } // namespace golf_sim

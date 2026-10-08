@@ -1,17 +1,27 @@
-// Logs viewer functionality
-let ws = null;
+/* global api, openSocket */
+let sock = null;
+let socketGen = 0;
 let isPaused = false;
+let pausedQueue = [];
 let currentService = null;
 let logBuffer = [];
 const maxLogLines = 2000;
+// Hard ceiling for scrollback growth; trims from the newest end so live-tail trimming stays unaffected
+const maxTotalLines = 5000;
+const stickToBottomPx = 40;
 let stats = { lines: 0, errors: 0, warnings: 0 };
 
-async function loadServices() {
-    try {
-        const response = await fetch('/api/logs/services');
-        const data = await response.json();
-        const select = document.getElementById('serviceSelect');
+let currentAnchor = null;
+let oldestCursor = null;
+let reachedStart = false;
+let historyLoading = false;
 
+const viewerEl = () => document.getElementById('logViewer');
+
+async function loadServices() {
+    const select = document.getElementById('serviceSelect');
+    try {
+        const data = await api('/api/logs/services');
         select.innerHTML = '<option value="">Select a service...</option>';
 
         data.services.forEach(service => {
@@ -29,162 +39,228 @@ async function loadServices() {
         }
     } catch (error) {
         console.error('Failed to load services:', error);
-        const select = document.getElementById('serviceSelect');
         select.innerHTML = '<option value="">Error loading services</option>';
     }
 }
 
 function changeService() {
     const select = document.getElementById('serviceSelect');
-    const selectedOption = select.options[select.selectedIndex];
+    const statusEl = document.getElementById('serviceStatus');
 
-    if (!select.value) {
-        disconnectWebSocket();
-        document.getElementById('serviceStatus').style.display = 'none';
-        document.getElementById('logViewer').className = 'log-viewer empty';
+    closeSocket();
+    clearLogs();
+    resetScrollbackState(null);
+    currentService = select.value || null;
+
+    if (!currentService) {
+        statusEl.classList.add('hidden');
+        viewerEl().dataset.empty = 'Not connected';
+        updateConnectionStatus(false);
         return;
     }
 
-    currentService = select.value;
-    const status = selectedOption.dataset.status;
-
-    const statusEl = document.getElementById('serviceStatus');
+    const status = select.options[select.selectedIndex].dataset.status;
     statusEl.textContent = status.charAt(0).toUpperCase() + status.slice(1);
-    statusEl.className = 'service-status ' + status;
-    statusEl.style.display = 'inline-flex';
+    statusEl.className = 'badge badge-soft ' + (status === 'running' ? 'badge-success' : 'badge-error');
 
-    clearLogs();
-    document.getElementById('logViewer').className = 'log-viewer loading';
-
-    connectWebSocket(currentService);
+    viewerEl().dataset.empty = 'Waiting for log lines...';
+    connectSocket(currentService);
 }
 
-function connectWebSocket(service) {
-    disconnectWebSocket();
-
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/logs`;
-
-    ws = new WebSocket(wsUrl);
-
-    ws.onopen = () => {
-        console.log('WebSocket connected');
-        updateConnectionStatus(true);
-
-        ws.send(JSON.stringify({ service: service }));
-
-        const viewer = document.getElementById('logViewer');
-        viewer.classList.remove('loading', 'empty');
-    };
-
-    ws.onmessage = (event) => {
-        if (!isPaused) {
-            const data = JSON.parse(event.data);
-            appendLog(data);
-        }
-    };
-
-    ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        updateConnectionStatus(false);
-    };
-
-    ws.onclose = () => {
-        console.log('WebSocket disconnected');
-        updateConnectionStatus(false);
-
-        if (currentService) {
-            setTimeout(() => {
-                if (currentService === service) {
-                    connectWebSocket(service);
-                }
-            }, 3000);
-        }
-    };
+function resetScrollbackState(anchor) {
+    currentAnchor = anchor;
+    oldestCursor = anchor ? { file: anchor.file, offset: anchor.offset } : null;
+    reachedStart = false;
+    historyLoading = false;
 }
 
-function disconnectWebSocket() {
-    if (ws) {
-        currentService = null;
-        ws.close();
-        ws = null;
-    }
+function levelOf(content) {
+    if (content.includes('ERROR') || content.includes('[error]')) return 'error';
+    if (content.includes('WARN') || content.includes('[warning]')) return 'warning';
+    if (content.includes('INFO') || content.includes('[info]')) return 'info';
+    if (content.includes('DEBUG') || content.includes('[debug]')) return 'debug';
+    return null;
 }
 
-function updateConnectionStatus(connected) {
-    const indicator = document.getElementById('connectionIndicator');
-    const text = document.getElementById('connectionText');
-
-    if (connected) {
-        indicator.classList.remove('disconnected');
-        indicator.classList.add('connected');
-        text.textContent = 'Connected';
-    } else {
-        indicator.classList.remove('connected');
-        indicator.classList.add('disconnected');
-        text.textContent = 'Disconnected';
-    }
-}
-
-function appendLog(logData) {
-    const viewer = document.getElementById('logViewer');
+function makeLogEntry(content, level = levelOf(content)) {
     const logEntry = document.createElement('div');
-    logEntry.className = 'log-entry';
-
-    const content = logData.message || logData.content || '';
-    if (content.includes('ERROR') || content.includes('[error]')) {
-        logEntry.classList.add('error');
-        stats.errors++;
-    } else if (content.includes('WARN') || content.includes('[warning]')) {
-        logEntry.classList.add('warning');
-        stats.warnings++;
-    } else if (content.includes('INFO') || content.includes('[info]')) {
-        logEntry.classList.add('info');
-    } else if (content.includes('DEBUG') || content.includes('[debug]')) {
-        logEntry.classList.add('debug');
-    }
-
-    if (logData.timestamp) {
-        const timestamp = document.createElement('span');
-        timestamp.className = 'log-timestamp';
-
-        let dateObj;
-        if (typeof logData.timestamp === 'string' && logData.timestamp.length > 10) {
-            dateObj = new Date(parseInt(logData.timestamp) / 1000);
-        } else if (typeof logData.timestamp === 'number') {
-            dateObj = new Date(logData.timestamp);
-        } else {
-            dateObj = new Date(logData.timestamp);
-        }
-
-        if (!isNaN(dateObj.getTime())) {
-            timestamp.textContent = dateObj.toLocaleTimeString();
-        } else {
-            timestamp.textContent = '';
-        }
-
-        logEntry.appendChild(timestamp);
-    }
+    logEntry.className = 'log-entry' + (level ? ' ' + level : '');
+    logEntry.dataset.level = level || '';
+    logEntry.dataset.text = content.toLowerCase();
 
     const logContent = document.createElement('span');
     logContent.className = 'log-content';
     logContent.textContent = content;
     logEntry.appendChild(logContent);
 
-    viewer.appendChild(logEntry);
+    applyFilter(logEntry);
+    return logEntry;
+}
 
-    logBuffer.push(logEntry);
-    if (logBuffer.length > maxLogLines) {
-        const oldEntry = logBuffer.shift();
-        oldEntry.remove();
+function applyFilter(entry) {
+    const errorsOnly = document.getElementById('errorsOnly').checked;
+    const needle = document.getElementById('logFilter').value.trim().toLowerCase();
+    entry.hidden = (errorsOnly && entry.dataset.level !== 'error')
+        || (needle !== '' && !entry.dataset.text.includes(needle));
+}
+
+function refilter() {
+    logBuffer.forEach(applyFilter);
+}
+
+function connectSocket(service) {
+    const gen = ++socketGen;
+    const live = fn => (...args) => { if (gen === socketGen) fn(...args); };
+
+    sock = openSocket('/ws/logs', live(handleMessage), {
+        onOpen: live(() => {
+            // The server replays its tail on every connection, so start from an empty view
+            clearLogs();
+            resetScrollbackState(null);
+            pausedQueue = [];
+            updatePauseButton();
+            viewerEl().dataset.empty = 'Waiting for log lines...';
+            updateConnectionStatus(true);
+            sock.send({ service });
+        }),
+        onClose: live(() => updateConnectionStatus(false)),
+    });
+}
+
+function closeSocket() {
+    socketGen++;
+    if (sock) sock.close();
+    sock = null;
+    pausedQueue = [];
+}
+
+function handleMessage(data) {
+    if (isPaused) {
+        pausedQueue.push(data);
+        if (pausedQueue.length > maxLogLines) pausedQueue.shift();
+        updatePauseButton();
+        return;
     }
 
+    if (data.type === 'anchor') {
+        const isRestart = currentAnchor !== null;
+        resetScrollbackState({ file: data.file, offset: data.offset });
+        if (isRestart) addEntry(makeLogEntry('pitrac restarted', 'info'));
+        return;
+    }
+    appendLog(data);
+}
+
+function updateConnectionStatus(connected) {
+    const dot = document.getElementById('connectionDot');
+    dot.classList.toggle('bg-success', connected);
+    dot.classList.toggle('bg-base-content/30', !connected);
+    document.getElementById('connectionText').textContent = connected ? 'Connected' : 'Reconnecting...';
+    if (!connected && !currentService) {
+        document.getElementById('connectionText').textContent = 'Not connected';
+    }
+}
+
+function isNearBottom(viewer) {
+    return viewer.scrollHeight - viewer.scrollTop - viewer.clientHeight <= stickToBottomPx;
+}
+
+function addEntry(entry) {
+    const viewer = viewerEl();
+    const follow = isNearBottom(viewer);
+    viewer.appendChild(entry);
+    logBuffer.push(entry);
+    if (logBuffer.length > maxLogLines) {
+        logBuffer.shift().remove();
+    }
+    if (follow) viewer.scrollTop = viewer.scrollHeight;
+}
+
+function timestampText(raw) {
+    let date;
+    if (typeof raw === 'string' && raw.length > 10) {
+        date = new Date(parseInt(raw) / 1000);
+    } else {
+        date = new Date(raw);
+    }
+    return isNaN(date.getTime()) ? '' : date.toLocaleTimeString();
+}
+
+function appendLog(logData) {
+    const isServerError = typeof logData.error === 'string';
+    const content = isServerError ? logData.error : (logData.message || logData.content || '');
+    const level = isServerError ? 'error' : levelOf(content);
+    const logEntry = makeLogEntry(content, level);
+
+    if (level === 'error') {
+        stats.errors++;
+    } else if (level === 'warning') {
+        stats.warnings++;
+    }
+
+    if (logData.timestamp) {
+        const timestamp = document.createElement('span');
+        timestamp.className = 'log-timestamp';
+        timestamp.textContent = timestampText(logData.timestamp);
+        logEntry.insertBefore(timestamp, logEntry.firstChild);
+    }
+
+    addEntry(logEntry);
     stats.lines++;
     updateStats();
+}
 
-    if (!isPaused) {
-        viewer.scrollTop = viewer.scrollHeight;
+async function loadOlderHistory() {
+    if (historyLoading || reachedStart || !oldestCursor || !currentService) return;
+
+    historyLoading = true;
+    const viewer = viewerEl();
+    const prevScrollHeight = viewer.scrollHeight;
+    const service = currentService;
+    const cursor = oldestCursor;
+
+    try {
+        const url = `/api/logs/history?service=${encodeURIComponent(service)}&file=${encodeURIComponent(cursor.file)}&before=${cursor.offset}&lines=200`;
+        const data = await api(url);
+
+        // The service changed or the stream re-anchored while the request was in flight
+        if (service !== currentService || cursor !== oldestCursor) {
+            historyLoading = false;
+            return;
+        }
+
+        if (data.reset) {
+            // Server says cursor is stale (file truncated), clear and let live stream re-anchor
+            clearLogs();
+            resetScrollbackState(null);
+            return;
+        }
+
+        const lines = data.lines || [];
+        if (lines.length > 0) {
+            const fragment = document.createDocumentFragment();
+            const newEntries = lines.map(line => makeLogEntry(line));
+            newEntries.forEach(entry => fragment.appendChild(entry));
+
+            viewer.insertBefore(fragment, viewer.firstChild);
+
+            // Prepend to buffer (oldest first); trim from newest end if over ceiling
+            logBuffer.unshift(...newEntries);
+            while (logBuffer.length > maxTotalLines) {
+                logBuffer.pop().remove();
+            }
+        }
+
+        oldestCursor = data.next || null;
+        if (data.next === null) reachedStart = true;
+
+        // Restore scroll so the previously visible content stays in place
+        viewer.scrollTop = viewer.scrollHeight - prevScrollHeight;
+    } catch (err) {
+        console.error('Failed to load log history:', err);
     }
+
+    historyLoading = false;
 }
 
 function updateStats() {
@@ -193,30 +269,36 @@ function updateStats() {
     document.getElementById('warningCount').textContent = stats.warnings;
 }
 
+function updatePauseButton() {
+    const button = document.getElementById('pauseButton');
+    const queued = pausedQueue.length;
+    const label = isPaused ? (queued ? `Resume (${queued})` : 'Resume') : 'Pause';
+    const hint = isPaused ? 'Resume log stream' : 'Pause log stream';
+    button.querySelector('.btn-text').textContent = label;
+    button.setAttribute('aria-label', hint);
+    button.title = hint;
+    button.classList.toggle('btn-warning', isPaused);
+    button.classList.toggle('btn-ghost', !isPaused);
+}
+
 function togglePause() {
     isPaused = !isPaused;
-    const button = document.getElementById('pauseButton');
-    const btnText = button.querySelector('.btn-text');
+    const icon = document.getElementById('pauseIcon');
+    icon.innerHTML = `<i data-lucide="${isPaused ? 'play' : 'pause'}" class="icon-sm"></i>`;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 
-    const iconEl = document.getElementById('pauseIcon');
-    if (isPaused) {
-        button.classList.add('paused');
-        btnText.textContent = 'Resume';
-        iconEl.setAttribute('data-lucide', 'play');
-    } else {
-        button.classList.remove('paused');
-        btnText.textContent = 'Pause';
-        iconEl.setAttribute('data-lucide', 'pause');
-
-        const viewer = document.getElementById('logViewer');
+    if (!isPaused) {
+        const queued = pausedQueue;
+        pausedQueue = [];
+        queued.forEach(handleMessage);
+        const viewer = viewerEl();
         viewer.scrollTop = viewer.scrollHeight;
     }
-    if (typeof lucide !== 'undefined') lucide.createIcons();
+    updatePauseButton();
 }
 
 function clearLogs() {
-    const viewer = document.getElementById('logViewer');
-    viewer.innerHTML = '';
+    viewerEl().innerHTML = '';
     logBuffer = [];
     stats = { lines: 0, errors: 0, warnings: 0 };
     updateStats();
@@ -233,7 +315,7 @@ function downloadLogs() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${currentService || 'logs'}_${new Date().toISOString()}.log`;
+    a.download = `${currentService || 'logs'}_${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -242,8 +324,20 @@ function downloadLogs() {
 
 document.addEventListener('DOMContentLoaded', () => {
     loadServices();
+
+    document.getElementById('serviceSelect').addEventListener('change', changeService);
+    document.getElementById('pauseButton').addEventListener('click', togglePause);
+    document.getElementById('clearButton').addEventListener('click', clearLogs);
+    document.getElementById('downloadButton').addEventListener('click', downloadLogs);
+    document.getElementById('errorsOnly').addEventListener('change', refilter);
+    document.getElementById('logFilter').addEventListener('input', refilter);
+
+    const viewer = viewerEl();
+    viewer.addEventListener('scroll', () => {
+        if (viewer.scrollTop < 50) {
+            loadOlderHistory();
+        }
+    });
 });
 
-window.addEventListener('beforeunload', () => {
-    disconnectWebSocket();
-});
+window.addEventListener('beforeunload', closeSocket);

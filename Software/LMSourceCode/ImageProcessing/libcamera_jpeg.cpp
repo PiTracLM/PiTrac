@@ -133,11 +133,6 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	// processed.
 	FlightCameraState state = kWaitingForFirstPrimingPulseGroup;
 
-	// Check here, once, to see if we are going to expect to produce a pre-image for later subtraction
-	golf_sim::GolfSimConfiguration::SetConstant("gs_config.ball_exposure_selection.kUsePreImageSubtraction", 
-												golf_sim::GolfSimCamera::kUsePreImageSubtraction);
-
-
     // True if the InnoMaker camera external trigger script has not been called yet
     // Note - The InnoMaker camera needs its trigger script to be called AFTER the camera
     // has already started up.  No idea why.

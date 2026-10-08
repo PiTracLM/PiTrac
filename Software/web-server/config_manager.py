@@ -1,27 +1,172 @@
 """Configuration Manager for PiTrac Web Server
 
-Handles reading and writing JSON configuration files with a three-tier system:
+Builds configuration from a three-tier system:
 1. Generated defaults: From configurations.json metadata
-2. Calibration data: ~/.pitrac/config/calibration_data.json (preserved across regenerations)
-3. User overrides: ~/.pitrac/config/user_settings.json (read-write, sparse)
+2. Calibration data: calibration table in the SQLite database
+3. User overrides: settings table in the SQLite database (sparse)
+
+~/.pitrac/config/user_settings.json and calibration_data.json are imported once at
+startup into whichever of those tables is still empty, then renamed to *.imported.
 """
 
 import copy
-import fcntl
+import ipaddress
 import json
 import logging
+import math
 import os
+import re
+from datetime import datetime
 from pathlib import Path
 from threading import RLock
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from constants import DB_PATH
+from db.database import Database
+from db.repositories import KeyValueRepository
+
 logger = logging.getLogger(__name__)
+
+_OLD_SIM = "gs_config.golf_simulator_interfaces"
+_RENAMED_SETTINGS = {
+    f"{_OLD_SIM}.GSPro.kGSProConnectAddress": "simulators.gspro.host",
+    f"{_OLD_SIM}.GSPro.kGSProConnectPort": "simulators.gspro.port",
+    f"{_OLD_SIM}.E6.kE6ConnectAddress": "simulators.e6.host",
+    f"{_OLD_SIM}.E6.kE6ConnectPort": "simulators.e6.port",
+    f"{_OLD_SIM}.E6.kE6InterMessageDelayMs": "simulators.e6.inter_message_delay_ms",
+    f"{_OLD_SIM}.kLaunchMonitorIdString": None,
+}
+_MODEL_KINDS = {
+    "gs_config.ball_identification.kModelPath": "ball",
+    "gs_config.spin_analysis.kSpinModelPath": "spin",
+}
+
+
+def _deep_merge(base: Dict, override: Dict) -> Dict:
+    """Recursively merge override into base"""
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def _set_in_dict(d: Dict[str, Any], key: str, value: Any) -> bool:
+    """Set value in nested dictionary using dot notation"""
+    parts = key.split(".")
+    current = d
+
+    for part in parts[:-1]:
+        if part not in current:
+            current[part] = {}
+        elif not isinstance(current[part], dict):
+            return False
+        current = current[part]
+
+    current[parts[-1]] = value
+    return True
+
+
+def _flatten(nested: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
+    flat = {}
+    for key, value in nested.items():
+        full_key = f"{prefix}.{key}" if prefix else key
+        if isinstance(value, dict):
+            flat.update(_flatten(value, full_key))
+        else:
+            flat[full_key] = value
+    return flat
+
+
+def _without_dotted_keys(nested: Dict[str, Any], dropped: List[str], prefix: str = "") -> Dict[str, Any]:
+    clean = {}
+    for key, value in nested.items():
+        full_key = f"{prefix}.{key}" if prefix else key
+        if "." in key:
+            dropped.append(full_key)
+        elif isinstance(value, dict):
+            clean[key] = _without_dotted_keys(value, dropped, full_key)
+        else:
+            clean[key] = value
+    return clean
+
+
+def _as_integer(value: Any) -> Any:
+    """Truncate toward zero like stoi did; boost's integer parse rejects "35.5" outright."""
+    try:
+        return int(float(value))
+    except (TypeError, ValueError, OverflowError):
+        return value
+
+
+_HOSTNAME_LABEL = re.compile(r"[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?")
+HOST_ERROR = "Enter an IP address or hostname without a port"
+
+
+def _is_valid_host(host: str) -> bool:
+    if host == "":
+        return True
+    try:
+        ipaddress.IPv4Address(host)
+        return True
+    except ValueError:
+        pass
+    labels = host.split(".")
+    return len(host) <= 253 and not labels[-1].isdigit() and all(_HOSTNAME_LABEL.fullmatch(label) for label in labels)
+
+
+def coerce(setting_type: str, value: Any) -> Any:
+    """Convert a submitted value to a metadata type; raises ValueError with a plain message."""
+    if setting_type in ("select", "string", "text", "path", "ip_address"):
+        if value is None or isinstance(value, (dict, list)):
+            raise ValueError("Must be text")
+        return str(value).strip() if setting_type == "ip_address" else str(value)
+
+    if setting_type == "boolean":
+        # The generated config writes booleans as "1" and "0"
+        if isinstance(value, str) and value.lower() in ("true", "false", "1", "0"):
+            return value.lower() in ("true", "1")
+        if value in (True, False):
+            return bool(value)
+        raise ValueError("Must be true or false")
+
+    if setting_type in ("integer", "number", "float"):
+        if isinstance(value, bool) or value is None:
+            raise ValueError("Must be a number")
+        try:
+            number = float(value)
+            if not math.isfinite(number):
+                raise ValueError
+        except (TypeError, ValueError, OverflowError):
+            raise ValueError("Must be a number") from None
+        if setting_type == "integer" and not number.is_integer():
+            raise ValueError("Must be a whole number")
+        if setting_type == "integer" or (setting_type == "number" and number.is_integer()):
+            return int(number)
+        return number
+
+    if setting_type == "array" and isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            raise ValueError("Invalid JSON array format") from None
+
+    return value
+
+
+def _unflatten(flat: Dict[str, Any]) -> Dict[str, Any]:
+    nested: Dict[str, Any] = {}
+    for key, value in flat.items():
+        _set_in_dict(nested, key, value)
+    return nested
 
 
 class ConfigurationManager:
-    """Manages PiTrac configuration with JSON-based system"""
+    """Manages PiTrac configuration stored in SQLite"""
 
-    def __init__(self):
+    def __init__(self, db: Optional[Database] = None):
         self._lock = RLock()
         self._metadata_cache = None
 
@@ -31,21 +176,29 @@ class ConfigurationManager:
         def expand_path(path_str: str) -> Path:
             return Path(path_str).expanduser()
 
-        # Configuration paths for three-tier system
+        # Legacy JSON files, read only to import them into the database
         self.user_settings_path = expand_path(
             sys_paths.get("userSettingsPath", {}).get("default", "~/.pitrac/config/user_settings.json")
         )
         self.calibration_data_path = expand_path("~/.pitrac/config/calibration_data.json")
-        self.generated_config_path = self.user_settings_path.parent / "generated_golf_sim_config.json"
 
         self.user_settings: Dict[str, Any] = {}
         self.calibration_data: Dict[str, Any] = {}
         self.merged_config: Dict[str, Any] = {}
+        self.transient_overrides: Dict[str, Any] = {}
 
         self.restart_required_params = self._load_restart_required_params()
 
         self._config_callbacks: Dict[str, List[Callable[[str, Any], None]]] = {}
 
+        self._db = db or Database(DB_PATH)
+        self._settings = KeyValueRepository(self._db, "settings")
+        self._calibration = KeyValueRepository(self._db, "calibration")
+
+        self.found_legacy_json = self.user_settings_path.exists() or self.calibration_data_path.exists()
+        self._import_json(self._settings, self.user_settings_path)
+        self._import_json(self._calibration, self.calibration_data_path)
+        self._move_renamed_keys()
         self.reload()
 
     def _load_raw_metadata(self) -> Dict[str, Any]:
@@ -75,8 +228,8 @@ class ConfigurationManager:
         """Reload configuration from metadata, calibration data, and user settings"""
         with self._lock:
             self._metadata_cache = None
-            self.user_settings = self._load_json(self.user_settings_path)
-            self.calibration_data = self._load_json(self.calibration_data_path)
+            self.user_settings = _unflatten(self._settings.load())
+            self.calibration_data = _unflatten(self._calibration.load())
             # Build merged config from metadata defaults + calibration + user overrides
             self.merged_config = self._build_config_from_metadata()
             self.restart_required_params = self._load_restart_required_params()
@@ -90,44 +243,75 @@ class ConfigurationManager:
         self.merged_config = self._build_config_from_metadata()
         self.restart_required_params = self._load_restart_required_params()
 
-    def _load_json(self, path: Path) -> Dict[str, Any]:
-        """Load JSON file safely"""
-        if not path.exists():
-            return {}
-
+    def _load_json(self, path: Path) -> Optional[Dict[str, Any]]:
+        """Load a JSON object, or None if the file is unreadable or holds something else"""
         try:
             with open(path, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
+                data = json.load(f)
+        except (OSError, ValueError) as e:
             logger.error(f"Failed to load {path}: {e}")
-            return {}
+            return None
+        return data if isinstance(data, dict) else None
 
-    def _save_json(self, path: Path, data: Dict[str, Any]) -> bool:
-        """Save JSON file with proper formatting and file locking"""
+    def _import_json(self, repo: KeyValueRepository, path: Path) -> None:
+        """Import a legacy JSON file into an empty table, then rename it"""
+        if not path.exists():
+            return
+        if repo.load():
+            logger.info(f"Not importing {path}: the {repo.table} table already has values")
+            return
+
+        data = self._load_json(path)
+        if data is None:
+            logger.warning(f"Not importing {path}: it is not a readable JSON object, keeping the stored values")
+            return
+
+        # get_config never resolved dotted keys, so importing them would change behavior
+        dotted: List[str] = []
+        data = _without_dotted_keys(data, dotted)
+        if dotted:
+            logger.info(f"Dropping dotted keys from {path}: {', '.join(dotted)}")
+
+        repo.replace_all(_flatten(data))
+
+        target = path.with_name(path.name + ".imported")
+        if target.exists():
+            stamped = f"{target.name}.{datetime.now():%Y%m%d-%H%M%S}"
+            target = path.with_name(stamped)
+            n = 0
+            while target.exists():
+                n += 1
+                target = path.with_name(f"{stamped}.{n}")
         try:
-            path.parent.mkdir(parents=True, exist_ok=True)
+            path.rename(target)
+        except OSError as e:
+            # The rows are written and a re-import is idempotent, so failing here would only crash-loop the service
+            logger.error(f"Imported {path} but could not rename it to {target}, will import it again next start: {e}")
+            return
+        logger.info(f"Imported {path} into the {repo.table} table, renamed to {target.name}")
 
-            data_copy = copy.deepcopy(data)
+    def _move_renamed_keys(self) -> None:
+        """Move stored settings to their renamed keys in one write; an old sim address also meant the sim was on"""
+        stored = self._settings.load()
+        old_keys = [key for key in _RENAMED_SETTINGS if key in stored]
+        if not old_keys:
+            return
 
-            lock_path = path.with_suffix(".lock")
-            temp_path = path.with_suffix(".tmp")
-            with open(lock_path, "w") as lock_f:
-                fcntl.flock(lock_f.fileno(), fcntl.LOCK_EX)
-                try:
-                    with open(temp_path, "w") as f:
-                        json.dump(data_copy, f, indent=2, sort_keys=True)
-                        f.flush()
-                        os.fsync(f.fileno())
-                    temp_path.replace(path)
-                finally:
-                    fcntl.flock(lock_f.fileno(), fcntl.LOCK_UN)
+        moved = {key: value for key, value in stored.items() if key not in _RENAMED_SETTINGS}
+        for old in old_keys:
+            new, value = _RENAMED_SETTINGS[old], stored[old]
+            if new is None:
+                logger.info(f"Dropping stored setting {old}={value!r}, nothing reads it any more")
+                continue
+            if new in stored:
+                logger.info(f"Dropping stored setting {old}={value!r}, {new} is already set")
+                continue
+            moved[new] = value
+            logger.info(f"Moved stored setting {old} to {new}")
+            if new.endswith(".host") and isinstance(value, str) and value.strip():
+                moved.setdefault(f"{new.rsplit('.', 1)[0]}.enabled", True)
 
-            logger.info(f"Saved configuration to {path}")
-            return True
-
-        except (IOError, OSError) as e:
-            logger.error(f"Failed to save {path}: {e}")
-            return False
+        self._settings.replace_all(moved)
 
     def _build_config_from_metadata(self) -> Dict[str, Any]:
         """Build configuration from metadata defaults, calibration data, and user overrides"""
@@ -150,22 +334,11 @@ class ConfigurationManager:
                 # Set the default value
                 current[parts[-1]] = setting_info["default"]
 
-        # Helper function for deep merging
-        def deep_merge(base: Dict, override: Dict) -> Dict:
-            """Recursively merge override into base"""
-            result = base.copy()
-            for key, value in override.items():
-                if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-                    result[key] = deep_merge(result[key], value)
-                else:
-                    result[key] = value
-            return result
-
         # Apply calibration data (persistent layer)
-        config = deep_merge(config, self.calibration_data)
+        config = _deep_merge(config, self.calibration_data)
 
         # Then apply user overrides (highest priority)
-        return deep_merge(config, self.user_settings)
+        return _deep_merge(config, self.user_settings)
 
     def register_callback(self, key_pattern: str, callback: Callable[[str, Any], None]) -> None:
         """Register callback for configuration updates matching pattern
@@ -218,6 +391,12 @@ class ConfigurationManager:
                     except Exception as e:
                         logger.error(f"Callback error for {key}: {e}", exc_info=True)
 
+    def _notify_changed(self, before: Dict[str, Any], after: Dict[str, Any]) -> None:
+        before, after = _flatten(before), _flatten(after)
+        for key in sorted(before.keys() | after.keys()):
+            if before.get(key) != after.get(key):
+                self._notify_callbacks(key, after.get(key))
+
     def get_config(self, key: Optional[str] = None) -> Any:
         """Get configuration value or entire config
 
@@ -245,6 +424,14 @@ class ConfigurationManager:
         """Get merged config (already includes metadata defaults)"""
         with self._lock:
             return copy.deepcopy(self.merged_config)
+
+    def get_calibrated_keys(self) -> List[str]:
+        with self._lock:
+            return sorted(_flatten(self.calibration_data))
+
+    def calibration_updated_at(self, key: str) -> Optional[str]:
+        """When a saved calibration value last changed, or None if it was never saved"""
+        return self._calibration.updated_at(key)
 
     def get_default(self, key: Optional[str] = None) -> Any:
         """Get default value from metadata"""
@@ -286,6 +473,14 @@ class ConfigurationManager:
         with self._lock:
             return copy.deepcopy(self.user_settings)
 
+    def coerce_value(self, key: str, value: Any) -> Any:
+        """Convert a submitted value to the type its metadata declares.
+
+        Raises ValueError with a plain message when it cannot be converted.
+        Keys without metadata pass through unchanged.
+        """
+        return coerce(self.load_configurations_metadata().get("settings", {}).get(key, {}).get("type", ""), value)
+
     def set_config(self, key: str, value: Any) -> Tuple[bool, str, bool]:
         """Set configuration value
 
@@ -304,71 +499,61 @@ class ConfigurationManager:
             default_value = self.get_default(key)
             is_calibration = self._is_calibration_field(key)
 
-            # Auto-convert JSON string to array if setting type is array
-            metadata = self.load_configurations_metadata()
-            settings_metadata = metadata.get("settings", {})
-            if key in settings_metadata:
-                setting_type = settings_metadata[key].get("type", "")
-                if setting_type == "array" and isinstance(value, str):
-                    try:
-                        value = json.loads(value)
-                    except json.JSONDecodeError:
-                        return False, "Invalid JSON array format", False
+            is_valid, error_msg = self.validate_config(key, value)
+            if not is_valid:
+                return False, error_msg, False
+            value = self.coerce_value(key, value)
 
             if value == default_value:
                 if is_calibration:
                     calibration_copy = copy.deepcopy(self.calibration_data)
                     if self._delete_from_dict(calibration_copy, key):
-                        if self._save_json(self.calibration_data_path, calibration_copy):
-                            self.calibration_data = calibration_copy
-                            self._rebuild_merged_config()
-                            notify_key = key
-                            notify_value = default_value
-                            result = (
-                                True,
-                                f"Reset calibration {key} to default value",
-                                key in self.restart_required_params,
-                            )
+                        self._calibration.replace_all(_flatten(calibration_copy))
+                        self.calibration_data = calibration_copy
+                        self._rebuild_merged_config()
+                        notify_key = key
+                        notify_value = default_value
+                        result = (
+                            True,
+                            f"Reset calibration {key} to default value",
+                            key in self.restart_required_params,
+                        )
                 else:
                     settings_copy = copy.deepcopy(self.user_settings)
                     if self._delete_from_dict(settings_copy, key):
-                        if self._save_json(self.user_settings_path, settings_copy):
-                            self.user_settings = settings_copy
-                            self._rebuild_merged_config()
-                            notify_key = key
-                            notify_value = default_value
-                            result = (
-                                True,
-                                f"Reset {key} to default value",
-                                key in self.restart_required_params,
-                            )
+                        self._settings.replace_all(_flatten(settings_copy))
+                        self.user_settings = settings_copy
+                        self._rebuild_merged_config()
+                        notify_key = key
+                        notify_value = default_value
+                        result = (
+                            True,
+                            f"Reset {key} to default value",
+                            key in self.restart_required_params,
+                        )
                 if result is None:
                     result = (True, "Value already at default", False)
 
             elif is_calibration:
                 calibration_copy = copy.deepcopy(self.calibration_data)
-                if self._set_in_dict(calibration_copy, key, value):
-                    if self._save_json(self.calibration_data_path, calibration_copy):
-                        self.calibration_data = calibration_copy
-                        self._rebuild_merged_config()
-                        notify_key = key
-                        notify_value = value
-                        requires_restart = key in self.restart_required_params
-                        result = (True, f"Set calibration {key} = {value}", requires_restart)
-                    else:
-                        result = (False, "Failed to save calibration data", False)
+                if _set_in_dict(calibration_copy, key, value):
+                    self._calibration.replace_all(_flatten(calibration_copy), touched=[key])
+                    self.calibration_data = calibration_copy
+                    self._rebuild_merged_config()
+                    notify_key = key
+                    notify_value = value
+                    requires_restart = key in self.restart_required_params
+                    result = (True, f"Set calibration {key} = {value}", requires_restart)
             else:
                 settings_copy = copy.deepcopy(self.user_settings)
-                if self._set_in_dict(settings_copy, key, value):
-                    if self._save_json(self.user_settings_path, settings_copy):
-                        self.user_settings = settings_copy
-                        self._rebuild_merged_config()
-                        notify_key = key
-                        notify_value = value
-                        requires_restart = key in self.restart_required_params
-                        result = (True, f"Set {key} = {value}", requires_restart)
-                    else:
-                        result = (False, "Failed to save configuration", False)
+                if _set_in_dict(settings_copy, key, value):
+                    self._settings.replace_all(_flatten(settings_copy))
+                    self.user_settings = settings_copy
+                    self._rebuild_merged_config()
+                    notify_key = key
+                    notify_value = value
+                    requires_restart = key in self.restart_required_params
+                    result = (True, f"Set {key} = {value}", requires_restart)
 
             if result is None:
                 result = (False, "Failed to set value", False)
@@ -390,12 +575,10 @@ class ConfigurationManager:
 
             calibration_copy = copy.deepcopy(self.calibration_data)
             for key, value in updates.items():
-                if not self._set_in_dict(calibration_copy, key, value):
+                if not _set_in_dict(calibration_copy, key, value):
                     return False, f"Failed to set {key}"
 
-            if not self._save_json(self.calibration_data_path, calibration_copy):
-                return False, "Failed to save calibration data"
-
+            self._calibration.replace_all(_flatten(calibration_copy), touched=updates)
             self.calibration_data = calibration_copy
             self._rebuild_merged_config()
 
@@ -403,21 +586,6 @@ class ConfigurationManager:
                 self._notify_callbacks(key, value)
 
         return True, f"Saved {len(updates)} calibration values"
-
-    def _set_in_dict(self, d: Dict[str, Any], key: str, value: Any) -> bool:
-        """Set value in nested dictionary using dot notation"""
-        parts = key.split(".")
-        current = d
-
-        for part in parts[:-1]:
-            if part not in current:
-                current[part] = {}
-            elif not isinstance(current[part], dict):
-                return False
-            current = current[part]
-
-        current[parts[-1]] = value
-        return True
 
     def _delete_from_dict(self, d: Dict[str, Any], key: str) -> bool:
         """Delete value from nested dictionary using dot notation"""
@@ -464,12 +632,13 @@ class ConfigurationManager:
     def reset_all(self) -> Tuple[bool, str]:
         """Reset all user settings to defaults"""
         with self._lock:
-            if self._save_json(self.user_settings_path, {}):
-                self.user_settings = {}
-                self._rebuild_merged_config()
-                return True, "Reset all settings to defaults"
-
-            return False, "Failed to reset configuration"
+            before = self.merged_config
+            self._settings.replace_all({})
+            self.user_settings = {}
+            self._rebuild_merged_config()
+            after = self.merged_config
+        self._notify_changed(before, after)
+        return True, "Reset all settings to defaults"
 
     def get_diff(self) -> Dict[str, Any]:
         """Get differences between user settings and defaults
@@ -506,6 +675,11 @@ class ConfigurationManager:
         Returns:
             Tuple of (is_valid, error_message)
         """
+        try:
+            value = self.coerce_value(key, value)
+        except ValueError as e:
+            return False, str(e)
+
         with self._lock:
             metadata = self.load_configurations_metadata()
             settings_metadata = metadata.get("settings", {})
@@ -516,8 +690,8 @@ class ConfigurationManager:
             setting_type = setting_info.get("type", "")
 
             if setting_type == "select" and "options" in setting_info:
-                if key in ("gs_config.ball_identification.kModelPath", "gs_config.spin_analysis.kSpinModelPath"):
-                    available_models = self.get_available_models()
+                if key in _MODEL_KINDS:
+                    available_models = self.get_available_models(_MODEL_KINDS[key])
                     if available_models:
                         valid_options = list(available_models.values())
                         str_value = str(value)
@@ -530,11 +704,11 @@ class ConfigurationManager:
                     if str_value not in valid_options:
                         return False, f"Must be one of: {', '.join(valid_options)}"
 
-            elif setting_type == "boolean":
-                if not isinstance(value, bool) and value not in [True, False, "true", "false"]:
-                    return False, "Must be true or false"
+            elif setting_type == "ip_address":
+                if not _is_valid_host(value):
+                    return False, HOST_ERROR
 
-            elif setting_type == "number":
+            elif setting_type in ("number", "integer", "float"):
                 try:
                     num_val = float(value)
                     if "min" in setting_info and num_val < setting_info["min"]:
@@ -545,15 +719,7 @@ class ConfigurationManager:
                     return False, "Must be a number"
 
             elif setting_type == "array":
-                # Handle JSON string representation of arrays
-                if isinstance(value, str):
-                    try:
-                        parsed = json.loads(value)
-                        if not isinstance(parsed, list):
-                            return False, "Must be a valid array"
-                    except json.JSONDecodeError:
-                        return False, "Must be a valid JSON array"
-                elif not isinstance(value, list):
+                if not isinstance(value, list):
                     return False, "Must be an array"
 
             return True, ""
@@ -574,57 +740,28 @@ class ConfigurationManager:
 
         return True, ""
 
-    def generate_golf_sim_config(self) -> Path:
-        """Generate golf_sim_config.json from configurations metadata and user settings
+    def build_generated_config(self) -> Dict[str, Any]:
+        """Build the merged config dict served to pitrac_lm (defaults + calibration + user settings)."""
+        config = {}
+        metadata = self.load_configurations_metadata()
+        settings_metadata = metadata.get("settings", {})
 
-        This method creates a complete golf_sim_config.json file by:
-        1. Taking all settings marked with passedVia: "json"
-        2. Getting their values (default + user overrides)
-        3. Building the nested JSON structure expected by pitrac_lm
+        if not settings_metadata:
+            raise RuntimeError("No settings found in configurations metadata")
 
-        Returns:
-            Path to the generated configuration file
+        json_settings_count = 0
+        for key, setting_info in settings_metadata.items():
+            value = self.get_config(key)
+            if setting_info.get("type") == "integer":
+                value = _as_integer(value)
+            if value is not None:
+                self._set_nested_json(config, key, value)
+                json_settings_count += 1
 
-        Raises:
-            RuntimeError: If generation fails
-        """
-        try:
-            config = {}
-            metadata = self.load_configurations_metadata()
-            settings_metadata = metadata.get("settings", {})
+        if json_settings_count == 0:
+            raise RuntimeError("No JSON settings found to generate config")
 
-            if not settings_metadata:
-                raise RuntimeError("No settings found in configurations metadata")
-
-            # Process all settings and build the JSON structure
-            json_settings_count = 0
-            for key, setting_info in settings_metadata.items():
-                # Skip non-JSON routed settings
-                passed_via = setting_info.get("passedVia", "json")  # Default to json if not specified
-                if passed_via in ["cli", "environment"]:
-                    continue
-
-                # Get the merged value (default + calibration + user override)
-                value = self.get_config(key)
-                if value is not None:
-                    # Build nested structure from dot notation key
-                    self._set_nested_json(config, key, value)
-                    json_settings_count += 1
-
-            if json_settings_count == 0:
-                raise RuntimeError("No JSON settings found to generate config")
-
-            # Save to generated location
-            generated_path = self.user_settings_path.parent / "generated_golf_sim_config.json"
-            if not self._save_json(generated_path, config):
-                raise RuntimeError(f"Failed to save generated config to {generated_path}")
-
-            logger.info(f"Generated golf_sim_config.json with {json_settings_count} settings at {generated_path}")
-            return generated_path
-
-        except Exception as e:
-            logger.error(f"Failed to generate golf_sim_config.json: {e}")
-            raise RuntimeError(f"Config generation failed: {e}")
+        return _deep_merge(config, self.transient_overrides)
 
     def _set_nested_json(self, config: dict, key: str, value: Any):
         """Set value in nested JSON structure based on dot notation key
@@ -662,9 +799,10 @@ class ConfigurationManager:
                 str_value = str(Path(str_value).expanduser())
             current[final_key] = str_value
 
-    def get_available_models(self) -> Dict[str, str]:
+    def get_available_models(self, kind: str) -> Dict[str, str]:
         """
-        Discover available YOLO models from the models directory.
+        Discover available YOLO models of one kind ("ball" or "spin") from the models directory.
+        A directory whose name contains "spin" holds a spin model; every other one holds a ball model.
         Returns a dict of {display_name: model_dir_path} for dropdown options.
         The C++ backend loads NCNN model files from the selected directory.
         """
@@ -685,7 +823,7 @@ class ConfigurationManager:
                 continue
 
             for model_dir in base_dir.iterdir():
-                if model_dir.is_dir():
+                if model_dir.is_dir() and ("spin" in model_dir.name.lower()) == (kind == "spin"):
                     for pattern in model_file_patterns:
                         if (model_dir / pattern).exists():
                             display_name = model_dir.name
@@ -707,60 +845,16 @@ class ConfigurationManager:
             with open(config_path, "r") as f:
                 metadata = json.load(f)
 
-            model_options = self.get_available_models()
-            if model_options and "settings" in metadata:
-                for model_key in ("gs_config.ball_identification.kModelPath", "gs_config.spin_analysis.kSpinModelPath"):
-                    if model_key in metadata["settings"]:
-                        metadata["settings"][model_key]["options"] = model_options
+            for model_key, kind in _MODEL_KINDS.items():
+                model_options = self.get_available_models(kind)
+                if model_options and model_key in metadata.get("settings", {}):
+                    metadata["settings"][model_key]["options"] = model_options
 
             self._metadata_cache = metadata
             return metadata
         except Exception as e:
             logger.error(f"Error loading configurations.json: {e}")
             return {"settings": {}}
-
-    def get_cli_parameters(self) -> List[Dict[str, Any]]:
-        """Get all CLI parameters to pass to the pitrac_lm process."""
-        metadata = self.load_configurations_metadata()
-        settings = metadata.get("settings", {})
-
-        cli_params = []
-        for key, info in settings.items():
-            if info.get("passedVia") == "cli":
-                cli_params.append({
-                    "key": key,
-                    "cliArgument": info.get("cliArgument"),
-                    "type": info.get("type"),
-                    "default": info.get("default"),
-                })
-        return cli_params
-
-    def get_environment_parameters(self) -> List[Dict[str, Any]]:
-        """Get all environment parameters to set for the pitrac_lm process."""
-        metadata = self.load_configurations_metadata()
-        settings = metadata.get("settings", {})
-
-        env_params = []
-        for key, info in settings.items():
-            if info.get("passedVia") == "environment":
-                env_params.append({
-                    "key": key,
-                    "envVariable": info.get("envVariable"),
-                    "type": info.get("type"),
-                    "default": info.get("default"),
-                })
-        return env_params
-
-    def flatten_config(self, config: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
-        """Flatten nested config dict into dot-notation keys."""
-        result = {}
-        for key, value in config.items():
-            full_key = f"{prefix}.{key}" if prefix else key
-            if isinstance(value, dict):
-                result.update(self.flatten_config(value, full_key))
-            else:
-                result[full_key] = value
-        return result
 
     def get_categories(self) -> Dict[str, Dict[str, List[str]]]:
         """Get configuration organized by categories with basic/advanced subcategories
@@ -774,7 +868,6 @@ class ConfigurationManager:
             "categoryList",
             [
                 "Cameras",
-                "Simulators",
                 "Ball Detection",
                 "AI Detection",
                 "Storage",
@@ -803,7 +896,7 @@ class ConfigurationManager:
             # Determine if this is a basic or advanced setting
             subcategory = setting_info.get("subcategory", "advanced")
 
-            if category in categories:
+            if category in categories and not setting_info.get("internal"):
                 categories[category][subcategory].append(key)
 
         # No auto-categorization - all items must have explicit categories
@@ -856,59 +949,64 @@ class ConfigurationManager:
             }
             return export_data
 
-    def import_config(self, import_data: Dict[str, Any]) -> Tuple[bool, str]:
+    def _coerce_imported(self, nested: Dict[str, Any], skipped: Dict[str, str]) -> Dict[str, Any]:
+        """Coerce every valid key of an imported tree; invalid keys are left out and recorded in skipped."""
+        flat = {}
+        for key, value in _flatten(nested).items():
+            # Simulators live in their own table; an old export's keys would migrate into a duplicate instance
+            if key.startswith("simulators."):
+                logger.info(f"Not importing {key}, simulators are added from the navbar now")
+                continue
+            is_valid, error = self.validate_config(key, value)
+            if not is_valid:
+                logger.warning(f"Not importing {key}: {error}")
+                skipped[key] = error
+                continue
+            flat[key] = self.coerce_value(key, value)
+        return _unflatten(flat)
+
+    def import_config(self, import_data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, str]]:
         """Import configuration from exported data
 
         Args:
             import_data: Dictionary with user_settings and optional calibration_data
 
         Returns:
-            Tuple of (success, message)
+            Tuple of (success, message, skipped keys with the reason each was not imported)
         """
+        skipped: Dict[str, str] = {}
         with self._lock:
             try:
                 if not isinstance(import_data, dict):
-                    return False, "Import data must be a dictionary"
+                    return False, "Import data must be a dictionary", skipped
 
                 new_user = None
                 new_cal = None
 
-                if "user_settings" in import_data:
-                    val = import_data["user_settings"]
-                    if isinstance(val, dict):
-                        new_user = copy.deepcopy(val)
+                if isinstance(import_data.get("user_settings"), dict):
+                    new_user = self._coerce_imported(import_data["user_settings"], skipped)
 
-                if "calibration_data" in import_data:
-                    val = import_data["calibration_data"]
-                    if isinstance(val, dict):
-                        new_cal = copy.deepcopy(val)
+                if isinstance(import_data.get("calibration_data"), dict):
+                    new_cal = self._coerce_imported(import_data["calibration_data"], skipped)
 
-                # Snapshot originals for rollback
-                orig_user = copy.deepcopy(self.user_settings)
-                orig_cal = copy.deepcopy(self.calibration_data)
+                with self._db.transaction() as conn:
+                    if new_user is not None:
+                        self._settings.replace_all_in(conn, _flatten(new_user))
+                    if new_cal is not None:
+                        self._calibration.replace_all_in(conn, _flatten(new_cal))
 
-                if new_user is not None:
-                    if not self._save_json(self.user_settings_path, new_user):
-                        return False, "Failed to save imported user settings"
-
-                if new_cal is not None:
-                    if not self._save_json(self.calibration_data_path, new_cal):
-                        # Roll back user_settings file if it was already written
-                        if new_user is not None:
-                            if not self._save_json(self.user_settings_path, orig_user):
-                                logger.error("Failed to roll back user_settings after calibration save failure")
-                        return False, "Failed to save imported calibration data"
-
-                # Both saves succeeded, update in-memory state
                 if new_user is not None:
                     self.user_settings = new_user
                 if new_cal is not None:
                     self.calibration_data = new_cal
 
+                before = self.merged_config
                 self._rebuild_merged_config()
-
-                return True, "Configuration imported successfully"
+                after = self.merged_config
 
             except Exception as e:
                 logger.error(f"Error importing configuration: {e}")
-                return False, f"Import failed: {e}"
+                return False, f"Import failed: {e}", skipped
+
+        self._notify_changed(before, after)
+        return True, "Configuration imported successfully", skipped

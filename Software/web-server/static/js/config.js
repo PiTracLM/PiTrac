@@ -1,1569 +1,755 @@
-// Configuration Manager JavaScript
-/* global saveChanges, resetAll, reloadConfig, showDiff,
-   filterConfig, closeModal, setTheme, openImage, resetShot, controlPiTrac,
-   resetValueFromDiff, resetAllFromDiff, clearSearch, searchConfig,
-   resetToDefault */
+// config.js - Setup card, category settings with an advanced toggle, search, diff, import and export
+/* global api, toast, confirmDialog, openSocket, onPiTracStatus, controlPiTrac, openSimulatorEditor, Option */
+(function () {
+    const ADVANCED_KEY = 'pitrac-config-advanced';
+    const GOLFER_KEYS = [
+        'gs_config.player.kGolferOrientation',
+        'gs_config.player.kUsePracticeBalls',
+        'gs_config.modes.kStartInPuttingMode',
+    ];
+    // Model dropdowns list { name: path } instead of { value: label }
+    const MODEL_KEYS = ['gs_config.ball_identification.kModelPath', 'gs_config.spin_analysis.kSpinModelPath'];
+    const NUMERIC = ['integer', 'number', 'float'];
 
-let currentConfig = {};
-let defaultConfig = {};
-let userSettings = {};
-let categories = {};
-let configMetadata = {};
-const modifiedSettings = new Set();
-let ws = null;
+    let meta = {};
+    let categories = {};
+    let config = {};
+    let defaults = {};
+    let user = {};
+    let calibrated = new Set();
+    let dependencies = new Set();
+    const pending = new Map();
+    const errors = new Map();
+    // Tags of our own writes (key, config_reset, config_import) to the time they were sent, so their /ws echo
+    // is not reported as a change from another device. Tags expire because a dropped socket never echoes.
+    const selfEcho = new Map();
+    const ECHO_MS = 5000;
+    const view = { category: null, search: '' };
+    let showAdvanced = false;
+    let piTracRunning = false;
+    let saving = false;
+    let remoteTimer = null;
 
-async function isPiTracRunning() {
-    try {
-        const res = await fetch('/api/pitrac/status');
-        const status = await res.json();
-        return !!status.is_running;
-    } catch (_) {
-        return false;
+    const byId = (id) => document.getElementById(id);
+    const getPath = (obj, key) => key.split('.').reduce((o, part) => o?.[part], obj);
+    const saved = (key) => getPath(config, key);
+    const defaultOf = (key) => getPath(defaults, key);
+    const current = (key) => (pending.has(key) ? pending.get(key) : saved(key));
+    const isCustom = (key) => getPath(user, key) !== undefined;
+    const isAdvanced = (key) => meta[key]?.subcategory !== 'basic';
+    const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true';
+    const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+    function countLeaves(obj) {
+        return Object.values(obj).reduce(
+            (n, v) => n + (v && typeof v === 'object' && !Array.isArray(v) ? countLeaves(v) : 1), 0);
     }
-}
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', () => {
-    initWebSocket();
-    loadConfiguration();
-});
-
-// Warn before navigating away with unsaved changes
-window.addEventListener('beforeunload', (e) => {
-    if (modifiedSettings.size > 0) {
-        e.preventDefault();
-        e.returnValue = '';
+    function displayName(key) {
+        return meta[key]?.displayName
+            || key.split('.').pop().replace(/^k/, '').replace(/([A-Z])/g, ' $1').trim();
     }
-});
 
-// Initialize WebSocket connection
-function initWebSocket() {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    function el(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+    }
 
-    ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
+    function badge(text, tone) {
+        return el('span', `badge badge-sm whitespace-nowrap ${tone}`, text);
+    }
 
-        if (data.type === 'config_update') {
-            updateStatus(`Configuration updated: ${data.key}`, 'success');
-            if (data.requires_restart) {
-                isPiTracRunning().then(running => {
-                    if (running) updateStatus('PiTrac restart needed for changes to take effect', 'warning');
-                });
+    function smallButton(label, onClick) {
+        const btn = el('button', 'btn btn-ghost btn-xs', label);
+        btn.type = 'button';
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+
+    function normalizeJson(v) {
+        if (typeof v !== 'string') return JSON.stringify(v ?? null);
+        try { return JSON.stringify(JSON.parse(v)); } catch { return v; }
+    }
+
+    function sameValue(key, a, b) {
+        const type = meta[key]?.type;
+        if (type === 'boolean') return toBool(a) === toBool(b);
+        if (a === '' || a == null || b === '' || b == null) return (a ?? '') === (b ?? '');
+        if (NUMERIC.includes(type)) return Number(a) === Number(b);
+        if (type === 'array') return normalizeJson(a) === normalizeJson(b);
+        return String(a) === String(b);
+    }
+
+    function modelName(path) {
+        return String(path).split('/').filter((p) => p && p !== 'weights').pop() || String(path);
+    }
+
+    function optionsFor(key) {
+        const entries = Object.entries(meta[key]?.options || {});
+        return MODEL_KEYS.includes(key) ? entries.map(([name, path]) => [path, name]) : entries;
+    }
+
+    function formatValue(key, v) {
+        if (v === undefined || v === null || v === '') return 'Not set';
+        const type = meta[key]?.type;
+        if (type === 'boolean') return toBool(v) ? 'On' : 'Off';
+        if (type === 'select') {
+            const match = optionsFor(key).find(([value]) => String(value) === String(v));
+            return match ? match[1] : MODEL_KEYS.includes(key) ? modelName(v) : String(v);
+        }
+        return typeof v === 'object' ? JSON.stringify(v) : String(v);
+    }
+
+    function visible(key) {
+        return Object.entries(meta[key]?.visibleWhen || {}).every(([k, v]) => String(current(k)) === String(v));
+    }
+
+    function clientError(key, value) {
+        const m = meta[key] || {};
+        if (NUMERIC.includes(m.type)) {
+            const n = Number(value);
+            if (value === '' || value === null || !Number.isFinite(n)) return 'Must be a number';
+            if (m.type === 'integer' && !Number.isInteger(n)) return 'Must be a whole number';
+            if (m.min !== undefined && n < m.min) return `Must be at least ${m.min}`;
+            if (m.max !== undefined && n > m.max) return `Must be at most ${m.max}`;
+        }
+        if (m.type === 'array' && typeof value === 'string') {
+            try {
+                if (!Array.isArray(JSON.parse(value))) return 'Must be a list like [1, 2, 3]';
+            } catch {
+                return 'Must be a list like [1, 2, 3]';
             }
-        } else if (data.type === 'config_reset') {
-            updateStatus('Configuration reset to defaults', 'success');
-            loadConfiguration();
-        } else if (data.type === 'config_import') {
-            updateStatus('Configuration imported', 'success');
-            loadConfiguration();
         }
-    };
-
-    ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        updateStatus('WebSocket connection error', 'error');
-    };
-}
-
-// Load configuration from server
-async function loadConfiguration() {
-    try {
-        modifiedSettings.clear();
-        updateModifiedCount();
-
-        // Load all configuration data in parallel
-        const [configRes, defaultsRes, userRes, categoriesRes, metadataRes] = await Promise.all([
-            fetch('/api/config'),
-            fetch('/api/config/defaults'),
-            fetch('/api/config/user'),
-            fetch('/api/config/categories'),
-            fetch('/api/config/metadata')
-        ]);
-
-        const configData = await configRes.json();
-        const defaultsData = await defaultsRes.json();
-        const userData = await userRes.json();
-        categories = await categoriesRes.json();
-        configMetadata = await metadataRes.json();
-
-        currentConfig = configData.data || {};
-        defaultConfig = defaultsData.data || {};
-        userSettings = userData.data || {};
-
-        renderCategories();
-        renderConfiguration();
-        updateModifiedCount();
-
-        updateConditionalVisibility();
-        setTimeout(updateConditionalVisibility, 100);
-
-        updateStatus('Configuration loaded', 'success');
-    } catch (error) {
-        console.error('Failed to load configuration:', error);
-        updateStatus('Failed to load configuration', 'error');
+        return null;
     }
-}
 
-// Render category list
-function renderCategories() {
-    const categoryList = document.getElementById('categoryList');
-    categoryList.innerHTML = '';
+    // -- Controls and rows --
 
-    // Add "All Settings" option first
-    const allItem = document.createElement('li');
-    allItem.className = 'category-item';
-    allItem.dataset.category = 'all';
-    allItem.textContent = 'All Settings';
-    allItem.onclick = () => selectCategory('all');
-    categoryList.appendChild(allItem);
-
-    // Add each category with its settings count
-    Object.keys(categories).forEach(category => {
-        const categoryData = categories[category];
-        const basicCount = categoryData.basic ? categoryData.basic.length : 0;
-        const advancedCount = categoryData.advanced ? categoryData.advanced.length : 0;
-        const totalCount = basicCount + advancedCount;
-
-        if (totalCount > 0) {
-            const li = document.createElement('li');
-            li.className = 'category-item';
-            li.dataset.category = category;
-            li.textContent = `${category} (${totalCount})`;
-            li.onclick = () => selectCategory(category);
-            categoryList.appendChild(li);
-        }
-    });
-
-    // Select 'all' by default
-    setTimeout(() => {
-        selectCategory('all');
-    }, 100);
-}
-
-// Select category
-function selectCategory(category) {
-    // Update active category
-    document.querySelectorAll('.category-item').forEach(item => {
-        item.classList.remove('active');
-        if (item.dataset.category === category) {
-            item.classList.add('active');
-        }
-    });
-
-    // Render configuration for selected category
-    if (category === 'all') {
-        renderConfiguration();
-    } else {
-        renderConfiguration(category);
+    function setControl(control, value) {
+        if (control.type === 'checkbox') control.checked = toBool(value);
+        else if (value !== null && typeof value === 'object') control.value = JSON.stringify(value);
+        else control.value = value ?? '';
     }
-}
 
-// Render configuration UI
-function renderConfiguration(selectedCategory = null) {
-    const content = document.getElementById('configContent');
-    content.innerHTML = '';
+    const controlValue = (control) => (control.type === 'checkbox' ? control.checked : control.value);
 
-    // Determine which categories to render
-    const categoriesToRender = selectedCategory && selectedCategory !== 'all'
-        ? { [selectedCategory]: categories[selectedCategory] }
-        : categories;
+    function createControl(key, id) {
+        const m = meta[key] || {};
+        const value = current(key);
+        let control;
+        if (m.type === 'boolean') {
+            control = el('input', 'toggle toggle-sm');
+            control.type = 'checkbox';
+        } else if (m.type === 'select') {
+            control = el('select', 'select select-sm w-full');
+            const options = optionsFor(key);
+            if (value != null && value !== '' && !options.some(([v]) => String(v) === String(value))) {
+                options.unshift([String(value), formatValue(key, value)]);
+            }
+            control.append(...options.map(([v, label]) => new Option(label, v)));
+        } else if (NUMERIC.includes(m.type)) {
+            control = el('input', 'input input-sm w-full');
+            control.type = 'number';
+            if (m.min !== undefined) control.min = m.min;
+            if (m.max !== undefined) control.max = m.max;
+            control.step = m.step ?? (m.type === 'integer' ? 1 : 'any');
+        } else if (m.type === 'array') {
+            control = el('textarea', 'textarea textarea-sm w-full font-mono');
+            control.rows = 2;
+        } else {
+            control = el('input', 'input input-sm w-full');
+            control.type = 'text';
+        }
+        control.id = id;
+        control.dataset.key = key;
+        control.classList.add('cfg-control');
+        setControl(control, value);
+        return control;
+    }
 
-    if (selectedCategory === null || selectedCategory === 'all') {
-        const hasBasicSettings = Object.entries(categoriesToRender).some(([_, categoryData]) =>
-            categoryData && categoryData.basic && categoryData.basic.length > 0
-        );
+    function numberHint(key) {
+        const m = meta[key] || {};
+        if (!NUMERIC.includes(m.type)) return '';
+        const def = m.default ?? null;
+        const range = m.min !== undefined && m.max !== undefined ? `Range ${m.min} to ${m.max}` : '';
+        if (def === null) return range;
+        return range ? `${range}, default ${def}` : `Default ${def}`;
+    }
 
-        if (hasBasicSettings) {
-            const basicSection = document.createElement('div');
-            basicSection.className = 'config-section';
+    function renderRow(key, prefix, restartNoted) {
+        const m = meta[key] || {};
+        const id = `${prefix}-${key}`;
+        const row = el('div', 'config-row');
+        row.dataset.key = key;
+        row.hidden = !visible(key);
+        if (restartNoted) row.dataset.restartNoted = '1';
 
-            const basicHeader = document.createElement('div');
-            basicHeader.className = 'config-main-section-header';
-            basicHeader.innerHTML = '<h2>Basic Settings</h2>';
-            basicSection.appendChild(basicHeader);
+        const info = el('div', 'min-w-0');
+        const head = el('div', 'flex flex-wrap items-center gap-1.5');
+        const label = el('label', 'text-sm font-medium', displayName(key));
+        label.htmlFor = id;
+        head.append(label, el('span', 'row-badges flex flex-wrap gap-1'));
+        info.append(head);
+        if (m.description) info.append(el('p', 'text-xs opacity-60 mt-0.5', m.description));
+        const hint = numberHint(key);
+        if (hint) info.append(el('p', 'text-xs opacity-50 mt-0.5', hint));
 
-            Object.entries(categoriesToRender).forEach(([category, categoryData]) => {
-                if (!categoryData || !categoryData.basic || categoryData.basic.length === 0) return;
-
-                const group = document.createElement('div');
-                group.className = 'config-group';
-                group.dataset.category = category;
-
-                const title = document.createElement('h3');
-                title.className = 'config-group-title';
-                title.textContent = category;
-                group.appendChild(title);
-
-                categoryData.basic.forEach(key => {
-                    const value = getNestedValue(currentConfig, key);
-                    const defaultValue = getNestedValue(defaultConfig, key);
-                    const isModified = getNestedValue(userSettings, key) !== undefined;
-
-                    const item = createConfigItem(key, value, defaultValue, isModified);
-                    group.appendChild(item);
-                });
-
-                basicSection.appendChild(group);
-            });
-
-            content.appendChild(basicSection);
+        const control = createControl(key, id);
+        const error = el('p', 'row-error text-xs text-error');
+        error.id = `${id}-error`;
+        control.setAttribute('aria-describedby', error.id);
+        // Saving the default over a calibrated value deletes the calibration entry
+        if (calibrated.has(key)) {
+            control.disabled = true;
+            const note = el('p', 'text-xs opacity-60 mt-0.5', 'Set by calibration. Redo it on the ');
+            const link = el('a', 'link', 'Calibration page');
+            link.href = '/calibration';
+            note.append(link, '.');
+            info.append(note);
         }
 
-        const hasAdvancedSettings = Object.entries(categoriesToRender).some(([_, categoryData]) =>
-            categoryData && categoryData.advanced && categoryData.advanced.length > 0
-        );
+        const side = el('div', 'config-row-control');
+        side.append(control, error, el('div', 'row-actions flex flex-wrap justify-end gap-1'));
+        row.append(info, side);
+        refreshRow(row);
+        return row;
+    }
 
-        if (hasAdvancedSettings) {
-            const advancedSection = document.createElement('div');
-            advancedSection.className = 'config-section';
+    function refreshRow(row) {
+        const key = row.dataset.key;
+        const isPending = pending.has(key);
+        const isCalibrated = calibrated.has(key);
+        const tags = [];
+        if (isPending) tags.push(['Unsaved', 'badge-warning badge-soft']);
+        if (isCalibrated) tags.push(['Calibrated', 'badge-info badge-soft']);
+        else if (isCustom(key)) tags.push(['Custom', 'badge-primary badge-soft']);
+        if (meta[key]?.requiresRestart && !row.dataset.restartNoted) tags.push(['Needs restart', 'badge-outline opacity-60']);
+        if (isAdvanced(key)) tags.push(['Advanced', 'badge-outline opacity-60']);
+        row.querySelector('.row-badges').replaceChildren(...tags.map(([text, tone]) => badge(text, tone)));
 
-            const advancedHeader = document.createElement('div');
-            advancedHeader.className = 'config-main-section-header';
-            advancedHeader.innerHTML = '<h2>Advanced Settings</h2>';
-            advancedSection.appendChild(advancedHeader);
-
-            Object.entries(categoriesToRender).forEach(([category, categoryData]) => {
-                if (!categoryData || !categoryData.advanced || categoryData.advanced.length === 0) return;
-
-                const group = document.createElement('div');
-                group.className = 'config-group';
-                group.dataset.category = category;
-
-                const title = document.createElement('h3');
-                title.className = 'config-group-title';
-                title.textContent = category;
-                group.appendChild(title);
-
-                categoryData.advanced.forEach(key => {
-                    const value = getNestedValue(currentConfig, key);
-                    const defaultValue = getNestedValue(defaultConfig, key);
-                    const isModified = getNestedValue(userSettings, key) !== undefined;
-
-                    const item = createConfigItem(key, value, defaultValue, isModified);
-                    group.appendChild(item);
-                });
-
-                advancedSection.appendChild(group);
-            });
-
-            content.appendChild(advancedSection);
+        const actions = [];
+        if (isPending) actions.push(smallButton('Undo', () => setValue(key, saved(key))));
+        if (isCustom(key) && !isCalibrated && !sameValue(key, current(key), defaultOf(key))) {
+            actions.push(smallButton('Reset to default', () => setValue(key, defaultOf(key))));
         }
-    } else {
-        Object.entries(categoriesToRender).forEach(([category, categoryData]) => {
-            if (!categoryData) return;
+        row.querySelector('.row-actions').replaceChildren(...actions);
 
-            const group = document.createElement('div');
-            group.className = 'config-group';
-            group.dataset.category = category;
+        const error = row.querySelector('.row-error');
+        error.textContent = errors.get(key) || '';
+        error.hidden = !errors.has(key);
+        row.classList.toggle('is-pending', isPending);
+    }
 
-            const title = document.createElement('h3');
-            title.className = 'config-group-title';
-            title.textContent = category;
-            group.appendChild(title);
+    function groupHeading(name, extra) {
+        const wrap = el('div', 'config-group-heading flex items-end justify-between gap-2 border-b border-base-300 pb-1');
+        wrap.append(el('h4', 'text-xs font-semibold uppercase tracking-wide text-base-content/60', name));
+        if (extra) wrap.append(extra);
+        return wrap;
+    }
 
-            if (categoryData.basic && categoryData.basic.length > 0) {
-                const basicHeader = document.createElement('div');
-                basicHeader.className = 'config-section-header';
-                basicHeader.innerHTML = '<span class="section-label">Basic Settings</span>';
-                group.appendChild(basicHeader);
+    function group(name, keys, prefix, { extra, restartNote } = {}) {
+        const wrap = el('div', 'config-group');
+        if (name) wrap.append(groupHeading(name, extra));
+        const noted = restartNote && keys.every((key) => meta[key]?.requiresRestart);
+        if (noted) wrap.append(el('p', 'text-xs opacity-60 mt-1', 'Changes here apply after PiTrac restarts.'));
+        keys.forEach((key) => wrap.append(renderRow(key, prefix, noted)));
+        return wrap;
+    }
 
-                categoryData.basic.forEach(key => {
-                    const value = getNestedValue(currentConfig, key);
-                    const defaultValue = getNestedValue(defaultConfig, key);
-                    const isModified = getNestedValue(userSettings, key) !== undefined;
+    // -- State changes --
 
-                    const item = createConfigItem(key, value, defaultValue, isModified);
-                    group.appendChild(item);
-                });
-            }
+    function setValue(key, value, source) {
+        if (sameValue(key, value, saved(key))) pending.delete(key);
+        else pending.set(key, value);
+        const problem = clientError(key, value);
+        if (problem) errors.set(key, problem);
+        else errors.delete(key);
 
-            if (categoryData.advanced && categoryData.advanced.length > 0) {
-                if (categoryData.basic && categoryData.basic.length > 0) {
-                    const advancedHeader = document.createElement('div');
-                    advancedHeader.className = 'config-section-header';
-                    advancedHeader.innerHTML = '<span class="section-label">Advanced Settings</span>';
-                    group.appendChild(advancedHeader);
-                }
-
-                categoryData.advanced.forEach(key => {
-                    const value = getNestedValue(currentConfig, key);
-                    const defaultValue = getNestedValue(defaultConfig, key);
-                    const isModified = getNestedValue(userSettings, key) !== undefined;
-
-                    const item = createConfigItem(key, value, defaultValue, isModified);
-                    group.appendChild(item);
-                });
-            }
-
-            content.appendChild(group);
+        document.querySelectorAll(`.cfg-control[data-key="${key}"]`).forEach((control) => {
+            if (control !== source) setControl(control, value);
         });
-    }
-}
-
-// Create configuration item element
-function createConfigItem(key, value, defaultValue, isModified) {
-    const item = document.createElement('div');
-    item.className = 'config-item';
-
-    const isUserSet = getNestedValue(userSettings, key) !== undefined;
-
-    if (isUserSet) {
-        item.classList.add('user-set');
-    } else {
-        item.classList.add('using-default');
+        document.querySelectorAll(`.config-row[data-key="${key}"]`).forEach(refreshRow);
+        if (dependencies.has(key)) {
+            document.querySelectorAll('.config-row').forEach((row) => { row.hidden = !visible(row.dataset.key); });
+            renderNav();
+        }
+        updateHeader();
     }
 
-    if (isModified) {
-        item.classList.add('modified');
-    }
-    item.dataset.key = key;
-
-    const metadata = configMetadata[key] || {};
-
-    if (metadata.visibleWhen && !checkVisibilityCondition(metadata.visibleWhen)) {
-        item.style.display = 'none';
-        item.dataset.hiddenByCondition = 'true';
+    function setAdvanced(on) {
+        showAdvanced = on;
+        byId('advanced-toggle').checked = on;
+        try {
+            localStorage.setItem(ADVANCED_KEY, on ? '1' : '0');
+        } catch { /* storage blocked: the toggle resets on reload */ }
+        renderNav();
+        renderRows();
     }
 
-    // Label
-    const label = document.createElement('div');
-    label.className = 'config-label';
-
-    // Use display name from metadata or extract readable name from key
-    const displayName = metadata.displayName || (() => {
-        const parts = key.split('.');
-        const name = parts[parts.length - 1]
-            .replace(/^k/, '')
-            .replace(/([A-Z])/g, ' $1')
-            .trim();
-        return name;
-    })();
-
-    let labelHTML = '<div class="config-label-name">';
-    labelHTML += displayName;
-
-    // Note: isUserSet already defined above
-    if (!isUserSet) {
-        labelHTML += ' <span class="default-badge" title="Using default value">DEFAULT</span>';
+    function selectCategory(category) {
+        view.category = category;
+        view.search = '';
+        byId('search-input').value = '';
+        renderNav();
+        renderRows();
     }
 
-    if (metadata.requiresRestart) {
-        labelHTML += ' <span class="restart-indicator" title="Changing this requires a PiTrac restart to take effect">&#x21bb;</span>';
+    // -- Rendering --
+
+    function categoryKeys(category) {
+        const { basic = [], advanced = [] } = categories[category] || {};
+        return { basic, advanced: showAdvanced ? advanced : [] };
     }
 
-    labelHTML += '</div>';
-
-    if (metadata.description) {
-        labelHTML += `<div class="config-description">${metadata.description}</div>`;
+    function renderNav() {
+        const items = Object.keys(categories).map((category) => {
+            const { basic, advanced } = categoryKeys(category);
+            return [category, [...basic, ...advanced].filter(visible).length];
+        });
+        byId('category-list').replaceChildren(...items.map(([category, count]) => {
+            const btn = el('button', 'justify-between');
+            btn.type = 'button';
+            const active = !view.search && category === view.category;
+            btn.classList.toggle('menu-active', active);
+            if (active) btn.setAttribute('aria-current', 'true');
+            btn.append(el('span', '', category), el('span', 'opacity-60 tabular-nums', String(count)));
+            btn.addEventListener('click', () => selectCategory(category));
+            const li = el('li');
+            li.append(btn);
+            return li;
+        }));
+        const select = byId('category-select');
+        select.replaceChildren(...items.map(([category, count]) => new Option(`${category} (${count})`, category)));
+        select.value = view.category;
     }
-    labelHTML += `<span class="key">${key}</span>`;
 
-    label.innerHTML = labelHTML;
-    item.appendChild(label);
+    function categoryView(category) {
+        const frag = document.createDocumentFragment();
+        frag.append(el('h3', 'text-base font-semibold', category));
+        const { basic, advanced } = categoryKeys(category);
+        if (!basic.length && !showAdvanced) {
+            const empty = el('div', 'flex flex-col items-start gap-2 mt-3');
+            const btn = el('button', 'btn btn-sm', 'Show advanced settings');
+            btn.type = 'button';
+            btn.addEventListener('click', () => setAdvanced(true));
+            empty.append(el('p', 'text-sm opacity-70', 'Everything in this category is advanced.'), btn);
+            frag.append(empty);
+            return frag;
+        }
+        const groups = new Map();
+        basic.forEach((key) => {
+            const name = meta[key]?.basicSubcategory || '';
+            groups.set(name, [...(groups.get(name) || []), key]);
+        });
+        [...groups].sort(([a], [b]) => (a ? 1 : 0) - (b ? 1 : 0))
+            .forEach(([name, keys]) => frag.append(group(name === category ? '' : name, keys, 'cfg')));
+        if (advanced.length) frag.append(group('Advanced', advanced, 'cfg'));
+        return frag;
+    }
 
-    // Input
-    const inputContainer = document.createElement('div');
-    inputContainer.className = 'input-container';
+    function searchResults() {
+        const query = view.search.toLowerCase();
+        const matches = (key) => [key, displayName(key), meta[key]?.description || '']
+            .some((text) => text.toLowerCase().includes(query));
+        const frag = document.createDocumentFragment();
+        const summary = el('p', 'text-sm opacity-70');
+        frag.append(summary);
+        let total = 0;
+        let anyAdvanced = false;
+        Object.entries(categories).forEach(([category, { basic = [], advanced = [] }]) => {
+            const keys = [...basic, ...advanced].filter((key) => visible(key) && matches(key));
+            if (!keys.length) return;
+            total += keys.length;
+            anyAdvanced = anyAdvanced || keys.some(isAdvanced);
+            const section = el('div', 'config-search-group');
+            section.append(el('h3', 'text-base font-semibold', category));
+            keys.forEach((key) => section.append(renderRow(key, 'cfg')));
+            frag.append(section);
+        });
+        summary.textContent = total
+            ? `${plural(total, 'result')}${anyAdvanced ? '. Includes advanced settings.' : ''}`
+            : `No settings match "${view.search}".`;
+        return frag;
+    }
 
-    const input = createInput(key, value, defaultValue, isUserSet);
-    input.className = 'config-input';
-    input.dataset.key = key;
-    input.dataset.original = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : String(value);
-    input.dataset.default = (typeof defaultValue === 'object' && defaultValue !== null) ? JSON.stringify(defaultValue) : String(defaultValue);
+    function renderRows() {
+        byId('settings-rows').replaceChildren(view.search ? searchResults() : categoryView(view.category));
+    }
 
-    if (!isUserSet) {
-        input.classList.add('default-value');
-        if (input.tagName === 'INPUT' && input.type === 'text') {
-            input.placeholder = `Default: ${defaultValue}`;
+    function renderSetup() {
+        const keys = Object.keys(meta).filter((key) => meta[key].setup && !meta[key].internal);
+        const detect = el('button', 'btn btn-xs mb-1', 'Detect cameras');
+        detect.type = 'button';
+        detect.addEventListener('click', () => detectCameras(detect));
+        byId('setup-groups').replaceChildren(
+            group('Hardware', keys.filter((key) => !GOLFER_KEYS.includes(key)), 'setup', { extra: detect, restartNote: true }),
+            group('Golfer', GOLFER_KEYS.filter((key) => keys.includes(key)), 'setup', { restartNote: true }),
+        );
+    }
+
+    function updateHeader() {
+        const n = pending.size;
+        const save = byId('save-btn');
+        save.disabled = !n || saving;
+        save.textContent = saving ? 'Saving' : n ? `Save ${plural(n, 'change')}` : 'Save';
+        byId('discard-btn').disabled = !n || saving;
+        const custom = countLeaves(user);
+        byId('custom-count').textContent = custom ? `${plural(custom, 'custom setting')}` : 'No custom settings';
+    }
+
+    function render() {
+        renderSetup();
+        renderNav();
+        renderRows();
+        updateHeader();
+    }
+
+    function showLoadError(err) {
+        console.error('Could not load configuration:', err);
+        const alert = el('div', 'alert alert-error alert-soft');
+        const retry = el('button', 'btn btn-sm', 'Retry');
+        retry.type = 'button';
+        retry.addEventListener('click', load);
+        alert.append(el('span', '', 'Could not load the configuration.'), retry);
+        byId('setup-groups').replaceChildren(alert);
+        byId('settings-rows').replaceChildren();
+    }
+
+    // -- Server data --
+
+    async function refreshSaved() {
+        const [c, u, cal] = await Promise.all([api('/api/config'), api('/api/config/user'), api('/api/config/calibrated')]);
+        config = c.data || {};
+        user = u.data || {};
+        calibrated = new Set(cal || []);
+        for (const [key, value] of pending) {
+            if (sameValue(key, value, saved(key))) pending.delete(key);
+        }
+        render();
+    }
+
+    async function load() {
+        try {
+            const [m, cats, d] = await Promise.all([
+                api('/api/config/metadata'), api('/api/config/categories'), api('/api/config/defaults'),
+            ]);
+            meta = m || {};
+            categories = cats || {};
+            defaults = d.data || {};
+            dependencies = new Set(Object.values(meta).flatMap((s) => Object.keys(s.visibleWhen || {})));
+            if (!categories[view.category]) view.category = Object.keys(categories)[0];
+            await refreshSaved();
+        } catch (err) {
+            showLoadError(err);
+            return;
+        }
+        if (location.hash === '#setup') byId('setup').scrollIntoView();
+    }
+
+    // -- Actions --
+
+    async function save() {
+        if (!pending.size || saving) return;
+        saving = true;
+        updateHeader();
+        const failed = [];
+        let restart = false;
+        let count = 0;
+        for (const [key, value] of [...pending]) {
+            selfEcho.set(key, Date.now());
+            try {
+                const res = await api(`/api/config/${key}`, { method: 'PUT', body: { value } });
+                if (sameValue(key, pending.get(key), value)) pending.delete(key);
+                errors.delete(key);
+                restart = restart || !!res?.requires_restart;
+                count += 1;
+            } catch (err) {
+                selfEcho.delete(key);
+                errors.set(key, err.message);
+                failed.push(key);
+            }
+        }
+        saving = false;
+        try {
+            await refreshSaved();
+        } catch (err) {
+            render();
+            toast(`Saved, but the page could not reload the settings: ${err.message}`, 'warning');
+        }
+        if (failed.length === 1) {
+            toast(`Could not save ${displayName(failed[0])}: ${errors.get(failed[0])}`, 'error');
+        } else if (failed.length) {
+            toast(`Could not save ${plural(failed.length, 'setting')}: ${failed.map(displayName).join(', ')}`, 'error');
+        }
+        if (count) toast(`Saved ${plural(count, 'change')}`, 'success');
+        if (restart && piTracRunning) {
+            toast('Restart PiTrac to apply', 'warning', {
+                sticky: true, actionLabel: 'Restart now', onAction: () => controlPiTrac('restart'),
+            });
         }
     }
 
-    const inputWrapper = document.createElement('div');
-    inputWrapper.className = 'input-wrapper';
-    inputWrapper.appendChild(input);
+    async function discard() {
+        const ok = await confirmDialog({
+            title: 'Discard changes?',
+            body: `Your ${plural(pending.size, 'unsaved change')} will be lost.`,
+            confirmLabel: 'Discard',
+            danger: true,
+        });
+        if (!ok) return;
+        pending.clear();
+        errors.clear();
+        render();
+    }
 
-    if (isUserSet || isModified) {
-        const clearBtn = document.createElement('button');
-        clearBtn.className = 'clear-value-btn';
-        clearBtn.innerHTML = '×';
-        clearBtn.title = 'Reset to default';
-        clearBtn.onclick = (e) => {
-            e.preventDefault();
-            resetValue(key);
+    async function putDefault(key) {
+        selfEcho.set(key, Date.now());
+        try {
+            await api(`/api/config/${key}`, { method: 'PUT', body: { value: defaultOf(key) } });
+        } catch (err) {
+            selfEcho.delete(key);
+            throw err;
+        }
+        pending.delete(key);
+        errors.delete(key);
+    }
+
+    async function showDiff() {
+        let diff;
+        try {
+            diff = (await api('/api/config/diff')).data || {};
+        } catch (err) {
+            toast(`Could not load the diff: ${err.message}`, 'error');
+            return;
+        }
+        for (const [key, value] of pending) diff[key] = { user: value, default: defaultOf(key), source: 'unsaved' };
+
+        const entries = Object.entries(diff);
+        byId('diff-summary').textContent = entries.length
+            ? `${plural(entries.length, 'setting')} differ from the defaults.`
+            : 'Everything matches the defaults.';
+        const list = el('ul', 'flex flex-col');
+        entries.forEach(([key, { user: mine, default: def, source }]) => {
+            const item = el('li', 'flex flex-wrap items-start gap-x-4 gap-y-1 py-3 border-b border-base-300 last:border-0');
+            const name = el('div', 'min-w-0 flex-1 basis-48');
+            const title = el('div', 'flex flex-wrap items-center gap-1.5');
+            title.append(el('span', 'font-medium', displayName(key)));
+            if (source === 'calibration') title.append(badge('Calibrated', 'badge-info badge-soft'));
+            if (source === 'unsaved') title.append(badge('Unsaved', 'badge-warning badge-soft'));
+            name.append(title, el('div', 'text-xs font-mono opacity-50 break-all', key));
+
+            const values = el('div', 'text-sm min-w-0 basis-full sm:basis-auto sm:max-w-[45%] break-all');
+            const line = (label, value) => {
+                const row = el('div');
+                row.append(el('span', 'opacity-60', `${label} `), el('code', '', formatValue(key, value)));
+                return row;
+            };
+            values.append(line('Default', def), line('Yours', mine));
+
+            item.append(name, values);
+            if (source === 'user') {
+                item.append(smallButton('Reset', () => resetFromDiff(key)));
+            } else if (source === 'unsaved') {
+                item.append(smallButton('Undo', () => {
+                    setValue(key, saved(key));
+                    showDiff();
+                }));
+            }
+            list.append(item);
+        });
+        byId('diff-body').replaceChildren(list);
+        const dialog = byId('diff-dialog');
+        if (!dialog.open) dialog.showModal();
+    }
+
+    async function resetFromDiff(key) {
+        const ok = await confirmDialog({
+            title: `Reset ${displayName(key)}?`,
+            body: `It goes back to ${formatValue(key, defaultOf(key))}.`,
+            confirmLabel: 'Reset',
+        });
+        if (!ok) return;
+        try {
+            await putDefault(key);
+            await refreshSaved();
+            toast(`${displayName(key)} is back to its default`, 'success');
+        } catch (err) {
+            toast(`Could not reset ${displayName(key)}: ${err.message}`, 'error');
+        }
+        showDiff();
+    }
+
+    function exportConfig() {
+        const link = el('a');
+        link.href = '/api/config/export';
+        link.download = `pitrac-config-${new Date().toLocaleDateString('en-CA')}.json`;
+        link.click();
+    }
+
+    async function importConfig(file) {
+        let data;
+        try {
+            data = JSON.parse(await file.text());
+        } catch {
+            toast('That file is not a PiTrac settings export.', 'error');
+            return;
+        }
+        const ok = await confirmDialog({
+            title: `Import ${file.name}?`,
+            body: data && data.calibration_data
+                ? 'Your custom settings and calibration are replaced by the ones in this file.'
+                : 'Your custom settings are replaced by the ones in this file.',
+            confirmLabel: 'Import',
+        });
+        if (!ok) return;
+        selfEcho.set('config_import', Date.now());
+        let result;
+        try {
+            result = await api('/api/config/import', { method: 'POST', body: data });
+        } catch (err) {
+            selfEcho.delete('config_import');
+            toast(`Import failed: ${err.message}`, 'error');
+            return;
+        }
+        await refreshSaved();
+        const skipped = Object.entries(result?.skipped || {});
+        if (skipped.length) {
+            const list = skipped.map(([key, reason]) => `${key.split('.').pop()} (${reason})`).join(', ');
+            const count = skipped.length === 1 ? 'one setting' : `${skipped.length} settings`;
+            toast(`Settings imported, except ${count} this PiTrac cannot use: ${list}.`, 'warning', { sticky: true });
+        } else {
+            toast('Settings imported', 'success');
+        }
+    }
+
+    async function resetAll() {
+        const ok = await confirmDialog({
+            title: 'Reset all settings?',
+            body: 'Your custom settings go back to defaults. Calibration is kept.',
+            confirmLabel: 'Reset all',
+            danger: true,
+        });
+        if (!ok) return;
+        selfEcho.set('config_reset', Date.now());
+        try {
+            await api('/api/config/reset', { method: 'POST' });
+        } catch (err) {
+            selfEcho.delete('config_reset');
+            toast(`Could not reset: ${err.message}`, 'error');
+            return;
+        }
+        pending.clear();
+        errors.clear();
+        await refreshSaved();
+        toast('Settings are back to defaults. Calibration was kept.', 'success');
+    }
+
+    async function detectCameras(btn) {
+        btn.disabled = true;
+        try {
+            const result = await api('/api/cameras/detect');
+            const warnings = result.warnings || [];
+            if (!result.success) {
+                toast([result.message || 'No cameras found', ...warnings].join('. '), 'error');
+                return;
+            }
+            setValue('cameras.slot1.type', String(result.configuration.slot1.type));
+            if (result.cameras.length > 1) setValue('cameras.slot2.type', String(result.configuration.slot2.type));
+            toast(`${result.message}. Save to keep it.`, 'success');
+            warnings.forEach((w) => toast(w, 'warning'));
+        } catch (err) {
+            toast(`Camera detection failed: ${err.message}`, 'error');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function manageSims() {
+        let sims = null;
+        try {
+            sims = await api('/api/sims');
+        } catch { /* the menu shows its own load error */ }
+        if (Array.isArray(sims) && !sims.length) {
+            openSimulatorEditor();
+            return;
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        byId('sims-menu').open = true;
+        byId('sims-nav-btn').focus({ preventScroll: true });
+    }
+
+    function onSocket(data) {
+        if (!data || typeof data.type !== 'string' || !data.type.startsWith('config_')) return;
+        const tag = data.type === 'config_update' ? data.key : data.type;
+        const sentAt = selfEcho.get(tag);
+        selfEcho.delete(tag);
+        if (sentAt !== undefined && Date.now() - sentAt < ECHO_MS) return;
+        clearTimeout(remoteTimer);
+        remoteTimer = setTimeout(async () => {
+            try {
+                await refreshSaved();
+            } catch (err) {
+                console.error('Could not reload configuration:', err);
+            }
+            toast('Settings changed on another device', 'info');
+        }, 300);
+    }
+
+    // -- Wiring --
+
+    document.addEventListener('DOMContentLoaded', () => {
+        try {
+            showAdvanced = localStorage.getItem(ADVANCED_KEY) === '1';
+        } catch { /* storage blocked: basic settings only */ }
+        byId('advanced-toggle').checked = showAdvanced;
+        byId('advanced-toggle').addEventListener('change', (e) => setAdvanced(e.target.checked));
+        byId('category-select').addEventListener('change', (e) => selectCategory(e.target.value));
+        byId('search-input').addEventListener('input', (e) => {
+            view.search = e.target.value.trim();
+            renderNav();
+            renderRows();
+        });
+        byId('save-btn').addEventListener('click', save);
+        byId('discard-btn').addEventListener('click', discard);
+        byId('manage-sims-btn').addEventListener('click', manageSims);
+
+        const more = byId('config-more');
+        const moreActions = { diff: showDiff, export: exportConfig, import: () => byId('import-file').click(), 'reset-all': resetAll };
+        more.addEventListener('click', (e) => {
+            const item = e.target.closest('[data-action]');
+            if (!item) return;
+            more.open = false;
+            moreActions[item.dataset.action]();
+        });
+        document.addEventListener('click', (e) => {
+            if (more.open && !more.contains(e.target)) more.open = false;
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape' || !more.open) return;
+            more.open = false;
+            more.querySelector('summary').focus();
+        });
+        byId('import-file').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            e.target.value = '';
+            if (file) importConfig(file);
+        });
+
+        const onEdit = (e) => {
+            const control = e.target.closest?.('.cfg-control');
+            if (control) setValue(control.dataset.key, controlValue(control), control);
         };
-        inputWrapper.appendChild(clearBtn);
-    }
-
-    const validationError = document.createElement('div');
-    validationError.className = 'validation-error';
-    validationError.style.display = 'none';
-
-    const validateAndUpdate = async () => {
-        const isValid = await validateInput(key, input.value, validationError);
-        if (isValid) {
-            handleValueChange(key, input.value, input.dataset.original);
-
-            if (input.value !== defaultValue) {
-                input.classList.remove('default-value');
-                item.classList.remove('using-default');
-                item.classList.add('user-set');
-
-                if (!inputWrapper.querySelector('.clear-value-btn')) {
-                    const clearBtn = document.createElement('button');
-                    clearBtn.className = 'clear-value-btn';
-                    clearBtn.innerHTML = '×';
-                    clearBtn.title = 'Reset to default';
-                    clearBtn.onclick = (e) => {
-                        e.preventDefault();
-                        resetValue(key);
-                    };
-                    inputWrapper.appendChild(clearBtn);
-                }
-            }
-        }
-    };
-
-    if (input.tagName === 'SELECT') {
-        input.onchange = validateAndUpdate;
-    } else {
-        input.oninput = validateAndUpdate;
-    }
-
-    inputContainer.appendChild(inputWrapper);
-    inputContainer.appendChild(validationError);
-
-    if (key === 'cameras.slot1.type' || key === 'cameras.slot2.type' ||
-        key === 'cameras.slot1_type' || key === 'cameras.slot2_type') {
-        inputContainer.style.display = 'flex';
-        inputContainer.style.alignItems = 'center';
-        inputContainer.style.gap = '0.75rem';
-
-        const detectBtn = document.createElement('button');
-        detectBtn.className = 'btn btn-secondary btn-small';
-        detectBtn.textContent = 'Detect';
-        detectBtn.style.flexShrink = '0';
-        detectBtn.title = 'Auto-detect connected camera';
-        detectBtn.onclick = async () => {
-            detectBtn.disabled = true;
-            const originalText = detectBtn.textContent;
-            detectBtn.textContent = 'Detecting...';
-            try {
-                await detectAndSetCameras(key);
-            } finally {
-                detectBtn.disabled = false;
-                detectBtn.textContent = originalText;
-            }
-        };
-        inputContainer.appendChild(detectBtn);
-    }
-
-    item.appendChild(inputContainer);
-
-    // Actions
-    const actions = document.createElement('div');
-    actions.className = 'config-actions';
-
-    // Only show reset button for user-set values (not for defaults)
-    if (isUserSet && !isModified) {
-        const resetBtn = document.createElement('button');
-        resetBtn.className = 'btn btn-secondary btn-small';
-        resetBtn.textContent = 'Reset';
-        resetBtn.title = 'Reset to default value';
-        resetBtn.onclick = () => resetValue(key);
-        actions.appendChild(resetBtn);
-    }
-
-    item.appendChild(actions);
-
-    return item;
-}
-
-// Create appropriate input based on value type
-function createInput(key, value, defaultValue, isUserSet) {
-    const metadata = configMetadata[key] || {};
-
-    if (key.includes('kModelPath')) {
-        const select = document.createElement('select');
-
-        if (metadata.options && Object.keys(metadata.options).length > 0) {
-            Object.entries(metadata.options).forEach(([modelName, modelPath]) => {
-                const option = document.createElement('option');
-                option.value = modelPath;
-                option.textContent = modelName;
-                if (modelPath === value) {
-                    option.selected = true;
-                }
-                select.appendChild(option);
-            });
-        } else {
-            if (value) {
-                const option = document.createElement('option');
-                option.value = value;
-                const parts = value.split('/');
-                let displayName = 'Unknown Model';
-                for (let i = parts.length - 2; i >= 0; i--) {
-                    if (parts[i] && parts[i] !== 'weights') {
-                        displayName = parts[i];
-                        break;
-                    }
-                }
-                option.textContent = displayName;
-                option.selected = true;
-                select.appendChild(option);
-            }
-        }
-
-        return select;
-    }
-
-    if (metadata.type === 'select' && metadata.options) {
-        const select = document.createElement('select');
-        Object.entries(metadata.options).forEach(([optValue, optDisplay]) => {
-            const option = document.createElement('option');
-            option.value = optValue;
-            option.textContent = optDisplay;
-            if (String(value) === String(optValue)) {
-                option.selected = true;
-            }
-            select.appendChild(option);
-        });
-        return select;
-    }
-
-    if (metadata.type === 'ip_address') {
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = value || '';
-        input.pattern = '^(([0-9]{1,3}\\.){3}[0-9]{1,3})(:[0-9]{1,5})?$';
-        input.placeholder = 'e.g., 192.168.1.100 or 192.168.1.100:921';
-        if (!isUserSet && defaultValue !== undefined && defaultValue !== '') {
-            input.placeholder = `Default: ${defaultValue}`;
-        }
-        return input;
-    }
-
-    // Handle arrays and complex objects
-    if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
-        const textarea = document.createElement('textarea');
-        textarea.value = JSON.stringify(value, null, 2);
-        textarea.rows = 3;
-        textarea.style.width = '100%';
-        textarea.style.fontFamily = 'Monaco, Menlo, monospace';
-        textarea.style.fontSize = '0.875rem';
-        if (!isUserSet) {
-            textarea.placeholder = `Default: ${JSON.stringify(defaultValue, null, 2)}`;
-        }
-        return textarea;
-    } else if (typeof value === 'boolean' || value === '0' || value === '1') {
-        const select = document.createElement('select');
-        select.innerHTML = `
-            <option value="true" ${value === true || value === '1' ? 'selected' : ''}>True</option>
-            <option value="false" ${value === false || value === '0' ? 'selected' : ''}>False</option>
-        `;
-        return select;
-    } else if (typeof value === 'number' || !isNaN(value)) {
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.value = value;
-
-        // Set constraints based on key patterns
-        if (key.includes('Port')) {
-            input.min = 1;
-            input.max = 65535;
-        } else if (key.includes('Gain')) {
-            input.min = 0.5;
-            input.max = 16;
-            input.step = 0.1;
-        }
-
-        return input;
-    } else {
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = value || '';
-        if (!isUserSet && defaultValue !== undefined) {
-            input.placeholder = `Default: ${defaultValue}`;
-        }
-        return input;
-    }
-}
-
-// Handle value change
-async function handleValueChange(key, currentValue, originalValue) {
-    try {
-        let current = currentValue;
-        let original = originalValue;
-        const defaultValue = getNestedValue(defaultConfig, key);
-
-        if (current === 'true') current = true;
-        else if (current === 'false') current = false;
-        else if (!isNaN(current) && current !== '') current = Number(current);
-        else if (typeof current === 'string' && (current.trim().startsWith('[') || current.trim().startsWith('{'))) {
-            try {
-                current = JSON.parse(current);
-            } catch (e) {
-                // Keep as string if invalid JSON
-            }
-        }
-
-        if (original === 'true') original = true;
-        else if (original === 'false') original = false;
-        else if (!isNaN(original) && original !== '') original = Number(original);
-        else if (typeof original === 'string' && (original.trim().startsWith('[') || original.trim().startsWith('{'))) {
-            try {
-                original = JSON.parse(original);
-            } catch (e) {
-                // Keep as string if invalid JSON
-            }
-        }
-
-        let defaultVal = defaultValue;
-        if (defaultVal === 'true' || defaultVal === '1') defaultVal = true;
-        else if (defaultVal === 'false' || defaultVal === '0') defaultVal = false;
-        else if (!isNaN(defaultVal) && defaultVal !== '') defaultVal = Number(defaultVal);
-
-        const isModified = JSON.stringify(current) !== JSON.stringify(original);
-        const isDifferentFromDefault = JSON.stringify(current) !== JSON.stringify(defaultVal);
-
-        setNestedValue(currentConfig, key, current);
-
-        if (isDifferentFromDefault) {
-            setNestedValue(userSettings, key, current);
-        } else {
-            deleteNestedValue(userSettings, key);
-        }
-
-        if (key === 'system.mode') {
-            updateConditionalVisibility();
-        }
-
-        const item = document.querySelector(`[data-key="${key}"]`);
-        if (item) {
-            const inputEl = item.querySelector('.config-input');
-            if (isModified) {
-                modifiedSettings.add(key);
-                item.classList.add('modified');
-                if (inputEl) inputEl.classList.add('modified');
-            } else {
-                modifiedSettings.delete(key);
-                item.classList.remove('modified');
-                if (inputEl) inputEl.classList.remove('modified');
-            }
-
-            if (isDifferentFromDefault) {
-                item.classList.remove('using-default');
-                item.classList.add('user-set');
-
-                const badge = item.querySelector('.default-badge');
-                if (badge) badge.remove();
-
-                const inputWrapper = item.querySelector('.input-wrapper');
-                if (inputWrapper && !inputWrapper.querySelector('.clear-value-btn')) {
-                    const clearBtn = document.createElement('button');
-                    clearBtn.className = 'clear-value-btn';
-                    clearBtn.innerHTML = '×';
-                    clearBtn.title = 'Reset to default';
-                    clearBtn.onclick = (e) => {
-                        e.preventDefault();
-                        resetValue(key);
-                    };
-                    inputWrapper.appendChild(clearBtn);
-                }
-
-                const input = item.querySelector('.config-input');
-                if (input) {
-                    input.classList.remove('default-value');
-                }
-            } else {
-                item.classList.remove('user-set');
-                item.classList.add('using-default');
-
-                const badge = item.querySelector('.default-badge');
-                if (!badge) {
-                    const labelName = item.querySelector('.config-label-name');
-                    if (labelName && !labelName.querySelector('.default-badge')) {
-                        const badgeHtml = ' <span class="default-badge" title="Using default value">DEFAULT</span>';
-                        labelName.insertAdjacentHTML('beforeend', badgeHtml);
-                    }
-                }
-
-                const clearBtn = item.querySelector('.clear-value-btn');
-                if (clearBtn) clearBtn.remove();
-
-                const input = item.querySelector('.config-input');
-                if (input) {
-                    input.classList.add('default-value');
-                }
-            }
-        }
-
-        updateModifiedCount();
-
-        if (isModified) {
-            updateStatus(`Modified: ${key}`, 'info');
-        }
-    } catch (error) {
-        console.error('Failed to handle value change:', error);
-        updateStatus('Failed to update value', 'error');
-    }
-}
-
-// Save all changes
-async function saveChanges() {
-    if (modifiedSettings.size === 0) {
-        updateStatus('No changes to save', 'warning');
-        return;
-    }
-
-    const saveBtn = document.getElementById('saveBtn');
-    if (saveBtn) saveBtn.disabled = true;
-
-    try {
-
-        updateStatus('Saving changes...', '');
-
-        const errors = [];
-        const successfulKeys = [];
-        const requiresRestart = [];
-        let savedCount = 0;
-        let resetCount = 0;
-
-        for (const key of modifiedSettings) {
-            const input = document.querySelector(`.config-input[data-key="${key}"]`);
-            if (!input) continue;
-
-            let value = input.value;
-            const defaultValue = getNestedValue(defaultConfig, key);
-
-            // Convert value type
-            if (value === 'true') value = true;
-            else if (value === 'false') value = false;
-            else if (!isNaN(value) && value !== '') value = Number(value);
-            else if (typeof value === 'string' && (value.trim().startsWith('[') || value.trim().startsWith('{'))) {
-                try {
-                    value = JSON.parse(value);
-                } catch (e) {
-                // Keep as string if invalid JSON
-                }
-            }
-
-            let defaultVal = defaultValue;
-            if (defaultVal === 'true' || defaultVal === '1') defaultVal = true;
-            else if (defaultVal === 'false' || defaultVal === '0') defaultVal = false;
-            else if (!isNaN(defaultVal) && defaultVal !== '') defaultVal = Number(defaultVal);
-
-            try {
-                const response = await fetch(`/api/config/${key}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ value })
-                });
-
-                const result = await response.json();
-
-                if (result.error) {
-                    errors.push(`${key}: ${result.error}`);
-                } else {
-                    successfulKeys.push(key);
-                    if (input) {
-                        input.dataset.original = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : String(value);
-                    }
-
-                    const item = document.querySelector(`[data-key="${key}"]`);
-                    if (item) {
-                        item.classList.remove('modified');
-                        const inputEl = item.querySelector('.config-input');
-                        if (inputEl) inputEl.classList.remove('modified');
-                    }
-
-                    if (value === defaultVal) {
-                        resetCount++;
-                    } else {
-                        savedCount++;
-                    }
-
-                    if (result.requires_restart) {
-                        requiresRestart.push(key);
-                    }
-                }
-            } catch (error) {
-                errors.push(`${key}: ${error.message}`);
-            }
-        }
-
-        // Remove successfully saved keys even if some failed
-        for (const key of successfulKeys) {
-            modifiedSettings.delete(key);
-        }
-
-        if (errors.length > 0) {
-            updateStatus(`Errors: ${errors.join(', ')}`, 'error');
-        } else {
-            updateModifiedCount();
-
-            let message = '';
-            if (savedCount > 0) {
-                message += `Saved ${savedCount} custom setting${savedCount !== 1 ? 's' : ''}`;
-            }
-            if (resetCount > 0) {
-                if (message) message += ', ';
-                message += `Reset ${resetCount} to default${resetCount !== 1 ? 's' : ''}`;
-            }
-
-            if (requiresRestart.length > 0) {
-                const running = await isPiTracRunning();
-                if (running) {
-                    updateStatus(message + '. Restart PiTrac for changes to take effect.', 'warning');
-                } else {
-                    updateStatus(message || 'All changes saved successfully', 'success');
-                }
-            } else {
-                updateStatus(message || 'All changes saved successfully', 'success');
-            }
-        }
-
-    } catch (e) {
-        console.error('Save failed:', e);
-        updateStatus('Save failed: ' + e.message, 'error');
-    } finally {
-        updateModifiedCount();
-    }
-}
-
-function resetToDefault(key) {
-    resetValue(key);
-}
-
-// Reset single value
-async function resetValue(key) {
-    try {
-        // If we have an unsaved local modification, just revert to last-saved value
-        if (modifiedSettings.has(key)) {
-            const item = document.querySelector(`[data-key="${key}"]`);
-            const input = item ? item.querySelector('.config-input') : null;
-            if (input) {
-                input.value = input.dataset.original;
-                input.classList.remove('modified');
-            }
-            if (item) {
-                item.classList.remove('modified');
-            }
-            modifiedSettings.delete(key);
-            // Restore currentConfig and userSettings to their pre-edit values
-            const originalRaw = input ? input.dataset.original : undefined;
-            if (originalRaw !== undefined) {
-                let restored = originalRaw;
-                try { restored = JSON.parse(originalRaw); } catch (_) { /* keep as string */ }
-                setNestedValue(currentConfig, key, restored);
-
-                // Fix visual state: if this value matches default, show as default
-                const defaultValue = getNestedValue(defaultConfig, key);
-                const isDefault = JSON.stringify(restored) === JSON.stringify(defaultValue);
-                if (item) {
-                    if (isDefault) {
-                        item.classList.add('using-default');
-                        item.classList.remove('user-set');
-                        deleteNestedValue(userSettings, key);
-                    } else {
-                        item.classList.remove('using-default');
-                        item.classList.add('user-set');
-                    }
-                }
-                if (input && isDefault) {
-                    input.classList.add('default-value');
-                }
-            }
-            updateModifiedCount();
-            updateStatus(`Reverted unsaved changes to ${key}`, 'info');
-            return;
-        }
-
-        // Otherwise, this is a saved user override -- reset to default on server
-        const defaultValue = getNestedValue(defaultConfig, key);
-
-        const response = await fetch(`/api/config/${key}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ value: defaultValue })
-        });
-
-        const result = await response.json();
-
-        if (result.error) {
-            updateStatus(`Failed to reset: ${result.error}`, 'error');
-        } else {
-            updateStatus(`Reset ${key} to default`, 'success');
-            modifiedSettings.delete(key);
-            updateModifiedCount();
-
-            deleteNestedValue(userSettings, key);
-
-            // Update UI
-            const item = document.querySelector(`[data-key="${key}"]`);
-            if (item) {
-                item.classList.remove('modified', 'user-set');
-                item.classList.add('using-default');
-
-                const input = item.querySelector('.config-input');
-                if (input) {
-                    input.value = defaultValue;
-                    input.dataset.original = (typeof defaultValue === 'object' && defaultValue !== null) ? JSON.stringify(defaultValue) : String(defaultValue);
-                    input.classList.remove('modified');
-                    input.classList.add('default-value');
-                    if (input.tagName === 'INPUT' && input.type === 'text') {
-                        input.placeholder = `Default: ${defaultValue}`;
-                    }
-                }
-
-                const badge = item.querySelector('.default-badge');
-                if (!badge) {
-                    const labelName = item.querySelector('.config-label-name');
-                    if (labelName) {
-                        const badgeHtml = ' <span class="default-badge" title="Using default value">DEFAULT</span>';
-                        labelName.insertAdjacentHTML('beforeend', badgeHtml);
-                    }
-                }
-
-                const clearBtn = item.querySelector('.clear-value-btn');
-                if (clearBtn) {
-                    clearBtn.remove();
-                }
-
-                const actions = item.querySelector('.config-actions');
-                if (actions) {
-                    actions.innerHTML = '';
-                }
-            }
-        }
-    } catch (error) {
-        console.error('Failed to reset value:', error);
-        updateStatus('Failed to reset value', 'error');
-    }
-}
-
-// Reset all to defaults
-function resetAll() {
-    showConfirm(
-        'Reset All Settings',
-        'Are you sure you want to reset all settings to defaults? This cannot be undone.',
-        async () => {
-            try {
-                const response = await fetch('/api/config/reset', {
-                    method: 'POST'
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    updateStatus('All settings reset to defaults', 'success');
-                    modifiedSettings.clear();
-                    loadConfiguration();
-                } else {
-                    updateStatus(`Failed to reset: ${result.message}`, 'error');
-                }
-            } catch (error) {
-                console.error('Failed to reset all:', error);
-                updateStatus('Failed to reset configuration', 'error');
-            }
-        }
-    );
-}
-
-// Reload configuration
-async function reloadConfig() {
-    if (modifiedSettings.size > 0) {
-        if (!confirm(`You have ${modifiedSettings.size} unsaved change(s). Reload anyway?`)) {
-            return;
-        }
-    }
-    updateStatus('Reloading configuration...', '');
-    await loadConfiguration();
-}
-
-// Show differences — merges saved server-side diffs with any unsaved local changes
-async function showDiff() {
-    try {
-        const response = await fetch('/api/config/diff');
-        const result = await response.json();
-        const diff = result.data || {};
-
-        // Merge in unsaved local changes so the diff is complete
-        for (const key of modifiedSettings) {
-            const input = document.querySelector(`.config-input[data-key="${key}"]`);
-            if (!input) continue;
-            let current = input.value;
-            if (current === 'true') current = true;
-            else if (current === 'false') current = false;
-            else if (!isNaN(current) && current !== '') current = Number(current);
-
-            const defaultVal = getNestedValue(defaultConfig, key);
-            if (JSON.stringify(current) !== JSON.stringify(defaultVal)) {
-                diff[key] = { user: current, default: defaultVal, unsaved: true };
-            }
-        }
-
-        if (Object.keys(diff).length === 0) {
-            updateStatus('No differences from defaults', '');
-            return;
-        }
-
-        const unsavedCount = Object.values(diff).filter(v => v.unsaved).length;
-
-        let diffHtml = `
-            <div class="diff-viewer">
-                <div class="diff-header">
-                    <h3>Configuration Differences</h3>
-                    <p class="diff-summary">${Object.keys(diff).length} settings differ from defaults</p>
-                </div>`;
-
-        if (unsavedCount > 0) {
-            diffHtml += `
-                <div style="margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 0.5rem; background: color-mix(in oklch, var(--color-warning) 10%, transparent); border: 1px solid var(--color-warning); color: var(--color-warning); font-size: 0.875rem;">
-                    ${unsavedCount} unsaved change(s) shown below — save to persist them.
-                </div>`;
-        }
-
-        diffHtml += `
-                <div class="diff-content">
-                    <table class="diff-table">
-                        <thead>
-                            <tr>
-                                <th>Setting</th>
-                                <th>Default Value</th>
-                                <th>Your Value</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-        `;
-
-        Object.entries(diff).forEach(([key, values]) => {
-            const defaultVal = formatValue(values.default);
-            const userVal = formatValue(values.user);
-            const metadata = configMetadata[key] || {};
-            const displayName = metadata.displayName || key.split('.').pop();
-            const unsavedTag = values.unsaved
-                ? ' <span style="color: var(--color-warning); font-size: 0.75rem;">(unsaved)</span>'
-                : '';
-
-            diffHtml += `
-                <tr class="diff-row">
-                    <td class="diff-key">
-                        <div class="diff-key-name">${displayName}${unsavedTag}</div>
-                        <div class="diff-key-path">${key}</div>
-                    </td>
-                    <td class="diff-default">
-                        <code>${defaultVal}</code>
-                    </td>
-                    <td class="diff-user">
-                        <code>${userVal}</code>
-                    </td>
-                    <td class="diff-actions">
-                        <button class="btn btn-small" onclick="resetValueFromDiff('${key}')">Reset</button>
-                    </td>
-                </tr>
-            `;
-        });
-
-        diffHtml += `
-                        </tbody>
-                    </table>
-                </div>
-                <div class="diff-footer">
-                    <button class="btn btn-error btn-sm" onclick="resetAllFromDiff()">Reset All to Defaults</button>
-                    <div class="flex gap-2">
-                        <button class="btn btn-ghost btn-sm" onclick="closeModal()">Close</button>
-                        <button class="btn btn-primary btn-sm" onclick="closeModal(); saveChanges();" ${modifiedSettings.size === 0 ? 'disabled' : ''}>Save Changes</button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        showModal('Configuration Differences', diffHtml);
-    } catch (error) {
-        console.error('Failed to get diff:', error);
-        updateStatus('Failed to get differences', 'error');
-    }
-}
-
-function formatValue(value) {
-    if (value === null) return 'null';
-    if (value === undefined) return 'undefined';
-    if (typeof value === 'boolean') return value ? 'true' : 'false';
-    if (typeof value === 'string') return `"${value}"`;
-    if (typeof value === 'object') return JSON.stringify(value, null, 2);
-    return String(value);
-}
-
-async function resetValueFromDiff(key) {
-    await resetValue(key);
-    closeModal();
-    showDiff();
-}
-
-function resetAllFromDiff() {
-    closeModal();
-    resetAll();
-}
-
-function searchConfig() {
-    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-
-    if (!searchTerm) {
-        document.querySelectorAll('.config-item').forEach(item => {
-            item.style.display = 'grid';
-        });
-        document.querySelectorAll('.config-group').forEach(group => {
-            group.style.display = 'block';
-        });
-        updateConditionalVisibility();
-        return;
-    }
-
-    let hasVisibleItems = false;
-
-    document.querySelectorAll('.config-group').forEach(group => {
-        group.style.display = 'none';
+        document.addEventListener('input', onEdit);
+        document.addEventListener('change', onEdit);
+
+        onPiTracStatus((status) => { piTracRunning = status.is_running; });
+        openSocket('/ws', onSocket, { onOpen: () => selfEcho.clear() });
+        load();
     });
 
-    document.querySelectorAll('.config-item').forEach(item => {
-        const key = item.dataset.key.toLowerCase();
-        const labelName = item.querySelector('.config-label-name')?.textContent.toLowerCase() || '';
-        const description = item.querySelector('.config-description')?.textContent.toLowerCase() || '';
-
-        if (key.includes(searchTerm) || labelName.includes(searchTerm) || description.includes(searchTerm)) {
-            item.style.display = 'grid';
-            const parentGroup = item.closest('.config-group');
-            if (parentGroup) {
-                parentGroup.style.display = 'block';
-            }
-            hasVisibleItems = true;
-        } else {
-            item.style.display = 'none';
-        }
+    window.addEventListener('beforeunload', (e) => {
+        if (pending.size) e.preventDefault();
     });
-
-    if (!hasVisibleItems) {
-        updateStatus('No settings found matching: ' + searchTerm, 'warning');
-    }
-}
-
-function clearSearch() {
-    document.getElementById('searchInput').value = '';
-    searchConfig();
-}
-
-function filterConfig() {
-    searchConfig();
-}
-
-async function validateInput(key, value, errorElement) {
-    try {
-        const metadata = configMetadata[key] || {};
-
-        if (metadata.type === 'number') {
-            const num = parseFloat(value);
-            if (isNaN(num)) {
-                errorElement.textContent = 'Must be a valid number';
-                errorElement.style.display = 'block';
-                return false;
-            }
-            if (metadata.min !== undefined && num < metadata.min) {
-                errorElement.textContent = `Minimum value is ${metadata.min}`;
-                errorElement.style.display = 'block';
-                return false;
-            }
-            if (metadata.max !== undefined && num > metadata.max) {
-                errorElement.textContent = `Maximum value is ${metadata.max}`;
-                errorElement.style.display = 'block';
-                return false;
-            }
-        }
-
-        if (metadata.type === 'ip_address' && value) {
-            const ipPortPattern = /^(([0-9]{1,3}\.){3}[0-9]{1,3})(:[0-9]{1,5})?$/;
-            if (!ipPortPattern.test(value)) {
-                errorElement.textContent = 'Invalid IP address format. Use format: 192.168.1.100 or 192.168.1.100:921';
-                errorElement.style.display = 'block';
-                return false;
-            }
-
-            const parts = value.split(':');
-            const ipParts = parts[0].split('.');
-            for (const octet of ipParts) {
-                const num = parseInt(octet, 10);
-                if (num < 0 || num > 255) {
-                    errorElement.textContent = 'IP address octets must be between 0 and 255';
-                    errorElement.style.display = 'block';
-                    return false;
-                }
-            }
-
-            if (parts[1]) {
-                const port = parseInt(parts[1], 10);
-                if (port < 1 || port > 65535) {
-                    errorElement.textContent = 'Port must be between 1 and 65535';
-                    errorElement.style.display = 'block';
-                    return false;
-                }
-            }
-        }
-
-        errorElement.style.display = 'none';
-        errorElement.textContent = '';
-
-        checkDependencies(key, value);
-
-        return true;
-    } catch (error) {
-        console.error('Validation error:', error);
-        return true; // Don't block on validation errors
-    }
-}
-
-function checkDependencies(key, value) {
-    const dependencies = {
-        'system.mode': {
-            'single': ['cameras.slot2 settings will be used for dual camera on single Pi'],
-            'dual_primary': ['This Pi will act as primary camera. Ensure secondary Pi is configured.'],
-            'dual_secondary': ['This Pi will act as secondary camera. Ensure primary Pi is configured.']
-        },
-        'cameras.slot1.type': {
-            '*': ['Camera type change may require recalibration']
-        },
-        'cameras.slot2.type': {
-            '*': ['Camera type change may require recalibration']
-        },
-        'network.broker_address': {
-            '*': ['Changing broker address will affect camera communication']
-        }
-    };
-
-    const keyDeps = dependencies[key];
-    if (keyDeps) {
-        const warnings = keyDeps[value] || keyDeps['*'] || [];
-        if (warnings.length > 0) {
-            showDependencyWarning(key, warnings);
-        }
-    }
-}
-
-function showDependencyWarning(key, warnings) {
-    const message = `<strong>Changing ${key} affects:</strong><br>` + warnings.join('<br>');
-
-    const notification = document.createElement('div');
-    notification.className = 'dependency-warning';
-    notification.innerHTML = message;
-    notification.style.cssText = `
-        position: fixed;
-        top: 80px;
-        right: 20px;
-        background: var(--warning-bg, #fef3c7);
-        color: var(--warning-text, #92400e);
-        padding: 1rem;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        max-width: 300px;
-        z-index: 1000;
-        animation: slideIn 0.3s ease;
-    `;
-
-    document.body.appendChild(notification);
-
-    setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease';
-        setTimeout(() => notification.remove(), 300);
-    }, 5000);
-}
-
-// Utility functions
-function getNestedValue(obj, path) {
-    return path.split('.').reduce((current, key) => current?.[key], obj);
-}
-
-function setNestedValue(obj, path, value) {
-    const parts = path.split('.');
-    let current = obj;
-    for (let i = 0; i < parts.length - 1; i++) {
-        const part = parts[i];
-        if (!(part in current) || typeof current[part] !== 'object') {
-            current[part] = {};
-        }
-        current = current[part];
-    }
-    current[parts[parts.length - 1]] = value;
-}
-
-function deleteNestedValue(obj, path) {
-    const parts = path.split('.');
-    if (parts.length === 1) {
-        delete obj[parts[0]];
-        return;
-    }
-
-    let current = obj;
-    for (let i = 0; i < parts.length - 1; i++) {
-        if (!(parts[i] in current)) {
-            return; // Path doesn't exist
-        }
-        current = current[parts[i]];
-    }
-
-    delete current[parts[parts.length - 1]];
-
-    let parent = obj;
-    for (let i = 0; i < parts.length - 1; i++) {
-        const nextParent = parent[parts[i]];
-        if (nextParent && Object.keys(nextParent).length === 0) {
-            delete parent[parts[i]];
-            break;
-        }
-        parent = nextParent;
-    }
-}
-
-function updateStatus(message, type = '') {
-    const statusEl = document.getElementById('statusMessage');
-    statusEl.textContent = message;
-    statusEl.className = 'status-message ' + type;
-}
-
-function updateModifiedCount() {
-    const modifiedCount = modifiedSettings.size;
-    document.getElementById('modifiedCount').textContent = modifiedCount;
-
-    const saveBtn = document.getElementById('saveBtn');
-    if (saveBtn) {
-        saveBtn.disabled = modifiedCount === 0;
-    }
-
-    let userSetCount = 0;
-    const countUserSettings = (obj, depth = 0) => {
-        if (depth > 10) return;
-        for (const key in obj) {
-            if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-                countUserSettings(obj[key], depth + 1);
-            } else {
-                userSetCount++;
-            }
-        }
-    };
-    countUserSettings(userSettings);
-
-    const totalSettings = document.querySelectorAll('.config-item').length;
-    const defaultCount = totalSettings - userSetCount;
-
-    let counterEl = document.getElementById('settingsCounter');
-    if (!counterEl) {
-        const statusBar = document.querySelector('.status-bar');
-        if (statusBar) {
-            counterEl = document.createElement('div');
-            counterEl.id = 'settingsCounter';
-            counterEl.className = 'settings-counter';
-            statusBar.insertBefore(counterEl, statusBar.firstChild);
-        }
-    }
-
-    if (counterEl) {
-        counterEl.innerHTML = `
-            <span class="counter-custom" title="Settings you've customized">${userSetCount} custom</span>
-            <span class="counter-default" title="Settings using default values">${defaultCount} defaults</span>
-            <span class="counter-total" title="Total number of settings">${totalSettings} total</span>
-        `;
-    }
-}
-
-function showModal(title, body) {
-    document.getElementById('modalTitle').textContent = title;
-    document.getElementById('modalBody').innerHTML = body;
-    // Hide the confirm button -- diff view and other info modals have their own action buttons
-    const confirmBtn = document.getElementById('modalConfirmBtn');
-    if (confirmBtn) confirmBtn.style.display = 'none';
-    document.getElementById('confirmModal').classList.add('active');
-}
-
-function showConfirm(title, message, onConfirm) {
-    document.getElementById('modalTitle').textContent = title;
-    document.getElementById('modalBody').textContent = message;
-
-    const confirmBtn = document.getElementById('modalConfirmBtn');
-    confirmBtn.style.display = '';
-    confirmBtn.onclick = () => {
-        closeModal();
-        onConfirm();
-    };
-
-    document.getElementById('confirmModal').classList.add('active');
-}
-
-function closeModal() {
-    document.getElementById('confirmModal').classList.remove('active');
-}
-
-async function detectAndSetCameras(targetKey = null) {
-    try {
-        updateStatus('Detecting cameras...', 'info');
-
-        const response = await fetch('/api/cameras/detect');
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const result = await response.json();
-        console.log('Camera detection result:', result);
-
-        if (result.success && result.cameras && result.cameras.length > 0) {
-            const config = result.configuration;
-            console.log('Configuration:', config);
-
-            if (targetKey === 'cameras.slot1.type') {
-                const input = document.querySelector('.config-input[data-key="cameras.slot1.type"]');
-                console.log('Found slot1 input:', input);
-                if (input) {
-                    const typeValue = String(config.slot1.type);
-                    console.log('Setting slot1 to:', typeValue);
-                    input.value = typeValue;
-
-                    // Trigger change event for select elements
-                    const event = new Event('change', { bubbles: true });
-                    input.dispatchEvent(event);
-
-                    await handleValueChange('cameras.slot1.type', typeValue, input.dataset.original);
-                } else {
-                    console.error('Could not find input for cameras.slot1.type');
-                }
-                updateStatus(`Camera 1 detected: Type ${config.slot1.type}`, 'success');
-            } else if (targetKey === 'cameras.slot2.type') {
-                const input = document.querySelector('.config-input[data-key="cameras.slot2.type"]');
-                console.log('Found slot2 input:', input);
-                if (input) {
-                    const typeValue = String(config.slot2.type);
-                    console.log('Setting slot2 to:', typeValue);
-                    input.value = typeValue;
-
-                    // Trigger change event for select elements
-                    const event = new Event('change', { bubbles: true });
-                    input.dispatchEvent(event);
-
-                    await handleValueChange('cameras.slot2.type', typeValue, input.dataset.original);
-                } else {
-                    console.error('Could not find input for cameras.slot2.type');
-                }
-                updateStatus(`Camera 2 detected: Type ${config.slot2.type}`, 'success');
-            } else {
-                const input1 = document.querySelector('.config-input[data-key="cameras.slot1.type"]');
-                const input2 = document.querySelector('.config-input[data-key="cameras.slot2.type"]');
-                console.log('Found inputs - slot1:', input1, 'slot2:', input2);
-
-                if (input1) {
-                    const typeValue = String(config.slot1.type);
-                    console.log('Setting slot1 to:', typeValue);
-                    input1.value = typeValue;
-
-                    // Trigger change event for select elements
-                    const event = new Event('change', { bubbles: true });
-                    input1.dispatchEvent(event);
-
-                    await handleValueChange('cameras.slot1.type', typeValue, input1.dataset.original);
-                } else {
-                    console.warn('Could not find input for cameras.slot1.type');
-                }
-
-                if (input2) {
-                    const typeValue = String(config.slot2.type);
-                    console.log('Setting slot2 to:', typeValue);
-                    input2.value = typeValue;
-
-                    // Trigger change event for select elements
-                    const event = new Event('change', { bubbles: true });
-                    input2.dispatchEvent(event);
-
-                    await handleValueChange('cameras.slot2.type', typeValue, input2.dataset.original);
-                } else {
-                    console.warn('Could not find input for cameras.slot2.type');
-                }
-
-                updateStatus(`Detected cameras - Slot 1: Type ${config.slot1.type}, Slot 2: Type ${config.slot2.type}`, 'success');
-            }
-
-        } else {
-            const errorMsg = result.message || 'No cameras detected';
-            updateStatus(`Camera detection failed: ${errorMsg}`, 'error');
-            console.error('Camera detection failed:', result);
-
-            if (result.warnings && result.warnings.length > 0) {
-                showModal('Camera Detection Failed',
-                    `<p><strong>${errorMsg}</strong></p>` +
-                    '<p>Warnings:</p>' +
-                    '<ul style="text-align: left; margin: 10px 20px;">' +
-                    result.warnings.map(w => `<li>${w}</li>`).join('') +
-                    '</ul>' +
-                    '<p style="margin-top: 15px;">Troubleshooting:</p>' +
-                    '<ul style="text-align: left; margin: 10px 20px;">' +
-                    '<li>Check ribbon cable connections and orientation</li>' +
-                    '<li>Verify camera_auto_detect=1 in /boot/firmware/config.txt</li>' +
-                    '<li>Power cycle the Raspberry Pi</li>' +
-                    '<li>Ensure cameras are compatible (IMX296 recommended)</li>' +
-                    '</ul>'
-                );
-            }
-        }
-    } catch (error) {
-        console.error('Camera detection error:', error);
-        updateStatus('Failed to detect cameras - check connection', 'error');
-        showModal('Connection Error',
-            '<p>Failed to connect to camera detection service.</p>' +
-            `<p>Error: ${error.message}</p>` +
-            '<p style="margin-top: 15px;">Please ensure:</p>' +
-            '<ul style="text-align: left; margin: 10px 20px;">' +
-            '<li>The PiTrac web service is running</li>' +
-            '<li>You have a stable network connection</li>' +
-            '<li>Try refreshing the page</li>' +
-            '</ul>'
-        );
-    }
-}
-
-function checkVisibilityCondition(condition) {
-    for (const [condKey, condValue] of Object.entries(condition)) {
-        let actualValue = getNestedValue(currentConfig, condKey);
-        // If value is not in currentConfig, use the default value
-        if (actualValue === undefined) {
-            actualValue = getNestedValue(defaultConfig, condKey);
-        }
-        if (actualValue !== condValue) {
-            return false;
-        }
-    }
-    return true;
-}
-
-function updateConditionalVisibility() {
-    document.querySelectorAll('.config-item').forEach(item => {
-        const key = item.dataset.key;
-        const metadata = configMetadata[key];
-
-        if (metadata && metadata.visibleWhen) {
-            const shouldBeVisible = checkVisibilityCondition(metadata.visibleWhen);
-            if (shouldBeVisible) {
-                item.style.display = '';
-                delete item.dataset.hiddenByCondition;
-            } else {
-                item.style.display = 'none';
-                item.dataset.hiddenByCondition = 'true';
-            }
-        }
-    });
-}
-
-window.saveChanges = saveChanges;
-window.reloadConfig = reloadConfig;
-window.showDiff = showDiff;
-window.resetAll = resetAll;
-window.searchConfig = searchConfig;
-window.clearSearch = clearSearch;
-window.resetToDefault = resetToDefault;
-window.resetValueFromDiff = resetValueFromDiff;
-window.resetAllFromDiff = resetAllFromDiff;
+})();

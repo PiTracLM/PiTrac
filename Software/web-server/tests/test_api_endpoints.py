@@ -134,7 +134,53 @@ class TestAPIEndpoints:
         assert response.status_code == 200
         assert response.json() == {"error": "Image not found"}
 
+    def test_image_endpoint_nested_path(self, client, tmp_path):
+        """Slashed paths like shots/123/x.png are routed and served correctly"""
+        with patch("server.IMAGES_DIR", tmp_path):
+            nested = tmp_path / "shots" / "1717236000123"
+            nested.mkdir(parents=True)
+            (nested / "ball_exposure_candidates.png").write_bytes(b"fake image data")
+
+            response = client.get("/api/images/shots/1717236000123/ball_exposure_candidates.png")
+            assert response.status_code == 200
+
+    def test_image_endpoint_nested_not_found(self, client, tmp_path):
+        """A slashed path that doesn't exist returns the not-found JSON (not a 404 routing error)"""
+        with patch("server.IMAGES_DIR", tmp_path):
+            response = client.get("/api/images/shots/999/missing.png")
+            assert response.status_code == 200
+            assert response.json() == {"error": "Image not found"}
+
+    def test_image_traversal_blocked(self, client, tmp_path):
+        """URL-encoded traversal (%2e%2e) is decoded by the router and blocked by is_relative_to"""
+        with patch("server.IMAGES_DIR", tmp_path):
+            # %2e%2e decodes to '..' — Starlette passes it as '../etc/passwd' to the handler
+            response = client.get("/api/images/%2e%2e/etc/passwd")
+            assert response.status_code == 200
+            assert response.json() == {"error": "Image not found"}
+
     def test_cors_headers(self, client):
         """Test CORS headers are present if needed"""
         response = client.get("/api/shot")
         assert response.status_code == 200
+
+    def test_internal_config_returns_merged_config(self, client, server_instance):
+        resp = client.get("/api/internal/config")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body == server_instance.config_manager.build_generated_config()
+        assert "gs_config" in body
+
+    def test_internal_config_reflects_calibration_put(self, client, server_instance):
+        resp = client.put("/api/config/gs_config.cameras.kCamera1FocalLength", json={"value": 6.25})
+        assert resp.status_code == 200
+        resp = client.put("/api/config/gs_config.cameras.kCamera1Angles", json={"value": [2.1, -26.4]})
+        assert resp.status_code == 200
+
+        body = client.get("/api/internal/config").json()
+        assert body["gs_config"]["cameras"]["kCamera1FocalLength"] == "6.25"
+        assert body["gs_config"]["cameras"]["kCamera1Angles"] == [2.1, -26.4]
+        assert server_instance.config_manager._calibration.load() == {
+            "gs_config.cameras.kCamera1FocalLength": 6.25,
+            "gs_config.cameras.kCamera1Angles": [2.1, -26.4],
+        }

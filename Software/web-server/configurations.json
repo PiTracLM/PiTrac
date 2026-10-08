@@ -5,14 +5,12 @@
     "camera1": {
       "displayName": "Camera 1",
       "slot": "slot1",
-      "defaultIndex": 0,
-      "envPrefix": "PITRAC_SLOT1"
+      "defaultIndex": 0
     },
     "camera2": {
       "displayName": "Camera 2",
       "slot": "slot2",
-      "defaultIndex": 1,
-      "envPrefix": "PITRAC_SLOT2"
+      "defaultIndex": 1
     }
   },
   "systemDefaults": {
@@ -150,6 +148,36 @@
       "internal": true
     }
   },
+  "storage": {
+    "sessionTimeoutMinutes": {
+      "displayName": "Session Timeout Minutes",
+      "description": "Minutes of inactivity before a new session starts",
+      "type": "number",
+      "default": 30,
+      "internal": true
+    },
+    "imageStorageCapMB": {
+      "displayName": "Image Storage Cap MB",
+      "description": "Maximum disk space for stored shot images",
+      "type": "number",
+      "default": 5000,
+      "internal": true
+    },
+    "logDirectoryCapMB": {
+      "displayName": "Log Directory Cap MB",
+      "description": "Maximum total disk space for all per-run log files",
+      "type": "number",
+      "default": 30,
+      "internal": true
+    },
+    "runLogCapMB": {
+      "displayName": "Run Log Cap MB",
+      "description": "Maximum size for a single per-run log file before truncation; kept under the directory cap so the live file can't exceed it",
+      "type": "number",
+      "default": 20,
+      "internal": true
+    }
+  },
   "environmentDefaults": {
     "ldLibraryPath": {
       "displayName": "LD Library Path",
@@ -206,6 +234,7 @@
       "displayName": "Pi Configuration Mode",
       "description": "Single Pi with dual cameras (most common) or Dual Pi setup (one camera per Pi)",
       "type": "select",
+      "setup": true,
       "options": {
         "single": "Single Pi (2 cameras on 1 Pi)",
         "dual": "Dual Pi (1 camera per Pi)"
@@ -216,8 +245,7 @@
         "cameras.slot2.type",
         "cameras.slot2.lens",
         "gs_config.cameras.kCamera2Gain"
-      ],
-      "passedVia": "json"
+      ]
     },
     "gs_config.strobing.kConnectionBoardVersion": {
       "category": "System",
@@ -226,21 +254,21 @@
       "displayName": "Connection Board Version",
       "description": "The original Ver. 1.0 board inverts the external shutter signal, so this setting tells the system whether to pre-invert the signal or not.",
       "type": "select",
+      "setup": true,
       "options": {
         "1": "Version 1.0",
         "2": "Version 2.0",
         "3": "Version 3.0"
       },
       "default": "3",
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.strobing.kDAC_setting": {
       "category": "Strobing",
       "subcategory": "advanced",
       "displayName": "Strobe DAC Setting",
       "description": "Calibrated DAC value for strobe LED current control. Set by the strobe calibration tool.",
-      "type": "number",
+      "type": "integer",
       "min": 0,
       "max": 255,
       "default": null,
@@ -251,32 +279,15 @@
       "subcategory": "basic",
       "basicSubcategory": "System",
       "displayName": "Enclosure Version",
-      "description": "The enclosure version (type) can affect various aspects of the system.  For example, the distance of the reference ball in the calibration rig, as different enclosures position the cameras at different locations.",
+      "description": "Version 2.0 (2025) has a flat base under a tower with triangular supports on the sides of the floors. Version 3.0 (2026) is a streamlined tower with stacked modules. The enclosure sets where the cameras sit, which changes things like the reference ball distance in the calibration rig.",
       "type": "select",
+      "setup": true,
       "options": {
-        "2": "Version 2.0 (Circa 2025 - Flat base bottom under a tower with triangular supports on the sides of the floors)",
-        "3": "Version 3.0 (Circa 2026 - Streamlined tower with stacked modules)"
+        "2": "Version 2.0 (2025, flat base)",
+        "3": "Version 3.0 (2026, stacked modules)"
       },
       "default": "2",
-      "requiresRestart": true,
-      "passedVia": "json"
-    },
-    "system.camera_role": {
-      "category": "System",
-      "subcategory": "advanced",
-      "displayName": "Camera Role (Dual Pi Mode)",
-      "description": "Which camera this Pi controls in dual Pi mode",
-      "type": "select",
-      "options": {
-        "camera1": "Camera 1 (Primary)",
-        "camera2": "Camera 2 (Secondary)"
-      },
-      "default": "camera1",
-      "requiresRestart": true,
-      "visibleWhen": {
-        "system.mode": "dual"
-      },
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.modes.kStartInPuttingMode": {
       "category": "System",
@@ -285,37 +296,35 @@
       "displayName": "Start in Putting Mode",
       "description": "Start the system in putting mode for short game practice",
       "type": "boolean",
+      "setup": true,
       "default": false,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.player.kGolferOrientation": {
       "category": "System",
       "subcategory": "basic",
       "basicSubcategory": "System",
       "displayName": "Golfer Orientation",
-      "description": "Golfer handedness - affects ball detection and swing analysis (CLI parameter)",
+      "description": "Golfer handedness - affects ball detection and swing analysis",
       "type": "select",
+      "setup": true,
       "options": {
         "right_handed": "Right Handed",
         "left_handed": "Left Handed"
       },
       "default": "right_handed",
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "cliArgument": "--golfer_orientation"
+      "requiresRestart": true
     },
     "gs_config.player.kUsePracticeBalls": {
       "category": "System",
       "subcategory": "basic",
       "basicSubcategory": "System",
       "displayName": "Practice Ball Mode",
-      "description": "Enable for lightweight practice/foam balls - adjusts detection parameters (CLI parameter)",
+      "description": "Enable for lightweight practice/foam balls - adjusts detection parameters",
       "type": "boolean",
+      "setup": true,
       "default": false,
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "cliArgument": "--practice_ball"
+      "requiresRestart": true
     },
     "cameras.slot1.type": {
       "category": "Cameras",
@@ -324,6 +333,7 @@
       "displayName": "Camera 1 Type",
       "description": "Type of camera connected to slot 1 (CAM0 port)",
       "type": "select",
+      "setup": true,
       "options": {
         "1": "Pi Camera v1.3 - OV5647 sensor (DEPRECATED)",
         "2": "Pi Camera v2 - IMX219 sensor (DEPRECATED)",
@@ -332,25 +342,23 @@
         "5": "InnoMaker IMX296 - Mono sensor (RECOMMENDED)"
       },
       "default": "5",
-      "requiresRestart": true,
-      "passedVia": "environment",
-      "envVariable": "PITRAC_SLOT1_CAMERA_TYPE"
+      "requiresRestart": true
     },
     "cameras.slot1.lens": {
       "category": "Cameras",
-      "subcategory": "advanced",
+      "subcategory": "basic",
+      "basicSubcategory": "Hardware",
       "displayName": "Camera 1 Lens",
       "description": "Lens type for camera 1",
       "type": "select",
+      "setup": true,
       "options": {
         "1": "6mm - Standard lens",
         "2": "3.6mm M12 - Wide angle lens",
         "3": "Custom - Use custom lens setting (below)"
       },
       "default": "1",
-      "requiresRestart": true,
-      "passedVia": "environment",
-      "envVariable": "PITRAC_SLOT1_LENS_TYPE"
+      "requiresRestart": true
     },
     "cameras.kSlot1CustomLensFocalLength": {
       "category": "Cameras",
@@ -358,7 +366,6 @@
       "default": 4.0,
       "description": "Focal length when using custom lens in Slot 1 (mm)",
       "ui_name": "Custom Lens Focal Length Slot 1",
-      "passedVia": "json",
       "requiresRestart": true
     },
     "cameras.slot1.orientation": {
@@ -372,9 +379,7 @@
         "2": "UpsideDown - Upside down orientation (system will flip)"
       },
       "default": "1",
-      "requiresRestart": true,
-      "passedVia": "environment",
-      "envVariable": "PITRAC_SLOT1_CAMERA_ORIENTATION"
+      "requiresRestart": true
     },
     "cameras.slot2.type": {
       "category": "Cameras",
@@ -386,6 +391,7 @@
         "system.mode": "single"
       },
       "type": "select",
+      "setup": true,
       "options": {
         "1": "Pi Camera v1.3 - OV5647 sensor (DEPRECATED)",
         "2": "Pi Camera v2 - IMX219 sensor (DEPRECATED)",
@@ -394,28 +400,26 @@
         "5": "InnoMaker IMX296 - Mono sensor (RECOMMENDED)"
       },
       "default": "5",
-      "requiresRestart": true,
-      "passedVia": "environment",
-      "envVariable": "PITRAC_SLOT2_CAMERA_TYPE"
+      "requiresRestart": true
     },
     "cameras.slot2.lens": {
       "category": "Cameras",
-      "subcategory": "advanced",
+      "subcategory": "basic",
+      "basicSubcategory": "Hardware",
       "displayName": "Camera 2 Lens",
       "description": "Lens type for camera 2 - Only used in single Pi mode",
       "visibleWhen": {
         "system.mode": "single"
       },
       "type": "select",
+      "setup": true,
       "options": {
         "1": "6mm - Standard lens",
         "2": "3.6mm M12 - Wide angle lens",
         "3": "Custom - Use custom lens setting (below)"
       },
       "default": "1",
-      "requiresRestart": true,
-      "passedVia": "environment",
-      "envVariable": "PITRAC_SLOT2_LENS_TYPE"
+      "requiresRestart": true
     },
     "cameras.kSlot2CustomLensFocalLength": {
       "category": "Cameras",
@@ -423,7 +427,6 @@
       "default": 4.0,
       "description": "Focal length when using custom lens in Slot 2 (mm)",
       "ui_name": "Custom Lens Focal Length Slot 2",
-      "passedVia": "json",
       "requiresRestart": true
     },
     "cameras.slot2.orientation": {
@@ -437,9 +440,7 @@
         "2": "UpsideDown - Upside down orientation (system will flip)"
       },
       "default": "1",
-      "requiresRestart": true,
-      "passedVia": "environment",
-      "envVariable": "PITRAC_SLOT2_CAMERA_ORIENTATION"
+      "requiresRestart": true
     },
     "logging.level": {
       "category": "Logging",
@@ -451,21 +452,19 @@
       "options": {
         "trace": "Trace - Most verbose, for deep debugging",
         "debug": "Debug - Detailed debugging information",
-        "info": "Info - Normal operational messages",
-        "warn": "Warning - Important notices (default)",
+        "info": "Info - Normal operational messages (default)",
+        "warn": "Warning - Important notices",
         "error": "Error - Only errors"
       },
       "default": "info",
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "cliArgument": "--logging_level"
+      "requiresRestart": true
     },
     "gs_config.logging.kArtifactSaveLevel": {
       "category": "Logging",
       "subcategory": "basic",
       "basicSubcategory": "Storage",
       "displayName": "Diagnostic Image Level",
-      "description": "Control how many diagnostic images are saved (CLI parameter)",
+      "description": "Control how many diagnostic images are saved",
       "type": "select",
       "options": {
         "none": "None - No images saved",
@@ -473,31 +472,25 @@
         "all": "All - Save all intermediate images (may slow system)"
       },
       "default": "final_results_only",
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "cliArgument": "--artifact_save_level"
+      "requiresRestart": true
     },
     "gs_config.debug.kShowDebugImages": {
       "category": "Debugging",
       "subcategory": "advanced",
       "displayName": "Show Debug Images",
-      "description": "Display debug/trace images on screen for troubleshooting (CLI parameter)",
+      "description": "Display debug/trace images on screen for troubleshooting",
       "type": "boolean",
       "default": false,
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "cliArgument": "--show_images"
+      "requiresRestart": true
     },
     "gs_config.debug.kWaitForKeyOnImages": {
       "category": "Debugging",
       "subcategory": "advanced",
       "displayName": "Pause on Debug Images",
-      "description": "Wait for keypress after showing debug images (CLI parameter)",
+      "description": "Wait for keypress after showing debug images",
       "type": "boolean",
       "default": false,
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "cliArgument": "--wait_keys"
+      "requiresRestart": true
     },
     "gs_config.ball_identification.kStrobedBallDetectionMethod": {
       "category": "Ball Detection",
@@ -511,8 +504,7 @@
         "experimental": "YOLO Neural Network"
       },
       "default": "experimental",
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.ball_identification.kBallPlacementDetectionMethod": {
       "category": "Ball Detection",
@@ -526,8 +518,7 @@
         "experimental": "YOLO (Fast & Accurate)"
       },
       "default": "experimental",
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.ball_identification.kModelPath": {
       "category": "AI Detection",
@@ -538,8 +529,7 @@
       "type": "select",
       "options": {},
       "default": "/etc/pitrac/models/yolo26-ball-detector",
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.ball_identification.kImageTypeToProcessWithYOLO": {
       "category": "Ball Detection",
@@ -553,8 +543,7 @@
         "1": "YOLO will process monochrome images (and convert as necessary)"
       },
       "default": "0",
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera1Gain": {
       "category": "Cameras",
@@ -567,8 +556,7 @@
       "max": 16.0,
       "step": 0.1,
       "default": 6.0,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera2Gain": {
       "category": "Cameras",
@@ -584,64 +572,57 @@
       "max": 16.0,
       "step": 0.1,
       "default": 3.0,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera1Saturation": {
       "category": "Cameras",
       "subcategory": "advanced",
       "advancedSubcategory": "Cameras",
       "displayName": "Camera 1 Saturation",
-      "description": "Brightness/gain setting for Camera 1",
+      "description": "Color saturation for camera 1. 1.0 is neutral.",
       "type": "float",
       "min": 0.0,
       "max": 2.0,
       "step": 0.1,
       "default": 1.0,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera2Saturation": {
       "category": "Cameras",
       "subcategory": "advanced",
       "advancedSubcategory": "Cameras",
       "displayName": "Camera 2 Saturation",
-      "description": "Brightness/gain setting for Camera 2",
+      "description": "Color saturation for camera 2. 1.0 is neutral.",
       "type": "float",
       "min": 0.0,
       "max": 2.0,
       "step": 0.1,
       "default": 1.0,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera1SearchCenterX": {
       "category": "Cameras",
       "subcategory": "advanced",
       "displayName": "Camera 1 Search Center X",
       "description": "X coordinate for ball search center in Camera 1 (calibration parameter)",
-      "type": "number",
+      "type": "integer",
       "min": 0,
       "max": 1920,
       "step": 10,
       "default": 850,
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "cliArgument": "--search_center_x"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera1SearchCenterY": {
       "category": "Cameras",
       "subcategory": "advanced",
       "displayName": "Camera 1 Search Center Y",
       "description": "Y coordinate for ball search center in Camera 1 (calibration parameter)",
-      "type": "number",
+      "type": "integer",
       "min": 0,
       "max": 1080,
       "step": 10,
       "default": 500,
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "cliArgument": "--search_center_y"
+      "requiresRestart": true
     },
     "gs_config.cameras.kHLAOffset": {
       "category": "Cameras",
@@ -654,8 +635,7 @@
       "max": 45.0,
       "step": 1.0,
       "default": 0.0,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.cameras.kVLAOffset": {
       "category": "Cameras",
@@ -668,58 +648,7 @@
       "max": 45.0,
       "step": 1.0,
       "default": 0.0,
-      "requiresRestart": false,
-      "passedVia": "json"
-    },
-    "gs_config.golf_simulator_interfaces.E6.kE6ConnectAddress": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "E6 Connect Address",
-      "description": "IP address of E6 Connect simulator",
-      "type": "ip_address",
-      "default": "",
-      "requiresRestart": false,
-      "passedVia": "cli",
-      "cliArgument": "--e6_host_address"
-    },
-    "gs_config.golf_simulator_interfaces.E6.kE6ConnectPort": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "E6 Connect Port",
-      "description": "Port number for E6 Connect simulator",
-      "type": "number",
-      "min": 1,
-      "max": 65535,
-      "default": 2483,
-      "requiresRestart": true,
-      "passedVia": "json"
-    },
-    "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectAddress": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "GSPro Address",
-      "description": "IP address of GSPro simulator (e.g., 192.168.1.100)",
-      "type": "ip_address",
-      "default": "",
-      "requiresRestart": false,
-      "passedVia": "cli",
-      "cliArgument": "--gspro_host_address"
-    },
-    "gs_config.golf_simulator_interfaces.GSPro.kGSProConnectPort": {
-      "category": "Simulators",
-      "subcategory": "basic",
-      "basicSubcategory": "Simulators",
-      "displayName": "GSPro Port",
-      "description": "Port number for GSPro simulator",
-      "type": "number",
-      "min": 1,
-      "max": 65535,
-      "default": 921,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kUseCLAHEProcessing": {
       "category": "Ball Detection",
@@ -729,39 +658,51 @@
       "description": "Enable Contrast Limited Adaptive Histogram Equalization for better ball detection",
       "type": "boolean",
       "default": true,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kCLAHEClipLimit": {
       "category": "Ball Detection",
-      "subcategory": "basic",
-      "basicSubcategory": "Ball Detection",
+      "subcategory": "advanced",
       "displayName": "CLAHE Clip Limit",
       "description": "Contrast enhancement strength (1-40)",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 40,
       "default": 8,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_position.kExpectedBallRadiusPixelsAt40cm": {
       "category": "Ball Detection",
-      "subcategory": "basic",
-      "basicSubcategory": "Ball Detection",
+      "subcategory": "advanced",
       "displayName": "Expected Ball Radius (pixels)",
       "description": "Expected ball size at 40cm distance - critical for distance calculations",
       "type": "number",
       "min": 10,
       "max": 200,
       "default": 87,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
+    },
+    "gs_config.cameras.kExpectedBallRadiusPixelsAt40cmCamera1": {
+      "category": "Cameras",
+      "subcategory": "advanced",
+      "displayName": "Camera 1 Expected Ball Radius at 40cm (px)",
+      "description": "Expected ball radius in pixels at 40 cm for camera 1. A value below 1 uses the camera model's built-in value.",
+      "type": "integer",
+      "default": -1,
+      "requiresRestart": true
+    },
+    "gs_config.cameras.kExpectedBallRadiusPixelsAt40cmCamera2": {
+      "category": "Cameras",
+      "subcategory": "advanced",
+      "displayName": "Camera 2 Expected Ball Radius at 40cm (px)",
+      "description": "Expected ball radius in pixels at 40 cm for camera 2. A value below 1 uses the camera model's built-in value.",
+      "type": "integer",
+      "default": -1,
+      "requiresRestart": true
     },
     "gs_config.strobing.kStandardBallSpeedSlowdownPercentage": {
       "category": "Strobing",
-      "subcategory": "basic",
-      "basicSubcategory": "Strobing",
+      "subcategory": "advanced",
       "displayName": "Standard Ball Speed Adjustment",
       "description": "Speed adjustment for standard golf balls (%)",
       "type": "number",
@@ -769,13 +710,11 @@
       "max": 10,
       "step": 0.1,
       "default": 0.1,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.strobing.kPracticeBallSpeedSlowdownPercentage": {
       "category": "Strobing",
-      "subcategory": "basic",
-      "basicSubcategory": "Strobing",
+      "subcategory": "advanced",
       "displayName": "Practice Ball Speed Adjustment",
       "description": "Speed adjustment for practice/foam balls (%)",
       "type": "number",
@@ -783,13 +722,11 @@
       "max": 20,
       "step": 0.1,
       "default": 4.0,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.strobing.kPuttingBallSpeedSlowdownPercentage": {
       "category": "Strobing",
-      "subcategory": "basic",
-      "basicSubcategory": "Strobing",
+      "subcategory": "advanced",
       "displayName": "Putting Speed Adjustment",
       "description": "Speed adjustment in putting mode (%)",
       "type": "number",
@@ -797,44 +734,40 @@
       "max": 20,
       "step": 0.1,
       "default": 5.2,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.strobing.number_bits_for_fast_on_pulse_": {
       "category": "Strobing",
       "subcategory": "advanced",
       "displayName": "Fast Strobe Pulse Width (bits)",
       "description": "Number of bits used for fast strobe on-pulse width. Controls the duration of the fast strobe pulse.",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 16,
       "default": 1,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.strobing.number_bits_for_slow_on_pulse_": {
       "category": "Strobing",
       "subcategory": "advanced",
       "displayName": "Slow Strobe Pulse Width (bits)",
       "description": "Number of bits used for slow strobe on-pulse width. Controls the duration of the slow strobe pulse.",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 16,
       "default": 1,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.strobing.kPrimingPulseFPS": {
       "category": "Strobing",
       "subcategory": "advanced",
       "displayName": "Priming Pulse FPS",
       "description": "Frame rate for priming pulses sent to camera before capture. Used to stabilize camera exposure.",
-      "type": "number",
+      "type": "integer",
       "min": 5,
       "max": 60,
       "default": 15,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.strobing.kCameraRequiresFlushPulse": {
       "category": "Strobing",
@@ -843,64 +776,61 @@
       "description": "Send an extra trigger pulse after the shutter pulse to flush the ball-hit frame out of the sensor. Required for some IMX296 boards (e.g. Pi GS) where one trigger only advances the capture FSM. Leave off for InnoMaker — it produces the second frame event natively.",
       "type": "boolean",
       "default": false,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.logging.kLogIntermediateExposureImagesToFile": {
       "category": "Logging",
-      "subcategory": "basic",
-      "basicSubcategory": "Storage",
+      "subcategory": "advanced",
       "displayName": "Log Exposure Images",
       "description": "Save intermediate exposure images for debugging",
       "type": "boolean",
       "default": false,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.logging.kLogIntermediateSpinImagesToFile": {
       "category": "Logging",
-      "subcategory": "basic",
-      "basicSubcategory": "Storage",
+      "subcategory": "advanced",
       "displayName": "Log Spin Images",
       "description": "Save spin analysis images",
       "type": "boolean",
       "default": false,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.logging.kLogWebserverImagesToFile": {
       "category": "Logging",
-      "subcategory": "basic",
-      "basicSubcategory": "Storage",
+      "subcategory": "advanced",
       "displayName": "Log Web Server Images",
       "description": "Save images for web server display",
       "type": "boolean",
       "default": true,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.logging.kLogDiagnosticImagesToUniqueFiles": {
       "category": "Logging",
-      "subcategory": "basic",
-      "basicSubcategory": "Storage",
+      "subcategory": "advanced",
       "displayName": "Use Unique Filenames",
       "description": "Save diagnostic images with unique names (vs overwriting)",
       "type": "boolean",
       "default": true,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.logging.kLinuxBaseImageLoggingDir": {
       "category": "Storage",
-      "subcategory": "basic",
-      "basicSubcategory": "Storage",
+      "subcategory": "advanced",
       "displayName": "Image Directory",
       "description": "Base directory for saving images",
       "type": "path",
       "default": "~/LM_Shares/Images/",
-      "requiresRestart": false,
-      "passedVia": "cli",
-      "cliArgument": "--base_image_logging_dir"
+      "requiresRestart": false
+    },
+    "gs_config.logging.kPCBaseImageLoggingDir": {
+      "category": "Logging",
+      "subcategory": "advanced",
+      "displayName": "PC Image Logging Directory",
+      "description": "Base image logging directory on Windows builds. Linux builds use Image Directory (kLinuxBaseImageLoggingDir).",
+      "type": "string",
+      "default": "",
+      "requiresRestart": true
     },
     "gs_config.ipc_interface.kWebServerShareDirectory": {
       "category": "Network",
@@ -910,32 +840,7 @@
       "description": "Directory for web server shared files",
       "type": "path",
       "default": "~/LM_Shares/Images/",
-      "requiresRestart": false,
-      "passedVia": "json"
-    },
-    "gs_config.ipc_interface.kWebServerTomcatShareDirectory": {
-      "category": "Network",
-      "subcategory": "basic",
-      "basicSubcategory": "Storage",
-      "displayName": "Tomcat Share Directory",
-      "description": "Directory for Tomcat web server files",
-      "type": "path",
-      "default": "~/LM_Shares/WebShare",
-      "requiresRestart": false,
-      "passedVia": "json"
-    },
-    "gs_config.ipc_interface.kRefreshTimeSeconds": {
-      "category": "Network",
-      "subcategory": "basic",
-      "basicSubcategory": "Network",
-      "displayName": "Web Refresh Interval",
-      "description": "Web interface refresh interval in seconds",
-      "type": "number",
-      "min": 1,
-      "max": 60,
-      "default": 3,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.golf_simulator_interfaces.kSkipSpinCalculation": {
       "category": "Spin Analysis",
@@ -945,19 +850,7 @@
       "description": "Disable spin calculation (for putting-only or debugging)",
       "type": "boolean",
       "default": false,
-      "requiresRestart": false,
-      "passedVia": "json"
-    },
-    "gs_config.golf_simulator_interfaces.kWriteSpinAnalysisCsvFiles": {
-      "category": "Spin Analysis",
-      "subcategory": "basic",
-      "basicSubcategory": "Spin",
-      "displayName": "Write Spin CSV Files",
-      "description": "Save spin analysis data to CSV files",
-      "type": "boolean",
-      "default": true,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kModelConfidenceThreshold": {
       "category": "AI Detection",
@@ -969,8 +862,7 @@
       "max": 1.0,
       "step": 0.05,
       "default": 0.5,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kModelNMSThreshold": {
       "category": "AI Detection",
@@ -982,47 +874,43 @@
       "max": 1.0,
       "step": 0.05,
       "default": 0.4,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kModelInputWidth": {
       "category": "AI Detection",
       "subcategory": "advanced",
       "displayName": "Model Input Width",
       "description": "Neural network input width in pixels (must match exported model, multiple of 32)",
-      "type": "number",
+      "type": "integer",
       "min": 320,
       "max": 2048,
       "step": 32,
       "default": 736,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.ball_identification.kModelInputHeight": {
       "category": "AI Detection",
       "subcategory": "advanced",
       "displayName": "Model Input Height",
       "description": "Neural network input height in pixels (must match exported model, multiple of 32)",
-      "type": "number",
+      "type": "integer",
       "min": 320,
       "max": 2048,
       "step": 32,
       "default": 544,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.ball_identification.kInferenceThreads": {
       "category": "AI Detection",
       "subcategory": "advanced",
       "displayName": "Inference Threads",
       "description": "Number of threads for inference (0 = auto)",
-      "type": "number",
+      "type": "integer",
       "min": 0,
       "max": 8,
       "step": 1,
       "default": 4,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.ball_identification.kStrobedBallsCannyLower": {
       "category": "Ball Detection",
@@ -1033,8 +921,7 @@
       "min": 0,
       "max": 255,
       "default": 33,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsCannyUpper": {
       "category": "Ball Detection",
@@ -1045,50 +932,18 @@
       "min": 0,
       "max": 255,
       "default": 90,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kCLAHETilesGridSize": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "CLAHE Tiles Grid Size",
       "description": "Grid size for CLAHE tiles",
-      "type": "number",
+      "type": "integer",
       "min": 2,
       "max": 16,
       "default": 6,
-      "requiresRestart": false,
-      "passedVia": "json"
-    },
-    "cli.system_mode": {
-      "category": "System",
-      "subcategory": "advanced",
-      "displayName": "CLI System Mode",
-      "description": "System mode passed via command line",
-      "type": "select",
-      "options": {
-        "camera1": "Normal Mode",
-        "test_gspro_server": "Test GSPro Server",
-        "test_images": "Test Images",
-        "test_spin": "Test Spin"
-      },
-      "default": "camera1",
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "cliArgument": "--system_mode",
-      "internal": true
-    },
-    "cli.run_single_pi": {
-      "category": "System",
-      "subcategory": "advanced",
-      "displayName": "Run Single Pi Mode (CLI)",
-      "description": "Run both cameras on a single Pi (overrides system.mode setting)",
-      "type": "boolean",
-      "default": false,
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "cliArgument": "--run_single_pi",
-      "internal": true
+      "requiresRestart": false
     },
     "gs_config.cameras.kCamera1HighFPSGain": {
       "category": "Cameras",
@@ -1100,8 +955,7 @@
       "max": 20.0,
       "step": 0.1,
       "default": 15.0,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera1Contrast": {
       "category": "Cameras",
@@ -1113,8 +967,7 @@
       "max": 2.0,
       "step": 0.1,
       "default": 1.0,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera2Contrast": {
       "category": "Cameras",
@@ -1126,8 +979,7 @@
       "max": 2.0,
       "step": 0.1,
       "default": 1.2,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera2ComparisonGain": {
       "category": "Cameras",
@@ -1139,8 +991,7 @@
       "max": 16.0,
       "step": 0.1,
       "default": 0.8,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera2CalibrateOrLocationGain": {
       "category": "Cameras",
@@ -1152,8 +1003,7 @@
       "max": 16.0,
       "step": 0.1,
       "default": 1.0,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera2PuttingGain": {
       "category": "Cameras",
@@ -1165,8 +1015,7 @@
       "max": 16.0,
       "step": 0.1,
       "default": 4.0,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera2PuttingContrast": {
       "category": "Cameras",
@@ -1178,32 +1027,29 @@
       "max": 2.0,
       "step": 0.1,
       "default": 1.2,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera1StillShutterTimeuS": {
       "category": "Cameras",
       "subcategory": "advanced",
       "displayName": "Camera 1 Still Shutter Time (\u03bcs)",
       "description": "Shutter time for Camera 1 still images in microseconds",
-      "type": "number",
+      "type": "integer",
       "min": 1000,
       "max": 100000,
       "default": 40000,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera2StillShutterTimeuS": {
       "category": "Cameras",
       "subcategory": "advanced",
       "displayName": "Camera 2 Still Shutter Time (\u03bcs)",
       "description": "Shutter time for Camera 2 still images in microseconds",
-      "type": "number",
+      "type": "integer",
       "min": 1000,
       "max": 100000,
       "default": 15000,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.physical_constants.kBallRadiusMeters": {
       "category": "System",
@@ -1216,8 +1062,7 @@
       "step": 1e-06,
       "default": 0.021335,
       "requiresRestart": false,
-      "internal": true,
-      "passedVia": "json"
+      "internal": true
     },
     "gs_config.ball_position.kMinMovedBallRadiusRatio": {
       "category": "Ball Detection",
@@ -1229,8 +1074,7 @@
       "max": 1.0,
       "step": 0.05,
       "default": 0.6,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_position.kMaxMovedBallRadiusRatio": {
       "category": "Ball Detection",
@@ -1242,8 +1086,7 @@
       "max": 2.0,
       "step": 0.05,
       "default": 1.5,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_position.kMinRadiusRatio": {
       "category": "Ball Detection",
@@ -1255,8 +1098,7 @@
       "max": 1.0,
       "step": 0.05,
       "default": 0.8,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_position.kMaxRadiusRatio": {
       "category": "Ball Detection",
@@ -1268,32 +1110,29 @@
       "max": 2.5,
       "step": 0.05,
       "default": 1.7,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_position.kMinRadiusOffset": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Min Radius Offset",
       "description": "Minimum radius offset in pixels",
-      "type": "number",
+      "type": "integer",
       "min": 0,
       "max": 50,
       "default": 20,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_position.kMaxRadiusOffset": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Max Radius Offset",
       "description": "Maximum radius offset in pixels",
-      "type": "number",
+      "type": "integer",
       "min": 0,
       "max": 50,
       "default": 20,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_position.kTeedBallSearchAreaMaskRadiusRatio": {
       "category": "Ball Detection",
@@ -1305,44 +1144,29 @@
       "max": 2.0,
       "step": 0.1,
       "default": 0.0,
-      "requiresRestart": false,
-      "passedVia": "json"
-    },
-    "gs_config.ball_position.kMinBallRadiusPixelsForProximityWarning": {
-      "category": "Ball Detection",
-      "subcategory": "advanced",
-      "displayName": "Min Ball Radius for Proximity Warning",
-      "description": "Minimum ball radius in pixels to trigger proximity warning",
-      "type": "number",
-      "min": 50,
-      "max": 300,
-      "default": 160,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.strobing.kBaudRateForFastPulses": {
       "category": "Strobing",
       "subcategory": "advanced",
       "displayName": "Baud Rate for Fast Pulses",
       "description": "Serial baud rate for fast strobe pulses",
-      "type": "number",
+      "type": "integer",
       "min": 9600,
       "max": 921600,
       "default": 115200,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.strobing.kBaudRateForSlowPulses": {
       "category": "Strobing",
       "subcategory": "advanced",
       "displayName": "Baud Rate for Slow Pulses",
       "description": "Serial baud rate for slow strobe pulses",
-      "type": "number",
+      "type": "integer",
       "min": 9600,
       "max": 921600,
       "default": 115200,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.strobing.kBaudRatePulseMultiplier": {
       "category": "Strobing",
@@ -1354,140 +1178,117 @@
       "max": 2.0,
       "step": 0.1,
       "default": 1.0,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.strobing.kCam2SetupPeriodMilliseconds": {
       "category": "Strobing",
       "subcategory": "advanced",
       "displayName": "Camera 2 Setup Period (ms)",
       "description": "Setup period for Camera 2 in milliseconds",
-      "type": "number",
+      "type": "integer",
       "min": 500,
       "max": 5000,
       "default": 2000,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.strobing.kNumberPrimingPulses": {
       "category": "Strobing",
       "subcategory": "advanced",
       "displayName": "Number of Priming Pulses",
       "description": "Number of priming pulses before capture",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 30,
       "default": 12,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.strobing.kPuttingStrobeDelayMs": {
       "category": "Strobing",
       "subcategory": "advanced",
       "displayName": "Putting Strobe Delay (ms)",
       "description": "Strobe delay for putting mode in milliseconds",
-      "type": "number",
+      "type": "integer",
       "min": 10,
       "max": 200,
       "default": 50,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.strobing.kPauseBeforeReadyForFinalPrimingPulseMs": {
       "category": "Strobing",
       "subcategory": "advanced",
       "displayName": "Pause Before Final Priming Pulse (ms)",
       "description": "Pause before ready for final priming pulse in milliseconds",
-      "type": "number",
+      "type": "integer",
       "min": 100,
       "max": 1000,
       "default": 400,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.strobing.kPauseBeforeSendingPreImageTriggerMs": {
       "category": "Strobing",
       "subcategory": "advanced",
       "displayName": "Pause Before Pre-Image Trigger (ms)",
       "description": "Pause before sending pre-image trigger in milliseconds",
-      "type": "number",
+      "type": "integer",
       "min": 100,
       "max": 1000,
       "default": 300,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.strobing.kPauseAfterSendingPreImageTriggerMs": {
       "category": "Strobing",
       "subcategory": "advanced",
       "displayName": "Pause After Pre-Image Trigger (ms)",
       "description": "Pause after sending pre-image trigger in milliseconds",
-      "type": "number",
+      "type": "integer",
       "min": 500,
       "max": 5000,
       "default": 2000,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.strobing.kPauseBeforeSendingImageFlushMs": {
       "category": "Strobing",
       "subcategory": "advanced",
       "displayName": "Pause Before Image Flush (ms)",
       "description": "Pause before sending image flush in milliseconds",
-      "type": "number",
+      "type": "integer",
       "min": 100,
       "max": 1000,
       "default": 300,
-      "requiresRestart": true,
-      "passedVia": "json"
-    },
-    "gs_config.strobing.kPauseBeforeSendingFinalImageTriggerMs": {
-      "category": "Strobing",
-      "subcategory": "advanced",
-      "displayName": "Pause Before Final Image Trigger (ms)",
-      "description": "Pause before sending final image trigger in milliseconds",
-      "type": "number",
-      "min": 500,
-      "max": 5000,
-      "default": 2000,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.strobing.kPauseToSetUpInnoMakerExternalTriggerMilliseconds": {
       "category": "Strobing",
       "subcategory": "advanced",
       "displayName": "InnoMaker External Trigger Setup (ms)",
       "description": "Pause to set up InnoMaker external trigger in milliseconds",
-      "type": "number",
+      "type": "integer",
       "min": 100,
       "max": 2000,
       "default": 500,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.image_capture.kMaxWatchingCropWidth": {
       "category": "Cameras",
       "subcategory": "advanced",
       "displayName": "Max Watching Crop Width",
       "description": "Maximum width for watching crop area in pixels",
-      "type": "number",
+      "type": "integer",
       "min": 32,
       "max": 256,
       "default": 96,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.image_capture.kMaxWatchingCropHeight": {
       "category": "Cameras",
       "subcategory": "advanced",
       "displayName": "Max Watching Crop Height",
       "description": "Maximum height for watching crop area in pixels",
-      "type": "number",
+      "type": "integer",
       "min": 32,
       "max": 256,
       "default": 88,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.spin_analysis.kSpinDetectionMethod": {
       "category": "Spin Analysis",
@@ -1501,152 +1302,139 @@
         "legacy": "Rotation Search (Legacy)"
       },
       "default": "ml",
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.spin_analysis.kCoarseSearchResolution": {
       "category": "Spin Analysis",
       "subcategory": "advanced",
       "displayName": "Coarse Search Resolution",
       "description": "Resolution (pixels) for downsampled dimple images during coarse spin search. Lower is faster, higher preserves more detail.",
-      "type": "number",
+      "type": "integer",
       "min": 45,
       "max": 120,
       "default": 90,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.spin_analysis.kGaborMaxWhitePercent": {
       "category": "Spin Analysis",
       "subcategory": "advanced",
       "displayName": "Gabor Max White Percent",
       "description": "Maximum white percentage for Gabor filter",
-      "type": "number",
+      "type": "integer",
       "min": 30,
       "max": 60,
       "default": 45,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.spin_analysis.kGaborMinWhitePercent": {
       "category": "Spin Analysis",
       "subcategory": "advanced",
       "displayName": "Gabor Min White Percent",
       "description": "Minimum white percentage for Gabor filter",
-      "type": "number",
+      "type": "integer",
       "min": 20,
       "max": 50,
       "default": 39,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.spin_analysis.kCoarseXRotationDegreesIncrement": {
       "category": "Spin Analysis",
       "subcategory": "advanced",
       "displayName": "Coarse X Rotation Increment",
       "description": "Increment for coarse X rotation in degrees",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 10,
       "default": 4,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.spin_analysis.kCoarseXRotationDegreesStart": {
       "category": "Spin Analysis",
       "subcategory": "advanced",
       "displayName": "Coarse X Rotation Start",
       "description": "Starting angle for coarse X rotation in degrees",
-      "type": "number",
+      "type": "integer",
       "min": -90,
       "max": 0,
       "default": -36,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.spin_analysis.kCoarseXRotationDegreesEnd": {
       "category": "Spin Analysis",
       "subcategory": "advanced",
       "displayName": "Coarse X Rotation End",
       "description": "Ending angle for coarse X rotation in degrees",
-      "type": "number",
+      "type": "integer",
       "min": 0,
       "max": 90,
       "default": 36,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.spin_analysis.kCoarseYRotationDegreesIncrement": {
       "category": "Spin Analysis",
       "subcategory": "advanced",
       "displayName": "Coarse Y Rotation Increment",
       "description": "Increment for coarse Y rotation in degrees",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 10,
       "default": 5,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.spin_analysis.kCoarseYRotationDegreesStart": {
       "category": "Spin Analysis",
       "subcategory": "advanced",
       "displayName": "Coarse Y Rotation Start",
       "description": "Starting angle for coarse Y rotation in degrees",
-      "type": "number",
+      "type": "integer",
       "min": -45,
       "max": 0,
       "default": -15,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.spin_analysis.kCoarseYRotationDegreesEnd": {
       "category": "Spin Analysis",
       "subcategory": "advanced",
       "displayName": "Coarse Y Rotation End",
       "description": "Ending angle for coarse Y rotation in degrees",
-      "type": "number",
+      "type": "integer",
       "min": 0,
       "max": 45,
       "default": 15,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.spin_analysis.kCoarseZRotationDegreesIncrement": {
       "category": "Spin Analysis",
       "subcategory": "advanced",
       "displayName": "Coarse Z Rotation Increment",
       "description": "Increment for coarse Z rotation in degrees",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 10,
       "default": 4,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.spin_analysis.kCoarseZRotationDegreesStart": {
       "category": "Spin Analysis",
       "subcategory": "advanced",
       "displayName": "Coarse Z Rotation Start",
       "description": "Starting angle for coarse Z rotation in degrees",
-      "type": "number",
+      "type": "integer",
       "min": -90,
       "max": 0,
       "default": -10,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.spin_analysis.kCoarseZRotationDegreesEnd": {
       "category": "Spin Analysis",
       "subcategory": "advanced",
       "displayName": "Coarse Z Rotation End",
       "description": "Ending angle for coarse Z rotation in degrees",
-      "type": "number",
+      "type": "integer",
       "min": 0,
       "max": 180,
       "default": 110,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.spin_analysis.kSpinModelPath": {
       "category": "Spin Analysis",
@@ -1656,8 +1444,7 @@
       "type": "select",
       "options": {},
       "default": "/etc/pitrac/models/spin-predictor",
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.spin_analysis.kSpinMLZFallbackThreshold": {
       "category": "Spin Analysis",
@@ -1668,42 +1455,18 @@
       "min": 10,
       "max": 180,
       "default": 60,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ipc_interface.kMaxCam2ImageReceivedTimeMs": {
       "category": "Network",
       "subcategory": "advanced",
       "displayName": "Max Camera 2 Image Receive Time (ms)",
       "description": "Maximum time to wait for Camera 2 image in milliseconds",
-      "type": "number",
+      "type": "integer",
       "min": 1000,
       "max": 60000,
       "default": 40000,
-      "requiresRestart": true,
-      "passedVia": "json"
-    },
-    "gs_config.golf_simulator_interfaces.E6.kE6InterMessageDelayMs": {
-      "category": "Simulators",
-      "subcategory": "advanced",
-      "displayName": "E6 Inter-Message Delay (ms)",
-      "description": "Delay between E6 messages in milliseconds",
-      "type": "number",
-      "min": 0,
-      "max": 500,
-      "default": 50,
-      "requiresRestart": false,
-      "passedVia": "json"
-    },
-    "gs_config.golf_simulator_interfaces.kLaunchMonitorIdString": {
-      "category": "Simulators",
-      "subcategory": "advanced",
-      "displayName": "Launch Monitor ID String",
-      "description": "Identification string sent to golf simulators",
-      "type": "text",
-      "default": "PiTrac LM 0.1",
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.club_data.kEnableClubImages": {
       "category": "Club Data",
@@ -1712,66 +1475,51 @@
       "description": "Enable capturing club images",
       "type": "boolean",
       "default": false,
-      "requiresRestart": true,
-      "passedVia": "json"
-    },
-    "gs_config.club_data.kClubImageOutputDir": {
-      "category": "Storage",
-      "subcategory": "advanced",
-      "displayName": "Club Image Output Directory",
-      "description": "Directory for saving club images",
-      "type": "path",
-      "default": "~/LM_Shares/Images/",
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.club_data.kNumberFramesToSaveBeforeHit": {
       "category": "Club Data",
       "subcategory": "advanced",
       "displayName": "Frames Before Hit",
       "description": "Number of frames to save before club hits ball",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 20,
       "default": 6,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.club_data.kNumberFramesToSaveAfterHit": {
       "category": "Club Data",
       "subcategory": "advanced",
       "displayName": "Frames After Hit",
       "description": "Number of frames to save after club hits ball",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 20,
       "default": 8,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.club_data.kClubImageWidthPixels": {
       "category": "Club Data",
       "subcategory": "advanced",
       "displayName": "Club Image Width",
       "description": "Width of club images in pixels",
-      "type": "number",
+      "type": "integer",
       "min": 100,
       "max": 1920,
       "default": 340,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.club_data.kClubImageHeightPixels": {
       "category": "Club Data",
       "subcategory": "advanced",
       "displayName": "Club Image Height",
       "description": "Height of club images in pixels",
-      "type": "number",
+      "type": "integer",
       "min": 100,
       "max": 1080,
       "default": 200,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.club_data.kClubImageCameraGain": {
       "category": "Club Data",
@@ -1782,8 +1530,7 @@
       "min": 1,
       "max": 100,
       "default": 40,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.club_data.kClubImageShutterSpeedMultiplier": {
       "category": "Club Data",
@@ -1795,87 +1542,29 @@
       "max": 2.0,
       "step": 0.1,
       "default": 0.4,
-      "requiresRestart": false,
-      "passedVia": "json"
-    },
-    "cli.cam_still_mode": {
-      "category": "Testing",
-      "displayName": "Camera Still Mode",
-      "description": "Take single still picture and exit",
-      "type": "boolean",
-      "default": false,
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "cliArgument": "--cam_still_mode",
-      "internal": true
-    },
-    "cli.pulse_test": {
-      "category": "Testing",
-      "displayName": "Pulse Test",
-      "description": "Continuous strobe/shutter test",
-      "type": "boolean",
-      "default": false,
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "cliArgument": "--pulse_test",
-      "internal": true
-    },
-    "cli.send_test_results": {
-      "category": "Testing",
-      "displayName": "Send Test Results",
-      "description": "Send test IPC message and exit",
-      "type": "boolean",
-      "default": false,
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "cliArgument": "--send_test_results",
-      "internal": true
-    },
-    "cli.lm_comparison_mode": {
-      "category": "Testing",
-      "displayName": "LM Comparison Mode",
-      "description": "Configure for other IR launch monitor environment",
-      "type": "boolean",
-      "default": false,
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "cliArgument": "--lm_comparison_mode",
-      "internal": true
-    },
-    "cli.skip_wait_armed": {
-      "category": "Testing",
-      "displayName": "Skip Wait Armed",
-      "description": "Skip simulator armed state wait",
-      "type": "boolean",
-      "default": false,
-      "requiresRestart": true,
-      "passedVia": "cli",
-      "cliArgument": "--skip_wait_armed",
-      "internal": true
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsMinHoughReturnCircles": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Strobed Balls Min Hough Circles",
       "description": "Minimum number of circles to return from HoughCircles for strobed balls",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 20,
       "default": 6,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsMaxHoughReturnCircles": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Strobed Balls Max Hough Circles",
       "description": "Maximum number of circles to return from HoughCircles for strobed balls",
-      "type": "number",
+      "type": "integer",
       "min": 5,
       "max": 50,
       "default": 20,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsMinParam2": {
       "category": "Ball Detection",
@@ -1886,8 +1575,7 @@
       "min": 1,
       "max": 200,
       "default": 18,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsMaxParam2": {
       "category": "Ball Detection",
@@ -1898,8 +1586,7 @@
       "min": 10,
       "max": 300,
       "default": 140,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsStartingParam2": {
       "category": "Ball Detection",
@@ -1910,8 +1597,7 @@
       "min": 10,
       "max": 150,
       "default": 60,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsParam2Increment": {
       "category": "Ball Detection",
@@ -1922,8 +1608,7 @@
       "min": 1,
       "max": 20,
       "default": 4,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsCurrentParam1": {
       "category": "Ball Detection",
@@ -1934,8 +1619,7 @@
       "min": 50,
       "max": 300,
       "default": 120,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsHoughDpParam1": {
       "category": "Ball Detection",
@@ -1947,34 +1631,31 @@
       "max": 3.0,
       "step": 0.1,
       "default": 1.5,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsPreCannyBlurSize": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Strobed Pre-Canny Blur Size",
       "description": "Blur kernel size before Canny edge detection",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 15,
       "step": 2,
       "default": 3,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsPreHoughBlurSize": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Strobed Pre-Hough Blur Size",
       "description": "Blur kernel size before HoughCircles (must be odd)",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 25,
       "step": 2,
       "default": 13,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsUseAltHoughAlgorithm": {
       "category": "Ball Detection",
@@ -1983,8 +1664,7 @@
       "description": "Use alternative HoughCircles algorithm for strobed balls",
       "type": "boolean",
       "default": true,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPuttingBallMinParam2": {
       "category": "Ball Detection",
@@ -1996,8 +1676,7 @@
       "max": 2.0,
       "step": 0.1,
       "default": 0.8,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPuttingBallMaxParam2": {
       "category": "Ball Detection",
@@ -2009,8 +1688,7 @@
       "max": 2.0,
       "step": 0.1,
       "default": 1.0,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPuttingBallStartingParam2": {
       "category": "Ball Detection",
@@ -2022,8 +1700,7 @@
       "max": 1.5,
       "step": 0.05,
       "default": 0.9,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPuttingBallParam2Increment": {
       "category": "Ball Detection",
@@ -2035,8 +1712,7 @@
       "max": 0.1,
       "step": 0.01,
       "default": 0.03,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPuttingBallCurrentParam1": {
       "category": "Ball Detection",
@@ -2047,32 +1723,29 @@
       "min": 100,
       "max": 500,
       "default": 300,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPuttingMinHoughReturnCircles": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Putting Min Hough Circles",
       "description": "Minimum circles to return in putting mode",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 20,
       "default": 6,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPuttingMaxHoughReturnCircles": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Putting Max Hough Circles",
       "description": "Maximum circles to return in putting mode",
-      "type": "number",
+      "type": "integer",
       "min": 10,
       "max": 50,
       "default": 25,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPuttingHoughDpParam1": {
       "category": "Ball Detection",
@@ -2084,21 +1757,19 @@
       "max": 3.0,
       "step": 0.1,
       "default": 1.5,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPuttingPreHoughBlurSize": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Putting Pre-Hough Blur Size",
       "description": "Blur kernel size before HoughCircles in putting mode",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 25,
       "step": 2,
       "default": 9,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.cameras.kCamera1FocalLength": {
       "category": "Calibration",
@@ -2110,8 +1781,7 @@
       "max": 10.0,
       "step": 0.001,
       "default": 5.868,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera2FocalLength": {
       "category": "Calibration",
@@ -2123,32 +1793,29 @@
       "max": 10.0,
       "step": 0.001,
       "default": 5.511,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.ball_exposure_selection.kNumberHighQualityBallsToRetain": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "High Quality Balls to Retain",
       "description": "Number of high quality ball detections to keep",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 10,
       "default": 2,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kMaximumOffTrajectoryDistance": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Max Off-Trajectory Distance",
       "description": "Maximum allowed distance from expected trajectory",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 50,
       "default": 8,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kMaxDistanceFromTrajectory": {
       "category": "Ball Detection",
@@ -2159,8 +1826,7 @@
       "min": 10,
       "max": 100,
       "default": 30,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kMaxStrobedBallColorDifferenceRelaxed": {
       "category": "Ball Detection",
@@ -2171,8 +1837,7 @@
       "min": 10000,
       "max": 100000,
       "default": 70000,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kMaxPuttingBallColorDifferenceRelaxed": {
       "category": "Ball Detection",
@@ -2183,8 +1848,7 @@
       "min": 10000,
       "max": 100000,
       "default": 40000,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kMaxStrobedBallColorDifferenceStrict": {
       "category": "Ball Detection",
@@ -2195,8 +1859,7 @@
       "min": 10000,
       "max": 100000,
       "default": 30000,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kUseOnlyHighQualityBallImagesForHLA": {
       "category": "Ball Detection",
@@ -2205,8 +1868,7 @@
       "description": "Because earlier-in-time balls have more overlap and lower radius accuracy, this allows for some of those balls to be ignored for HLA calculations.",
       "type": "boolean",
       "default": false,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.motion_detect_stage.kDifferenceM": {
       "category": "Ball Detection",
@@ -2218,8 +1880,7 @@
       "max": 2.0,
       "step": 0.1,
       "default": 0.6,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.motion_detect_stage.kDifferenceC": {
       "category": "Ball Detection",
@@ -2231,8 +1892,7 @@
       "max": 10.0,
       "step": 0.5,
       "default": 3.0,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.motion_detect_stage.kRegionThreshold": {
       "category": "Ball Detection",
@@ -2244,8 +1904,7 @@
       "max": 0.2,
       "step": 0.01,
       "default": 0.05,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.strobing.kStrobePulseVectorDriver": {
       "category": "Strobing",
@@ -2263,8 +1922,7 @@
         4.0,
         0
       ],
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.strobing.kStrobePulseVectorPutter": {
       "category": "Strobing",
@@ -2280,8 +1938,7 @@
         50.0,
         0
       ],
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.user_interface.kWebServerResultBallExposureCandidates": {
       "category": "Display",
@@ -2290,8 +1947,7 @@
       "description": "Image filename for ball exposure candidates",
       "type": "text",
       "default": "ball_exposure_candidates",
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.user_interface.kWebServerResultSpinBall1Image": {
       "category": "Display",
@@ -2300,8 +1956,7 @@
       "description": "Image filename for spin ball 1",
       "type": "text",
       "default": "spin_ball_1_gray_image1",
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.user_interface.kWebServerResultSpinBall2Image": {
       "category": "Display",
@@ -2310,8 +1965,7 @@
       "description": "Image filename for spin ball 2",
       "type": "text",
       "default": "spin_ball_2_gray_image1",
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.user_interface.kWebServerResultBallRotatedByBestAngles": {
       "category": "Display",
@@ -2320,8 +1974,7 @@
       "description": "Image filename for ball rotated by best angles",
       "type": "text",
       "default": "ball1_rotated_by_best_angles",
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.user_interface.kWebServerCamera2Image": {
       "category": "Display",
@@ -2330,8 +1983,7 @@
       "description": "Image filename for camera 2",
       "type": "text",
       "default": "log_cam2_last_strobed_img",
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.user_interface.kWebServerLastTeedBallImage": {
       "category": "Display",
@@ -2340,8 +1992,7 @@
       "description": "Image filename for last teed ball",
       "type": "text",
       "default": "log_ball_final_found_ball_img",
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.user_interface.kWebServerErrorExposuresImage": {
       "category": "Display",
@@ -2350,8 +2001,7 @@
       "description": "Image filename for error exposures",
       "type": "text",
       "default": "log_cam2_last_strobed_img",
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.user_interface.kWebServerBallSearchAreaImage": {
       "category": "Display",
@@ -2360,8 +2010,7 @@
       "description": "Image filename for ball search area",
       "type": "text",
       "default": "log_cam1_search_area_img",
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsAltCannyLower": {
       "category": "Ball Detection",
@@ -2372,8 +2021,7 @@
       "min": 10,
       "max": 100,
       "default": 35,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsAltCannyUpper": {
       "category": "Ball Detection",
@@ -2384,8 +2032,7 @@
       "min": 30,
       "max": 150,
       "default": 70,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsAltCurrentParam1": {
       "category": "Ball Detection",
@@ -2396,8 +2043,7 @@
       "min": 50,
       "max": 300,
       "default": 130,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsAltHoughDpParam1": {
       "category": "Ball Detection",
@@ -2409,8 +2055,7 @@
       "max": 2.0,
       "step": 0.1,
       "default": 0.8,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsAltMinParam2": {
       "category": "Ball Detection",
@@ -2422,8 +2067,7 @@
       "max": 1.5,
       "step": 0.05,
       "default": 0.5,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsAltMaxParam2": {
       "category": "Ball Detection",
@@ -2435,8 +2079,7 @@
       "max": 2.0,
       "step": 0.05,
       "default": 1.0,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsAltStartingParam2": {
       "category": "Ball Detection",
@@ -2448,8 +2091,7 @@
       "max": 1.0,
       "step": 0.05,
       "default": 0.65,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsAltParam2Increment": {
       "category": "Ball Detection",
@@ -2461,34 +2103,31 @@
       "max": 0.2,
       "step": 0.01,
       "default": 0.05,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsAltPreCannyBlurSize": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Alt Algorithm Pre-Canny Blur",
       "description": "Blur size before Canny edge detection in alternative algorithm",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 21,
       "step": 2,
       "default": 9,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedBallsAltPreHoughBlurSize": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Alt Algorithm Pre-Hough Blur",
       "description": "Blur size before HoughCircles in alternative algorithm (must be odd)",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 31,
       "step": 2,
       "default": 15,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedBallCannyLower": {
       "category": "Ball Detection",
@@ -2499,8 +2138,7 @@
       "min": 10,
       "max": 100,
       "default": 35,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedBallCannyUpper": {
       "category": "Ball Detection",
@@ -2511,8 +2149,7 @@
       "min": 30,
       "max": 150,
       "default": 80,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedBallMinParam2": {
       "category": "Ball Detection",
@@ -2524,8 +2161,7 @@
       "max": 1.5,
       "step": 0.05,
       "default": 0.8,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedBallMaxParam2": {
       "category": "Ball Detection",
@@ -2537,8 +2173,7 @@
       "max": 1.5,
       "step": 0.05,
       "default": 1.0,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedBallStartingParam2": {
       "category": "Ball Detection",
@@ -2550,8 +2185,7 @@
       "max": 1.2,
       "step": 0.05,
       "default": 0.9,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedBallParam2Increment": {
       "category": "Ball Detection",
@@ -2563,8 +2197,7 @@
       "max": 0.1,
       "step": 0.01,
       "default": 0.03,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedBallCurrentParam1": {
       "category": "Ball Detection",
@@ -2575,8 +2208,7 @@
       "min": 50,
       "max": 300,
       "default": 130,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedBallHoughDpParam1": {
       "category": "Ball Detection",
@@ -2588,58 +2220,53 @@
       "max": 3.0,
       "step": 0.1,
       "default": 1.5,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedPreCannyBlurSize": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Placed Ball Pre-Canny Blur",
       "description": "Blur size before Canny for placed ball",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 21,
       "step": 2,
       "default": 11,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedPreHoughBlurSize": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Placed Ball Pre-Hough Blur",
       "description": "Blur size before HoughCircles for placed ball",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 25,
       "step": 2,
       "default": 13,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedMinHoughReturnCircles": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Placed Ball Min Circles",
       "description": "Minimum circles to return for placed ball",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 10,
       "default": 1,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedMaxHoughReturnCircles": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Placed Ball Max Circles",
       "description": "Maximum circles to return for placed ball",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 10,
       "default": 4,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedBallUseLargestBall": {
       "category": "Ball Detection",
@@ -2648,8 +2275,7 @@
       "description": "Use the largest detected circle for placed ball",
       "type": "boolean",
       "default": false,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kUseBestCircleRefinement": {
       "category": "Ball Detection",
@@ -2658,8 +2284,7 @@
       "description": "Enable best circle refinement algorithm",
       "type": "boolean",
       "default": false,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kUseBestCircleLargestCircle": {
       "category": "Ball Detection",
@@ -2668,8 +2293,7 @@
       "description": "Use largest circle in best circle algorithm",
       "type": "boolean",
       "default": false,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kBestCircleCannyLower": {
       "category": "Ball Detection",
@@ -2680,8 +2304,7 @@
       "min": 20,
       "max": 100,
       "default": 55,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kBestCircleCannyUpper": {
       "category": "Ball Detection",
@@ -2692,34 +2315,31 @@
       "min": 50,
       "max": 200,
       "default": 110,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kBestCirclePreCannyBlurSize": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Best Circle Pre-Canny Blur",
       "description": "Blur size before Canny in best circle algorithm",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 15,
       "step": 2,
       "default": 5,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kBestCirclePreHoughBlurSize": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Best Circle Pre-Hough Blur",
       "description": "Blur size before HoughCircles in best circle algorithm",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 25,
       "step": 2,
       "default": 13,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kBestCircleParam1": {
       "category": "Ball Detection",
@@ -2730,8 +2350,7 @@
       "min": 100,
       "max": 500,
       "default": 300,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kBestCircleParam2": {
       "category": "Ball Detection",
@@ -2743,8 +2362,7 @@
       "max": 1.0,
       "step": 0.05,
       "default": 0.65,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kBestCircleHoughDpParam1": {
       "category": "Ball Detection",
@@ -2756,8 +2374,7 @@
       "max": 3.0,
       "step": 0.1,
       "default": 1.5,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kBestCircleIdentificationMinRadiusRatio": {
       "category": "Ball Detection",
@@ -2769,8 +2386,7 @@
       "max": 1.0,
       "step": 0.05,
       "default": 0.9,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kBestCircleIdentificationMaxRadiusRatio": {
       "category": "Ball Detection",
@@ -2782,8 +2398,7 @@
       "max": 2.0,
       "step": 0.05,
       "default": 1.2,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kUseDynamicRadiiAdjustment": {
       "category": "Ball Detection",
@@ -2792,20 +2407,18 @@
       "description": "Enable dynamic adjustment of search radii",
       "type": "boolean",
       "default": false,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kNumberRadiiToAverageForDynamicAdjustment": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Number Radii to Average",
       "description": "Number of radii to average for dynamic adjustment",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 10,
       "default": 2,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedNarrowingRadiiMinRatio": {
       "category": "Ball Detection",
@@ -2817,8 +2430,7 @@
       "max": 1.0,
       "step": 0.05,
       "default": 0.7,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedNarrowingRadiiMaxRatio": {
       "category": "Ball Detection",
@@ -2830,8 +2442,7 @@
       "max": 2.0,
       "step": 0.05,
       "default": 1.6,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedNarrowingRadiiDpParam": {
       "category": "Ball Detection",
@@ -2843,8 +2454,7 @@
       "max": 3.0,
       "step": 0.1,
       "default": 1.5,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kStrobedNarrowingRadiiParam2": {
       "category": "Ball Detection",
@@ -2856,8 +2466,7 @@
       "max": 1.5,
       "step": 0.05,
       "default": 0.8,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedNarrowingRadiiMinRatio": {
       "category": "Ball Detection",
@@ -2869,8 +2478,7 @@
       "max": 1.0,
       "step": 0.05,
       "default": 0.9,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedNarrowingRadiiMaxRatio": {
       "category": "Ball Detection",
@@ -2882,8 +2490,7 @@
       "max": 1.5,
       "step": 0.05,
       "default": 1.1,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedNarrowingStartingParam2": {
       "category": "Ball Detection",
@@ -2895,20 +2502,7 @@
       "max": 1.2,
       "step": 0.05,
       "default": 0.9,
-      "requiresRestart": false,
-      "passedVia": "json"
-    },
-    "gs_config.ball_identification.kPlacedNarrowingParam1": {
-      "category": "Ball Detection",
-      "subcategory": "advanced",
-      "displayName": "Placed Narrowing Param1",
-      "description": "Canny edge threshold for placed narrowing",
-      "type": "number",
-      "min": 100,
-      "max": 500,
-      "default": 300,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_identification.kPlacedNarrowingRadiiDpParam": {
       "category": "Ball Detection",
@@ -2920,8 +2514,7 @@
       "max": 3.0,
       "step": 0.1,
       "default": 1.5,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kBallProximityMarginPercentRelaxed": {
       "category": "Ball Detection",
@@ -2932,8 +2525,7 @@
       "min": 30,
       "max": 100,
       "default": 65,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kBallProximityMarginPercentStrict": {
       "category": "Ball Detection",
@@ -2944,20 +2536,18 @@
       "min": 5,
       "max": 50,
       "default": 15,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kClosestBallPairEdgeBackoffPixels": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Ball Pair Edge Backoff",
       "description": "Edge backoff in pixels for closest ball pairs",
-      "type": "number",
+      "type": "integer",
       "min": 50,
       "max": 500,
       "default": 200,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kColorDifferenceRgbPostMultiplierForDarker": {
       "category": "Ball Detection",
@@ -2969,8 +2559,7 @@
       "max": 10.0,
       "step": 0.5,
       "default": 4.0,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kColorDifferenceRgbPostMultiplierForLighter": {
       "category": "Ball Detection",
@@ -2982,8 +2571,7 @@
       "max": 5.0,
       "step": 0.1,
       "default": 1.0,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kColorDifferenceStdPostMultiplierForDarker": {
       "category": "Ball Detection",
@@ -2995,8 +2583,7 @@
       "max": 10.0,
       "step": 0.5,
       "default": 3.0,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kColorDifferenceStdPostMultiplierForLighter": {
       "category": "Ball Detection",
@@ -3008,20 +2595,18 @@
       "max": 10.0,
       "step": 0.5,
       "default": 5.0,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kMaxBallsToRetain": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Max Balls to Retain",
       "description": "Maximum number of ball detections to keep",
-      "type": "number",
+      "type": "integer",
       "min": 10,
       "max": 100,
       "default": 30,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kMaxIntermediateBallRadiusChangePercent": {
       "category": "Ball Detection",
@@ -3032,8 +2617,7 @@
       "min": 1,
       "max": 20,
       "default": 5,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kMaxPuttingIntermediateBallRadiusChangePercent": {
       "category": "Ball Detection",
@@ -3044,8 +2628,7 @@
       "min": 1,
       "max": 20,
       "default": 8,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kMaxOverlappedBallRadiusChangeRatio": {
       "category": "Ball Detection",
@@ -3057,8 +2640,7 @@
       "max": 2.0,
       "step": 0.1,
       "default": 1.3,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kMaxRadiusDifferencePercentageFromBest": {
       "category": "Ball Detection",
@@ -3069,8 +2651,7 @@
       "min": 10,
       "max": 100,
       "default": 35,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kUnlikelyAngleMinimumDistancePixels": {
       "category": "Ball Detection",
@@ -3081,8 +2662,7 @@
       "min": 10,
       "max": 100,
       "default": 40,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kMaxQualityExposureLaunchAngle": {
       "category": "Ball Detection",
@@ -3093,8 +2673,7 @@
       "min": 20,
       "max": 60,
       "default": 35,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kMinQualityExposureLaunchAngle": {
       "category": "Ball Detection",
@@ -3105,8 +2684,7 @@
       "min": -20,
       "max": 10,
       "default": -5,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kMaxPuttingQualityExposureLaunchAngle": {
       "category": "Ball Detection",
@@ -3117,8 +2695,7 @@
       "min": 0,
       "max": 20,
       "default": 8,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kMinPuttingQualityExposureLaunchAngle": {
       "category": "Ball Detection",
@@ -3129,20 +2706,18 @@
       "min": -10,
       "max": 5,
       "default": -5,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kNumberAngleCheckExposures": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Number Angle Check Exposures",
       "description": "Number of exposures to check for angle validation",
-      "type": "number",
+      "type": "integer",
       "min": 2,
       "max": 10,
       "default": 4,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kUsePreImageSubtraction": {
       "category": "Ball Detection",
@@ -3151,8 +2726,7 @@
       "description": "Enable pre-image subtraction for better detection",
       "type": "boolean",
       "default": false,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kPreImageWeightingOverall": {
       "category": "Ball Detection",
@@ -3164,8 +2738,7 @@
       "max": 1.0,
       "step": 0.05,
       "default": 0.0,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kPreImageWeightingRed": {
       "category": "Ball Detection",
@@ -3177,8 +2750,7 @@
       "max": 2.0,
       "step": 0.05,
       "default": 1.0,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kPreImageWeightingGreen": {
       "category": "Ball Detection",
@@ -3190,8 +2762,7 @@
       "max": 2.0,
       "step": 0.05,
       "default": 1.2,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.ball_exposure_selection.kPreImageWeightingBlue": {
       "category": "Ball Detection",
@@ -3203,8 +2774,7 @@
       "max": 2.0,
       "step": 0.05,
       "default": 1.05,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.motion_detect_stage.kMaxRegionThreshold": {
       "category": "Ball Detection",
@@ -3216,68 +2786,62 @@
       "max": 0.2,
       "step": 0.01,
       "default": 0.05,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.motion_detect_stage.kFramePeriod": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Motion Frame Period",
       "description": "Frame period for motion detection",
-      "type": "number",
+      "type": "integer",
       "min": 0,
       "max": 10,
       "default": 0,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.motion_detect_stage.kHSkip": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Motion H Skip",
       "description": "Horizontal skip for motion detection",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 10,
       "default": 2,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.motion_detect_stage.kVSkip": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Motion V Skip",
       "description": "Vertical skip for motion detection",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 10,
       "default": 2,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.motion_detect_stage.kCroppedImagePixelOffsetLeft": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Cropped Image Offset Left",
       "description": "Left offset for cropped image in motion detection",
-      "type": "number",
+      "type": "integer",
       "min": -50,
       "max": 50,
       "default": 0,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.motion_detect_stage.kCroppedImagePixelOffsetUp": {
       "category": "Ball Detection",
       "subcategory": "advanced",
       "displayName": "Cropped Image Offset Up",
       "description": "Up offset for cropped image in motion detection",
-      "type": "number",
+      "type": "integer",
       "min": -50,
       "max": 50,
       "default": -3,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.cameras.kCamera1XOffsetForTilt": {
       "category": "Calibration",
@@ -3288,8 +2852,7 @@
       "min": -100,
       "max": 100,
       "default": 0,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera1YOffsetForTilt": {
       "category": "Calibration",
@@ -3300,8 +2863,7 @@
       "min": -100,
       "max": 100,
       "default": 0,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera2XOffsetForTilt": {
       "category": "Calibration",
@@ -3312,8 +2874,7 @@
       "min": -100,
       "max": 100,
       "default": 0,
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera2YOffsetForTilt": {
       "category": "Calibration",
@@ -3324,44 +2885,7 @@
       "min": -100,
       "max": 100,
       "default": 0,
-      "requiresRestart": true,
-      "passedVia": "json"
-    },
-    "gs_config.strobing.kLastPulsePutterRepeats": {
-      "category": "Strobing",
-      "subcategory": "advanced",
-      "displayName": "Last Pulse Putter Repeats",
-      "description": "Number of times to repeat last pulse in putting mode",
-      "type": "number",
-      "min": 0,
-      "max": 10,
-      "default": 0,
-      "requiresRestart": true,
-      "passedVia": "json"
-    },
-    "gs_config.strobing.kLongerStrobePulseVectorDriver": {
-      "category": "Strobing",
-      "subcategory": "advanced",
-      "displayName": "Longer Strobe Pulse Vector Driver",
-      "description": "Extended strobe timing vector for driver shots",
-      "type": "array",
-      "default": [
-        0.175,
-        0.7,
-        1.4,
-        2.45,
-        1.26,
-        2.8,
-        2.1,
-        3.15,
-        3.85,
-        3.85,
-        10.4,
-        3.5,
-        0
-      ],
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.strobing.kDynamicFollowOnPulseVectorPutter": {
       "category": "Strobing",
@@ -3372,44 +2896,29 @@
       "default": [
         444.0
       ],
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.calibration.kNumberPicturesForFocalLengthAverage": {
       "category": "Calibration",
       "subcategory": "advanced",
       "displayName": "Pictures for Focal Length Average",
       "description": "Number of pictures to average for focal length calibration",
-      "type": "number",
+      "type": "integer",
       "min": 1,
       "max": 20,
       "default": 6,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": false
     },
     "gs_config.calibration.kNumberOfCalibrationFailuresToTolerate": {
       "category": "Calibration",
       "subcategory": "advanced",
       "displayName": "Number Of Calibration Failures To Tolerate",
       "description": "Allows a few ball-ID failures to be skipped over and re-tried.",
-      "type": "number",
+      "type": "integer",
       "min": 0,
       "max": 20,
       "default": 4,
-      "requiresRestart": true,
-      "passedVia": "json"
-    },
-    "gs_config.user_interface.kRefreshTimeSeconds": {
-      "category": "Network",
-      "subcategory": "advanced",
-      "displayName": "UI Refresh Time",
-      "description": "User interface refresh interval in seconds",
-      "type": "number",
-      "min": 1,
-      "max": 30,
-      "default": 3,
-      "requiresRestart": false,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.testing.kAutomatedTestExpectedResultsCSV": {
       "type": "string",
@@ -3440,14 +2949,14 @@
       "ui_name": "Backspin Tolerance"
     },
     "gs_config.testing.kAutomatedTestToleranceBallSpeedMPH": {
-      "type": "integer",
+      "type": "number",
       "default": 4,
       "description": "Ball speed tolerance for automated testing (MPH)",
       "category": "testing",
       "ui_name": "Ball Speed Tolerance"
     },
     "gs_config.testing.kAutomatedTestToleranceHLA": {
-      "type": "integer",
+      "type": "number",
       "default": 3,
       "description": "Horizontal launch angle tolerance for automated testing (degrees)",
       "category": "testing",
@@ -3461,7 +2970,7 @@
       "ui_name": "Sidespin Tolerance"
     },
     "gs_config.testing.kAutomatedTestToleranceVLA": {
-      "type": "integer",
+      "type": "number",
       "default": 2,
       "description": "Vertical launch angle tolerance for automated testing (degrees)",
       "category": "testing",
@@ -3474,61 +2983,347 @@
       "category": "testing",
       "ui_name": "Test Image Directory"
     },
-    "gs_config.testing.kExternallyStrobedALTBestCircleCannyLower": {
-      "type": "integer",
-      "default": 35,
-      "description": "Canny lower threshold for externally strobed ALT best circle",
+    "gs_config.testing.kExternallyStrobedBestCircleHoughDpParam1": {
       "category": "testing",
-      "ui_name": "External Strobe Canny Lower"
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Best Circle Hough DP",
+      "description": "Hough dp for best-circle detection with external strobes",
+      "type": "number",
+      "default": 1.5,
+      "requiresRestart": true
     },
-    "gs_config.testing.kExternallyStrobedALTBestCircleCannyUpper": {
-      "type": "integer",
-      "default": 80,
-      "description": "Canny upper threshold for externally strobed ALT best circle",
+    "gs_config.testing.kExternallyStrobedBestCircleParam1": {
       "category": "testing",
-      "ui_name": "External Strobe Canny Upper"
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Best Circle Param1",
+      "description": "Hough param1 for best-circle detection with external strobes",
+      "type": "number",
+      "default": 120.0,
+      "requiresRestart": true
     },
-    "gs_config.testing.kExternallyStrobedALTBestCircleHoughDpParam1": {
-      "type": "float",
-      "default": 1.3,
-      "description": "Hough DP parameter 1 for externally strobed ALT best circle",
+    "gs_config.testing.kExternallyStrobedBestCircleParam2": {
       "category": "testing",
-      "ui_name": "External Strobe Hough DP1"
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Best Circle Param2",
+      "description": "Hough param2 for best-circle detection with external strobes",
+      "type": "number",
+      "default": 35.0,
+      "requiresRestart": true
     },
-    "gs_config.testing.kExternallyStrobedALTBestCircleHoughParam2": {
+    "gs_config.testing.kExternallyStrobedBestCirclePreHoughBlurSize": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Best Circle Pre-Hough Blur",
+      "description": "Pre-Hough blur size for best-circle detection with external strobes",
       "type": "integer",
       "default": 13,
-      "description": "Hough parameter 2 for externally strobed ALT best circle",
-      "category": "testing",
-      "ui_name": "External Strobe Hough P2"
+      "requiresRestart": true
     },
-    "gs_config.testing.kExternallyStrobedALTBestCircleMaxIterations": {
+    "gs_config.testing.kExternallyStrobedCLAHEClipLimit": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe CLAHE Clip Limit",
+      "description": "CLAHE clip limit with external strobes",
       "type": "integer",
-      "default": 25,
-      "description": "Max iterations for externally strobed ALT best circle",
-      "category": "testing",
-      "ui_name": "External Strobe Max Iterations"
+      "default": 6,
+      "requiresRestart": true
     },
-    "gs_config.testing.kExternallyStrobedALTBestCircleMinInliers": {
+    "gs_config.testing.kExternallyStrobedCLAHETilesGridSize": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe CLAHE Tile Grid Size",
+      "description": "CLAHE tile grid size with external strobes",
       "type": "integer",
-      "default": 25,
-      "description": "Min inliers for externally strobed ALT best circle",
-      "category": "testing",
-      "ui_name": "External Strobe Min Inliers"
+      "default": 6,
+      "requiresRestart": true
     },
-    "gs_config.testing.kExternallyStrobedBallIdentificationCannyLower": {
+    "gs_config.testing.kExternallyStrobedEnvBottomIgnoreHeight": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Bottom Ignore Height",
+      "description": "Pixels at the bottom of the image blacked out with external strobes",
       "type": "integer",
-      "default": 35,
-      "description": "Canny lower threshold for externally strobed ball identification",
-      "category": "testing",
-      "ui_name": "External Ball ID Canny Lower"
+      "default": 70,
+      "requiresRestart": true
     },
-    "gs_config.testing.kExternallyStrobedBallIdentificationCannyUpper": {
+    "gs_config.testing.kExternallyStrobedEnvCleanupCannyLower": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Cleanup Canny Lower",
+      "description": "Canny lower threshold for external strobe artifact cleanup",
+      "type": "integer",
+      "default": 156,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvCleanupCannyUpper": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Cleanup Canny Upper",
+      "description": "Canny upper threshold for external strobe artifact cleanup",
+      "type": "integer",
+      "default": 337,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvCleanupPreHoughBlurSize": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Cleanup Pre-Hough Blur",
+      "description": "Pre-Hough blur size for external strobe artifact cleanup",
+      "type": "integer",
+      "default": 13,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvCurrentParam1": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Hough Param1",
+      "description": "Hough param1 with external strobes",
+      "type": "number",
+      "default": 130.0,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvFilterHsvLowerH": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe HSV Lower H",
+      "description": "Lower hue for the external strobe HSV filter",
+      "type": "integer",
+      "default": 14,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvFilterHsvLowerS": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe HSV Lower S",
+      "description": "Lower saturation for the external strobe HSV filter",
+      "type": "integer",
+      "default": 26,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvFilterHsvLowerV": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe HSV Lower V",
+      "description": "Lower value for the external strobe HSV filter",
+      "type": "integer",
+      "default": 114,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvFilterHsvUpperH": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe HSV Upper H",
+      "description": "Upper hue for the external strobe HSV filter",
+      "type": "integer",
+      "default": 48,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvFilterHsvUpperS": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe HSV Upper S",
+      "description": "Upper saturation for the external strobe HSV filter",
+      "type": "integer",
+      "default": 255,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvFilterHsvUpperV": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe HSV Upper V",
+      "description": "Upper value for the external strobe HSV filter",
+      "type": "integer",
+      "default": 255,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvFilterImage": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Filter Image",
+      "description": "Apply the HSV filter to images taken with external strobes",
+      "type": "boolean",
+      "default": true,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvHoughDpParam1": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Hough DP",
+      "description": "Hough dp with external strobes",
+      "type": "number",
+      "default": 1.0,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvLinesAngleLower": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Lines Angle Lower",
+      "description": "Lower line angle with external strobes",
+      "type": "integer",
+      "default": 140,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvLinesAngleUpper": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Lines Angle Upper",
+      "description": "Upper line angle with external strobes",
+      "type": "integer",
+      "default": 180,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvMaxHoughReturnCircles": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Max Hough Circles",
+      "description": "Maximum Hough circles returned with external strobes",
+      "type": "integer",
+      "default": 20,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvMaxParam2": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Max Param2",
+      "description": "Maximum Hough param2 with external strobes",
+      "type": "number",
+      "default": 100,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvMaximumSearchRadius": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Max Search Radius",
+      "description": "Maximum ball search radius in pixels with external strobes",
       "type": "integer",
       "default": 80,
-      "description": "Canny upper threshold for externally strobed ball identification",
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvMinHoughReturnCircles": {
       "category": "testing",
-      "ui_name": "External Ball ID Canny Upper"
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Min Hough Circles",
+      "description": "Minimum Hough circles returned with external strobes",
+      "type": "integer",
+      "default": 3,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvMinimumHoughLineLength": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Min Hough Line Length",
+      "description": "Minimum Hough line length with external strobes",
+      "type": "integer",
+      "default": 23,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvMinimumSearchRadius": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Min Search Radius",
+      "description": "Minimum ball search radius in pixels with external strobes",
+      "type": "integer",
+      "default": 60,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvNarrowingDpParam": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Narrowing DP",
+      "description": "Hough dp for the narrowing pass with external strobes",
+      "type": "number",
+      "default": 1.1,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvNarrowingParam2": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Narrowing Param2",
+      "description": "Hough param2 for the narrowing pass with external strobes",
+      "type": "number",
+      "default": 0.6,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvNumber_bits_for_fast_on_pulse_": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Fast Pulse On Bits",
+      "description": "Bits per fast strobe on-pulse in comparison mode",
+      "type": "integer",
+      "default": 0,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvParam2Increment": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Param2 Increment",
+      "description": "Hough param2 step with external strobes",
+      "type": "number",
+      "default": 4,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvPreCannyBlurSize": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Pre-Canny Blur",
+      "description": "Pre-Canny blur size with external strobes",
+      "type": "integer",
+      "default": 3,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvPreHoughBlurSize": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Pre-Hough Blur",
+      "description": "Pre-Hough blur size with external strobes",
+      "type": "integer",
+      "default": 11,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedEnvStartingParam2": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Starting Param2",
+      "description": "Starting Hough param2 with external strobes",
+      "type": "number",
+      "default": 65,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kExternallyStrobedUseCLAHEProcessing": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Ext Strobe Use CLAHE",
+      "description": "Apply CLAHE to images taken with external strobes",
+      "type": "boolean",
+      "default": true,
+      "requiresRestart": true
+    },
+    "gs_config.testing.kTwoImageTestPreImage": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Two Image Test Pre Image",
+      "description": "Pre-image file for the two image test, relative to the test image directory",
+      "type": "string",
+      "default": "",
+      "requiresRestart": true
+    },
+    "gs_config.testing.kTwoImageTestStrobedBallImage": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Two Image Test Strobed Ball Image",
+      "description": "Strobed ball image file for the two image test, relative to the test image directory",
+      "type": "string",
+      "default": "",
+      "requiresRestart": true
+    },
+    "gs_config.testing.kTwoImageTestTeedBallImage": {
+      "category": "testing",
+      "subcategory": "advanced",
+      "displayName": "Two Image Test Teed Ball Image",
+      "description": "Teed ball image file for the two image test, relative to the test image directory",
+      "type": "string",
+      "default": "",
+      "requiresRestart": true
     },
     "gs_config.cameras.kCamera1CalibrationMatrix": {
       "type": "array",
@@ -3602,78 +3397,6 @@
       "category": "calibration",
       "ui_name": "Camera 2 Distortion Vector"
     },
-    "gs_config.cameras.3_6Lens_kCamera1CalibrationMatrix": {
-      "type": "array",
-      "default": [
-        [
-          "1748.506644661262953",
-          "0.0",
-          "632.5374407393054526"
-        ],
-        [
-          "0.0",
-          "1743.341748687922745",
-          "407.5677927449370941"
-        ],
-        [
-          "0.0",
-          "0.0",
-          "1.0"
-        ]
-      ],
-      "description": "Camera 1 calibration matrix for 3.6mm lens",
-      "category": "calibration",
-      "ui_name": "Camera 1 3.6mm Lens Matrix"
-    },
-    "gs_config.cameras.3_6Lens_kCamera1DistortionVector": {
-      "type": "array",
-      "default": [
-        "-0.5323350228082535107",
-        "0.3171607772519656199",
-        "0.0007282375091653870043",
-        "-0.002130459534525419",
-        "0.0"
-      ],
-      "description": "Camera 1 distortion for 3.6mm lens",
-      "category": "calibration",
-      "ui_name": "Camera 1 3.6mm Lens Distortion"
-    },
-    "gs_config.cameras.3_6Lens_kCamera2CalibrationMatrix": {
-      "type": "array",
-      "default": [
-        [
-          "1065.366451276604266",
-          "0.0",
-          "715.3187116996945178"
-        ],
-        [
-          "0.0",
-          "1068.642040947899886",
-          "509.4612905764302582"
-        ],
-        [
-          "0.0",
-          "0.0",
-          "1.0"
-        ]
-      ],
-      "description": "Camera 2 calibration matrix for 3.6mm lens",
-      "category": "calibration",
-      "ui_name": "Camera 2 3.6mm Lens Matrix"
-    },
-    "gs_config.cameras.3_6Lens_kCamera2DistortionVector": {
-      "type": "array",
-      "default": [
-        "-0.4854175692996230418",
-        "0.2637456313607589586",
-        "0.002679639341176350345",
-        "-0.001576282874523095",
-        "0.0"
-      ],
-      "description": "Camera 2 distortion for 3.6mm lens",
-      "category": "calibration",
-      "ui_name": "Camera 2 3.6mm Lens Distortion"
-    },
     "gs_config.cameras.kCamera1Angles": {
       "type": "array",
       "default": [
@@ -3739,8 +3462,7 @@
         "3": "Custom rig (user will provide ball positions - see custom parameters below)"
       },
       "default": "1",
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.calibration.kCustomCalibrationRigPositionFromCamera1": {
       "category": "Calibration",
@@ -3753,8 +3475,7 @@
         -0.28,
         0.44
       ],
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.calibration.kCustomCalibrationRigPositionFromCamera2": {
       "category": "Calibration",
@@ -3767,8 +3488,7 @@
         "0.095",
         "0.435"
       ],
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.calibration.kAutoCalibrationBallPositionFromCam1MetersForStraightOutCamerasV2Enclosure": {
       "category": "Calibration",
@@ -3781,8 +3501,7 @@
         "-0.28",
         "0.44"
       ],
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.calibration.kAutoCalibrationBallPositionFromCam2MetersForStraightOutCamerasV2Enclosure": {
       "category": "Calibration",
@@ -3795,8 +3514,7 @@
         "0.095",
         "0.435"
       ],
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.calibration.kAutoCalibrationBallPositionFromCam1MetersForSkewedCamerasV2Enclosure": {
       "category": "Calibration",
@@ -3809,8 +3527,7 @@
         "-0.28",
         "0.44"
       ],
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.calibration.kAutoCalibrationBallPositionFromCam2MetersForSkewedCamerasV2Enclosure": {
       "category": "Calibration",
@@ -3823,8 +3540,7 @@
         "0.095",
         "0.435"
       ],
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.calibration.kAutoCalibrationBallPositionFromCam1MetersForStraightOutCamerasV3Enclosure": {
       "category": "Calibration",
@@ -3837,8 +3553,7 @@
         "-0.243",
         "0.481"
       ],
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.calibration.kAutoCalibrationBallPositionFromCam2MetersForStraightOutCamerasV3Enclosure": {
       "category": "Calibration",
@@ -3851,8 +3566,7 @@
         "0.109",
         "0.481"
       ],
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.calibration.kAutoCalibrationBallPositionFromCam1MetersForSkewedCamerasV3Enclosure": {
       "category": "Calibration",
@@ -3865,8 +3579,7 @@
         "-0.243",
         "0.481"
       ],
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.calibration.kAutoCalibrationBallPositionFromCam2MetersForSkewedCamerasV3Enclosure": {
       "category": "Calibration",
@@ -3879,8 +3592,7 @@
         "0.109",
         "0.472"
       ],
-      "requiresRestart": true,
-      "passedVia": "json"
+      "requiresRestart": true
     },
     "gs_config.calibration.kTestAutoCalibrationFileName": {
       "type": "string",
@@ -3888,19 +3600,11 @@
       "description": "Test file for auto calibration",
       "category": "calibration",
       "ui_name": "Test Auto Cal File"
-    },
-    "gs_config.ball_identification.kStrobedBallsAltPreHoughBlurSize HAS TO BE ODD": {
-      "type": "integer",
-      "default": 0,
-      "description": "Pre-Hough blur size for ALT algorithm (must be odd)",
-      "category": "ball_identification",
-      "ui_name": "ALT Pre-Hough Blur Size"
     }
   },
   "categoryList": [
     "System",
     "Cameras",
-    "Simulators",
     "Ball Detection",
     "AI Detection",
     "Storage",
@@ -3934,11 +3638,6 @@
       "displayName": "Cameras",
       "description": "Camera hardware and settings",
       "icon": "camera"
-    },
-    "Simulators": {
-      "displayName": "Simulator Interfaces",
-      "description": "Golf simulator connections",
-      "icon": "game"
     },
     "Strobing": {
       "displayName": "LED Strobing",
@@ -3988,10 +3687,6 @@
     "Cameras": {
       "displayName": "Cameras",
       "order": 3
-    },
-    "Simulators": {
-      "displayName": "Simulators",
-      "order": 4
     },
     "Ball Detection": {
       "displayName": "Ball Detection",

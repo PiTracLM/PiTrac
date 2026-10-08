@@ -1,9 +1,13 @@
-/* Dashboard — custom styles that daisyUI/Tailwind can't cover */
+/* Dashboard: custom styles that daisyUI/Tailwind can't cover */
 
 /* Left accent border on all metric cards */
 .metric-card {
     border-left: 3px solid var(--color-primary);
 }
+
+.metric-number { font-size: clamp(2.5rem, 5vw, 3.25rem); }
+.metric-card.hero .metric-number { font-size: clamp(3.25rem, 7vw, 4.5rem); }
+.metric-unit { font-size: clamp(1rem, 1.8vw, 1.25rem); }
 
 /* Metric value pop animation on update */
 .metric-number.updated {
@@ -17,7 +21,7 @@
     100% { transform: scale(1); }
 }
 
-/* Status strip — accent left border changes per state */
+/* Status strip: accent left border changes per state */
 .status-strip {
     border-left: 3px solid color-mix(in oklch, var(--color-base-content) 30%, transparent);
     transition: all 0.3s ease;
@@ -31,13 +35,10 @@
     transition: all 0.3s ease;
 }
 
-/* Status strip message — in CSS because JS resets className */
+/* Status strip message */
 .status-strip-message {
     font-size: 0.875rem;
     color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 /* Status strip states */
@@ -47,28 +48,35 @@
     animation: pulse 2s infinite;
 }
 
-.status-strip.waiting { border-left-color: var(--color-warning); }
+/* Traffic-light ramp at matched OKLCH L 80 / C 0.17, hue 50/85/150. */
+.status-strip.waiting { border-left-color: oklch(80% 0.17 50); }
 .status-strip.waiting .ball-icon {
-    background-color: var(--color-warning);
+    background-color: oklch(80% 0.17 50);
     animation: pulse 2s infinite;
 }
+.status-strip.waiting #status-strip-title {
+    color: oklch(80% 0.17 50);
+}
 
-.status-strip.stabilizing { border-left-color: #fbbf24; }
+.status-strip.stabilizing { border-left-color: oklch(80% 0.17 85); }
 .status-strip.stabilizing .ball-icon {
-    background-color: #fbbf24;
+    background-color: oklch(80% 0.17 85);
     animation: bounce 1s infinite;
+}
+.status-strip.stabilizing #status-strip-title {
+    color: oklch(80% 0.17 85);
 }
 
 .status-strip.ready {
-    border-left-color: var(--color-success);
-    background: linear-gradient(90deg, color-mix(in oklch, var(--color-success) 6%, transparent) 0%, transparent 40%);
+    border-left-color: oklch(80% 0.17 150);
+    background: linear-gradient(90deg, color-mix(in oklch, oklch(80% 0.17 150) 6%, transparent) 0%, transparent 40%);
 }
 .status-strip.ready .ball-icon {
-    background-color: var(--color-success);
+    background-color: oklch(80% 0.17 150);
     transform: scale(1.05);
 }
 .status-strip.ready #status-strip-title {
-    color: var(--color-success);
+    color: oklch(80% 0.17 150);
 }
 
 .status-strip.hit { border-left-color: var(--color-primary); }
@@ -82,7 +90,7 @@
     background-color: var(--color-error);
 }
 
-/* Image panel inner — in CSS because JS resets className directly */
+/* Image panel inner */
 .image-panel-inner {
     flex: 1;
     display: flex;
@@ -92,7 +100,7 @@
     min-height: 300px;
 }
 
-/* Empty state — centered with a ring around the golf ball */
+/* Empty state: centered with a ring around the golf ball */
 .image-empty-state {
     display: flex;
     flex-direction: column;
@@ -142,11 +150,11 @@
 
 @media (max-width: 767px) {
     .status-strip-separator { display: none; }
-    .metric-number { font-size: 1.75rem !important; }
-    .metric-card.hero .metric-number { font-size: 2.5rem !important; }
+    .metric-number { font-size: 1.75rem; }
+    .metric-card.hero .metric-number { font-size: 2.5rem; }
 }
 
 @media (min-width: 1400px) {
-    .metric-card.hero .metric-number { font-size: 5rem !important; }
-    .metric-number { font-size: 3.5rem !important; }
+    .metric-number { font-size: 3.5rem; }
+    .metric-card.hero .metric-number { font-size: 5rem; }
 }

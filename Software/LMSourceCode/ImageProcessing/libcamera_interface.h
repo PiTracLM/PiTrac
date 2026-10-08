@@ -58,11 +58,9 @@ namespace golf_sim {
 		static double kCamera2Saturation;
 		static double kCamera2ComparisonGain;  // 0.0 to TBD??
 		static double kCamera2CalibrateOrLocationGain;
-		static double kCamera2StrobedEnvironmentGain;
 		static double kCamera2Contrast; // 0.0 to 32.0
 		static double kCamera2PuttingGain;  // 0.0 to TBD??
 		static double kCamera2PuttingContrast; // 0.0 to 32.0
-		static std::string kCameraMotionDetectSettings;
 
 		static long kCamera1StillShutterTimeuS;
 		static long kCamera2StillShutterTimeuS;

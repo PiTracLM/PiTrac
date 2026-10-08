@@ -1,14 +1,25 @@
-{% from "_macros.html" import pitrac_btn, nav_item %}
+{% from "_macros.html" import nav_item %}
+{# top: in the navbar from md up and in the menu below md. Other pages are always in the menu. #}
+{% set nav_pages = [
+    ("/", "home", "Dashboard", true),
+    ("/history", "list", "Shot History", true),
+    ("/config", "settings", "Configuration", false),
+    ("/calibration", "crosshair", "Calibration", false),
+    ("/logs", "file-text", "Logs", false),
+    ("/testing", "flask-conical", "Testing", false),
+    ("/update", "refresh-cw", "System update", false),
+] %}
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}PiTrac Launch Monitor{% endblock %}</title>
+    <script>try{const t=localStorage.getItem('pitrac-theme')||'system';document.documentElement.dataset.theme=t==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):t;}catch{}</script>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <link rel="stylesheet" href="/static/css/pitrac.css">
+    <link href="/static/vendor/daisyui-5.7.47.css?v={{ asset_version }}" rel="stylesheet" type="text/css" />
+    <script src="/static/vendor/tailwindcss-browser-4.3.3.js?v={{ asset_version }}"></script>
+    <link rel="stylesheet" href="/static/css/pitrac.css?v={{ asset_version }}">
     {% block extra_css %}{% endblock %}
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -17,65 +28,68 @@
 <body class="bg-base-100 text-base-content min-h-screen p-2 sm:p-4">
     <div class="max-w-[1400px] mx-auto animate-fade-in">
 
-        <div class="navbar bg-base-200 rounded-box shadow-md border border-base-300 mb-4 px-3 min-h-0 py-2 gap-2">
-            <!-- Status dots -->
-            <div class="flex flex-col gap-1 pr-3 border-r border-base-300">
-                <div class="flex items-center gap-1.5">
-                    <div class="status-dot" id="ws-status-dot" title="WebSocket"></div>
-                    <span class="text-[0.6rem] font-semibold opacity-40 uppercase tracking-wide">WS</span>
+        <div class="navbar relative bg-base-200 rounded-box shadow-md border border-base-300 mb-4 px-3 min-h-0 py-2 gap-2">
+            <a href="/" title="Dashboard" class="shrink-0">
+                <img src="/static/logos/PiTrac.svg" alt="PiTrac Logo" class="h-8 sm:h-10 header-logo">
+            </a>
+
+            <ul class="menu menu-horizontal menu-sm hidden md:flex flex-nowrap gap-1 px-1">
+                {% for href, icon, label, top in nav_pages if top %}{{ nav_item(href, icon, label, request.url.path == href) }}{% endfor %}
+            </ul>
+
+            <div class="flex-1"></div>
+
+            <button type="button" id="pitrac-btn" class="btn btn-sm bg-base-300 border-base-300 font-medium gap-2"
+                    onclick="if (this.dataset.action) controlPiTrac(this.dataset.action)" aria-label="Checking PiTrac status" disabled>
+                <span class="w-2 h-2 rounded-full bg-base-content/40"></span>
+            </button>
+            <span id="pitrac-status-live" class="sr-only" role="status"></span>
+
+            <details class="dropdown dropdown-end max-sm:static" id="sims-menu">
+                <summary id="sims-nav-btn" class="btn btn-sm bg-base-300 border-base-300 font-medium gap-2"
+                         aria-label="Simulator" aria-expanded="false" aria-controls="sims-panel">
+                    <span id="sims-status-dot" class="w-2 h-2 rounded-full hidden"></span>
+                    <i id="sims-radio-icon" data-lucide="radio" class="icon-sm opacity-70"></i>
+                    <span id="sims-nav-label" class="hidden sm:inline">Simulator</span>
+                    <i data-lucide="chevron-down" class="icon-sm opacity-60"></i>
+                </summary>
+                <div id="sims-panel" class="dropdown-content bg-base-200 rounded-box z-50 w-[22rem] max-w-[calc(100vw-2rem)] p-2 shadow-xl border border-base-300 mt-2">
+                    <div id="sims-list"><p class="text-sm opacity-60 p-2">Loading simulators</p></div>
+                    <button type="button" id="sims-add-btn" class="btn btn-sm btn-primary w-full mt-2 gap-1.5">
+                        <i data-lucide="plus" class="icon-sm"></i> Add simulator
+                    </button>
                 </div>
-                <div class="flex items-center gap-1.5">
-                    <div class="status-dot" id="pitrac-status-dot" title="PiTrac"></div>
-                    <span class="text-[0.6rem] font-semibold opacity-40 uppercase tracking-wide">LM</span>
-                </div>
-            </div>
+            </details>
 
-            <!-- Logo -->
-            <div class="flex-1 flex justify-center">
-                <a href="/" title="Dashboard">
-                    <img src="/static/logos/PiTrac.svg" alt="PiTrac Logo" class="h-10 header-logo">
-                </a>
-            </div>
-
-            <!-- Desktop controls -->
-            <div class="hidden md:flex gap-2 mr-2 pitrac-controls">
-                {{ pitrac_btn("start", "play", "Start", "desktop", "btn-success") }}
-                {{ pitrac_btn("stop", "square", "Stop", "desktop", "btn-error") }}
-                {{ pitrac_btn("restart", "rotate-cw", "Restart", "desktop", "btn-warning") }}
-            </div>
-
-            <!-- Menu -->
             <details class="dropdown dropdown-end" id="nav-dropdown">
-                <summary class="btn btn-ghost btn-square btn-sm">
-                    <i data-lucide="more-vertical" class="icon-md"></i>
+                <summary class="btn btn-sm btn-ghost btn-square" aria-label="Menu">
+                    <i data-lucide="more-vertical" class="icon-sm"></i>
                 </summary>
                 <ul class="menu dropdown-content bg-base-200 rounded-box z-50 w-56 p-2 shadow-xl border border-base-300 mt-2">
-                    <li class="menu-title md:hidden">PiTrac Controls</li>
-                    <li class="md:hidden">
-                        <div class="flex flex-col gap-1.5 p-1">
-                            {{ pitrac_btn("start", "play", "Start", "mobile", "btn-success w-full") }}
-                            {{ pitrac_btn("stop", "square", "Stop", "mobile", "btn-error w-full") }}
-                            {{ pitrac_btn("restart", "rotate-cw", "Restart", "mobile", "btn-warning w-full") }}
-                        </div>
+                    {% for href, icon, label, top in nav_pages %}
+                    {{ nav_item(href, icon, label, request.url.path == href, "md:hidden" if top else "") }}
+                    {% endfor %}
+                    <li></li>
+                    <li id="setup-show-item" class="hidden">
+                        <button class="gap-2" onclick="showSetupChecklist()">
+                            <i data-lucide="list-checks" class="icon-menu"></i> Show setup checklist
+                        </button>
                     </li>
-                    <div class="divider my-0 md:hidden"></div>
-                    {{ nav_item("/", "home", "Dashboard") }}
-                    {{ nav_item("/calibration", "crosshair", "Calibration") }}
-                    {{ nav_item("/config", "settings", "Configuration") }}
-                    {{ nav_item("/logs", "file-text", "Logs") }}
-                    {{ nav_item("/testing", "flask-conical", "Testing Tools") }}
-                    {{ nav_item("/update", "refresh-cw", "System Update") }}
-                    <div class="divider my-0"></div>
+                    <li id="pitrac-restart-item" class="hidden">
+                        <button id="pitrac-restart-btn" class="control-btn gap-2" onclick="controlPiTrac('restart')">
+                            <i data-lucide="rotate-cw" class="icon-menu"></i> Restart PiTrac
+                        </button>
+                    </li>
                     <li class="menu-title">Theme</li>
                     <li>
                         <div class="flex gap-2 p-1">
-                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-theme="light" title="Light" onclick="setTheme('light')">
+                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-mode="light" title="Light" onclick="setTheme('light')">
                                 <i data-lucide="sun"></i>
                             </button>
-                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-theme="dark" title="Dark" onclick="setTheme('dark')">
+                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-mode="dark" title="Dark" onclick="setTheme('dark')">
                                 <i data-lucide="moon"></i>
                             </button>
-                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-theme="system" title="System" onclick="setTheme('system')">
+                            <button class="theme-btn btn btn-ghost btn-sm flex-1" data-mode="system" title="System" onclick="setTheme('system')">
                                 <i data-lucide="monitor"></i>
                             </button>
                         </div>
@@ -87,26 +101,66 @@
         {% block content %}{% endblock %}
     </div>
 
-    <!-- Strobe safety modal (hidden, shown by JS) -->
-    <dialog id="strobe-safety-modal" class="modal">
+    <div id="toast-region" class="toast toast-bottom toast-end z-50" role="status" aria-live="polite"></div>
+
+    <dialog id="confirm-dialog" class="modal" aria-labelledby="confirm-dialog-title">
+        <div class="modal-box">
+            <h3 id="confirm-dialog-title" class="text-lg font-semibold"></h3>
+            <p id="confirm-dialog-body" class="py-4"></p>
+            <form method="dialog" class="modal-action">
+                <button value="cancel" class="btn btn-ghost">Cancel</button>
+                <button value="confirm" id="confirm-dialog-ok" class="btn btn-primary">Confirm</button>
+            </form>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button value="cancel">close</button></form>
+    </dialog>
+
+    <dialog id="sim-editor" class="modal" aria-labelledby="sim-editor-title">
+        <div class="modal-box max-w-lg">
+            <h3 id="sim-editor-title" class="text-lg font-semibold">Add simulator</h3>
+            <div id="sim-editor-types" class="py-4">
+                <p class="text-sm opacity-70 mb-3">Pick the simulator PiTrac should send shots to.</p>
+                <div id="sim-editor-type-list" class="grid grid-cols-1 sm:grid-cols-3 gap-2"></div>
+                <form method="dialog" class="modal-action">
+                    <button class="btn btn-ghost">Cancel</button>
+                </form>
+            </div>
+            <form id="sim-editor-form" class="hidden" novalidate>
+                <div id="sim-editor-fields" class="py-2"></div>
+                <div id="sim-editor-result" class="text-sm min-h-5 break-words" role="status" aria-live="polite"></div>
+                <div class="modal-action flex-wrap">
+                    <button type="button" id="sim-editor-test" class="btn">Test connection</button>
+                    <button type="button" id="sim-editor-cancel" class="btn btn-ghost">Cancel</button>
+                    <button type="submit" id="sim-editor-save" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
+
+    <dialog id="strobe-safety-modal" class="modal" aria-labelledby="strobe-safety-title">
         <div class="modal-box">
             <div class="text-center mb-4 text-error">
                 <i data-lucide="triangle-alert" class="icon-lg"></i>
             </div>
-            <h3 class="text-lg font-bold text-center">Strobe Calibration Required</h3>
+            <h3 id="strobe-safety-title" class="text-lg font-semibold text-center">Strobe calibration required</h3>
             <p class="py-4 text-center opacity-60" id="strobe-safety-msg">
                 V3 board requires strobe calibration before use.
             </p>
+            <p class="text-sm text-center">
+                Not a V3 board? <a href="/config#setup" class="link link-primary" onclick="this.closest('dialog').close()">Set the Connection Board Version</a>
+            </p>
             <div class="modal-action justify-center">
-                <a href="/calibration" class="btn btn-primary">Go to Calibration</a>
+                <a href="/calibration#strobe" class="btn btn-primary" onclick="this.closest('dialog').close()">Go to Calibration</a>
                 <form method="dialog"><button class="btn btn-ghost">Dismiss</button></form>
             </div>
         </div>
         <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
 
-    <script src="/static/js/lucide.min.js"></script>
-    <script src="/static/js/common.js"></script>
+    <script src="/static/js/lucide.min.js?v={{ asset_version }}"></script>
+    <script src="/static/js/common.js?v={{ asset_version }}"></script>
+    <script src="/static/js/sims.js?v={{ asset_version }}"></script>
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>

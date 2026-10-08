@@ -3,8 +3,9 @@ import asyncio
 import os
 import time
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, Mock, patch, mock_open
-from testing_tools_manager import TestingToolsManager
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from constants import SERVER_PORT
+from testing_tools_manager import TestingToolsManager as ToolsManager
 
 
 @pytest.fixture
@@ -16,10 +17,7 @@ def mock_config_manager():
             "ipc_interface": {"kWebServerShareDirectory": "~/LM_Shares/Images/"}
         },
     }
-    manager.generate_golf_sim_config.return_value = "/tmp/test_config.json"
-    manager.get_environment_parameters.return_value = [
-        {"key": "camera1.slot1_camera_type", "envVariable": "PITRAC_SLOT1_CAMERA_TYPE"}
-    ]
+    manager.transient_overrides = {}
     return manager
 
 
@@ -27,7 +25,7 @@ def mock_config_manager():
 def testing_manager(mock_config_manager, tmp_path):
     """Create TestingToolsManager instance for testing"""
     with patch("testing_tools_manager.Path.home", return_value=tmp_path):
-        manager = TestingToolsManager(mock_config_manager)
+        manager = ToolsManager(mock_config_manager)
         return manager
 
 
@@ -39,9 +37,9 @@ class TestTestingToolsManagerInit:
         """Test that manager initializes correctly"""
         assert testing_manager.pitrac_binary == "/usr/lib/pitrac/pitrac_lm"
         assert isinstance(testing_manager.running_processes, dict)
-        assert isinstance(testing_manager.completed_results, dict)
+        assert isinstance(testing_manager.last_results, dict)
         assert len(testing_manager.running_processes) == 0
-        assert len(testing_manager.completed_results) == 0
+        assert len(testing_manager.last_results) == 0
 
     def test_test_images_directory_created(self, testing_manager, tmp_path):
         """Test that test images directory is created"""
@@ -115,6 +113,39 @@ class TestRunTool:
         assert "already running" in result["message"]
 
     @pytest.mark.asyncio
+    async def test_run_tool_refused_while_other_tool_running(self, testing_manager, mock_config_manager):
+        testing_manager.running_processes["pulse_test"] = MagicMock()
+        mock_config_manager.transient_overrides = {"logging": {"level": "trace"}}
+
+        with patch("asyncio.create_subprocess_exec") as create:
+            result = await testing_manager.run_tool("camera1_still")
+
+        assert result == {"status": "error", "message": "Strobe Pulse Test is already running"}
+        create.assert_not_called()
+        assert mock_config_manager.transient_overrides == {"logging": {"level": "trace"}}
+
+    @pytest.mark.asyncio
+    async def test_run_tool_refused_while_another_is_spawning(self, testing_manager):
+        spawning = asyncio.Event()
+        release = asyncio.Event()
+
+        async def slow_spawn(*args, **kwargs):
+            spawning.set()
+            await release.wait()
+            raise OSError("spawn failed")
+
+        with patch("asyncio.create_subprocess_exec", side_effect=slow_spawn):
+            first = asyncio.create_task(testing_manager.run_tool("pulse_test"))
+            await spawning.wait()
+            second = await asyncio.wait_for(testing_manager.run_tool("camera1_still"), 1)
+            release.set()
+            first_result = await first
+
+        assert second == {"status": "error", "message": "Strobe Pulse Test is already running"}
+        assert first_result == {"status": "error", "message": "spawn failed"}
+        assert testing_manager.running_processes == {}
+
+    @pytest.mark.asyncio
     async def test_run_tool_success(self, testing_manager, mock_config_manager):
         """Test successfully running a tool"""
         mock_process = AsyncMock()
@@ -147,11 +178,11 @@ class TestRunTool:
     async def test_run_tool_timeout(self, testing_manager, mock_config_manager):
         """Test tool timeout handling"""
         mock_process = AsyncMock()
-        mock_process.communicate.side_effect = asyncio.TimeoutError()
-        mock_process.terminate = AsyncMock()
-        mock_process.wait = AsyncMock()
+        mock_process.communicate.return_value = (b"", b"")
+        mock_process.terminate = Mock()
 
-        with patch("asyncio.create_subprocess_exec", return_value=mock_process):
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process), \
+                patch("asyncio.wait_for", side_effect=asyncio.TimeoutError()):
             result = await testing_manager.run_tool("camera1_still")
 
         assert result["status"] == "timeout"
@@ -162,11 +193,11 @@ class TestRunTool:
     async def test_run_continuous_test_timeout(self, testing_manager, mock_config_manager):
         """Test continuous test timeout behavior"""
         mock_process = AsyncMock()
-        mock_process.communicate.side_effect = asyncio.TimeoutError()
-        mock_process.terminate = AsyncMock()
-        mock_process.wait = AsyncMock()
+        mock_process.communicate.return_value = (b"", b"")
+        mock_process.terminate = Mock()
 
-        with patch("asyncio.create_subprocess_exec", return_value=mock_process):
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process), \
+                patch("asyncio.wait_for", side_effect=asyncio.TimeoutError()):
             with patch.object(testing_manager, "_find_and_read_test_log", return_value="Test log content"):
                 result = await testing_manager.run_tool("pulse_test")
 
@@ -174,35 +205,63 @@ class TestRunTool:
         assert "Test log content" in result["output"]
 
     @pytest.mark.asyncio
+    async def test_timed_out_tool_returns_partial_output(self, testing_manager):
+        testing_manager.tools["camera1_ball_location"]["timeout"] = 0.01
+        process = Mock(returncode=-15)
+        exited = asyncio.Event()
+        process.terminate = Mock(side_effect=exited.set)
+
+        async def communicate():
+            await exited.wait()
+            return b"Ball found at (512, 300)", b"camera warning"
+
+        process.communicate = communicate
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            result = await testing_manager.run_tool("camera1_ball_location")
+
+        assert result["status"] == "timeout"
+        assert result["output"] == "Ball found at (512, 300)"
+        assert result["error"] == "camera warning"
+        process.terminate.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_run_tool_with_sudo(self, testing_manager, mock_config_manager, tmp_path):
         """Test running a tool that requires sudo"""
-        config_file = tmp_path / "test_config.json"
-        config_file.write_text('{"gs_config": {"testing": {}}}')
-        mock_config_manager.generate_golf_sim_config.return_value = str(config_file)
-
         mock_process = AsyncMock()
         mock_process.returncode = 0
         mock_process.communicate.return_value = (b"Output", b"")
 
-        config_content = '{"gs_config": {}}'
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+            with patch.object(testing_manager, "_find_and_read_test_log", return_value=None):
+                await testing_manager.run_tool("test_images")
+
+                args, kwargs = mock_exec.call_args
+                assert args[0] == "sudo"
+                assert "-E" in args
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("camera", ["camera1", "camera2"])
+    async def test_ball_location_tool_uses_ball_location_mode(self, testing_manager, camera):
+        mock_process = AsyncMock()
+        mock_process.returncode = 0
+        mock_process.communicate.return_value = (b"", b"")
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
-            with patch("builtins.open", mock_open(read_data=config_content)):
-                with patch.object(testing_manager, "_find_and_read_test_log", return_value=None):
-                    await testing_manager.run_tool("test_images")
+            with patch.object(testing_manager, "_find_and_read_test_log", return_value=None):
+                await testing_manager.run_tool(f"{camera}_ball_location")
 
-                    args, kwargs = mock_exec.call_args
-                    assert args[0] == "sudo"
-                    assert "-E" in args
+        args = mock_exec.call_args.args
+        assert args[1:3] == ("--system_mode", f"{camera}_ball_location")
+        assert "--check_ball_location" not in args
 
     @pytest.mark.asyncio
     async def test_run_tool_exception(self, testing_manager, mock_config_manager):
         """Test exception handling during tool run"""
-        mock_config_manager.generate_golf_sim_config.side_effect = Exception("Config error")
-
-        result = await testing_manager.run_tool("camera1_still")
+        with patch("asyncio.create_subprocess_exec", side_effect=Exception("Spawn error")):
+            result = await testing_manager.run_tool("camera1_still")
         assert result["status"] == "error"
-        assert "Config error" in result["message"]
+        assert "Spawn error" in result["message"]
 
     @pytest.mark.asyncio
     async def test_run_tool_with_test_image(self, testing_manager, mock_config_manager, tmp_path):
@@ -211,18 +270,39 @@ class TestRunTool:
         test_image = testing_manager.test_images_dir / "test_flight.jpg"
         test_image.touch()
 
-        # Mock config file operations
-        config_content = '{"gs_config": {}}'
-
         mock_process = AsyncMock()
         mock_process.returncode = 0
         mock_process.communicate.return_value = (b"Test completed", b"")
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_process):
-            with patch("builtins.open", mock_open(read_data=config_content)):
-                result = await testing_manager.run_tool("test_uploaded_image")
+            result = await testing_manager.run_tool("test_uploaded_image")
 
         assert result["status"] == "success"
+
+    @pytest.mark.asyncio
+    async def test_run_tool_sets_transient_overrides_and_clears_them(self, testing_manager, mock_config_manager):
+        """Test overrides are served while the tool runs and dropped afterwards"""
+        (testing_manager.test_images_dir / "test_flight.jpg").touch()
+        seen = {}
+
+        async def communicate():
+            seen["overrides"] = mock_config_manager.transient_overrides
+            return (b"ok", b"")
+
+        mock_process = AsyncMock()
+        mock_process.returncode = 0
+        mock_process.communicate = communicate
+
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+            await testing_manager.run_tool("test_uploaded_image")
+
+        testing = seen["overrides"]["gs_config"]["testing"]
+        assert testing["kTwoImageTestTeedBallImage"] == "test_flight.jpg"
+        assert seen["overrides"]["logging"] == {"level": "trace"}
+        cmd = mock_exec.call_args.args
+        assert f"--web_server_port={SERVER_PORT}" in cmd
+        assert not any(a.startswith(("--config_", "--logging_level")) for a in cmd)
+        assert mock_config_manager.transient_overrides == {}
 
     @pytest.mark.asyncio
     async def test_run_tool_no_test_image(self, testing_manager):
@@ -259,6 +339,15 @@ class TestStopTool:
         assert "not running" in result["message"]
 
     @pytest.mark.asyncio
+    async def test_stop_tool_still_starting(self, testing_manager):
+        testing_manager.running_processes["pulse_test"] = None
+
+        result = await testing_manager.stop_tool("pulse_test")
+
+        assert result == {"status": "error", "message": "Strobe Pulse Test is still starting"}
+        assert testing_manager.running_processes == {"pulse_test": None}
+
+    @pytest.mark.asyncio
     async def test_stop_tool_success(self, testing_manager):
         """Test successfully stopping a running tool"""
         mock_process = AsyncMock()
@@ -271,7 +360,67 @@ class TestStopTool:
         assert result["status"] == "success"
         assert "stopped" in result["message"]
         mock_process.terminate.assert_called_once()
-        assert "pulse_test" not in testing_manager.running_processes
+        assert testing_manager.running_processes["pulse_test"] is mock_process
+
+    @pytest.mark.asyncio
+    async def test_stopped_run_reports_stopped(self, testing_manager):
+        exited = asyncio.Event()
+        process = Mock(returncode=-15)
+        process.terminate = Mock(side_effect=exited.set)
+
+        async def communicate():
+            await exited.wait()
+            return b"partial", b""
+
+        async def wait():
+            await exited.wait()
+
+        process.communicate = communicate
+        process.wait = wait
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            run = asyncio.create_task(testing_manager.run_tool("pulse_test"))
+            while testing_manager.running_processes.get("pulse_test") is not process:
+                await asyncio.sleep(0)
+            await testing_manager.stop_tool("pulse_test")
+            result = await run
+
+        assert result["status"] == "stopped"
+        assert result["output"] == "partial"
+
+    @pytest.mark.asyncio
+    async def test_run_refused_until_stopped_run_cleans_up(self, testing_manager, mock_config_manager):
+        exited = asyncio.Event()
+        log_read = asyncio.Event()
+        process = Mock(returncode=-15)
+        process.terminate = Mock(side_effect=exited.set)
+
+        async def communicate():
+            await exited.wait()
+            return b"", b""
+
+        async def wait():
+            await exited.wait()
+
+        async def slow_log_read(start_time):
+            await log_read.wait()
+
+        process.communicate = communicate
+        process.wait = wait
+
+        with patch("asyncio.create_subprocess_exec", return_value=process):
+            with patch.object(testing_manager, "_find_and_read_test_log", side_effect=slow_log_read):
+                first = asyncio.create_task(testing_manager.run_tool("pulse_test"))
+                while testing_manager.running_processes.get("pulse_test") is not process:
+                    await asyncio.sleep(0)
+                await testing_manager.stop_tool("pulse_test")
+                second = await asyncio.wait_for(testing_manager.run_tool("camera1_still"), 1)
+                log_read.set()
+                await first
+
+        assert second == {"status": "error", "message": "Strobe Pulse Test is already running"}
+        assert testing_manager.running_processes == {}
+        assert mock_config_manager.transient_overrides == {}
 
     @pytest.mark.asyncio
     async def test_stop_tool_kill_on_timeout(self, testing_manager):
@@ -501,3 +650,22 @@ class TestGetRunningTools:
         assert len(result) == 2
         assert "pulse_test" in result
         assert "camera1_still" in result
+
+
+@pytest.mark.unit
+class TestStillImages:
+    @pytest.mark.asyncio
+    async def test_camera1_still_uses_cam1_image(self, testing_manager, tmp_path):
+        images = tmp_path / "LM_Shares/Images"
+        images.mkdir(parents=True)
+        (images / "cam1_still_picture.png").write_bytes(b"1")
+        (images / "cam2_still_picture.png").write_bytes(b"2")
+        mock_process = AsyncMock()
+        mock_process.returncode = 0
+        mock_process.communicate.return_value = (b"", b"")
+
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process), \
+                patch("testing_tools_manager.Path.home", return_value=tmp_path):
+            result = await testing_manager.run_tool("camera1_still")
+
+        assert result["image_url"] == "/api/images/cam1_still_picture.png"

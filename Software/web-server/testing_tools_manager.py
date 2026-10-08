@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
+from constants import SERVER_PORT
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,7 +24,9 @@ class TestingToolsManager:
         self.config_manager = config_manager
         self.pitrac_binary = "/usr/lib/pitrac/pitrac_lm"
         self.running_processes = {}
-        self.completed_results = {}
+        self.started_at: Dict[str, float] = {}
+        self.stopping: set = set()
+        self.last_results: Dict[str, Dict[str, Any]] = {}
 
         # Create TestImages directory if it doesn't exist
         self.test_images_dir = Path.home() / "LM_Shares/TestImages"
@@ -32,8 +36,10 @@ class TestingToolsManager:
             "test_uploaded_image": {
                 "name": "Test Uploaded Image",
                 "description": "Run full pipeline on uploaded flight camera image",
+                "before": "Upload a strobed flight camera image above.",
+                "success": "Shows the detection log and timing in the output.",
                 "category": "testing",
-                "args": ["--system_mode", "test", "--skip_wait_armed"],
+                "args": ["--system_mode", "test"],
                 "requires_sudo": False,
                 "timeout": 60,
                 "uses_uploaded_image": True,
@@ -41,6 +47,8 @@ class TestingToolsManager:
             "pulse_test": {
                 "name": "Strobe Pulse Test",
                 "description": "Test IR strobe pulse functionality",
+                "before": "Runs for 60 seconds.",
+                "success": "The strobe pulses until the test ends.",
                 "category": "hardware",
                 "args": ["--pulse_test", "--system_mode", "camera1"],
                 "requires_sudo": False,
@@ -50,38 +58,50 @@ class TestingToolsManager:
             "camera1_still": {
                 "name": "Camera 1 Still Image",
                 "description": "Capture a still image from Camera 1",
+                "before": "Takes up to 10 seconds.",
+                "success": "Shows a picture from Camera 1.",
                 "category": "camera",
                 "args": ["--system_mode", "camera1", "--cam_still_mode", "--output_filename=cam1_still_picture.png"],
+                "output_image": "cam1_still_picture.png",
                 "requires_sudo": False,
                 "timeout": 10,
             },
             "camera2_still": {
                 "name": "Camera 2 Still Image",
                 "description": "Capture a still image from Camera 2",
+                "before": "Takes up to 10 seconds.",
+                "success": "Shows a picture from Camera 2.",
                 "category": "camera",
                 "args": ["--system_mode", "camera2", "--cam_still_mode", "--output_filename=cam2_still_picture.png"],
+                "output_image": "cam2_still_picture.png",
                 "requires_sudo": False,
                 "timeout": 10,
             },
             "camera1_ball_location": {
                 "name": "Camera 1 Ball Location",
                 "description": "Check ball location for Camera 1",
+                "before": "Place a ball on the tee and stop PiTrac.",
+                "success": "Shows what the camera found before the test stops after 10 seconds.",
                 "category": "calibration",
-                "args": ["--system_mode", "camera1", "--check_ball_location"],
+                "args": ["--system_mode", "camera1_ball_location"],
                 "requires_sudo": False,
                 "timeout": 10,
             },
             "camera2_ball_location": {
                 "name": "Camera 2 Ball Location",
                 "description": "Check ball location for Camera 2",
+                "before": "Place a ball on the tee and stop PiTrac.",
+                "success": "Shows what the camera found before the test stops after 10 seconds.",
                 "category": "calibration",
-                "args": ["--system_mode", "camera2", "--check_ball_location"],
+                "args": ["--system_mode", "camera2_ball_location"],
                 "requires_sudo": False,
                 "timeout": 10,
             },
             "test_images": {
                 "name": "Test with Sample Images",
                 "description": "Run detection on test images",
+                "before": "Uses the sample images installed with PiTrac.",
+                "success": "Shows the detection log and timing in the output.",
                 "category": "testing",
                 "args": ["--system_mode", "test"],
                 "requires_sudo": True,
@@ -90,18 +110,12 @@ class TestingToolsManager:
             "automated_testing": {
                 "name": "Automated Test Suite",
                 "description": "Run full automated testing suite",
+                "before": "Uses the sample test suite installed with PiTrac. Takes up to 2 minutes.",
+                "success": "Prints how each sample shot compares with the expected results.",
                 "category": "testing",
                 "args": ["--system_mode", "automated_testing"],
                 "requires_sudo": False,
                 "timeout": 120,
-            },
-            "test_gspro_server": {
-                "name": "Test GSPro Server",
-                "description": "Test GSPro server connectivity",
-                "category": "connectivity",
-                "args": ["--system_mode", "test_gspro_server"],
-                "requires_sudo": False,
-                "timeout": 30,
             },
         }
 
@@ -117,6 +131,8 @@ class TestingToolsManager:
                     "id": tool_id,
                     "name": tool_info["name"],
                     "description": tool_info["description"],
+                    "before": tool_info["before"],
+                    "success": tool_info["success"],
                     "requires_sudo": tool_info["requires_sudo"],
                 }
             )
@@ -134,80 +150,54 @@ class TestingToolsManager:
         if tool_id not in self.tools:
             return {"status": "error", "message": f"Unknown tool: {tool_id}"}
 
-        if tool_id in self.running_processes:
-            return {"status": "error", "message": f"Tool {tool_id} is already running"}
+        # One tool at a time: they share config_manager.transient_overrides
+        running = next(iter(self.running_processes), None)
+        if running:
+            return {"status": "error", "message": f"{self.tools[running]['name']} is already running"}
+        # Reserved with no await since the check, so a run arriving during the spawn sees it
+        self.running_processes[tool_id] = None
+        self.started_at[tool_id] = time.time()
 
         tool_info = self.tools[tool_id]
 
         try:
-            config_path = self.config_manager.generate_golf_sim_config()
+            testing: Dict[str, str] = {}
 
-            # For image test tool, update config with uploaded image
             if tool_info.get("uses_uploaded_image"):
                 test_images = list(self.test_images_dir.glob("*"))
                 if not test_images:
-                    return {"status": "error", "message": "No test images found. Please upload an image first."}
+                    return {"status": "error", "message": "No test images found. Upload an image first."}
 
-                # Use the most recent image
                 latest_image = max(test_images, key=lambda p: p.stat().st_mtime)
                 logger.info(f"Using test image: {latest_image}")
 
-                # Modify the generated config to add test image path
-                import json
+                testing["kBaseTestImageDir"] = str(self.test_images_dir) + "/"
+                testing["kTwoImageTestTeedBallImage"] = latest_image.name
+                testing["kTwoImageTestStrobedBallImage"] = latest_image.name
+                testing["kTwoImageTestPreImage"] = ""
 
-                with open(config_path, "r") as f:
-                    config_json = json.load(f)
-
-                # Add test configuration section for SystemMode::kTest
-                if "gs_config" not in config_json:
-                    config_json["gs_config"] = {}
-                if "testing" not in config_json["gs_config"]:
-                    config_json["gs_config"]["testing"] = {}
-
-                image_filename = latest_image.name
-
-                # Set the base directory to where our test images are
-                config_json["gs_config"]["testing"]["kBaseTestImageDir"] = str(self.test_images_dir) + "/"
-                config_json["gs_config"]["testing"]["kTwoImageTestTeedBallImage"] = image_filename
-                config_json["gs_config"]["testing"]["kTwoImageTestStrobedBallImage"] = image_filename
-                config_json["gs_config"]["testing"]["kTwoImageTestPreImage"] = ""  # Optional
-
-                with open(config_path, "w") as f:
-                    json.dump(config_json, f, indent=2)
-
-            # For sample image test or automated testing, set up test suite paths
             if tool_id in ("test_images", "automated_testing"):
-                import json
-
                 test_suite_dir = Path("/usr/share/pitrac/test-suites/TestSuite_2025_02_07")
-                with open(config_path, "r") as f:
-                    config_json = json.load(f)
-
-                if "gs_config" not in config_json:
-                    config_json["gs_config"] = {}
-                if "testing" not in config_json["gs_config"]:
-                    config_json["gs_config"]["testing"] = {}
 
                 if tool_id == "test_images" and test_suite_dir.exists():
-                    # Use a matched pair from the test suite (Shot 1)
                     teed_files = sorted(test_suite_dir.glob("*log_ball_final_found_ball_img_Shot_1_*"))
                     strobed_files = sorted(test_suite_dir.glob("*log_cam2_last_strobed_img_Shot_1_*"))
                     if teed_files and strobed_files:
-                        config_json["gs_config"]["testing"]["kBaseTestImageDir"] = str(test_suite_dir) + "/"
-                        config_json["gs_config"]["testing"]["kTwoImageTestTeedBallImage"] = teed_files[0].name
-                        config_json["gs_config"]["testing"]["kTwoImageTestStrobedBallImage"] = strobed_files[0].name
+                        testing["kBaseTestImageDir"] = str(test_suite_dir) + "/"
+                        testing["kTwoImageTestTeedBallImage"] = teed_files[0].name
+                        testing["kTwoImageTestStrobedBallImage"] = strobed_files[0].name
 
                 if tool_id == "automated_testing":
-                    config_json["gs_config"]["testing"]["kAutomatedTestSuiteDirectory"] = str(test_suite_dir) + "/"
-                    config_json["gs_config"]["testing"]["kAutomatedTestExpectedResultsCSV"] = "Uneekor Comparison 2025-02-07_Small_Test.csv"
+                    testing["kAutomatedTestSuiteDirectory"] = str(test_suite_dir) + "/"
+                    testing["kAutomatedTestExpectedResultsCSV"] = "Uneekor Comparison 2025-02-07_Small_Test.csv"
 
-                with open(config_path, "w") as f:
-                    json.dump(config_json, f, indent=2)
+            # Trace keeps the info-level lines _parse_timing_output reads, whatever the UI level is
+            self.config_manager.transient_overrides = {"gs_config": {"testing": testing}, "logging": {"level": "trace"}}
 
             cmd = [self.pitrac_binary]
 
             cmd.extend(tool_info["args"])
-            cmd.append(f"--config_file={config_path}")
+            cmd.append(f"--web_server_port={SERVER_PORT}")
 
             config = self.config_manager.get_config()
 
@@ -222,29 +212,11 @@ class TestingToolsManager:
             base_image_dir = str(Path.home() / "LM_Shares/Images")
             cmd.append(f"--base_image_logging_dir={base_image_dir}")
 
-            cmd.append("--logging_level=trace")
-
             env = os.environ.copy()
             env["LD_LIBRARY_PATH"] = "/usr/lib/pitrac"
             env["PITRAC_ROOT"] = "/usr/lib/pitrac"
-            env["PITRAC_BASE_IMAGE_LOGGING_DIR"] = base_image_dir
-            env["PITRAC_WEBSERVER_SHARE_DIR"] = str(Path.home() / "LM_Shares/WebShare")
             env["DISPLAY"] = ":0.0"
             env["OMP_WAIT_POLICY"] = "PASSIVE"
-
-            merged_config = self.config_manager.get_config()
-            for param in self.config_manager.get_environment_parameters():
-                key = param["key"]
-                env_var = param["envVariable"]
-                value = merged_config
-                for part in key.split("."):
-                    if isinstance(value, dict):
-                        value = value.get(part)
-                    else:
-                        value = None
-                        break
-                if value is not None and value != "":
-                    env[env_var] = str(value)
 
             if tool_info["requires_sudo"]:
                 cmd = ["sudo", "-E"] + cmd
@@ -259,70 +231,66 @@ class TestingToolsManager:
 
             start_time = time.time()
 
+            # Shielded so a timeout still collects what the binary printed before it was stopped
+            communicate = asyncio.ensure_future(process.communicate())
+            timed_out = False
             try:
-                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=tool_info["timeout"])
+                stdout, stderr = await asyncio.wait_for(asyncio.shield(communicate), timeout=tool_info["timeout"])
+            except asyncio.TimeoutError:
+                timed_out = True
+                process.terminate()
+                stdout, stderr = await communicate
 
-                output = stdout.decode() if stdout else ""
-                error = stderr.decode() if stderr else ""
+            output = stdout.decode() if stdout else ""
+            error = stderr.decode() if stderr else ""
 
-                log_content = await self._find_and_read_test_log(start_time)
-                if log_content:
-                    if output:
-                        output += "\n\n=== Test Log ===\n"
-                    output += log_content
+            log_content = await self._find_and_read_test_log(start_time)
+            if log_content:
+                if output:
+                    output += "\n\n=== Test Log ===\n"
+                output += log_content
 
-                result = {
-                    "status": "success" if process.returncode == 0 else "failed",
+            if timed_out and tool_info.get("continuous_test", False):
+                return {
+                    "status": "success",
+                    "output": log_content or "Test completed but no log file found",
+                    "message": f"Test ran for {tool_info['timeout']} seconds",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            if timed_out:
+                return {
+                    "status": "timeout",
+                    "message": f"{tool_info['name']} timed out after {tool_info['timeout']} seconds",
                     "output": output,
                     "error": error,
-                    "return_code": process.returncode,
                     "timestamp": datetime.now().isoformat(),
                 }
 
-                if "still" in tool_id:
-                    if "cam1" in tool_id:
-                        image_path = Path.home() / "LM_Shares/Images/cam1_still_picture.png"
-                    else:
-                        image_path = Path.home() / "LM_Shares/Images/cam2_still_picture.png"
+            result = {
+                "status": "stopped" if tool_id in self.stopping
+                else "success" if process.returncode == 0 else "failed",
+                "output": output,
+                "error": error,
+                "return_code": process.returncode,
+                "timestamp": datetime.now().isoformat(),
+            }
 
-                    if image_path.exists():
-                        result["image_path"] = str(image_path)
-                        result["image_url"] = f"/api/images/{image_path.name}"
+            if image_name := tool_info.get("output_image"):
+                image_path = Path.home() / "LM_Shares/Images" / image_name
+                if image_path.exists():
+                    result["image_path"] = str(image_path)
+                    result["image_url"] = f"/api/images/{image_path.name}"
 
-                return result
-
-            except asyncio.TimeoutError:
-                process.terminate()
-                await process.wait()
-
-                if tool_info.get("continuous_test", False):
-                    log_content = await self._find_and_read_test_log(start_time)
-                    if log_content:
-                        return {
-                            "status": "success",
-                            "output": log_content,
-                            "message": f"Test ran for {tool_info['timeout']} seconds",
-                            "timestamp": datetime.now().isoformat(),
-                        }
-                    else:
-                        return {
-                            "status": "success",
-                            "output": "Test completed but no log file found",
-                            "message": f"Test ran for {tool_info['timeout']} seconds",
-                            "timestamp": datetime.now().isoformat(),
-                        }
-                else:
-                    return {
-                        "status": "timeout",
-                        "message": f"Tool {tool_id} timed out after {tool_info['timeout']} seconds",
-                    }
-            finally:
-                if tool_id in self.running_processes:
-                    del self.running_processes[tool_id]
+            return result
 
         except Exception as e:
             logger.error(f"Error running tool {tool_id}: {e}")
             return {"status": "error", "message": str(e)}
+        finally:
+            self.running_processes.pop(tool_id, None)
+            self.started_at.pop(tool_id, None)
+            self.stopping.discard(tool_id)
+            self.config_manager.transient_overrides = {}
 
     async def stop_tool(self, tool_id: str) -> Dict[str, Any]:
         """Stop a running tool
@@ -333,11 +301,15 @@ class TestingToolsManager:
         Returns:
             Dict with status
         """
+        name = self.tools.get(tool_id, {}).get("name", tool_id)
         if tool_id not in self.running_processes:
-            return {"status": "error", "message": f"Tool {tool_id} is not running"}
+            return {"status": "error", "message": f"{name} is not running"}
+        process = self.running_processes[tool_id]
+        if process is None:
+            return {"status": "error", "message": f"{name} is still starting"}
 
         try:
-            process = self.running_processes[tool_id]
+            self.stopping.add(tool_id)
             process.terminate()
 
             try:
@@ -346,8 +318,7 @@ class TestingToolsManager:
                 process.kill()
                 await process.wait()
 
-            del self.running_processes[tool_id]
-
+            # run_tool's finally releases the slot and the overrides once its cleanup is done
             return {"status": "success", "message": f"Tool {tool_id} stopped"}
 
         except Exception as e:

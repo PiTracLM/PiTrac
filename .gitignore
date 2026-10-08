@@ -104,3 +104,4 @@ packaging/pitrac
 
 # Node.js (root-level tooling)
 node_modules/
+!Software/web-server/static/vendor/
