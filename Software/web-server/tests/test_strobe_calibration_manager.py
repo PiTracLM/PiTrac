@@ -49,7 +49,7 @@ class TestOpenHardware:
     """_open_hardware sets up SPI and GPIO"""
 
     @patch("strobe_calibration_manager.spidev")
-    @patch("strobe_calibration_manager.DigitalOutputDevice")
+    @patch("strobe_calibration_manager.Rp1GpioPin")
     def test_open_creates_spi_and_gpio(self, mock_led_cls, mock_spidev_mod):
         from strobe_calibration_manager import StrobeCalibrationManager
 
@@ -80,6 +80,39 @@ class TestOpenHardware:
         mgr = StrobeCalibrationManager(Mock())
         with pytest.raises(RuntimeError, match="spidev"):
             mgr._open_hardware()
+
+
+class TestRp1GpioPin:
+    """Register writes against a file standing in for /dev/gpiomem0"""
+
+    def test_borrows_pin_and_restores_it(self, tmp_path, monkeypatch):
+        import struct
+        from strobe_calibration_manager import Rp1GpioPin
+
+        ctrl, pad, bit = 10 * 8 + 4, Rp1GpioPin.PADS + 4 + 10 * 4, 1 << 10
+        spi_ctrl, spi_pad = 0x00, Rp1GpioPin.PAD_OD | 0x16
+        mem = bytearray(Rp1GpioPin.MAP_SIZE)
+        struct.pack_into("<I", mem, ctrl, spi_ctrl)
+        struct.pack_into("<I", mem, pad, spi_pad)
+        dev = tmp_path / "gpiomem0"
+        dev.write_bytes(mem)
+        monkeypatch.setattr(Rp1GpioPin, "DEVICE", str(dev))
+
+        def reg(offset):
+            return struct.unpack_from("<I", dev.read_bytes(), offset)[0]
+
+        pin = Rp1GpioPin(10)
+        assert reg(ctrl) & Rp1GpioPin.FSEL_MASK == Rp1GpioPin.FSEL_SYS_RIO
+        assert reg(pad) & (Rp1GpioPin.PAD_OD | Rp1GpioPin.PAD_IE) == Rp1GpioPin.PAD_IE
+        assert reg(Rp1GpioPin.RIO_OE + Rp1GpioPin.SET) == bit
+        assert reg(Rp1GpioPin.RIO_OUT + Rp1GpioPin.CLR) == bit
+
+        pin.on()
+        assert reg(Rp1GpioPin.RIO_OUT + Rp1GpioPin.SET) == bit
+
+        pin.close()
+        assert reg(ctrl) == spi_ctrl
+        assert reg(pad) == spi_pad
 
 
 class TestCloseHardware:

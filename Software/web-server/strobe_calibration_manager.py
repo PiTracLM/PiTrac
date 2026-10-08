@@ -5,10 +5,11 @@ LED current on the V3 Connector Board.
 """
 
 import asyncio
+import ctypes
 import gc
 import logging
+import mmap
 import os
-import subprocess
 import time
 from typing import Any, Dict, Optional
 
@@ -19,11 +20,60 @@ try:
 except ImportError:
     spidev = None
 
-try:
-    os.environ.setdefault('LG_WD', '/tmp')
-    from gpiozero import DigitalOutputDevice
-except ImportError:
-    DigitalOutputDevice = None
+
+class Rp1GpioPin:
+    """Drives an RP1 bank 0 GPIO through /dev/gpiomem0, as pinctrl does.
+
+    Strict RP1 pinmux kernels refuse a GPIO line request on GPIO10 while SPI0
+    owns it, so the function select is switched in the registers and restored
+    on close().
+    """
+
+    DEVICE = "/dev/gpiomem0"
+    MAP_SIZE = 0x30000
+    RIO_OUT = 0x10000
+    RIO_OE = 0x10004
+    SET = 0x2000
+    CLR = 0x3000
+    PADS = 0x20000
+    FSEL_MASK = 0x1F
+    FSEL_SYS_RIO = 5
+    PAD_IE = 1 << 6
+    PAD_OD = 1 << 7
+
+    def __init__(self, gpio: int):
+        self._bit = 1 << gpio
+        self._ctrl = (gpio * 2 + 1) * 4
+        self._pad = self.PADS + 4 + gpio * 4
+        with open(self.DEVICE, "r+b", buffering=0) as f:
+            self._mem = mmap.mmap(f.fileno(), self.MAP_SIZE)
+        self._regs = (ctypes.c_uint32 * (self.MAP_SIZE // 4)).from_buffer(self._mem)
+        self._saved_ctrl = self._read(self._ctrl)
+        self._saved_pad = self._read(self._pad)
+
+        self.off()
+        self._write(self.RIO_OE + self.SET, self._bit)
+        self._write(self._ctrl, (self._saved_ctrl & ~self.FSEL_MASK) | self.FSEL_SYS_RIO)
+        self._write(self._pad, (self._saved_pad | self.PAD_IE) & ~self.PAD_OD)
+
+    def _read(self, offset: int) -> int:
+        return self._regs[offset // 4]
+
+    def _write(self, offset: int, value: int):
+        self._regs[offset // 4] = value
+
+    def on(self):
+        self._write(self.RIO_OUT + self.SET, self._bit)
+
+    def off(self):
+        self._write(self.RIO_OUT + self.CLR, self._bit)
+
+    def close(self):
+        self.off()
+        self._write(self._ctrl, self._saved_ctrl)
+        self._write(self._pad, self._saved_pad)
+        del self._regs
+        self._mem.close()
 
 
 class StrobeCalibrationManager:
@@ -90,10 +140,6 @@ class StrobeCalibrationManager:
     def _open_hardware(self):
         if spidev is None:
             raise RuntimeError("spidev library not available -- not running on a Raspberry Pi?")
-        if DigitalOutputDevice is None:
-            raise RuntimeError("gpiozero library not available -- not running on a Raspberry Pi?")
-
-        saved_cwd = os.getcwd()
 
         self._spi_dac = spidev.SpiDev()
         self._spi_dac.open(self.SPI_BUS, self.SPI_DAC_DEVICE)
@@ -105,9 +151,7 @@ class StrobeCalibrationManager:
         self._spi_adc.max_speed_hz = self.SPI_MAX_SPEED_HZ
         self._spi_adc.mode = 0
 
-        self._diag_pin = DigitalOutputDevice(self.DIAG_GPIO_PIN)
-
-        os.chdir(saved_cwd)
+        self._diag_pin = Rp1GpioPin(self.DIAG_GPIO_PIN)
 
     def _close_hardware(self):
         for name, resource in [("diag", self._diag_pin),
@@ -126,19 +170,6 @@ class StrobeCalibrationManager:
         self._diag_pin = None
         self._spi_dac = None
         self._spi_adc = None
-
-        # gpiozero leaves GPIO10 in GPIO mode after close(); restore SPI0 MOSI.
-        try:
-            result = subprocess.run(
-                ["pinctrl", "set", str(self.DIAG_GPIO_PIN), "a0"],
-                capture_output=True, text=True, timeout=5,
-            )
-            if result.returncode != 0:
-                logger.warning("pinctrl restore SPI0 MOSI: %s", result.stderr.strip())
-        except FileNotFoundError:
-            logger.warning("pinctrl not found — reboot required to restore SPI0")
-        except Exception:
-            logger.warning("Failed to restore SPI0 MOSI", exc_info=True)
 
     # ------------------------------------------------------------------
     # DAC / ADC primitives
