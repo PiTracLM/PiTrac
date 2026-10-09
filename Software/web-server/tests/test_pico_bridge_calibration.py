@@ -15,7 +15,7 @@ class TestPicoModeOpenHardware:
 
     @patch("strobe_calibration_manager.serial")
     @patch("strobe_calibration_manager.spidev")
-    @patch("strobe_calibration_manager.DigitalOutputDevice")
+    @patch("strobe_calibration_manager.Rp1GpioPin")
     def test_pico_enabled_required_opens_serial(self, mock_led_cls, mock_spidev_mod, mock_serial_mod, monkeypatch):
         from strobe_calibration_manager import StrobeCalibrationManager
 
@@ -40,7 +40,7 @@ class TestPicoModeOpenHardware:
 
     @patch("strobe_calibration_manager.serial")
     @patch("strobe_calibration_manager.spidev")
-    @patch("strobe_calibration_manager.DigitalOutputDevice")
+    @patch("strobe_calibration_manager.Rp1GpioPin")
     def test_pico_enabled_false_uses_legacy(self, mock_led_cls, mock_spidev_mod, mock_serial_mod, monkeypatch):
         from strobe_calibration_manager import StrobeCalibrationManager
 
@@ -52,14 +52,14 @@ class TestPicoModeOpenHardware:
         mgr = StrobeCalibrationManager(cm)
         mgr._open_hardware()
 
-        # Legacy: DigitalOutputDevice(10) is what gets used.
+        # Legacy: Rp1GpioPin(10) is what gets used.
         mock_led_cls.assert_called_once_with(10)
         mock_serial_mod.Serial.assert_not_called()
         assert mgr._serial is None
 
     @patch("strobe_calibration_manager.serial")
     @patch("strobe_calibration_manager.spidev")
-    @patch("strobe_calibration_manager.DigitalOutputDevice")
+    @patch("strobe_calibration_manager.Rp1GpioPin")
     def test_pico_device_env_var_overrides_default_path(self, mock_led_cls, mock_spidev_mod, mock_serial_mod, monkeypatch):
         from strobe_calibration_manager import StrobeCalibrationManager
 
@@ -82,7 +82,7 @@ class TestPicoConfigManagerWiring:
 
     @patch("strobe_calibration_manager.serial")
     @patch("strobe_calibration_manager.spidev")
-    @patch("strobe_calibration_manager.DigitalOutputDevice")
+    @patch("strobe_calibration_manager.Rp1GpioPin")
     def test_config_manager_false_overrides_env_var_true(
         self, mock_led_cls, mock_spidev_mod, mock_serial_mod, monkeypatch
     ):
@@ -105,7 +105,7 @@ class TestPicoConfigManagerWiring:
 
     @patch("strobe_calibration_manager.serial")
     @patch("strobe_calibration_manager.spidev")
-    @patch("strobe_calibration_manager.DigitalOutputDevice")
+    @patch("strobe_calibration_manager.Rp1GpioPin")
     def test_config_manager_device_override_used(
         self, mock_led_cls, mock_spidev_mod, mock_serial_mod, monkeypatch
     ):
@@ -134,7 +134,7 @@ class TestPicoModeGetLedCurrent:
 
     @patch("strobe_calibration_manager.serial")
     @patch("strobe_calibration_manager.spidev")
-    @patch("strobe_calibration_manager.DigitalOutputDevice")
+    @patch("strobe_calibration_manager.Rp1GpioPin")
     def test_pico_mode_uses_fire_peak(self, mock_led_cls, mock_spidev_mod, mock_serial_mod, monkeypatch):
         from strobe_calibration_manager import StrobeCalibrationManager
 
@@ -174,7 +174,7 @@ class TestPicoModeGetLedCurrent:
 
     @patch("strobe_calibration_manager.serial")
     @patch("strobe_calibration_manager.spidev")
-    @patch("strobe_calibration_manager.DigitalOutputDevice")
+    @patch("strobe_calibration_manager.Rp1GpioPin")
     def test_legacy_mode_uses_diag_pin(self, mock_led_cls, mock_spidev_mod, mock_serial_mod, monkeypatch):
         from strobe_calibration_manager import StrobeCalibrationManager
 
@@ -203,7 +203,7 @@ class TestLmRunningGate:
 
     @patch("strobe_calibration_manager.serial")
     @patch("strobe_calibration_manager.spidev")
-    @patch("strobe_calibration_manager.DigitalOutputDevice")
+    @patch("strobe_calibration_manager.Rp1GpioPin")
     def test_open_hardware_refuses_when_lm_running(
         self, mock_led_cls, mock_spidev_mod, mock_serial_mod, monkeypatch
     ):
@@ -225,7 +225,7 @@ class TestLmRunningGate:
 
     @patch("strobe_calibration_manager.serial")
     @patch("strobe_calibration_manager.spidev")
-    @patch("strobe_calibration_manager.DigitalOutputDevice")
+    @patch("strobe_calibration_manager.Rp1GpioPin")
     def test_open_hardware_proceeds_when_lm_not_running(
         self, mock_led_cls, mock_spidev_mod, mock_serial_mod, monkeypatch
     ):

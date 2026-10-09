@@ -392,25 +392,28 @@ class TestPiTracProcessManagerIntegration:
 
 
 class TestPicoEnvExport:
-    """gs_config.pico.enabled has to reach pitrac_lm as the PITRAC_PICO_ENABLED
-    env var so the C++ side knows whether to use the Pico (auto/required/legacy).
-    That happens generically: start() exports every setting marked
-    passedVia=environment. This guards the config wiring that makes it work."""
+    """pitrac_lm reads its Pico settings from the environment, so start() has to
+    export them from the config."""
 
-    def _settings(self):
-        import json
-        from pathlib import Path
+    @pytest.mark.asyncio
+    async def test_start_exports_pico_settings(self):
+        config_manager = Mock()
+        config_manager.load_configurations_metadata.return_value = {"settings": {}}
+        config_manager.get_config.return_value = {
+            "gs_config": {"pico": {"enabled": "required", "device": "/dev/ttyACM1", "mic_threshold": 4477000}}
+        }
+        with patch("pitrac_manager.Path.mkdir"):
+            manager = PiTracProcessManager(config_manager=config_manager)
 
-        path = Path(__file__).resolve().parent.parent / "configurations.json"
-        with open(path) as f:
-            return json.load(f)["settings"]
+        process = Mock(pid=12345)
+        process.poll.return_value = None
+        with patch("subprocess.Popen", return_value=process) as popen, patch("builtins.open", mock_open()):
+            with patch("pitrac_manager.Path.exists", return_value=True), patch("pitrac_manager.Path.mkdir"):
+                with patch("pitrac_manager.Path.unlink"), patch.object(manager, "is_running", return_value=False):
+                    await manager.start()
 
-    def test_pico_enabled_is_exported_to_environment(self):
-        entry = self._settings()["gs_config.pico.enabled"]
-        assert entry["passedVia"] == "environment"
-        assert entry["envVariable"] == "PITRAC_PICO_ENABLED"
-
-    def test_pico_device_is_exported_to_environment(self):
-        entry = self._settings()["gs_config.pico.device"]
-        assert entry["passedVia"] == "environment"
-        assert entry["envVariable"] == "PITRAC_PICO_DEVICE"
+        env = popen.call_args.kwargs["env"]
+        assert env["PITRAC_PICO_ENABLED"] == "required"
+        assert env["PITRAC_PICO_DEVICE"] == "/dev/ttyACM1"
+        assert env["PITRAC_PICO_MIC_THRESHOLD"] == "4477000"
+        assert "PITRAC_PICO_CAM_XTR_SETUP_US" not in env

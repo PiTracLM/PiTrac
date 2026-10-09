@@ -41,7 +41,9 @@ module.exports = [
                 CustomEvent: 'readonly',
                 getComputedStyle: 'readonly',
                 Node: 'readonly',
-                FileReader: 'readonly'
+                FileReader: 'readonly',
+                EventSource: 'readonly',
+                TextDecoder: 'readonly'
             }
         },
         rules: {

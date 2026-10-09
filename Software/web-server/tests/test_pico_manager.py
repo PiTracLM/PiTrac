@@ -555,7 +555,7 @@ class TestSharedLock:
 
     @patch("strobe_calibration_manager.serial")
     @patch("strobe_calibration_manager.spidev")
-    @patch("strobe_calibration_manager.DigitalOutputDevice")
+    @patch("strobe_calibration_manager.Rp1GpioPin")
     @patch("pico_manager.serial")
     def test_both_managers_share_one_serial_owner(
         self, mock_pico_serial, mock_led_cls, mock_spidev_mod, mock_strobe_serial, monkeypatch

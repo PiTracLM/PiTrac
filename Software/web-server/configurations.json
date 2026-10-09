@@ -276,9 +276,7 @@
         "legacy": "Legacy SPI only (Pico ignored)"
       },
       "default": "auto",
-      "requiresRestart": true,
-      "passedVia": "environment",
-      "envVariable": "PITRAC_PICO_ENABLED"
+      "requiresRestart": true
     },
     "gs_config.pico.device": {
       "category": "System",
@@ -288,9 +286,7 @@
       "description": "Path to the Pico's USB-CDC serial device. Change only if your Pi enumerates the Pico as a different ACM index.",
       "type": "string",
       "default": "/dev/ttyACM0",
-      "requiresRestart": true,
-      "passedVia": "environment",
-      "envVariable": "PITRAC_PICO_DEVICE"
+      "requiresRestart": true
     },
     "gs_config.pico.last_uf2_path": {
       "category": "System",
@@ -324,9 +320,7 @@
       "type": "number",
       "min": 0,
       "max": 1000000000,
-      "default": 2500000,
-      "passedVia": "environment",
-      "envVariable": "PITRAC_PICO_MIC_THRESHOLD_PUTT"
+      "default": 2500000
     },
     "gs_config.pico.cam_xtr_setup_us": {
       "category": "System",
@@ -336,9 +330,7 @@
       "type": "number",
       "min": 100,
       "max": 5000,
-      "default": 1000,
-      "passedVia": "environment",
-      "envVariable": "PITRAC_PICO_CAM_XTR_SETUP_US"
+      "default": 1000
     },
     "gs_config.strobing.kDAC_setting": {
       "category": "Strobing",
@@ -2962,17 +2954,6 @@
       "min": -100,
       "max": 100,
       "default": 0,
-      "requiresRestart": true
-    },
-    "gs_config.strobing.kDynamicFollowOnPulseVectorPutter": {
-      "category": "Strobing",
-      "subcategory": "advanced",
-      "displayName": "Dynamic Follow-On Pulse Vector Putter",
-      "description": "Dynamic follow-on pulse timing for putting",
-      "type": "array",
-      "default": [
-        444.0
-      ],
       "requiresRestart": true
     },
     "gs_config.calibration.kNumberPicturesForFocalLengthAverage": {
