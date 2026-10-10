@@ -978,7 +978,30 @@ bool SetLibcameraTuningFileEnvVariable(const GolfSimCamera& camera) {
 
     std::string tuning_file;
 
-    if (camera.camera_hardware_.camera_is_mono()) {
+    const CameraHardware::CameraModel camera_model = camera.camera_hardware_.camera_model_;
+
+    // LIBCAMERA_RPI_TUNING_FILE overrides the tuning of every camera in the process, and
+    // the Arducam module carries its own. With one attached, leave libcamera to pick per
+    // camera: it finds the IMX296 files (mono included) by itself.
+    if (GolfSimCamera::kSystemSlot1CameraType == CameraHardware::CameraModel::ArducamMira220_Mono ||
+        GolfSimCamera::kSystemSlot2CameraType == CameraHardware::CameraModel::ArducamMira220_Mono) {
+        unsetenv("LIBCAMERA_RPI_TUNING_FILE");
+        return true;
+    }
+
+    if (CameraHardware::is_mira220(camera_model)) {
+        if (pi_model != GolfSimConfiguration::PiModel::kRPi5) {
+            tuning_file = "/usr/share/libcamera/ipa/rpi/vc4/mira220.json";
+        }
+        else if (camera_model == CameraHardware::CameraModel::Mira220_Mono) {
+            // libcamera ships no mono tuning for the Mira220, so PiTrac carries its own
+            tuning_file = GolfSimConfiguration::safe_getenv("PITRAC_ROOT") + "/ImageProcessing/CameraTools/mira220_mono.json";
+        }
+        else {
+            tuning_file = "/usr/share/libcamera/ipa/rpi/pisp/mira220.json";
+        }
+    }
+    else if (camera.camera_hardware_.camera_is_mono()) {
         // If this is a mono camera, than we must use the "mono" tuning file, regardless of whether
         // the camera is camera 1 or camera 2
 
@@ -1486,7 +1509,7 @@ bool PerformCameraSystemStartup() {
     SetLibCameraLoggingOff();
 
     // Defensive reset in case a prior crashed run left the sensor in external trigger.
-    SetImx296TriggerModeViaI2C(0);
+    SetCam2TriggerMode(0);
 
     return true;
 }

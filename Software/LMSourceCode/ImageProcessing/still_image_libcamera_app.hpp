@@ -44,6 +44,6 @@ bool still_image_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg);
 bool ball_flight_camera_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg);
 
 // 0=free-running, 1=external trigger (XTRIG)
-void SetImx296TriggerModeViaI2C(int mode);
+void SetCam2TriggerMode(int mode);
 
 #endif // #ifdef __unix__  // Ignore in Windows environment

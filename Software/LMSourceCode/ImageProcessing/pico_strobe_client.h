@@ -22,6 +22,7 @@ struct PicoStatus {
     uint64_t    event_count = 0;
     std::vector<float> intervals;   // strobe pulse-gap vector echoed by firmware
     std::string fw_version;
+    bool        cam2_xtr_active_high = false;
 };
 
 class PicoStrobeClient {
@@ -80,6 +81,11 @@ public:
     // firmware clamps to [100, 10000]. Lower trims trigger latency; too low and the
     // strobe fires before the sensor is integrating.
     bool SetCamXtrSetup(uint32_t microseconds);
+
+    // Cam2 XTR polarity: false idles high and pulses low (IMX296), true idles low
+    // and pulses high (Mira220 REQ_EXP). Verified against the STATUS echo, so this
+    // returns false on firmware older than 0.8.6, which ignores the key.
+    bool SetCam2XtrActiveHigh(bool active_high);
 
     // Persist DSP detector config so a power-cycled Pico recovers operator tuning
     // instead of compiled defaults. Each STATUS-verifies the echo.

@@ -345,6 +345,15 @@ bool PicoStrobeClient::SetCamXtrSetup(uint32_t microseconds) {
     return impl_->WriteLine("CFG CAM_XTR_SETUP_US=" + std::to_string(microseconds));
 }
 
+bool PicoStrobeClient::SetCam2XtrActiveHigh(bool active_high) {
+    std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
+    if (!IsOpen()) return false;
+    if (!impl_->WriteLine(std::string("CFG CAM2_XTR_ACTIVE_HIGH=") + (active_high ? "1" : "0"))) return false;
+    PicoStatus st;
+    if (!ReadStatus(st)) return false;
+    return st.cam2_xtr_active_high == active_high;
+}
+
 bool PicoStrobeClient::Heartbeat() {
     std::lock_guard<std::recursive_mutex> lock(impl_->io_mutex);
     if (!IsOpen()) return false;
@@ -424,6 +433,8 @@ bool PicoStrobeClient::ReadStatus(PicoStatus& out) {
                 }
             } else if (key == "strobe_hold") {
                 out.strobe_hold = ParseBoolDigit(val);
+            } else if (key == "cam2_xtr_active_high") {
+                out.cam2_xtr_active_high = ParseBoolDigit(val);
             } else if (key == "fw") {
                 out.fw_version = val;
             }

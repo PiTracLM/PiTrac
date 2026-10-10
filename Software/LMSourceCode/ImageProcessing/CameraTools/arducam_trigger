@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Switch an Arducam Pivariety camera between free-running and external trigger.
+#   arducam_trigger <0|1>
+#   0  free-running
+#   1  external trigger: one frame per pulse on the module's REQ EXP pad
+# The setting is a V4L2 control on the sensor subdevice and stays set until it
+# is changed or the Pi reboots. Needs v4l-utils.
+set -euo pipefail
+
+mode=$1
+
+# The subdevice number depends on how many cameras are attached, so find it by name.
+for name_file in /sys/class/video4linux/v4l-subdev*/name; do
+    if [[ $(<"$name_file") == arducam-pivariety* ]]; then
+        subdev=/dev/$(basename "$(dirname "$name_file")")
+        exec v4l2-ctl -d "$subdev" -c "trigger_mode=$mode"
+    fi
+done
+
+echo "arducam_trigger: no arducam-pivariety subdevice found" >&2
+exit 1

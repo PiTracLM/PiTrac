@@ -47,18 +47,37 @@ using namespace std::placeholders;
 using libcamera::Stream;
 namespace gs = golf_sim;
 
-void SetImx296TriggerModeViaI2C(int mode) {
+// 0 = free-running, 1 = external trigger.
+void SetCam2TriggerMode(int mode) {
 	if (mode != 0 && mode != 1) {
 		GS_LOG_MSG(error, "Invalid trigger mode: " + std::to_string(mode) + " (must be 0 or 1)");
 		return;
 	}
-	const std::string cmd = "$PITRAC_ROOT/ImageProcessing/CameraTools/imx296_trigger 4 " + std::to_string(mode);
+	const gs::CameraHardware::CameraModel camera_model = gs::GolfSimCamera::kSystemSlot2CameraType;
+	std::string tool;
+	if (camera_model == gs::CameraHardware::CameraModel::ArducamMira220_Mono) {
+		// A V4L2 control that stays set across stream starts, so it is always written.
+		tool = "arducam_trigger " + std::to_string(mode);
+	}
+	else if (gs::CameraHardware::is_mira220(camera_model)) {
+		if (mode == 0) {
+			// The mira220 driver puts the sensor back in master mode on every stream start,
+			// and the sensor is powered down (no I2C) whenever the stream is stopped.
+			return;
+		}
+		tool = "mira220_trigger 4 " + std::to_string(mode);
+	}
+	else {
+		// cam2 is on I2C bus 4
+		tool = "imx296_trigger 4 " + std::to_string(mode);
+	}
+	const std::string cmd = "$PITRAC_ROOT/ImageProcessing/CameraTools/" + tool;
 	int rc = system(cmd.c_str());
 	if (rc != 0) {
-		GS_LOG_MSG(warning, "imx296_trigger 4 " + std::to_string(mode) + " failed (rc=" + std::to_string(rc) + ")");
+		GS_LOG_MSG(warning, tool + " failed (rc=" + std::to_string(rc) + ")");
 		return;
 	}
-	GS_LOG_TRACE_MSG(trace, "Set IMX296 trigger mode via I2C: " + std::to_string(mode));
+	GS_LOG_TRACE_MSG(trace, "Set cam2 trigger mode: " + tool);
 }
 
 enum FlightCameraState {
@@ -82,19 +101,10 @@ void SetExternalTrigger(bool& flag) {
 	const gs::CameraHardware::CameraModel  camera_model = gs::GolfSimCamera::kSystemSlot2CameraType;
 
 	// This will take a moment to complete, so the waiting time to deal with it is dealt with elsehwere in the code
-	if (!flag && camera_model == gs::CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+	if (!flag && gs::CameraHardware::needs_trigger_mode_setup(camera_model)) {
 
 		flag = true;
-
-		std::string trigger_mode_command = "$PITRAC_ROOT/ImageProcessing/CameraTools/imx296_trigger 4 1";
-
-		GS_LOG_TRACE_MSG(trace, "ball_flight_camera_event_loop - Camera 2 trigger_mode_command = " + trigger_mode_command);
-		int command_result = system(trigger_mode_command.c_str());
-
-		if (command_result != 0) {
-			GS_LOG_TRACE_MSG(trace, "system(trigger_mode_command) failed.");
-			return;
-		}
+		SetCam2TriggerMode(1);
 	}
 }
 
@@ -122,7 +132,7 @@ static void PicoFireWarmUpPulses(int pulses, long pulse_width_us) {
 bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_priming_pulses)
 {
 	struct TriggerModeResetGuard {
-		~TriggerModeResetGuard() { SetImx296TriggerModeViaI2C(0); }
+		~TriggerModeResetGuard() { SetCam2TriggerMode(0); }
 	} trigger_reset_guard;
 
 	gs::PulseStrobe::cam2_ready_for_final_trigger_.store(false);
@@ -154,7 +164,7 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	long kQuiesceTimeMs = (gs::PulseStrobe::kNumberPrimingPulses ) * (1000 / gs::PulseStrobe::kPrimingPulseFPS) + 10;
 
 	// If appropriate, add the time we allow to setup external trigginer for the InnoMaker cameras
-	if (camera_model == gs::CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+	if (gs::CameraHardware::needs_trigger_mode_setup(camera_model)) {
 		kQuiesceTimeMs += gs::PulseStrobe::kPauseToSetUpInnoMakerExternalTriggerMilliseconds;
 	}
 
@@ -320,8 +330,8 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 				// SetExternalTrigger on the first frame. Warm-up pulses are already firing
 				// (started before the loop). Ignore this frame.
 				pico_trigger_set = true;
-				if (camera_model == gs::CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
-					SetImx296TriggerModeViaI2C(1);
+				if (gs::CameraHardware::needs_trigger_mode_setup(camera_model)) {
+					SetCam2TriggerMode(1);
 				}
 				GS_LOG_TRACE_MSG(trace, "Pico: first frame -- trigger re-committed (main-style set-2).");
 				CompletedRequestPtr& first_discard = std::get<CompletedRequestPtr>(msg.payload);

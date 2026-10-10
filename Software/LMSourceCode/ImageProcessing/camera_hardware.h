@@ -36,8 +36,28 @@ namespace golf_sim {
             PiHQ = 3,
             PiGS = 4,
             InnoMakerIMX296GS_Mono = 5,
+            Mira220 = 6,
+            Mira220_Mono = 7,
+            ArducamMira220_Mono = 8,
             kCameraUnknown = 100
         };
+
+        // The Arducam Pivariety module is a Mira220 behind Arducam's own controller:
+        // same sensor geometry, different driver, tuning and trigger control.
+        static bool is_mira220(CameraModel model) {
+            return model == Mira220 || model == Mira220_Mono || model == ArducamMira220_Mono;
+        }
+
+        // These cameras are switched into external trigger mode by a CameraTools
+        // program once the stream is running.
+        static bool needs_trigger_mode_setup(CameraModel model) {
+            return model == InnoMakerIMX296GS_Mono || is_mira220(model);
+        }
+
+        // The Mira220 exposes while its trigger input is high; the IMX296 while it is low.
+        static bool trigger_is_active_high(CameraModel model) {
+            return is_mira220(model);
+        }
 
         enum LensType {
             Lens_6mm = 1,

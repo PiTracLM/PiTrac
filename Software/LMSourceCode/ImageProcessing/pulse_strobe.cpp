@@ -658,6 +658,15 @@ namespace golf_sim {
 					GS_LOG_MSG(warning, "ignoring malformed PITRAC_PICO_CAM_XTR_SETUP_US=" + std::string(xtr));
 				}
 			}
+
+			// Always pushed, so swapping the camera back also restores the IMX296 polarity
+			// on a Pico that was never power-cycled.
+			const bool xtr_active_high = CameraHardware::trigger_is_active_high(GolfSimCamera::kSystemSlot2CameraType);
+			if (!pico_client_->SetCam2XtrActiveHigh(xtr_active_high) && xtr_active_high) {
+				GS_LOG_MSG(error, "Pico did not accept the active-high camera 2 trigger setting. "
+					"The Mira220 needs Pico firmware 0.8.6 or newer; flash it from the Pico page.");
+				return false;
+			}
 		}
 
 		// Pre-compute the pulse sequences to save time at trigger
@@ -770,7 +779,7 @@ namespace golf_sim {
 			// after the first image post-start.
 			const CameraHardware::CameraModel  camera_model = GolfSimCamera::kSystemSlot2CameraType;
 
-			if (i == 0 && camera_model == CameraHardware::CameraModel::InnoMakerIMX296GS_Mono) {
+			if (i == 0 && CameraHardware::needs_trigger_mode_setup(camera_model)) {
 				GS_LOG_TRACE_MSG(trace, "Pausing for InnoMaker external trigger setup: " + std::to_string(kPauseToSetUpInnoMakerExternalTriggerMilliseconds) + " ms");
 				usleep(kPauseToSetUpInnoMakerExternalTriggerMilliseconds * 1000);
 			}

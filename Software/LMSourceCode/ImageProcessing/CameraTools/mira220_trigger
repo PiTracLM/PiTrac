@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Switch a streaming Mira220 between free-running and external trigger.
+# Same arguments as imx296_trigger: mira220_trigger <i2c bus> <0|1>
+#   0  master mode, the sensor times its own frames
+#   1  slave mode, single pin: exposure lasts while REQ_EXP is high and the
+#      falling edge starts readout
+# Register names are from the Mira220 datasheet (DS000642). Needs i2c-tools.
+set -euo pipefail
+
+bus=$1
+mode=$2
+addr=0x54
+
+write_reg() { i2ctransfer -f -y "$bus" "w3@$addr" "$1" "$2" "$3"; }
+
+# 0x1001: bit 6 EXT_EVENT_SEL (1 = REQ_FRAME starts readout), bit 0 EXT_EXP_PW_SEL
+# (1 = exposure length from EXP_TIME). The driver sets both; the other bits are kept.
+event_sel=$(i2ctransfer -f -y "$bus" "w2@$addr" 0x10 0x01 r1)
+
+write_reg 0x10 0x03 0x02 # IMAGER_STATE: stop at row boundary
+write_reg 0x10 0xf0 0x00 # IMAGER_RUN: stop
+sleep 0.04
+
+if [[ $mode == 1 ]]; then
+    write_reg 0x10 0x01 "$(printf '0x%02x' $((event_sel & ~0x41)))"
+    write_reg 0x10 0x03 0x08 # IMAGER_STATE: slave exposure control
+else
+    write_reg 0x10 0x01 "$(printf '0x%02x' $((event_sel | 0x41)))"
+    write_reg 0x10 0x03 0x10 # IMAGER_STATE: master exposure control
+fi
+write_reg 0x10 0xf0 0x01 # IMAGER_RUN: start

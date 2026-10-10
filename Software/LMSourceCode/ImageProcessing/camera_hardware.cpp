@@ -16,6 +16,7 @@
 // TBD
 #endif
 
+#include <cmath>
 #include <sstream>
 #include "gs_options.h"
 #include "gs_config.h"
@@ -88,6 +89,9 @@ namespace golf_sim {
             { "3", CameraModel::PiHQ },
             { "4", CameraModel::PiGS },
             { "5", CameraModel::InnoMakerIMX296GS_Mono },
+            { "6", CameraModel::Mira220 },
+            { "7", CameraModel::Mira220_Mono },
+            { "8", CameraModel::ArducamMira220_Mono },
             { "100", CameraModel::kCameraUnknown },
         };
         if (camera_table.count(model_enum_value_string) == 0)
@@ -133,7 +137,8 @@ namespace golf_sim {
 
 
     bool CameraHardware::camera_is_mono() const {
-        return (camera_model_ == CameraModel::InnoMakerIMX296GS_Mono);
+        return (camera_model_ == CameraModel::InnoMakerIMX296GS_Mono || camera_model_ == CameraModel::Mira220_Mono ||
+                camera_model_ == CameraModel::ArducamMira220_Mono);
     }
 
 
@@ -237,15 +242,30 @@ namespace golf_sim {
 
         // This section deals with the common characteristics of some of the cameras
         if (model == PiGS || 
-            model == InnoMakerIMX296GS_Mono) {
+            model == InnoMakerIMX296GS_Mono ||
+            is_mira220(model)) {
 
-        GS_LOG_TRACE_MSG(trace, "Initializing with a PiGS or InnoMakerIMX296GS_Mono camera." );
-            // Sensor pixel width is 3.45uM square?  No - 6.33mm diagonal.  It appears that
-            // the actual width is the full resolution (1456)  * 3.4uM = 4.95mm,
-            // Not simply the diagonal sensor width
+            const bool mira220 = is_mira220(model);
 
-            sensor_width_ = (float)5.077365371;   // 4.45;   // (1456.0 * 3.4) / 1000;   // = 4.95; //  In mm 6.3 / sqrt(2.0);  // TBD - Confirm math from diagonal measurement
-            sensor_height_ = (float)3.789078635;    // 4.45; //(1088.0 * 3.4) / 1000;   //  In mm 6.3 / sqrt(2.0);
+            if (mira220) {
+                GS_LOG_TRACE_MSG(trace, "Initializing with a Mira220 camera.");
+                // 1600 x 1400 active pixels at 2.79uM
+                sensor_width_ = 4.464f;
+                sensor_height_ = 3.906f;
+
+                // The lens defaults above were measured on the IMX296 (3.45uM pixels), and
+                // GetExpectedBallRadiusPixels scales them by resolution_x / 1456.
+                expected_ball_radius_pixels_at_40cm_ = (int)std::round(expected_ball_radius_pixels_at_40cm_ * (3.45 / 2.79) * (1456.0 / 1600.0));
+            }
+            else {
+                GS_LOG_TRACE_MSG(trace, "Initializing with a PiGS or InnoMakerIMX296GS_Mono camera." );
+                // Sensor pixel width is 3.45uM square?  No - 6.33mm diagonal.  It appears that
+                // the actual width is the full resolution (1456)  * 3.4uM = 4.95mm,
+                // Not simply the diagonal sensor width
+
+                sensor_width_ = (float)5.077365371;   // 4.45;   // (1456.0 * 3.4) / 1000;   // = 4.95; //  In mm 6.3 / sqrt(2.0);  // TBD - Confirm math from diagonal measurement
+                sensor_height_ = (float)3.789078635;    // 4.45; //(1088.0 * 3.4) / 1000;   //  In mm 6.3 / sqrt(2.0);
+            }
             
             if (resolution_x_override_ > 0 && resolution_y_override_ > 0) {
                 resolution_x_ = resolution_x_override_;
@@ -253,14 +273,14 @@ namespace golf_sim {
             }
             else {
                 //  Defaults
-                resolution_x_ = 1456;
-                resolution_y_ = 1088;
+                resolution_x_ = mira220 ? 1600 : 1456;
+                resolution_y_ = mira220 ? 1400 : 1088;
             }
 
             // For some reason, the effective resolution when taking video (and in particular, when cropping)
-            // appears to be less in the y direction than when taking a still image.
+            // appears to be less in the y direction on the IMX296 than when taking a still image.
             video_resolution_x_ = resolution_x_;
-            video_resolution_y_ = 1080;
+            video_resolution_y_ = mira220 ? resolution_y_ : 1080;
 
             GS_LOG_TRACE_MSG(trace, "Video resolution (x,y) is: " + std::to_string(video_resolution_x_) + "/" + std::to_string(video_resolution_y_) + ".");
 
