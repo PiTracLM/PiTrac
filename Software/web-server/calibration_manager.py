@@ -85,6 +85,8 @@ RPICAM_CAL_SHUTTER_US = 11000
 
 IMX296_TRIGGER_BINARY = "/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_trigger"
 IMX296_I2C_BUS = "4"
+ARDUCAM_TRIGGER_TOOL = "/usr/lib/pitrac/ImageProcessing/CameraTools/arducam_trigger"
+CAMERA_TYPE_ARDUCAM_MIRA220 = "8"
 
 
 def _distortion_requirements(pixel_coverage: float, tilted: int, good: int, size_bins: Dict[str, int]) -> Dict[str, Any]:
@@ -152,28 +154,27 @@ class CalibrationManager:
         self._free_running_refs = 0
         self._trigger_mode_lock = asyncio.Lock()
 
+    def _camera2_is_arducam(self) -> bool:
+        return str(self.config_manager.get_config("cameras.slot2.type")) == CAMERA_TYPE_ARDUCAM_MIRA220
+
     def _set_trigger_mode(self, mode: int) -> bool:
-        """Set IMX296 trigger mode (0=free-running, 1=external). Returns True on success."""
+        """Set Camera 2 trigger mode (0=free-running, 1=external). Returns True on success."""
         if mode not in (0, 1):
             logger.error(f"Invalid trigger_mode: {mode}")
             return False
+        if self._camera2_is_arducam():
+            cmd = [ARDUCAM_TRIGGER_TOOL, str(mode)]
+        else:
+            cmd = [IMX296_TRIGGER_BINARY, IMX296_I2C_BUS, str(mode)]
         try:
-            result = subprocess.run(
-                [IMX296_TRIGGER_BINARY, IMX296_I2C_BUS, str(mode)],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
-            logger.warning(f"Could not invoke imx296_trigger: {e}")
+            logger.warning(f"Could not invoke {cmd[0]}: {e}")
             return False
         if result.returncode != 0:
-            logger.warning(
-                f"imx296_trigger {IMX296_I2C_BUS} {mode} failed "
-                f"(rc={result.returncode}): {result.stderr.strip()}"
-            )
+            logger.warning(f"{' '.join(cmd)} failed (rc={result.returncode}): {result.stderr.strip()}")
             return False
-        logger.debug(f"Set IMX296 trigger_mode={mode} via I2C")
+        logger.debug(f"Set Camera 2 trigger_mode={mode}")
         return True
 
     async def request_free_running(self, camera_index: int) -> None:
@@ -1392,8 +1393,13 @@ class CalibrationManager:
             "--shutter", str(RPICAM_CAL_SHUTTER_US),
             "--awbgains", "1.0,1.0",
             "--denoise", "cdn_off",
-            "--tuning-file", RPICAM_TUNING_FILE,
         ]
+        if camera_index == 1 and self._camera2_is_arducam():
+            # The Arducam module carries its own tuning, and rpicam-still hangs on it
+            # when it restarts the stream between preview and capture.
+            cmd.append("--immediate")
+        else:
+            cmd += ["--tuning-file", RPICAM_TUNING_FILE]
 
         process = None
         try:

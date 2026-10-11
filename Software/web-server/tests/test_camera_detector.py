@@ -105,6 +105,46 @@ class TestCameraDetector:
         assert cameras[0]["pitrac_type"] == 4
         assert cameras[0]["status"] == "SUPPORTED"
 
+    @pytest.mark.parametrize(
+        "resolution, mode, pitrac_type",
+        [
+            ("1600x1400 12-bit RGGB", "SRGGB12_CSI2P", 6),
+            ("1600x1400 12-bit MONO", "R12_CSI2P", 7),
+        ],
+    )
+    def test_parse_camera_info_mira220(self, resolution, mode, pitrac_type):
+        """The stock driver reports a Bayer Mira220 (type 6), the ams driver a mono one (type 7)"""
+        detector = CameraDetector()
+        output = f"""Available cameras
+-----------------
+0 : imx296 [1456x1088 10-bit MONO] (/base/axi/pcie@1000120000/rp1/i2c@88000/imx296@1a)
+    Modes: 'R10_CSI2P' : 1456x1088 [60.38 fps - (0, 0)/1456x1088 crop]
+1 : mira220 [{resolution}] (/base/axi/pcie@1000120000/rp1/i2c@80000/mira220@10)
+    Modes: '{mode}' : 1600x1400 [30.00 fps - (0, 0)/1600x1400 crop]
+"""
+        cameras = detector._parse_camera_info(output)
+        assert [c["sensor"] for c in cameras] == ["imx296", "mira220"]
+        assert cameras[1]["pitrac_type"] == pitrac_type
+        assert cameras[1]["status"] == "EXPERIMENTAL"
+
+    def test_parse_camera_info_arducam_mira220(self):
+        """The Pivariety driver lists the mono Mira220 as Bayer under a hyphenated name (type 8)"""
+        detector = CameraDetector()
+        output = """Available cameras
+-----------------
+0 : imx296 [1456x1088 10-bit MONO] (/base/axi/pcie@1000120000/rp1/i2c@88000/imx296@1a)
+    Modes: 'R10_CSI2P' : 1456x1088 [60.38 fps - (0, 0)/1456x1088 crop]
+
+1 : arducam-pivariety [1600x1400 12-bit RGGB] (/base/axi/pcie@1000120000/rp1/i2c@80000/arducam_pivariety@c)
+    Modes: 'SRGGB12_CSI2P' : 640x480 [81.04 fps - (0, 0)/1600x1400 crop]
+                             1600x1400 [32.01 fps - (0, 0)/1600x1400 crop]
+"""
+        cameras = detector._parse_camera_info(output)
+        assert [c["sensor"] for c in cameras] == ["imx296", "arducam-pivariety"]
+        assert cameras[1]["pitrac_type"] == 8
+        assert cameras[1]["status"] == "EXPERIMENTAL"
+        assert cameras[1]["cfa"] == "MONO"
+
     def test_parse_camera_info_multiple(self):
         """Test parsing multiple cameras"""
         detector = CameraDetector()

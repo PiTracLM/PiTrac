@@ -1233,6 +1233,16 @@ class TestTriggerModeSwitching:
         assert kwargs["capture_output"] is True
 
     @patch("calibration_manager.subprocess.run")
+    def test_set_trigger_mode_uses_arducam_tool_for_camera_type_8(self, mock_run, manager):
+        manager.config_manager.get_config = Mock(return_value="8")
+        mock_run.return_value = Mock(returncode=0, stderr="")
+        assert manager._set_trigger_mode(1) is True
+        assert mock_run.call_args[0][0] == [
+            "/usr/lib/pitrac/ImageProcessing/CameraTools/arducam_trigger",
+            "1",
+        ]
+
+    @patch("calibration_manager.subprocess.run")
     def test_set_trigger_mode_returns_false_on_nonzero_rc(self, mock_run, manager):
         mock_run.return_value = Mock(returncode=1, stderr="permission denied")
         assert manager._set_trigger_mode(1) is False

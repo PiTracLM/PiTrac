@@ -28,9 +28,11 @@ class CameraDetector:
         "imx477": "Pi HQ Camera",
         "imx296": "Global Shutter Camera",
         "imx708": "Pi Camera v3",
+        "mira220": "ams Mira220",
+        "arducam-pivariety": "Arducam Pivariety",
     }
 
-    PITRAC_TYPES = {"ov5647": 1, "imx219": 2, "imx477": 3, "imx296": 4, "imx708": 0}
+    PITRAC_TYPES = {"ov5647": 1, "imx219": 2, "imx477": 3, "imx296": 4, "imx708": 0, "mira220": 6}
 
     CAMERA_STATUS = {
         "ov5647": "DEPRECATED",
@@ -38,10 +40,13 @@ class CameraDetector:
         "imx477": "DEPRECATED",
         "imx296": "SUPPORTED",
         "imx708": "UNSUPPORTED",
+        "mira220": "EXPERIMENTAL",
     }
 
     PITRAC_TYPE_PI_GS = 4
     PITRAC_TYPE_INNOMAKER = 5
+    PITRAC_TYPE_MIRA220_MONO = 7
+    PITRAC_TYPE_ARDUCAM_MIRA220_MONO = 8
 
     DT_ROOT = "/sys/firmware/devicetree/base"
     DT_ROOT_ALT = "/proc/device-tree"
@@ -194,7 +199,7 @@ class CameraDetector:
         """Parse camera information from libcamera output"""
         cameras = []
 
-        camera_pattern = r"^(\d+)\s*:\s*(\w+)\s*\[([^\]]+)\](?:\s*\(([^)]+)\))?"
+        camera_pattern = r"^(\d+)\s*:\s*([\w-]+)\s*\[([^\]]+)\](?:\s*\(([^)]+)\))?"
 
         for match in re.finditer(camera_pattern, output, re.MULTILINE):
             idx = int(match.group(1))
@@ -224,6 +229,16 @@ class CameraDetector:
                 else:
                     pitrac_type = self.PITRAC_TYPE_PI_GS
                     description = "IMX296 (assumed color)"
+            elif sensor == "mira220" and cfa == "MONO":
+                pitrac_type = self.PITRAC_TYPE_MIRA220_MONO
+                description = "ams Mira220 (Mono)"
+            elif sensor == "arducam-pivariety" and resolution.startswith("1600x1400"):
+                # Every Pivariety module reports this driver name, and the mono Mira220
+                # is listed as Bayer, so the sensor is told apart by its resolution.
+                pitrac_type = self.PITRAC_TYPE_ARDUCAM_MIRA220_MONO
+                description = "Arducam Mira220 (Mono)"
+                status = "EXPERIMENTAL"
+                cfa = "MONO"
             else:
                 description = model_name
 
@@ -535,6 +550,24 @@ class CameraDetector:
                 "label": "InnoMaker IMX296",
                 "description": "IMX296 Mono (RECOMMENDED)",
                 "status": "supported",
+            },
+            {
+                "value": 6,
+                "label": "ams Mira220",
+                "description": "Color, camera 2 with the Pico trigger only (EXPERIMENTAL)",
+                "status": "experimental",
+            },
+            {
+                "value": 7,
+                "label": "ams Mira220 Mono",
+                "description": "Mono, camera 2 with the Pico trigger only (EXPERIMENTAL)",
+                "status": "experimental",
+            },
+            {
+                "value": 8,
+                "label": "Arducam Mira220 Mono",
+                "description": "Pivariety module, camera 2 with the Pico trigger only (EXPERIMENTAL)",
+                "status": "experimental",
             },
         ]
 
