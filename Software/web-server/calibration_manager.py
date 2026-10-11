@@ -713,7 +713,9 @@ class CalibrationManager:
         """
         logger.info(f"Capturing still image for {camera}")
 
-        cmd = [self.pitrac_binary, f"--system_mode={camera}", "--cam_still_mode"]
+        # "camera2" is not a system_mode since single-process; a still selects camera 2 from any camera2 mode.
+        mode = "camera1" if camera == "camera1" else "camera2_ball_location"
+        cmd = [self.pitrac_binary, f"--system_mode={mode}", "--cam_still_mode"]
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_file = f"calibration_{camera}_{timestamp}.png"

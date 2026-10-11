@@ -72,7 +72,12 @@ class TestingToolsManager:
                 "before": "Takes up to 10 seconds.",
                 "success": "Shows a picture from Camera 2.",
                 "category": "camera",
-                "args": ["--system_mode", "camera2", "--cam_still_mode", "--output_filename=cam2_still_picture.png"],
+                "args": [
+                    "--system_mode",
+                    "camera2_ball_location",
+                    "--cam_still_mode",
+                    "--output_filename=cam2_still_picture.png",
+                ],
                 "output_image": "cam2_still_picture.png",
                 "requires_sudo": False,
                 "timeout": 10,

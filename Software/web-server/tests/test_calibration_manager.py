@@ -873,6 +873,7 @@ class TestRealCalibrationWorkflows:
             with patch("pathlib.Path.exists", return_value=True):
                 result = await manager.capture_still_image("camera2")
 
+        assert "--system_mode=camera2_ball_location" in mock_subprocess.call_args[0]
         assert result["status"] == "success"
         assert "image_path" in result
         assert "image_url" in result
