@@ -173,6 +173,7 @@ pitrac_lm_sources += ([
 			'ball_watcher.cpp',
 			'ball_watcher_image_buffer.cpp',
 			'ball_image_proc.cpp',
+			'ball_geometry.cpp',
 			'ncnn_detector.cpp',
 			'spin_predictor.cpp',
 			'spin_surface.cpp',

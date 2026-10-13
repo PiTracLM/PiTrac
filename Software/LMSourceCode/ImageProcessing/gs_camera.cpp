@@ -334,6 +334,13 @@ namespace golf_sim {
             return 0;
         }
 
+        if (camera_hardware.use_undistortion_matrix_ && camera_hardware.resolution_x_ > 0) {
+            // The lens calibration measured this lens, so the lens type's stock radius is not needed
+            double measured_radius = GetLens(camera_hardware).fx * GolfBall::kBallRadiusMeters / distance;
+            measured_radius *= ((double)resolution_x_ / (double)camera_hardware.resolution_x_);
+            return (int)std::round(measured_radius);
+        }
+
         radius *= (0.40 / distance);
 
         // Scale to our current resolution
@@ -865,86 +872,42 @@ namespace golf_sim {
             return ( ball_distance_meters * camera.camera_hardware_.sensor_width_ * ((2.0 * ball_radius_pixels) / camera.camera_hardware_.resolution_x_ ) / (2.0*GolfBall::kBallRadiusMeters));
         }
 
-        double GolfSimCamera::convertXDistanceToMeters(const GolfSimCamera& camera, double zDistanceMeters, double xDistancePixels) {
-            // Note that we are NOT using the calibrated_focal_length
-            double halfWidthMeters = (zDistanceMeters / camera.camera_hardware_.focal_length_) * (camera.camera_hardware_.sensor_width_ / 2.0);
-            double xDistanceMeters = halfWidthMeters * (xDistancePixels / (camera.camera_hardware_.resolution_x_ / 2.0));
-            return (xDistanceMeters);
-        }
+        ball_geometry::Lens GolfSimCamera::GetLens(const CameraHardware& camera_hardware) {
+            ball_geometry::Lens lens;
 
-        double GolfSimCamera::convertYDistanceToMeters(const GolfSimCamera& camera, double zDistanceMeters, double yDistancePixels) {
-            // Note that we are NOT using the calibrated_focal_length
-            double halfHeightMeters = (zDistanceMeters / camera.camera_hardware_.focal_length_) * (camera.camera_hardware_.sensor_height_/2.0);
-            double yDistanceMeters = halfHeightMeters * (yDistancePixels / (camera.camera_hardware_.resolution_y_ / 2.0));
-            return (yDistanceMeters);
+            if (camera_hardware.use_undistortion_matrix_ && !camera_hardware.calibrationMatrix_.empty()) {
+                cv::Mat k;
+                camera_hardware.calibrationMatrix_.convertTo(k, CV_64F);
+                lens.fx = k.at<double>(0, 0);
+                lens.fy = k.at<double>(1, 1);
+                lens.cx = k.at<double>(0, 2);
+                lens.cy = k.at<double>(1, 2);
+            }
+            else {
+                lens.fx = camera_hardware.focal_length_ * camera_hardware.resolution_x_ / camera_hardware.sensor_width_;
+                lens.fy = lens.fx;
+                lens.cx = camera_hardware.resolution_x_ / 2.0;
+                lens.cy = camera_hardware.resolution_y_ / 2.0;
+            }
+
+            return lens;
         }
 
         double GolfSimCamera::ComputeDistanceToBallUsingRadius(const GolfSimCamera& camera, const GolfBall& ball) {
-            // compute and return the distance from the object to the camera in meters
-            // (based on triangle similarity, e.g., https://pyimagesearch.com/2015/01/19/find-distance-camera-objectmarker-using-python-opencv/) is
 
             double chosenRadiusPixels;
 
-            double effectiveSensorWidth;
-            double effectiveCameraResolution;
-
             if (ball.ball_ellipse_.size.width > 0 && ball.ball_ellipse_.size.height > 0) {
-
-                // TBD - Currently Deprecated
-                
-
-                // If we have ellipse representation, then use it - it's probably more reliable than a strict circle, but
-                // we need to figure out WHICH radius of the ellipse to use
-                
-                // TBD -- Seems to work correctly only if we use the (smaller) width.
-                // We could also use the largest radius in the hope that it will be more accurate, percentage-wise
-                // This should presumably be the height
+                // A ball off to one side images as an ellipse stretched away from the image center.
+                // Its short axis is the one that still reflects the ball's distance.
                 chosenRadiusPixels = std::min(ball.ball_ellipse_.size.width, ball.ball_ellipse_.size.height) / 2.0;
-
-                // The ellipse may be at an angle.  
-                // Use the effective number of pixels on the sensor at that angle as a measuring stick to determine the real-world distance
-                double ellipseAngleDegrees = ball.ball_ellipse_.angle;
-
-                // From vertical
-                double ellipseAngleAtSensorCorner = CvUtils::RadiansToDegrees(atan(camera.camera_hardware_.sensor_height_ / camera.camera_hardware_.sensor_width_));
-
-
-                // See notebook for details of this algorithm
-                // Note - see https://namkeenman.wordpress.com/2015/12/21/opencv-determine-orientation-of-ellipserotatedrect-in-fitellipse/
-                // for details of rotatedRect angles.  They are non-intuitive.  Ellipse angle is to the right from vertical
-                if ((ellipseAngleDegrees > ellipseAngleAtSensorCorner && ellipseAngleDegrees < 180 - ellipseAngleAtSensorCorner) ||
-                    (ellipseAngleDegrees > (180 + ellipseAngleAtSensorCorner) && ellipseAngleDegrees < (360 - ellipseAngleAtSensorCorner))
-                    ) {
-                    effectiveSensorWidth = std::abs(camera.camera_hardware_.sensor_width_ / cos(CvUtils::DegreesToRadians(90 - ellipseAngleDegrees)));
-                    effectiveCameraResolution = std::abs(camera.camera_hardware_.resolution_x_ / cos(CvUtils::DegreesToRadians(90 - ellipseAngleDegrees)));
-                }
-                else {
-                    effectiveSensorWidth = std::abs((double)camera.camera_hardware_.sensor_height_ / cos(CvUtils::DegreesToRadians(ellipseAngleDegrees)));  // 90-ellipse angle
-                    effectiveCameraResolution = std::abs((double)camera.camera_hardware_.resolution_y_ / cos(CvUtils::DegreesToRadians(ellipseAngleDegrees)));
-                }
-
             }
             else {
-                // Use the information from the circle to determine the radiue
                 chosenRadiusPixels = CvUtils::CircleRadius(ball.ball_circle_);
-
-                effectiveSensorWidth = camera.camera_hardware_.sensor_width_;
-                effectiveCameraResolution = camera.camera_hardware_.resolution_x_;
             }
 
-            // Use similar triangles should also work
-            // double ballRadiusMeters = (effectiveCameraResolution / (2.0 * chosenRadiusPixels)) * (2.0 * kBallRadiusMeters) * (camera.focal_length_ / effectiveSensorWidth);
-
-            double distanceToBallMeters = (effectiveCameraResolution / (2.0 * chosenRadiusPixels)) * (2.0 * GolfBall::kBallRadiusMeters) * (camera.camera_hardware_.focal_length_ / effectiveSensorWidth);
-
-            return distanceToBallMeters;
-
-            // TBD - AlternativelyCreate an upright (non-rotated) rectangle that fits around the ellipse, which is itself a rotated rect.
-            // Then, use the X and Y widths of the resulting upright rectangle to figure out how wide/high the ellipse is.  
-            // Finally, use the pythagorean theory to figure out the diagonal's real-world length.
-
-            std::vector<cv::Point> contours;    // ?? = std::vector<cv:Point>(ball.ball_ellipse_.re);
-
+            return ball_geometry::BallRange(GetLens(camera.camera_hardware_), ball.x(), ball.y(),
+                                            chosenRadiusPixels, GolfBall::kBallRadiusMeters);
         }
 
 
@@ -1068,10 +1031,9 @@ namespace golf_sim {
 
 
 
-        // The ball's direct distance to the lens, as well as the x,y coordinates from the picture center
-        // origin both have to be set BEFORE calling this method.
-        // Axes are as perceived by the camera -- z is close/far, x is left/right, and y is up/down
-        // NOTE that the Z distance is the line-of-sight distance from the lens to the ball.
+        // The ball's line-of-sight distance to the lens, as well as its x,y coordinates in the picture,
+        // both have to be set BEFORE calling this method.
+        // The result is in the launch monitor's frame -- z is close/far, x is left/right, and y is up/down
         bool GolfSimCamera::ComputeXyzDistanceFromOrthoCamPerspective(const GolfSimCamera& camera, const GolfBall& b1, cv::Vec3d& distances) {
 
             if (std::abs(b1.distance_to_z_plane_from_lens_) <= 0.0001) {
@@ -1079,82 +1041,17 @@ namespace golf_sim {
                 return false;
             }
 
-            // First calculate the distances as if the camera was facing straight ahead toward 
-            // the ball flight plane
+            // The ball lies along the ray through its pixel, at its line-of-sight distance.  Turning that
+            // ray by the camera's pan and tilt gives the position as the launch monitor sees it.
+            // Positive X camera angle is to the left looking out the camera, positive Y is tilted up.
+            const cv::Matx33d camera_rotation = ball_geometry::CameraRotation(camera.camera_hardware_.camera_angles_[0],
+                                                                              camera.camera_hardware_.camera_angles_[1]);
 
-            double xFromCameraCenter = b1.x() - std::round(camera.camera_hardware_.resolution_x_ / 2.0);
-            double yFromCameraCenter = b1.y() - std::round(camera.camera_hardware_.resolution_y_ / 2.0);
+            distances = ball_geometry::BallPosition(GetLens(camera.camera_hardware_), camera_rotation,
+                                                    b1.x(), b1.y(), b1.distance_to_z_plane_from_lens_);
 
-            cv::Vec3d camera_perspective_distances;
-
-            // Direct-to-ball-PLANE distance is already in real-world meters.   
-            // However, we do not have the exact direct-to-ball distance due to the lens.
-            // We will figure out the Z axis distance (which will generally be a little shorter) first.
-            double xDistanceFromCamCenter = convertXDistanceToMeters(camera, b1.distance_to_z_plane_from_lens_, xFromCameraCenter);
-            camera_perspective_distances[0] = xDistanceFromCamCenter;  // X distance, negative means to the left of the camera
-            
-            double yDistanceFromCamCenter = convertYDistanceToMeters(camera, b1.distance_to_z_plane_from_lens_, yFromCameraCenter);
-
-            camera_perspective_distances[1] = -yDistanceFromCamCenter;  // Y distance, positive is upward (smaller Y values)  // TBD - sqrt(pow(b1.distance_to_z_plane_from_lens_, 2) - pow(yDistanceFromCamCenter, 2));  // Y distance.  Positive values are above the camera center
-
-            camera_perspective_distances[2] = b1.distance_to_z_plane_from_lens_;// FOR NON_DIRECT sqrt(pow(b1.distance_to_z_plane_from_lens_, 2) - pow(xDistanceFromCamCenter, 2));  // Z distance.  Only positive values in front of camera
-
-            GS_LOG_TRACE_MSG(trace, "GolfSimCamera::ComputeXyzDistanceFromOrthoCamPerspective computed camera_perspective_distances of: " +
-                std::to_string(camera_perspective_distances[0]) + ", " +
-                std::to_string(camera_perspective_distances[1]));
-
-            // If the camera were pointed straight out, the above is all we would need to have in 
-            // order to compute the x,y,z position of the ball.  The ball would be at the same z-distance,
-            // and the x and y distances would just have to be added/subtracted to the point in space
-            // directly out from the camera.
-            // 
-            // However, because the camera is at an angle, we need to convert the x,y,z distances from the
-            // camera's perspective into x,y,z from a perspective that is orthogonal to the launch monitor.
-            // This will entail a polar (or spherical) coordinate system to a cartesian (x,y,z) conversion
-            // So, Convert the distances from the camera into a set of angles from the camera's perspective
-
-            // Using the adjusted X and Y distances (lined up with the real world up/down and left/right),
-            // determine the angles of the ball from the camera perspective
-            // Positive X degrees is to the left looking out the camera
-            // Negative Y degrees is tilting down looking out the camera
-            cv::Vec2d deltaAnglesCameraPerspective;
-            deltaAnglesCameraPerspective[0] = -CvUtils::RadiansToDegrees(atan(camera_perspective_distances[0] / b1.distance_to_z_plane_from_lens_));
-            deltaAnglesCameraPerspective[1] = CvUtils::RadiansToDegrees(atan(camera_perspective_distances[1] / b1.distance_to_z_plane_from_lens_));
-
-            // Account for the angle of the camera, which will adjust the camera perspective angles
-            // to the real-world orthogonal-to-the-LM-perspective polar coordinates.
-            // X angle here is positive in a counter-clockwise movement looking down at the LM from above
-            // Y angle is negative as the azimuth angle goes down from horizontal
-            cv::Vec2d deltaAnglesLMPerspective;
-            deltaAnglesLMPerspective[0] = camera.camera_hardware_.camera_angles_[0] + deltaAnglesCameraPerspective[0] ;
-            deltaAnglesLMPerspective[1] = camera.camera_hardware_.camera_angles_[1] + deltaAnglesCameraPerspective[1];
-
-            GS_LOG_TRACE_MSG(trace, "GolfSimCamera::ComputeXyzDistanceFromOrthoCamPerspective computed (LM-perspective) X,Y angles of: " + 
-                                        std::to_string(deltaAnglesLMPerspective[0]) + ", " +
-                                        std::to_string(deltaAnglesLMPerspective[1]));
-
-            // Second, figure out the X, Y, and Z distances from the LM's perspective
-            // Theta is the rotation in the floor plane
-            // Phi is the rotation down/away from the vertical
-            // This is essentially a polar-coordinate system to cartesian system conversion
-            // See https://math.libretexts.org/Courses/Mount_Royal_University/MATH_2200%3A_Calculus_for_Scientists_II/7%3A_Vector_Spaces/5.7%3A_Cylindrical_and_Spherical_Coordinates#:~:text=To%20convert%20a%20point%20from,y2%2Bz2).
-
-            double phi_radians = CvUtils::DegreesToRadians( 90. + deltaAnglesLMPerspective[1] );
-            double p_rho = camera_perspective_distances[2];
-            double theta_radians = CvUtils::DegreesToRadians(deltaAnglesLMPerspective[0]);
-            // Intermediate results for precision testing - ignore
-            double sin_phi = sin(phi_radians);
-            double cos_theta = cos(theta_radians);
-            double sin_theta = sin(theta_radians);
-
-            double cartesian_x = p_rho * sin(phi_radians) * cos(theta_radians);
-            double cartesian_y = p_rho * sin(phi_radians) * sin(theta_radians);
-            double cartesian_z = p_rho * cos(phi_radians);
-
-            // Convert from the model cartesian system into the one used by the launch monitor
-            distances[0] = -cartesian_y;
-            distances[1] = -cartesian_z;
-            distances[2] = cartesian_x;
+            GS_LOG_TRACE_MSG(trace, "GolfSimCamera::ComputeXyzDistanceFromOrthoCamPerspective computed (LM-perspective) X,Y,Z distances of: " +
+                std::to_string(distances[0]) + ", " + std::to_string(distances[1]) + ", " + std::to_string(distances[2]));
 
             return true;
         }
@@ -2982,8 +2879,9 @@ namespace golf_sim {
             // At this point, we also have a more accurate idea of the launch side-angle than we could have
             // derived from just the change in the radius of the ball in the camera2 image.  So, re-calculate
             // the velocity based on that side angle in combination with the other two original angles
-            result_ball.position_deltas_ball_perspective_[0] = result_ball.distances_ortho_camera_perspective_[0] * 
-                                                                sin(CvUtils::DegreesToRadians(result_ball.angles_ball_perspective_[0]));
+            // The sideways travel between the two balls is their down-range travel times the tangent of that side angle
+            result_ball.position_deltas_ball_perspective_[0] = result_ball.position_deltas_ball_perspective_[2] *
+                                                                tan(CvUtils::DegreesToRadians(result_ball.angles_ball_perspective_[0]));
 
             // The velocity will be calculated from the updated position_deltas_ball_perspective_
             CalculateBallVelocity(result_ball, time_between_balls_uS);

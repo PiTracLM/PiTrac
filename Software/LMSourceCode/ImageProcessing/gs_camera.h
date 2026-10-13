@@ -20,6 +20,7 @@
 #include "cv_utils.h"
 #include "gs_globals.h"
 #include "camera_hardware.h"
+#include "ball_geometry.hpp"
 #include "golf_ball.h"
 
 namespace golf_sim {
@@ -310,11 +311,10 @@ namespace golf_sim {
         // Returns the difference, in meters, between b2 - b1 for the X, Y, and Z axes
         static bool ComputeXyzDeltaDistances(const GolfBall& b1, const GolfBall& b2, cv::Vec3d& position_deltas_ball_perspective, cv::Vec3d& distance_deltas_camera_perspective);
 
-        // Returns the real-world distances in the X and Y directions from the perspective of the camera,
-        // based in part on the input Z-distance from the ball to the camera.  The X,Y origin from which the
-        // distances are measured is considered the center of the image.
-        // Regardless of the camera angle, the returned distances are as if the camera was facing straight at the
-        // plane of the expected ball's line of flight.
+        // Returns where the ball is relative to the camera lens, in meters: X to the right, Y up, and Z
+        // straight out from the launch monitor.  The ball's line-of-sight distance must already be set.
+        // The camera's tilt and pan are taken out, so the result is as if the camera faced straight at
+        // the plane of the expected ball's line of flight.
         static bool ComputeXyzDistanceFromOrthoCamPerspective(const GolfSimCamera& camera, const GolfBall& b1, cv::Vec3d& distance_deltas);
 
         static bool ComputeBallXYAnglesFromCameraPerspective(const cv::Vec3d& distances_camera_perspective,
@@ -325,10 +325,10 @@ namespace golf_sim {
         static bool getXYDeltaAnglesBallPerspective(const cv::Vec3d& position_deltas_ball_perspective,
                                                   cv::Vec2d&       deltaAnglesBallPerspective);
 
-        // Given the current focal length, direct-to-ball distance, and sensed ball radius, determine what a distance in pixels in the 
-        // X or Y direction is in real-life distance in meters.
-        static double convertXDistanceToMeters(const GolfSimCamera& camera, double zDistanceMeters, double xDistancePixels);
-        static double convertYDistanceToMeters(const GolfSimCamera& camera, double zDistanceMeters, double yDistancePixels);
+        // The lens as the ball geometry needs it.  Uses the lens calibration when there is one, so no lens
+        // type or sensor size is involved.  Without one, falls back to the focal length setting with the
+        // optical center assumed mid-frame.
+        static ball_geometry::Lens GetLens(const CameraHardware& camera_hardware);
 
         // Given two images of a golf ball, with the first taken before the second, this function
         // takes those images and the time delay between them to determine the velocity and 3D spin
@@ -535,7 +535,7 @@ namespace golf_sim {
         // Return the distance of the ball in meters
         // TBD _ REMOVE double getBallDistance(const GolfBall& calibrated_ball);
 
-        // Compute the distance to the ball based on the known radius of the ball in the real world
+        // Line-of-sight distance to the ball, from how big a ball of known size looks at that spot in the image
         static double ComputeDistanceToBallUsingRadius(const GolfSimCamera& camera, const GolfBall& ball);
     };
 }

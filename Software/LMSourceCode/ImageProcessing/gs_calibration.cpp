@@ -209,76 +209,20 @@ namespace golf_sim {
 
         ball = return_balls[0];
 
-        // First calculate the distances as if the camera was facing straight ahead toward 
-        // the ball flight plane.  
-        // The Z-distance in this scenario would measure as if the image plane is orthogonal to the camera's
-        // bore.  The image plane would only actually go through the ball's center if the
-        // ball was in the exact center of the image.
-
-        double xFromCameraCenter = ball.x() - std::round(camera.camera_hardware_.resolution_x_ / 2.0);
-        double yFromCameraCenter = ball.y() - std::round(camera.camera_hardware_.resolution_y_ / 2.0);
-
-        cv::Vec3d camera_perspective_distances;
-
-        double distance_direct_to_ball = CvUtils::GetDistance(kFinalAutoCalibrationBallPositionFromCameraMeters);
-
-        if (distance_direct_to_ball <= 0.0001) {
-            LoggingTools::Warning("DetermineFocalLengthForAutoCalibration called without setting the kFinalAutoCalibrationBallPositionFromCameraMeters values.");
-            return false;
-        }
-
-        if (kFinalAutoCalibrationBallPositionFromCameraMeters[2] < 0.0) {
+        if (kFinalAutoCalibrationBallPositionFromCameraMeters[2] <= 0.0) {
             GS_LOG_MSG(error, "DetermineCameraAngles called without kFinalAutoCalibrationBallPositionFromCameraMeters constants being set.");
             return false;
         }
 
-        // We have the direct-to-ball-PLANE distance - it is already in real-world meters.   
-        // However, we do not have the exact direct-to-ball distance due to the fact the lens will slightly
-        // enlarge objects that are actually further away the camera.
-
-        // Use the direct-to-ball-plane distance as the direct-to-ball distance to calculate the offset of the ball from center.
-        double xDistanceFromCamCenter = GolfSimCamera::convertXDistanceToMeters(camera, distance_direct_to_ball, xFromCameraCenter);
-        camera_perspective_distances[0] = xDistanceFromCamCenter;  // X distance, negative means to the left of the camera
-
-        double yDistanceFromCamCenter = GolfSimCamera::convertYDistanceToMeters(camera, distance_direct_to_ball, yFromCameraCenter);
-
-        camera_perspective_distances[1] = -yDistanceFromCamCenter;  // Y distance, positive is upward (smaller Y values)
-
-        camera_perspective_distances[2] = kFinalAutoCalibrationBallPositionFromCameraMeters[2];
-
-        GS_LOG_TRACE_MSG(trace, "GolfSimCalibration::DetermineCameraAngles computed camera_perspective_distances of: " +
-            std::to_string(camera_perspective_distances[0]) + ", " +
-            std::to_string(camera_perspective_distances[1]));
-
-        // Determine the angles from the center-bore of the camera at which the ball exists to the ball
-
-        // Angles in this section are taken using a ray that extends out from the camera
+        // The ball is seen along the ray through its pixel, and its real position is known.  The camera's
+        // pan and tilt are whatever turn that ray onto the direction of the known position.
         // Positive X angle is counter-clockwise looking down on the camera/ball from above
-        // Positive Y angle is looking up from level to the ball
-        double x_angle_degrees_of_ball_camera_perspective = -CvUtils::RadiansToDegrees(atan(camera_perspective_distances[0] / distance_direct_to_ball));
-        double y_angle_degrees_of_ball_camera_perspective = CvUtils::RadiansToDegrees(atan(camera_perspective_distances[1] / distance_direct_to_ball));
-
-        GS_LOG_TRACE_MSG(trace, "GolfSimCalibration::DetermineCameraAngles computed angles to ball from center-bore of camera of: " +
-            std::to_string(x_angle_degrees_of_ball_camera_perspective) + ", " +
-            std::to_string(y_angle_degrees_of_ball_camera_perspective));
-
-        // Determine the angles at which the camera would be if the ball were centered (in other
-        // words, the angle of the ball from the center of the lens if the camera was
-        // pointing straight out).
-
-        double x_angle_degrees_of_ball_lm_perspective = -CvUtils::RadiansToDegrees(atan(kFinalAutoCalibrationBallPositionFromCameraMeters[0] / kFinalAutoCalibrationBallPositionFromCameraMeters[2]));
-            
-        // Need to calculate the adjacent (tan x = opposite/adjacent) distance by using the known x and z distances) to determine the y angle
-        double horizontal_distance_to_ball_vertical_axis = sqrt(pow(kFinalAutoCalibrationBallPositionFromCameraMeters[0], 2) + pow(kFinalAutoCalibrationBallPositionFromCameraMeters[2], 2) );
-        double y_angle_degrees_of_ball_lm_perspective = CvUtils::RadiansToDegrees(atan(kFinalAutoCalibrationBallPositionFromCameraMeters[1] / horizontal_distance_to_ball_vertical_axis));
-
-        GS_LOG_TRACE_MSG(trace, "GolfSimCalibration::DetermineCameraAngles computed angles to ball from the perspective of the LM (from the center of the camera lens if the camera was pointing straight out): " +
-            std::to_string(x_angle_degrees_of_ball_lm_perspective) + ", " +
-            std::to_string(y_angle_degrees_of_ball_lm_perspective));
-
-        // The difference (if any) will be the angle of the ball from the camera
-        camera_angles[0] = x_angle_degrees_of_ball_lm_perspective - x_angle_degrees_of_ball_camera_perspective;
-        camera_angles[1] = y_angle_degrees_of_ball_lm_perspective - y_angle_degrees_of_ball_camera_perspective;
+        // Positive Y angle is tilted up
+        if (!ball_geometry::SolveCameraAngles(GolfSimCamera::GetLens(camera.camera_hardware_), ball.x(), ball.y(),
+                                              kFinalAutoCalibrationBallPositionFromCameraMeters, camera_angles)) {
+            GS_LOG_MSG(error, "GolfSimCalibration::DetermineCameraAngles could not find camera angles that place the ball at its known position.");
+            return false;
+        }
 
         const double kMaxReasonableAngle = 45.0;
         if (std::abs(camera_angles[0]) > kMaxReasonableAngle || std::abs(camera_angles[1]) > kMaxReasonableAngle) {
