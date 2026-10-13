@@ -29,6 +29,7 @@
 unsigned int RPiCamApp::verbosity = 1;
 std::mutex RPiCamApp::cm_mutex_;
 std::weak_ptr<RPiCamApp::CameraManager> RPiCamApp::shared_cm_;
+std::chrono::steady_clock::time_point RPiCamApp::last_camera_stop_;
 std::recursive_mutex RPiCamApp::pipeline_mutex_;
 
 static libcamera::PixelFormat mode_to_pixel_format(Mode const &mode)
@@ -840,6 +841,11 @@ void RPiCamApp::StartCamera()
 		controls_.set(controls::AeFlickerPeriod, options_->Get().flicker_period.get<std::chrono::microseconds>());
 	}
 
+	// An Arducam Pivariety camera delivers no frames when its stream is started within
+	// about 100 ms of the previous stop (50 ms fails, 100 ms works on the Mira220 module).
+	if (camera_->id().find("arducam") != std::string::npos)
+		std::this_thread::sleep_until(last_camera_stop_ + std::chrono::milliseconds(250));
+
 	if (camera_->start(&controls_))
 		throw std::runtime_error("failed to start camera");
 	controls_.clear();
@@ -873,6 +879,7 @@ void RPiCamApp::StopCamera()
 			post_processor_.Stop();
 
 			camera_started_ = false;
+			last_camera_stop_ = std::chrono::steady_clock::now();
 		}
 	}
 

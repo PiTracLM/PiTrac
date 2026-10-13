@@ -17,6 +17,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <chrono>
 #include <thread>
 #include <variant>
 #include <vector>
@@ -276,6 +277,8 @@ private:
 	std::mutex completed_requests_mutex_;
 	std::set<CompletedRequest *> completed_requests_;
 	bool camera_started_ = false;
+	// Shared by every instance, since a camera can be stopped by one app object and started by another.
+	static std::chrono::steady_clock::time_point last_camera_stop_;
 	std::mutex camera_stop_mutex_;
 	MessageQueue<Msg> msg_queue_;
 	std::vector<SensorMode> sensor_modes_;
