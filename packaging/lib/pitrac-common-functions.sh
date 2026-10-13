@@ -32,14 +32,19 @@ detect_pi_model() {
     fi
 }
 
-# libcamera 0.7.1+rpt20260429 null-derefs in registerCamera() when rpi_apps.yaml
-# has a non-zero camera_timeout_value_ms — loadPipelineConfiguration calls
-# ipa_->setCameraTimeout.disconnect() before loadIPA() initializes ipa_. Pin
-# libcamera and the matching rpicam-apps (1.12.0 hard-depends on broken
-# libcamera) until a fixed libcamera ships upstream.
-LIBCAMERA_PIN_VERSION="0.7.0+rpt20260205-1"
-LIBCAMERA_PIN_PKGS=(libcamera0.7 libcamera-dev libcamera-ipa libcamera-tools libcamera-v4l2)
-RPICAM_APPS_PIN_VERSION="1.11.1-1"
+# Arducam Pivariety cameras (their Mira220 module) only run on Arducam's build of
+# libcamera, which is the stock 0.7.2 plus their sensor helpers and still drives
+# the IMX296. Every install gets Arducam's libcamera0.7, -dev and -ipa so one
+# build serves both cameras; the tools and rpicam-apps stay stock. Stock
+# 0.7.1+rpt20260429 null-derefs in registerCamera() when rpi_apps.yaml has a
+# non-zero camera_timeout_value_ms; 0.7.2 has the fix. Everything is held so
+# apt upgrade cannot swap a build without the Arducam helpers back in.
+ARDUCAM_LIBCAMERA_VERSION="0.7.2+rpt20260819-2"
+ARDUCAM_LIBCAMERA_URL="https://github.com/ArduCAM/Arducam-Pivariety-V4L2-Driver/releases/download/libcamera-v0.0.5"
+ARDUCAM_LIBCAMERA_PKGS=(libcamera0.7 libcamera-dev libcamera-ipa)
+LIBCAMERA_PIN_VERSION="0.7.2+rpt20260817-1"
+LIBCAMERA_PIN_PKGS=(libcamera-tools libcamera-v4l2)
+RPICAM_APPS_PIN_VERSION="1.13.0-1"
 RPICAM_APPS_PIN_ARM64=(librpicam-app1 rpicam-apps-core rpicam-apps-encoder rpicam-apps-opencv-postprocess rpicam-apps-preview)
 RPICAM_APPS_PIN_ALL=(rpicam-apps rpicam-apps-lite)
 
@@ -48,7 +53,7 @@ pin_libcamera_workaround() {
     libcam=$(dpkg-query -W -f='${Version}' libcamera0.7 2>/dev/null || true)
     rpicam=$(dpkg-query -W -f='${Version}' rpicam-apps-core 2>/dev/null || true)
     held=$(apt-mark showhold 2>/dev/null || true)
-    if [[ "$libcam" == "$LIBCAMERA_PIN_VERSION" ]] \
+    if [[ "$libcam" == "$ARDUCAM_LIBCAMERA_VERSION" ]] \
             && [[ "$rpicam" == "$RPICAM_APPS_PIN_VERSION" ]] \
             && grep -qx libcamera0.7 <<<"$held" \
             && grep -qx rpicam-apps-core <<<"$held"; then
@@ -56,7 +61,7 @@ pin_libcamera_workaround() {
         return 0
     fi
 
-    log_info "Pinning libcamera $LIBCAMERA_PIN_VERSION + rpicam-apps $RPICAM_APPS_PIN_VERSION"
+    log_info "Pinning libcamera $ARDUCAM_LIBCAMERA_VERSION + rpicam-apps $RPICAM_APPS_PIN_VERSION"
 
     (
         tmpdir=$(mktemp -d -t pitrac-libcam-pin.XXXXXX)
@@ -65,6 +70,23 @@ pin_libcamera_workaround() {
         libcam_pool="https://archive.raspberrypi.com/debian/pool/main/libc/libcamera"
         rpicam_pool="https://archive.raspberrypi.com/debian/pool/main/r/rpicam-apps"
         debs=() hold=()
+
+        for pkg in "${ARDUCAM_LIBCAMERA_PKGS[@]}"; do
+            deb="${pkg}_${ARDUCAM_LIBCAMERA_VERSION}_arm64.deb"
+            curl -fsSL -o "$tmpdir/$deb" "$ARDUCAM_LIBCAMERA_URL/$deb"
+            debs+=("$tmpdir/$deb"); hold+=("$pkg")
+        done
+
+        # These three come from Arducam's GitHub release, not the Raspberry Pi archive.
+        if ! (cd "$tmpdir" && sha256sum -c --quiet - <<SUMS
+25699b9608ad7af8d4625031e5b494788e2a23331679c1a2bbbb7d68706bb63d  libcamera0.7_${ARDUCAM_LIBCAMERA_VERSION}_arm64.deb
+3e4ff72f4f5289da93d41bc6455fb3fa4c7d878ed1ba975bd2ee20b48c9ee996  libcamera-dev_${ARDUCAM_LIBCAMERA_VERSION}_arm64.deb
+e1ede547b99f0f3a088b4b9ec4858195f4659b38e19aedf088133ba9a1995812  libcamera-ipa_${ARDUCAM_LIBCAMERA_VERSION}_arm64.deb
+SUMS
+        ); then
+            log_error "Arducam libcamera packages failed their checksum, not installing"
+            exit 1
+        fi
 
         for pkg in "${LIBCAMERA_PIN_PKGS[@]}"; do
             deb="${pkg}_${LIBCAMERA_PIN_VERSION}_arm64.deb"
@@ -84,7 +106,10 @@ pin_libcamera_workaround() {
             debs+=("$tmpdir/$deb"); hold+=("$pkg")
         done
 
-        INITRD=No apt-get install -y --allow-downgrades "${debs[@]}"
+        # libcamera 0.7.2 needs a newer libpisp than 0.7.0 did; apt resolves it from
+        # the archive, so the package lists have to be current.
+        apt-get update
+        INITRD=No apt-get install -y --allow-downgrades --allow-change-held-packages "${debs[@]}"
         apt-mark hold "${hold[@]}" >/dev/null
     )
 }

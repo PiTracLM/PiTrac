@@ -233,7 +233,7 @@ build_dev() {
 
     # libapr1/libaprutil1 → *t64 in Trixie (time_t transition); -dev keeps the old names.
     for pkg in libcamera-dev libcamera-tools libfmt-dev libssl-dev \
-               liblgpio-dev \
+               liblgpio-dev i2c-tools v4l-utils \
                libapr1t64 libaprutil1t64 libapr1-dev libaprutil1-dev; do
         pkg_installed "$pkg" || missing_deps+=("$pkg")
     done

@@ -54,7 +54,9 @@ configure_boot_config() {
     # A run that misses a camera must not strip overlays a previous run wrote:
     # with camera_auto_detect=0 nothing else would bring them back.
     local previous_cameras
-    previous_cameras=$(sed -n "/^${BLOCK_START}/,/^${BLOCK_END}/p" "$config_path" | grep -c '^dtoverlay=imx296') || true
+    local previous_block
+    previous_block=$(sed -n "/^${BLOCK_START}/,/^${BLOCK_END}/p" "$config_path")
+    previous_cameras=$(grep -c '^dtoverlay=\(imx296\|mira220\|arducam-pivariety\)' <<<"$previous_block") || true
     if [[ "$num_cameras" -lt "$previous_cameras" ]]; then
         log_warn "Detected ${num_cameras} camera(s) but config.txt has overlays for ${previous_cameras}, keeping ${previous_cameras}"
         num_cameras=$previous_cameras
@@ -116,11 +118,24 @@ arm_boost=1"
     # trigger mode can be switched at runtime without a reboot. InnoMaker IMX296
     # boards use the same stock imx296 overlay.
     if [[ "$num_cameras" -eq 2 ]]; then
+        # A Mira220 is invisible until its overlay is loaded, so it can't be
+        # detected into place. PITRAC_CAM2_OVERLAY names the CAM1 overlay
+        # (arducam-pivariety for the Arducam module, mira220 for the stock
+        # driver, or the name an out-of-tree driver was installed under), and
+        # after that the line already in config.txt is kept.
+        local cam2_overlay="dtoverlay=imx296,always-on,cam1"
+        local previous_cam2
+        previous_cam2=$(grep -m1 '^dtoverlay=\(mira220\|arducam-pivariety\)' <<<"$previous_block") || true
+        if [[ -n "${PITRAC_CAM2_OVERLAY:-}" ]]; then
+            cam2_overlay="dtoverlay=${PITRAC_CAM2_OVERLAY}"
+        elif [[ -n "$previous_cam2" ]]; then
+            cam2_overlay="$previous_cam2"
+        fi
         config_block="$config_block
 
 [all]
 dtoverlay=imx296,always-on,cam0
-dtoverlay=imx296,always-on,cam1"
+$cam2_overlay"
     elif [[ "$num_cameras" -eq 1 ]]; then
         config_block="$config_block
 
