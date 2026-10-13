@@ -31,6 +31,7 @@ public:
         double z_deg = 0;
         bool z_used_fallback = false;
         float inference_ms = 0;
+        float match_score = 0;  // how well the two balls line up under the result, -1 to 1
     };
 
     explicit SpinPredictor(const Config& config);
@@ -39,8 +40,14 @@ public:
     bool Initialize();
     bool IsInitialized() const { return initialized_; }
 
-    Result Predict(const cv::Mat& dimple_edges_1,
-                   const cv::Mat& dimple_edges_2);
+    // The crops are the un-equalized square images of each ball, sized alike, with the
+    // ball centered and radius_N its radius in pixels. view_rotation_N is the (x,y,z)
+    // rotation the caller applies to ball N's image to correct for camera perspective;
+    // the result is the rotation between the two balls after that correction.
+    Result Predict(const cv::Mat& raw_ball_1, float radius_1,
+                   const cv::Mat& raw_ball_2, float radius_2,
+                   const cv::Vec3i& view_rotation_1 = cv::Vec3i(0, 0, 0),
+                   const cv::Vec3i& view_rotation_2 = cv::Vec3i(0, 0, 0));
 
 private:
     Config config_;
@@ -50,10 +57,7 @@ private:
     ncnn::Net net_;
 #endif
 
-    void TernaryToTwoChannel(const cv::Mat& gabor_img, float* out_data, int size);
-    static void Rotation6DToEuler(const float* r6d,
-                                  double& x_deg, double& y_deg, double& z_deg);
-    static void GramSchmidt(const float* r6d, double R[3][3]);
+    static cv::Matx33d GramSchmidt(const float* r6d);
 };
 
 } // namespace golf_sim

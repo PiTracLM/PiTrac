@@ -2607,7 +2607,7 @@ namespace golf_sim {
 
     // Returns new coordinates in the passed-in ball, so make a copy of it before
     // calling this if the original information needs to be preserved
-    cv::Mat BallImageProc::IsolateBall(const cv::Mat& img, GolfBall& ball) {
+    cv::Mat BallImageProc::CropAroundBall(const cv::Mat& img, GolfBall& ball) {
 
         // We will grab a rectangle a little larger than the actual ball size
         const float ballSurroundMult = 1.05f;
@@ -2641,7 +2641,14 @@ namespace golf_sim {
 
         cv::Point offset_sub_to_full;
         cv::Point offset_full_to_sub;
-        cv::Mat ball_image = CvUtils::GetSubImage(img, ballRect, offset_sub_to_full, offset_full_to_sub);
+        return CvUtils::GetSubImage(img, ballRect, offset_sub_to_full, offset_full_to_sub);
+    }
+
+    // Returns new coordinates in the passed-in ball, so make a copy of it before
+    // calling this if the original information needs to be preserved
+    cv::Mat BallImageProc::IsolateBall(const cv::Mat& img, GolfBall& ball) {
+
+        cv::Mat ball_image = CropAroundBall(img, ball);
 
         // Draw the mask circle slightly smaller than the ball to prevent any bright prenumbra around the isolated ball
         const float referenceBallMaskReductionFactor = 0.995f;
@@ -2713,6 +2720,13 @@ namespace golf_sim {
         GolfBall local_ball1 = ball1;
         GolfBall local_ball2 = ball2;
 
+        // The ML spin model works from the balls as photographed. IsolateBall equalizes
+        // its crop where it sits in the full image, so copy these out first.
+        GolfBall raw_ball1 = ball1;
+        GolfBall raw_ball2 = ball2;
+        cv::Mat raw_ball_image1 = CropAroundBall(full_gray_image1, raw_ball1).clone();
+        cv::Mat raw_ball_image2 = CropAroundBall(full_gray_image2, raw_ball2).clone();
+
 
         // NOTE - The ball that is passed into the IsolateBall image will be adjusted
         // to have the new x, y, and radius values relative to the smaller, isolated picture
@@ -2748,6 +2762,13 @@ namespace golf_sim {
             int upWidth = ball_image2.cols;
             int upHeight = ball_image2.rows;
             cv::resize(ball_image1, ball_image1, cv::Size(upWidth, upHeight), cv::INTER_LINEAR);
+        }
+
+        if (raw_ball_image1.size() != ball_image1.size()) {
+            cv::resize(raw_ball_image1, raw_ball_image1, ball_image1.size(), 0, 0, cv::INTER_LINEAR);
+        }
+        if (raw_ball_image2.size() != ball_image2.size()) {
+            cv::resize(raw_ball_image2, raw_ball_image2, ball_image2.size(), 0, 0, cv::INTER_LINEAR);
         }
 
         // Save the original, non-equalized images for later QA
@@ -2874,7 +2895,10 @@ namespace golf_sim {
         }
 
         if (use_ml) {
-            auto ml_result = spin_predictor_->Predict(ball_image1DimpleEdges, ball_image2DimpleEdges);
+            auto ml_result = spin_predictor_->Predict(
+                raw_ball_image1, (float)local_ball1.measured_radius_pixels_,
+                raw_ball_image2, (float)local_ball2.measured_radius_pixels_,
+                angleOffsetDeltas1, angleOffsetDeltas2);
 
             best_rot_x = (int)std::round(ml_result.x_deg);
             best_rot_y = (int)std::round(ml_result.y_deg);
@@ -2882,7 +2906,8 @@ namespace golf_sim {
 
             GS_LOG_MSG(info, "ML spin prediction: (" + std::to_string(ml_result.x_deg) + ", " +
                        std::to_string(ml_result.y_deg) + ", " + std::to_string(ml_result.z_deg) +
-                       ") in " + std::to_string(ml_result.inference_ms) + "ms");
+                       ") match " + std::to_string(ml_result.match_score) +
+                       " in " + std::to_string(ml_result.inference_ms) + "ms");
 
             if (ml_result.z_used_fallback) {
                 GS_LOG_MSG(info, "ML Z fallback triggered - running fine search for Z axis");

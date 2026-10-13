@@ -4,10 +4,12 @@
  */
 
 #include "spin_predictor.hpp"
+#include "spin_surface.hpp"
 #include "logging_tools.h"
 
 #include <cmath>
 #include <chrono>
+#include <cstring>
 #include <filesystem>
 
 namespace golf_sim {
@@ -56,8 +58,9 @@ bool SpinPredictor::Initialize() {
                " threads, input=" + std::to_string(config_.input_size) + "px)");
 
     cv::Mat dummy = cv::Mat::zeros(config_.input_size, config_.input_size, CV_8UC1);
+    const float dummy_radius = config_.input_size / 2.1f;
     for (int i = 0; i < 3; i++) {
-        Predict(dummy, dummy);
+        Predict(dummy, dummy_radius, dummy, dummy_radius);
     }
     GS_LOG_MSG(info, "SpinPredictor warmup complete (3 iterations)");
 
@@ -66,8 +69,10 @@ bool SpinPredictor::Initialize() {
 }
 
 SpinPredictor::Result SpinPredictor::Predict(
-    const cv::Mat& dimple_edges_1,
-    const cv::Mat& dimple_edges_2) {
+    const cv::Mat& raw_ball_1, float radius_1,
+    const cv::Mat& raw_ball_2, float radius_2,
+    const cv::Vec3i& view_rotation_1,
+    const cv::Vec3i& view_rotation_2) {
 
     Result result;
 
@@ -84,15 +89,17 @@ SpinPredictor::Result SpinPredictor::Predict(
 
     const int s = config_.input_size;
 
-    cv::Mat img1, img2;
-    cv::resize(dimple_edges_1, img1, cv::Size(s, s), 0, 0, cv::INTER_NEAREST);
-    cv::resize(dimple_edges_2, img2, cv::Size(s, s), 0, 0, cv::INTER_NEAREST);
+    const spin_surface::SurfaceInput input1 = spin_surface::MakeSurfaceInput(raw_ball_1, radius_1, s);
+    const spin_surface::SurfaceInput input2 = spin_surface::MakeSurfaceInput(raw_ball_2, radius_2, s);
 
     ncnn::Mat in0(s, s, 2);
     ncnn::Mat in1(s, s, 2);
 
-    TernaryToTwoChannel(img1, (float*)in0.data, s);
-    TernaryToTwoChannel(img2, (float*)in1.data, s);
+    const size_t plane_bytes = (size_t)s * s * sizeof(float);
+    std::memcpy((float*)in0.channel(0), input1.value.data, plane_bytes);
+    std::memcpy((float*)in0.channel(1), input1.valid.data, plane_bytes);
+    std::memcpy((float*)in1.channel(0), input2.value.data, plane_bytes);
+    std::memcpy((float*)in1.channel(1), input2.valid.data, plane_bytes);
 
     ncnn::Extractor ex = net_.create_extractor();
     if (ex.input("in0", in0) != 0 || ex.input("in1", in1) != 0) {
@@ -106,8 +113,18 @@ SpinPredictor::Result SpinPredictor::Predict(
         return result;
     }
 
-    const float* r6d = (const float*)out.data;
-    Rotation6DToEuler(r6d, result.x_deg, result.y_deg, result.z_deg);
+    // The model gets the rotation roughly right; the search around its answer makes it precise
+    const cv::Matx33d predicted = GramSchmidt((const float*)out.data);
+    const cv::Matx33d refined = spin_surface::RefineRotation(input1, input2, predicted, &result.match_score);
+
+    // The model saw the balls as photographed. Re-express its rotation between the
+    // two perspective-corrected views, which is what the rest of the pipeline expects.
+    const cv::Matx33d view1 = spin_surface::EulerToMatrix(view_rotation_1[0], view_rotation_1[1], view_rotation_1[2]);
+    const cv::Matx33d view2 = spin_surface::EulerToMatrix(view_rotation_2[0], view_rotation_2[1], view_rotation_2[2]);
+    const cv::Vec3d euler = spin_surface::MatrixToEuler(view2 * refined * view1.t());
+    result.x_deg = euler[0];
+    result.y_deg = euler[1];
+    result.z_deg = euler[2];
 
     auto t_end = std::chrono::high_resolution_clock::now();
     result.inference_ms = std::chrono::duration<float, std::milli>(t_end - t_start).count();
@@ -122,33 +139,13 @@ SpinPredictor::Result SpinPredictor::Predict(
 #endif
 }
 
-void SpinPredictor::TernaryToTwoChannel(const cv::Mat& gabor_img,
-                                         float* out_data, int size) {
-    const int n_pixels = size * size;
-    float* edge_channel = out_data;
-    float* valid_channel = out_data + n_pixels;
-
-    for (int y = 0; y < size; y++) {
-        const uchar* row = gabor_img.ptr<uchar>(y);
-        for (int x = 0; x < size; x++) {
-            int idx = y * size + x;
-            uchar pixel = row[x];
-            edge_channel[idx] = (pixel == 255) ? 1.0f : 0.0f;
-            valid_channel[idx] = (pixel != 128) ? 1.0f : 0.0f;
-        }
-    }
-}
-
-void SpinPredictor::GramSchmidt(const float* r6d, double R[3][3]) {
+cv::Matx33d SpinPredictor::GramSchmidt(const float* r6d) {
     double a1[3] = { r6d[0], r6d[1], r6d[2] };
     double a2[3] = { r6d[3], r6d[4], r6d[5] };
 
     double norm1 = std::sqrt(a1[0]*a1[0] + a1[1]*a1[1] + a1[2]*a1[2]);
     if (norm1 < 1e-8) {
-        R[0][0] = 1; R[0][1] = 0; R[0][2] = 0;
-        R[1][0] = 0; R[1][1] = 1; R[1][2] = 0;
-        R[2][0] = 0; R[2][1] = 0; R[2][2] = 1;
-        return;
+        return cv::Matx33d::eye();
     }
     double b1[3] = { a1[0]/norm1, a1[1]/norm1, a1[2]/norm1 };
 
@@ -156,10 +153,7 @@ void SpinPredictor::GramSchmidt(const float* r6d, double R[3][3]) {
     double v2[3] = { a2[0] - dot*b1[0], a2[1] - dot*b1[1], a2[2] - dot*b1[2] };
     double norm2 = std::sqrt(v2[0]*v2[0] + v2[1]*v2[1] + v2[2]*v2[2]);
     if (norm2 < 1e-8) {
-        R[0][0] = 1; R[0][1] = 0; R[0][2] = 0;
-        R[1][0] = 0; R[1][1] = 1; R[1][2] = 0;
-        R[2][0] = 0; R[2][1] = 0; R[2][2] = 1;
-        return;
+        return cv::Matx33d::eye();
     }
     double b2[3] = { v2[0]/norm2, v2[1]/norm2, v2[2]/norm2 };
 
@@ -169,34 +163,9 @@ void SpinPredictor::GramSchmidt(const float* r6d, double R[3][3]) {
         b1[0]*b2[1] - b1[1]*b2[0],
     };
 
-    R[0][0] = b1[0]; R[0][1] = b2[0]; R[0][2] = b3[0];
-    R[1][0] = b1[1]; R[1][1] = b2[1]; R[1][2] = b3[1];
-    R[2][0] = b1[2]; R[2][1] = b2[2]; R[2][2] = b3[2];
-}
-
-void SpinPredictor::Rotation6DToEuler(const float* r6d,
-                                       double& x_deg, double& y_deg, double& z_deg) {
-    double R[3][3];
-    GramSchmidt(r6d, R);
-
-    double sy = -R[2][0];
-    if (sy > 1.0) sy = 1.0;
-    if (sy < -1.0) sy = -1.0;
-    double y_rad = std::asin(sy);
-    double cy = std::cos(y_rad);
-
-    double x_neg_rad, z_rad;
-    if (std::abs(cy) > 1e-6) {
-        x_neg_rad = std::atan2(R[2][1], R[2][2]);
-        z_rad = std::atan2(R[1][0], R[0][0]);
-    } else {
-        x_neg_rad = 0.0;
-        z_rad = std::atan2(-R[0][1], R[1][1]);
-    }
-
-    x_deg = -x_neg_rad * 180.0 / M_PI;
-    y_deg = y_rad * 180.0 / M_PI;
-    z_deg = z_rad * 180.0 / M_PI;
+    return cv::Matx33d(b1[0], b2[0], b3[0],
+                       b1[1], b2[1], b3[1],
+                       b1[2], b2[2], b3[2]);
 }
 
 } // namespace golf_sim

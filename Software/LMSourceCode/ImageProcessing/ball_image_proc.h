@@ -408,6 +408,10 @@ private:
     // Updates the input ball1 to reflect the new position of the ball within the isolated image we are returning.
     static cv::Mat IsolateBall(const cv::Mat& img, GolfBall& ball);
 
+    // The square region around the ball that IsolateBall works on, as a view into img.
+    // Re-centers the passed-in ball's x and y to that region, as IsolateBall does.
+    static cv::Mat CropAroundBall(const cv::Mat& img, GolfBall& ball);
+
     static cv::Mat ReduceReflections(const cv::Mat& img, const cv::Mat& mask);
 
     // Will set pixels that were over-saturated in the original_image to be the special "ignore" kPixelIgnoreValue value

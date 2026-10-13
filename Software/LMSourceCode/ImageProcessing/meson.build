@@ -175,6 +175,7 @@ pitrac_lm_sources += ([
 			'ball_image_proc.cpp',
 			'ncnn_detector.cpp',
 			'spin_predictor.cpp',
+			'spin_surface.cpp',
 			'pulse_strobe.cpp',
 			'colorsys.cpp',
 			'cv_utils.cpp',
