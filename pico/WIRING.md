@@ -47,6 +47,19 @@ Pin numbers are physical (header position counted from the silkscreened "1"). GP
 | 21 | Pico pin 11 (GP8)     | Pi pin 15 (GPIO 22)          | HEARTBEAT_OUT liveness |
 | 22 | V3 TP4                | Pico pin 31 (GP26 / ADC0)    | LED current sense for FIRE_PEAK |
 
+## Arducam Mira220 as camera 2
+
+The Arducam Mira220 module (B0526) takes its trigger on the REQ EXP pad. That input is 1.8 V only and active high, so wires 3 and 12 change and two resistors are added. Do not connect GP15 to REQ EXP directly: 3.3 V on that pad can damage the camera.
+
+| Wire | From | To | Purpose |
+|----|-----------------------|------------------------------|---------|
+| 3  | Pi pin 20 (GND)       | Arducam GND pad              | camera trigger ground |
+| 12 | Pico pin 20 (GP15)    | 1.5 kΩ resistor              | cam2 external trigger |
+| -  | other end of the 1.5 kΩ | Arducam REQ EXP pad        | 1.8 V at the pad when GP15 is high |
+| -  | Arducam REQ EXP pad   | 1.8 kΩ resistor to GND       | lower half of the divider |
+
+Set Camera 2 Type to the Arducam Mira220 in the web UI. PiTrac then tells the Pico to idle GP15 low and pulse it high, which needs Pico firmware 0.8.6 or newer.
+
 ## Migration from a Pi-only build
 
 | Was                                  | Now                                      |
