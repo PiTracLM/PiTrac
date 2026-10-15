@@ -58,7 +58,7 @@ The Arducam Mira220 module (B0526) takes its trigger on the REQ EXP pad. That in
 | -  | other end of the 1.5 kΩ | Arducam REQ EXP pad        | 1.8 V at the pad when GP15 is high |
 | -  | Arducam REQ EXP pad   | 1.8 kΩ resistor to GND       | lower half of the divider |
 
-Set Camera 2 Type to the Arducam Mira220 in the web UI. PiTrac then tells the Pico to idle GP15 low and pulse it high, which needs Pico firmware 0.8.6 or newer.
+Set Camera 2 Type to the Arducam Mira220 in the web UI. PiTrac then tells the Pico to idle GP15 low and pulse it high, which needs Pico firmware 0.8.7 or newer.
 
 ## Migration from a Pi-only build
 

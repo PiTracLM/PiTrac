@@ -292,9 +292,10 @@ static void fw_emit_status(void) {
     for (uint8_t i = 0; i < STROBE_MAX_PULSES; ++i) {
         snap.intervals_ms[i]  = g_state.intervals_ms[i];
     }
+    snap.cam2_xtr_active_high = g_state.cam2_xtr_active_high;
     snap.min_inter_shot_ms    = g_state.min_inter_shot_ms;
     snap.pre_trigger_delay_ms = g_state.pre_trigger_delay_ms;
-    snap.last_event_us        = g_state.last_event_us;
+    snap.last_event_us       = g_state.last_event_us;
     snap.last_rms             = g_state.last_rms;
     snap.event_count          = g_state.event_count;
     snap.dma_rearm_count      = g_state.dma_rearm_count;

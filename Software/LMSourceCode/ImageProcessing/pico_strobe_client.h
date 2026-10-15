@@ -84,7 +84,7 @@ public:
 
     // Cam2 XTR polarity: false idles high and pulses low (IMX296), true idles low
     // and pulses high (Mira220 REQ_EXP). Verified against the STATUS echo, so this
-    // returns false on firmware older than 0.8.6, which ignores the key.
+    // returns false on firmware older than 0.8.7, which does not report the key.
     bool SetCam2XtrActiveHigh(bool active_high);
 
     // Persist DSP detector config so a power-cycled Pico recovers operator tuning

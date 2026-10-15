@@ -664,7 +664,7 @@ namespace golf_sim {
 			const bool xtr_active_high = CameraHardware::trigger_is_active_high(GolfSimCamera::kSystemSlot2CameraType);
 			if (!pico_client_->SetCam2XtrActiveHigh(xtr_active_high) && xtr_active_high) {
 				GS_LOG_MSG(error, "Pico did not accept the active-high camera 2 trigger setting. "
-					"The Mira220 needs Pico firmware 0.8.6 or newer; flash it from the Pico page.");
+					"The Mira220 needs Pico firmware 0.8.7 or newer; flash it from the Pico page.");
 				return false;
 			}
 		}
