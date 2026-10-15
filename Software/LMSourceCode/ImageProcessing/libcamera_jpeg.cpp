@@ -190,7 +190,9 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	// only just started), so a free-running first frame still arrives and the loop's re-commit
 	// lands it -- exactly like main's double-set. No (!pico_mode) gate now: SetExternalTrigger
 	// no-ops for non-InnoMaker cameras, so it's safe in every mode.
-	{
+	// The Arducam sends no frames at all if trigger mode is set before its first frame, so it
+	// free-runs until the first-frame handler below sets it.
+	if (camera_model != gs::CameraHardware::CameraModel::ArducamMira220_Mono) {
 		bool dummy = false;
 		SetExternalTrigger(dummy);
 	}
