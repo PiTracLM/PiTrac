@@ -50,7 +50,7 @@ bool EncoderFactory::HasEncoder(const std::string &name) const
 
 void EncoderFactory::LoadEncoderLibraries(const std::string &lib_dir)
 {
-	const fs::path path(!lib_dir.empty() ? lib_dir : ".");
+	const fs::path path(!lib_dir.empty() ? lib_dir : ENCODER_LIB_DIR);
 	const std::string ext(".so");
 
 	if (!fs::exists(path))

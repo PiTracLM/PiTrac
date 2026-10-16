@@ -41,7 +41,7 @@ bool PreviewFactory::HasPreview(const std::string &name) const
 
 void PreviewFactory::LoadPreviewLibraries(const std::string &lib_dir)
 {
-	const fs::path path(!lib_dir.empty() ? lib_dir : ".");
+	const fs::path path(!lib_dir.empty() ? lib_dir : PREVIEW_LIB_DIR);
 	const std::string ext(".so");
 
 	if (!fs::exists(path))

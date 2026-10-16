@@ -117,7 +117,8 @@ void SetExternalTrigger(bool& flag) {
 static void PicoFireWarmUpPulses(int pulses, long pulse_width_us) {
 	const long inter_pulse_us =
 		(long)(1000000.0 / gs::PulseStrobe::kPrimingPulseFPS) - pulse_width_us;
-	for (int i = 0; i < pulses && gs::GolfSimGlobals::golf_sim_running_; ++i) {
+	for (int i = 0; i < pulses && gs::GolfSimGlobals::golf_sim_running_ &&
+	                !gs::PulseStrobe::cam2_ready_for_final_trigger_.load(); ++i) {
 		gs::PulseStrobe::SendOnOffPulse(pulse_width_us);  // -> Pico CAM_PULSE: XTR low/high, no strobe
 		if (inter_pulse_us > 0) {
 			std::this_thread::sleep_for(std::chrono::microseconds(inter_pulse_us));
@@ -153,6 +154,13 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	// free-runs at 30fps. So: don't set it here.
 	const bool pico_mode = gs::PulseStrobe::IsPicoActive();
 	const gs::CameraHardware::CameraModel camera_model = gs::GolfSimCamera::kSystemSlot2CameraType;
+
+	// The Arducam is the opposite: switched mid-stream it usually ignores every pulse, but set
+	// before the stream starts it drops the first 5 pulses and then gives one frame per pulse.
+	const bool arducam = camera_model == gs::CameraHardware::CameraModel::ArducamMira220_Mono;
+	if (arducam) {
+		SetCam2TriggerMode(1);
+	}
 
 	app.StartCamera();
 	GS_LOG_TRACE_MSG(trace, "cam2_run_event_loop: camera started, waiting for triggers");
@@ -190,9 +198,7 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	// only just started), so a free-running first frame still arrives and the loop's re-commit
 	// lands it -- exactly like main's double-set. No (!pico_mode) gate now: SetExternalTrigger
 	// no-ops for non-InnoMaker cameras, so it's safe in every mode.
-	// The Arducam sends no frames at all if trigger mode is set before its first frame, so it
-	// free-runs until the first-frame handler below sets it.
-	if (camera_model != gs::CameraHardware::CameraModel::ArducamMira220_Mono) {
+	if (!arducam) {
 		bool dummy = false;
 		SetExternalTrigger(dummy);
 	}
@@ -249,8 +255,9 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 	// (its priming train spans ~1.8s via the InnoMaker commit pause); our 12-pulse ~800ms train
 	// stopped short of the 1302ms window, so the quiesce never fired and cam2 blocked until the
 	// strike -- the 93s hang. CAM_PULSE runs on core1 (no DSP/audio impact), so more is safe.
+	// Only a cap: the train stops once the quiesce completes (the Arducam's first frame takes ~10 pulses).
 	const long pico_inter_pulse_ms = 1000 / gs::PulseStrobe::kPrimingPulseFPS;  // ~66ms at 15fps
-	int pico_warm_up_pulses = (int)((kQuiesceTimeMs + 400) / pico_inter_pulse_ms) + 1;
+	int pico_warm_up_pulses = (int)((kQuiesceTimeMs + 3000) / pico_inter_pulse_ms) + 1;
 	if (pico_warm_up_pulses < gs::PulseStrobe::kNumberPrimingPulses) {
 		pico_warm_up_pulses = gs::PulseStrobe::kNumberPrimingPulses;
 	}
@@ -332,7 +339,7 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 				// SetExternalTrigger on the first frame. Warm-up pulses are already firing
 				// (started before the loop). Ignore this frame.
 				pico_trigger_set = true;
-				if (gs::CameraHardware::needs_trigger_mode_setup(camera_model)) {
+				if (gs::CameraHardware::needs_trigger_mode_setup(camera_model) && !arducam) {
 					SetCam2TriggerMode(1);
 				}
 				GS_LOG_TRACE_MSG(trace, "Pico: first frame -- trigger re-committed (main-style set-2).");
@@ -371,6 +378,7 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 					// grabs the strobed frame, not a leftover dark warm-up frame -- with
 					// the sensor in external-trigger mode, the only frame after the drain
 					// is the one our fire triggers.
+					gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
 					if (pico_warmup_thread.joinable()) {
 						pico_warmup_thread.join();
 					}
@@ -378,7 +386,6 @@ bool cam2_run_event_loop(LibcameraJpegApp& app, cv::Mat& returnImg, bool send_pr
 					std::this_thread::sleep_for(std::chrono::milliseconds(kPicoStillSettleMs));
 					app.DrainMessages();
 					pico_event_baseline = gs::PulseStrobe::PicoEventCount();
-					gs::PulseStrobe::cam2_ready_for_final_trigger_.store(true);
 					if (!gs::PulseStrobe::FirePicoForStill()) {
 						GS_LOG_MSG(error, "Pico still-capture fire failed -- cam2 will not trigger.");
 						return_status = false;
