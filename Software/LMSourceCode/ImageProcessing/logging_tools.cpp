@@ -162,12 +162,15 @@ namespace golf_sim {
         auto fsSink = boost::log::add_file_log(
             boost::log::keywords::file_name = log_dir + "test_%Y-%m-%d_%H-%M-%S.%N.log",
             boost::log::keywords::rotation_size = 10 * 1024 * 1024,
+            boost::log::keywords::target = log_dir,
+            boost::log::keywords::max_size = 100 * 1024 * 1024,
             boost::log::keywords::min_free_space = 30 * 1024 * 1024,
             boost::log::keywords::open_mode = std::ios_base::app);
 
         // This is pretty verbose! fsSink->set_formatter(logFmtWithLineNumbers);
         fsSink->set_formatter(logFmt);
         fsSink->locked_backend()->auto_flush(true);
+        fsSink->locked_backend()->scan_for_files();
 
         // Add our custom recent-messages sink to the logger.
         /*** TBD - Not Completed yet
